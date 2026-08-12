@@ -16100,7 +16100,7 @@ export function TeacherDashboard({
           <div style={{ flex: '1 1 300px', minWidth: '0', width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
             {/* Search & Actions Bar */}
-            <div style={{ display: 'flex', gap: windowWidth < 768 ? '10px' : '16px', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
+            <div className="schueler-header-controls" style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', gap: windowWidth < 768 ? '10px' : '16px', alignItems: windowWidth < 768 ? 'stretch' : 'center', flexWrap: 'wrap', width: '100%' }}>
               <div style={{ position: 'relative', flex: 1, minWidth: windowWidth < 768 ? '100%' : '200px' }}>
                 <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 <input 

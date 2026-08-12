@@ -9257,7 +9257,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           minWidth: 0
         }}>
             {/* TITLE BLOCK WITH INTEGRATED INLINE STAT BADGES */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            <div className="schueler-header-wrap" style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', alignItems: windowWidth < 768 ? 'stretch' : 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', width: '100%' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <Users size={18} style={{ color: '#0f172a' }} />
                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>

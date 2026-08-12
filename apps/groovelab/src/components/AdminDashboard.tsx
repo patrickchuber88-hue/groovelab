@@ -5263,6 +5263,9 @@ export function AdminDashboard({
 
   const renderStudentsTab = () => {
     const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const isSimMobile = typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]'));
+    const isMobileLayout = windowWidth < 768 || isSimMobile;
+
     return (
       <div style={{ marginTop: '0px' }}>
         <div 
@@ -5278,18 +5281,18 @@ export function AdminDashboard({
             gap: '16px' 
           }}
         >
-          <div style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', justifyContent: 'space-between', alignItems: windowWidth < 768 ? 'stretch' : 'center', gap: '12px', marginBottom: '4px' }}>
-            <h2 style={{ fontSize: windowWidth < 768 ? '1.4rem' : '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+          <div className="schueler-header-wrap" style={{ display: 'flex', flexDirection: isMobileLayout ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobileLayout ? 'stretch' : 'center', gap: '12px', marginBottom: '4px', width: '100%' }}>
+            <h2 style={{ fontSize: isMobileLayout ? '1.4rem' : '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
               <div style={{ background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(234, 179, 8, 0.15)', color: activePlatform === 'campus' ? '#34a853' : '#eab308', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Users size={16} />
               </div>
               Schülerverwaltung ({students.length})
             </h2>
-            <div style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', gap: '10px', width: windowWidth < 768 ? '100%' : 'auto' }}>
+            <div className="schueler-header-controls" style={{ display: 'flex', flexDirection: isMobileLayout ? 'column' : 'row', gap: '10px', width: isMobileLayout ? '100%' : 'auto' }}>
               {/* Apple-like Segmented Switch for Active / Archive */}
-              <div style={{
+              <div className="schueler-header-segmented" style={{
                 display: 'flex',
-                width: windowWidth < 768 ? '100%' : 'auto',
+                width: isMobileLayout ? '100%' : 'auto',
                 background: 'rgba(241, 245, 249, 0.8)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
@@ -5331,7 +5334,7 @@ export function AdminDashboard({
               </div>
 
               {canManageStudents && (
-                <div style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', gap: '8px', width: windowWidth < 768 ? '100%' : 'auto' }}>
+                <div className="schueler-header-actions" style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', gap: '8px', width: windowWidth < 768 ? '100%' : 'auto' }}>
                   <button
                     onClick={() => toggleRealNames()}
                     style={{
@@ -5391,16 +5394,47 @@ export function AdminDashboard({
                         setShowAddStudent(false);
                       }}
                       style={{
-                        background: '#f1f5f9',
+                        background: activePlatform === 'groovelab' 
+                          ? 'linear-gradient(135deg, #fefce8 0%, #fffbe6 100%)' 
+                          : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                        color: activePlatform === 'groovelab' ? '#854d0e' : '#334155',
+                        border: activePlatform === 'groovelab' 
+                          ? '1.5px solid #fef08a' 
+                          : '1.5px solid #e2e8f0',
+                        padding: '10px 18px',
+                        borderRadius: '16px',
+                        fontWeight: 800,
                         fontSize: '0.85rem',
+                        letterSpacing: '-0.01em',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        justifyContent: 'center',
+                        gap: '8px',
+                        width: windowWidth < 768 ? '100%' : 'auto',
+                        minHeight: windowWidth < 768 ? '44px' : '38px',
+                        boxShadow: activePlatform === 'groovelab'
+                          ? '0 2px 8px rgba(234, 179, 8, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
+                          : '0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                        boxSizing: 'border-box'
                       }}
                       className="hover-scale"
+                      title="Mehrere Schüler gleichzeitig importieren oder anlegen"
                     >
-                      <Users size={16} /> Mehrere anlegen
+                      <div style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '8px',
+                        background: activePlatform === 'groovelab' ? '#fef08a' : '#e2e8f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Users size={14} style={{ color: activePlatform === 'groovelab' ? '#ca8a04' : '#475569' }} />
+                      </div>
+                      <span>Mehrere anlegen</span>
                     </button>
                   )}
                 </div>
@@ -5411,7 +5445,7 @@ export function AdminDashboard({
           {showAddStudent && (
             <form onSubmit={handleAddStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'white', borderRadius: '20px', border: `1px solid ${brandColor}20` }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>Neuen Schüler anlegen</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : '1fr 1fr', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
                   <input required placeholder="Vorname" value={newStudent.firstName} onChange={e => setNewStudent({...newStudent, firstName: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
@@ -5598,7 +5632,7 @@ export function AdminDashboard({
           {editingStudent && (
             <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: activePlatform === 'campus' ? '#e6f4ea' : (activePlatform === 'groovelab' ? '#fefce8' : '#fce8e6'), border: `1px solid ${brandColor}`, borderRadius: '20px' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: brandColor }}>Schüler bearbeiten</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : '1fr 1fr', gap: '16px' }}>
                 <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
                 <input required placeholder={schoolObj?.has_campus_subscription !== false ? "Nachname" : "Nachname (Initial)"} value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
 
@@ -5743,7 +5777,7 @@ export function AdminDashboard({
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px', width: '100%', paddingBottom: windowWidth < 768 ? '120px' : '0px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobileLayout ? '1fr' : 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px', width: '100%', paddingBottom: isMobileLayout ? '120px' : '0px' }}>
             {(() => {
               const filtered = students.filter(s => {
                 const isArchived = s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now();
@@ -5803,15 +5837,15 @@ export function AdminDashboard({
                 return (
                   <div 
                     key={s.id} 
-                    className="glass-panel" 
+                    className="glass-panel schueler-card-item" 
                     style={{ 
-                      padding: windowWidth < 768 ? '14px 12px' : '18px 22px', 
+                      padding: isMobileLayout ? '14px 12px' : '18px 22px', 
                       background: 'white', 
                       display: 'flex', 
-                      flexDirection: windowWidth < 768 ? 'column' : 'row',
+                      flexDirection: isMobileLayout ? 'column' : 'row',
                       justifyContent: 'space-between', 
-                      alignItems: windowWidth < 768 ? 'stretch' : 'center', 
-                      gap: windowWidth < 768 ? '12px' : '8px',
+                      alignItems: isMobileLayout ? 'stretch' : 'center', 
+                      gap: isMobileLayout ? '12px' : '8px',
                       borderRadius: '24px', 
                       border: '1px solid #e2e8f0', 
                       borderLeft: `6px solid ${brandColor}`, 
@@ -5872,14 +5906,19 @@ export function AdminDashboard({
                         </div>
                       </div>
                     </div>
-                  <div style={{ 
-                    display: windowWidth < 768 ? 'grid' : 'flex', 
-                    gridTemplateColumns: windowWidth < 768 ? 'repeat(5, 1fr)' : 'none',
-                    gap: '8px', 
-                    marginLeft: windowWidth < 768 ? '0px' : '8px',
-                    width: windowWidth < 768 ? '100%' : 'auto',
-                    marginTop: windowWidth < 768 ? '6px' : '0px'
-                  }}>
+                  <div 
+                    className="schueler-action-buttons"
+                    style={{ 
+                      display: isMobileLayout ? 'grid' : 'flex', 
+                      gridTemplateColumns: isMobileLayout 
+                        ? (activePlatform === 'campus' ? (canManageStudents ? 'repeat(5, 1fr)' : 'repeat(3, 1fr)') : (canManageStudents ? 'repeat(3, 1fr)' : 'repeat(1, 1fr)'))
+                        : 'none',
+                      gap: '8px', 
+                      marginLeft: isMobileLayout ? '0px' : '8px',
+                      width: isMobileLayout ? '100%' : 'auto',
+                      marginTop: isMobileLayout ? '6px' : '0px'
+                    }}
+                  >
                     {canManageStudents && (
                       <>
                         <button 
@@ -5926,76 +5965,80 @@ export function AdminDashboard({
                         </button>
                       </>
                     )}
-                    {/* Hausaufgabenheft / Schüler-Protokoll Button (Harmonisierte Soft-Glass Einheit) */}
-                    <button 
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        setSelectedStudentForTageskompass(s);
-                        setShowTageskompassModal(true); 
-                      }} 
-                      style={{ 
-                        background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', 
-                        border: activePlatform === 'campus' ? '1px solid #a7f3d0' : '1px solid #fef08a', 
-                        padding: "10px", 
-                        minHeight: '44px',
-                        borderRadius: "12px", 
-                        cursor: "pointer", 
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '100%'
-                      }} 
-                      className="hover-scale-mini"
-                      title="Hausaufgabenheft & Schüler-Protokoll öffnen"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={`url(#bookHeaderGrad-${s.id})`} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <defs>
-                          <linearGradient id={`bookHeaderGrad-${s.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor={activePlatform === 'campus' ? '#34a853' : '#f59e0b'} />
-                            <stop offset="100%" stopColor={activePlatform === 'campus' ? '#4f46e5' : '#d97706'} />
-                          </linearGradient>
-                        </defs>
-                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                      </svg>
-                    </button>
-                    {/* Stundenplan-Onboarding Status Icon */}
-                    <button 
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        setSelectedTimetableStudent(s); 
-                      }} 
-                      style={{ 
-                        background: hasTimetableOnboarding(s) ? '#e6f4ea' : '#fefce8', 
-                        border: hasTimetableOnboarding(s) ? '1px solid #a7f3d0' : '1px solid #fef08a', 
-                        padding: "10px", 
-                        minHeight: '44px',
-                        borderRadius: "12px", 
-                        cursor: "pointer", 
-                        color: hasTimetableOnboarding(s) ? '#34a853' : '#d97706', 
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        position: 'relative',
-                        width: '100%'
-                      }} 
-                      className="hover-scale-mini"
-                      title={hasTimetableOnboarding(s) ? "Stundenplan-Onboarding: Abgeschlossen (Klicken für Slot-Details)" : "Stundenplan-Onboarding: Ausstehend (Klicken für Manuelles Eintragen)"}
-                    >
-                      <Calendar size={18} />
-                      <div style={{
-                        position: 'absolute',
-                        top: '-3px',
-                        right: '-3px',
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        background: hasTimetableOnboarding(s) ? '#34a853' : '#eab308',
-                        border: '2px solid white'
-                      }} />
-                    </button>
+                    {/* Hausaufgabenheft / Schüler-Protokoll Button (ONLY FOR CAMPUS MODULE) */}
+                    {activePlatform === 'campus' && (
+                      <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setSelectedStudentForTageskompass(s);
+                          setShowTageskompassModal(true); 
+                        }} 
+                        style={{ 
+                          background: '#e6f4ea', 
+                          border: '1px solid #a7f3d0', 
+                          padding: "10px", 
+                          minHeight: '44px',
+                          borderRadius: "12px", 
+                          cursor: "pointer", 
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '100%'
+                        }} 
+                        className="hover-scale-mini"
+                        title="Hausaufgabenheft & Schüler-Protokoll öffnen"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={`url(#bookHeaderGrad-${s.id})`} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <defs>
+                            <linearGradient id={`bookHeaderGrad-${s.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#34a853" />
+                              <stop offset="100%" stopColor="#4f46e5" />
+                            </linearGradient>
+                          </defs>
+                          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                        </svg>
+                      </button>
+                    )}
+                    {/* Stundenplan-Onboarding Status Icon (ONLY FOR CAMPUS MODULE) */}
+                    {activePlatform === 'campus' && (
+                      <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setSelectedTimetableStudent(s); 
+                        }} 
+                        style={{ 
+                          background: hasTimetableOnboarding(s) ? '#e6f4ea' : '#fefce8', 
+                          border: hasTimetableOnboarding(s) ? '1px solid #a7f3d0' : '1px solid #fef08a', 
+                          padding: "10px", 
+                          minHeight: '44px',
+                          borderRadius: "12px", 
+                          cursor: "pointer", 
+                          color: hasTimetableOnboarding(s) ? '#34a853' : '#d97706', 
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          width: '100%'
+                        }} 
+                        className="hover-scale-mini"
+                        title={hasTimetableOnboarding(s) ? "Stundenplan-Onboarding: Abgeschlossen (Klicken für Slot-Details)" : "Stundenplan-Onboarding: Ausstehend (Klicken für Manuelles Eintragen)"}
+                      >
+                        <Calendar size={18} />
+                        <div style={{
+                          position: 'absolute',
+                          top: '-3px',
+                          right: '-3px',
+                          width: '10px',
+                          height: '10px',
+                          borderRadius: '50%',
+                          background: hasTimetableOnboarding(s) ? '#34a853' : '#eab308',
+                          border: '2px solid white'
+                        }} />
+                      </button>
+                    )}
                     <button 
                       onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
                       style={{ 
