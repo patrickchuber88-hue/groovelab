@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Music, Calendar, ShieldCheck, Users, 
-  Layers, ChevronDown, Check, ArrowRight, X, Menu, BookOpen, Sparkles
+  Layers, ChevronDown, Check, ArrowRight, X, Menu, BookOpen, Sparkles,
+  HardDrive, Lock
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useMasterPricing } from '../context/MasterPricingContext';
@@ -62,7 +63,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
       },
       {
         q: 'Fallen für Eltern oder Schüler versteckte Kosten oder Abo-Fallen an?',
-        a: `Nein, niemals. Wenn Ihre Musikschule die Zugänge übernimmt, ist die Nutzung für Sie zu 100 % kostenlos. Falls Eltern direkt zahlen, kostet der Zugang transparente ${pricing.student.toFixed(2).replace('.', ',')} € im Monat (oder ${(pricing.student * 12 * 0.816).toFixed(2).replace('.', ',')} € im Jahr) – ohne Vertragslaufzeit. Es gibt keine Werbung und keine In-App-Käufe.`
+        a: `Nein, niemals. Wenn Ihre Musikschule die Zugänge übernimmt, ist die Nutzung für Sie zu 100 % kostenlos. Falls Eltern direkt zahlen, wird der Zugang als transparenter Jahres-Einmalbeitrag von ${(pricing.student * 12).toFixed(2).replace('.', ',')} € für das gesamte Schuljahr abgerechnet (entspricht umgerechnet nur ${pricing.student.toFixed(2).replace('.', ',')} € im Monat). Es gibt kein laufendes Monats-Abo, keine automatische Verlängerungsfalle und keine Kündigungsfristen: Nach Ablauf des Schuljahres endet der Zugang automatisch, sofern Sie ihn nicht aktiv für das neue Schuljahr bestätigen. Es gibt keine Werbung und keine In-App-Käufe.`
       },
       {
         q: 'Gibt es eine Regelung für Familien mit wenig Einkommen oder mehreren Kindern?',
@@ -227,8 +228,12 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               color: '#000000'
             }}
           >
-            <Music size={24} style={{ color: '#232326' }} />
-            <span>Campus-Groovelab</span>
+            <Music size={24} style={{ color: '#34a853' }} />
+            <span>
+              <span style={{ color: '#34a853' }}>Campus</span>
+              <span style={{ color: '#94a3b8', margin: '0 1px' }}>-</span>
+              <span style={{ color: '#eab308' }}>Groovelab</span>
+            </span>
           </div>
 
           {/* Desktop Navigation */}
@@ -544,7 +549,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
           lineHeight: 1.6,
           marginBottom: '40px'
         }}>
-          Unser Fokus liegt nicht in der Verwaltung, sondern in der Umsetzung. Campus-Groovelab schließt als intelligenter Übebegleiter und smarter Organisator die Lücke zwischen Schülern, Lehrkräften und Verwaltung – für weniger Missverständnisse und mehr Freude am Musikmachen.
+          Unser Fokus liegt nicht in der Verwaltung, sondern in der Umsetzung. <span style={{ fontWeight: 800 }}><span style={{ color: '#34a853' }}>Campus</span>-<span style={{ color: '#eab308' }}>Groovelab</span></span> schließt als intelligenter Übebegleiter und smarter Organisator die Lücke zwischen Schülern, Lehrkräften und Verwaltung – für weniger Missverständnisse und mehr Freude am Musikmachen.
         </p>
 
         {/* Form and CTA */}
@@ -960,7 +965,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
             color: '#000000',
             marginBottom: '16px'
           }}>
-            Warum Musikschulen Campus-Groovelab lieben
+            Warum Musikschulen <span style={{ color: '#34a853' }}>Campus</span>-<span style={{ color: '#eab308' }}>Groovelab</span> lieben
           </h2>
           <p style={{ fontSize: '16px', color: '#7d7d82', maxWidth: '600px', margin: '0 auto' }}>
             Erlebe die einzigartigen Funktionen, die unsere Plattform zum Standard für moderne Musikschulen machen.
@@ -1144,7 +1149,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               lineHeight: 1.6,
               marginBottom: '32px'
             }}>
-              Wir überlassen Datenschutz nicht dem Zufall. Weil Campus-Groovelab sich als Add-on versteht, speichern wir nur das absolute Minimum an Nutzerdaten – keine Bankverbindungen, keine Wohnadressen. Dieser minimale Daten-Fußabdruck ermöglicht uns innovative Interaktionsfeatures, die klassische, überladene Administrationssoftwares aus Datenschutzgründen gar nicht erst umsetzen dürfen.
+              Wir überlassen Datenschutz nicht dem Zufall. Weil <span style={{ fontWeight: 800 }}><span style={{ color: '#22c55e' }}>Campus</span>-<span style={{ color: '#eab308' }}>Groovelab</span></span> sich als Add-on versteht, speichern wir nur das absolute Minimum an Nutzerdaten – keine Bankverbindungen, keine Wohnadressen. Dieser minimale Daten-Fußabdruck ermöglicht uns innovative Interaktionsfeatures, die klassische, überladene Administrationssoftwares aus Datenschutzgründen gar nicht erst umsetzen dürfen.
             </p>
 
             <div style={{
@@ -1178,6 +1183,15 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   Auf gemeinsam genutzten Schul-iPads sperrt die App den Campus-Bereich automatisch ab. Der Wechsel dorthin erfordert eine kurze QR-Scan-Bestätigung des Schülers.
                 </p>
               </div>
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <HardDrive size={17} style={{ color: '#eab308' }} />
+                  <span>Audio-Tresor (AES-256 &amp; Art. 17 DSGVO Physisch-Löschung)</span>
+                </h4>
+                <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
+                  Schüler-Aufnahmen und Loop-Mixe werden auf ISO 27001 zertifizierten deutschen Servern AES-256 verschlüsselt gespeichert. Bei Löschung im Hausaufgabenheft greift die physische Sofort-Vernichtung (Recht auf Vergessenwerden).
+                </p>
+              </div>
             </div>
 
             <div style={{
@@ -1197,7 +1211,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 }}>
                   <ShieldCheck size={18} style={{ color: '#eab308' }} />
                 </div>
-                <span style={{ fontSize: '15px', fontWeight: 600 }}>100% DSGVO-konformes Hosting in Europa</span>
+                <span style={{ fontSize: '15px', fontWeight: 600 }}>100% DSGVO-konformes Hosting in Deutschland (ISO 27001)</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
@@ -1423,7 +1437,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 lineHeight: 1.6,
                 fontWeight: 550
               }}>
-                Keine Einrichtungsgebühr, keine Vertragskosten für die Softwarenutzung und unbegrenzte Admin-, Lehrer- & Schülerkonten in der Basisversion. Du bezahlst ausschließlich das dedizierte Cloud-Hosting oder aktive Service-Funktionen.
+                Keine Einrichtungsgebühr und keine Lizenzkosten für die Softwarenutzung. Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab 4,99 € / Mo.) und aktive Profile.
               </p>
             </div>
 
@@ -1590,7 +1604,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ fontSize: '16px', fontWeight: 900, color: '#14532d', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    Das Campus-Groovelab Preisversprechen: 100 % Bestandsschutz & Garantie
+                    Das <span style={{ color: '#34a853' }}>Campus</span>-<span style={{ color: '#eab308' }}>Groovelab</span> Preisversprechen: 100 % Bestandsschutz &amp; Garantie
                   </div>
                   <div style={{ fontSize: '13.5px', color: '#166534', lineHeight: 1.5, fontWeight: 500 }}>
                     <strong>Sichern Sie sich den Tarif von heute – inklusive aller Innovationen von morgen!</strong> Der gebuchte Grundtarif Ihrer Musikschule (Server-Flatrate) sowie bestehende Lehrer- und Schüler-Profile sind dauerhaft vor Preiserhöhungen geschützt. Auch bei neuen KI-Funktionen, Raumplanern oder Modul-Updates steigt Ihr Sockelpreis um keinen Cent. Für neu angemeldete Schüler im neuen Schuljahr gilt transparent der jeweils aktuell gültige Schüler-Tarif.
@@ -1943,12 +1957,16 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
           gap: '24px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '16px' }}>
-            <Music size={20} style={{ color: '#232326' }} />
-            <span>Campus-Groovelab</span>
+            <Music size={20} style={{ color: '#34a853' }} />
+            <span>
+              <span style={{ color: '#34a853' }}>Campus</span>
+              <span style={{ color: '#94a3b8', margin: '0 1px' }}>-</span>
+              <span style={{ color: '#eab308' }}>Groovelab</span>
+            </span>
           </div>
 
           <div style={{ fontSize: '14px', color: '#7d7d82' }}>
-            &copy; {new Date().getFullYear()} Campus-Groovelab. Alle Rechte vorbehalten.
+            &copy; {new Date().getFullYear()} <span style={{ color: '#34a853', fontWeight: 700 }}>Campus</span>-<span style={{ color: '#eab308', fontWeight: 700 }}>Groovelab</span>. Alle Rechte vorbehalten.
           </div>
 
           <div style={{

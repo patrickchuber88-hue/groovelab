@@ -27,6 +27,8 @@ export interface School {
   has_groovelab_subscription?: boolean;
   has_campus_subscription?: boolean;
   subscription_bypass?: boolean;
+  subscription_bypass_until?: string | null;
+  subscription_bypass_reason?: string | null;
   groovelab_kiosk_token?: string | null;
   campus_login_token?: string | null;
   secretary_onboarding_token?: string | null;

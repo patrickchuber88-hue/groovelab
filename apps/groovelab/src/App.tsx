@@ -2449,8 +2449,21 @@ function App() {
   const [isSchoolPaused, setIsSchoolPaused] = useState(false);
   const [showSchoolOnboardingModal, setShowSchoolOnboardingModal] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return window.location.search.includes('invite=school_onboarding') || window.location.search.includes('onboarding=school');
+    const params = new URLSearchParams(window.location.search);
+    return params.get('invite') === 'school_onboarding' || 
+           params.get('onboarding') === 'school' || 
+           params.has('school_onboarding') ||
+           window.location.search.includes('invite=school_onboarding');
   });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('invite') === 'school_onboarding' || params.get('onboarding') === 'school' || params.has('school_onboarding')) {
+        setShowSchoolOnboardingModal(true);
+      }
+    }
+  }, [location.search]);
   const [user, setUserRaw] = useState<any>(() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -2504,6 +2517,40 @@ function App() {
       }
     }
   }, [loggedInUserId, location.pathname, loading, navigate]);
+
+  // Auto-switch context when support_ghost is active in URL (Placed before any early returns)
+  useEffect(() => {
+    const ghostUrlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const isGhostParam = ghostUrlParams.get('support_ghost') === 'true' || sessionStorage.getItem('groovelab_support_ghost') === 'true';
+    const ghostSchoolId = ghostUrlParams.get('school_id') || sessionStorage.getItem('groovelab_ghost_school_id');
+    if (isGhostParam && ghostSchoolId) {
+      sessionStorage.setItem('groovelab_support_ghost', 'true');
+      sessionStorage.setItem('groovelab_ghost_school_id', ghostSchoolId);
+      supabase.from('schools').select('*').eq('id', ghostSchoolId).single().then(({ data: ghostSchool }) => {
+        if (ghostSchool) {
+          const ghostUser = {
+            id: 'master-support-id',
+            school_id: ghostSchool.id,
+            role: 'secretary',
+            first_name: 'Master',
+            last_name: 'Support',
+            is_master_admin: false,
+            is_ghost_mode: true,
+            schools: ghostSchool
+          };
+          setUserRaw(ghostUser);
+          setLoggedInUserId('master-support-id');
+          setActivePlatform('campus');
+          setActiveStudentTab('briefing');
+          try {
+            localStorage.setItem('groovelab_active_workspace', 'secretary');
+            localStorage.setItem('campus_active_tab', 'briefing');
+          } catch (e) {}
+        }
+      });
+    }
+  }, []);
+
   const [session, setSession] = useState<any>(null);
   const [totalPresenceMins, setTotalPresenceMins] = useState(0);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -7225,6 +7272,28 @@ function App() {
 
   // 2. AUTHENTICATION CHECK
   if (!loggedInUserId && !showDeletionPrompt) {
+    if (showSchoolOnboardingModal) {
+      return (
+        <div style={{ position: 'relative', minHeight: '100vh', background: '#0f172a' }}>
+          <SchoolSelfOnboardingModal
+            onClose={() => {
+              setShowSchoolOnboardingModal(false);
+              navigate('/', { replace: true });
+            }}
+            onSuccess={(schoolData, userData) => {
+              setShowSchoolOnboardingModal(false);
+              if (userData?.id) {
+                handleLogin(userData.id, false);
+              } else {
+                navigate('/login', { replace: true });
+                window.location.reload();
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
     if (location.pathname === '/') {
       const urlParams = new URLSearchParams(location.search);
       
@@ -7266,13 +7335,15 @@ function App() {
       }
 
       return (
-        <Startseite 
-          onLogin={() => navigate('/login?school=musaek-bs&groovelab=true')} 
-          onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
-          onShowPrivacy={() => setShowPrivacy(true)}
-          onShowAgb={() => setShowAgb(true)}
-          onShowImpressum={() => setShowImpressum(true)}
-        />
+        <Suspense fallback={<DashboardLoader />}>
+          <Startseite 
+            onLogin={() => navigate('/login?school=musaek-bs&groovelab=true')} 
+            onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
+            onShowPrivacy={() => setShowPrivacy(true)}
+            onShowAgb={() => setShowAgb(true)}
+            onShowImpressum={() => setShowImpressum(true)}
+          />
+        </Suspense>
       );
     }
     if (location.pathname === '/login') {
@@ -7409,14 +7480,29 @@ function App() {
 
   // 2.5 MASTER ADMIN PORTAL — nur via is_master_admin DB-Flag
   // SECURITY: Niemals per Vorname oder Rolle erkennen — ausschließlich das is_master_admin-Flag aus der DB ist maßgeblich.
-  const isMasterAdminSession = user?.is_master_admin === true || 
-                               sessionStorage.getItem('groovelab_is_master_admin') === 'true';
+  const ghostUrlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const isGhostParam = ghostUrlParams.get('support_ghost') === 'true' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
+  const ghostSchoolId = ghostUrlParams.get('school_id') || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_ghost_school_id') : null);
+
+  const isMasterAdminSession = (user?.is_master_admin === true || 
+                               sessionStorage.getItem('groovelab_is_master_admin') === 'true') && !(isGhostParam && ghostSchoolId);
 
   if (isMasterAdminSession) {
     return (
-      <Suspense fallback={<DashboardLoader />}>
-        <MasterAdminDashboard onLogout={handleLogout} currentUser={{ ...user, is_master_admin: true }} />
-      </Suspense>
+      <>
+        <Suspense fallback={<DashboardLoader />}>
+          <MasterAdminDashboard onLogout={handleLogout} currentUser={{ ...user, is_master_admin: true }} />
+        </Suspense>
+        {showSchoolOnboardingModal && (
+          <SchoolSelfOnboardingModal
+            onClose={() => setShowSchoolOnboardingModal(false)}
+            onSuccess={(schoolData, userData) => {
+              setShowSchoolOnboardingModal(false);
+              window.location.reload();
+            }}
+          />
+        )}
+      </>
     );
   }
 
@@ -8403,6 +8489,51 @@ function App() {
           to { transform: scale(1) translateY(0); opacity: 1; }
         }
       `}</style>
+      {/* 🛡️ Support Ghost-Mode Sticky Top Banner */}
+      {user?.is_ghost_mode && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 999999,
+          background: '#0f172a',
+          color: '#ffffff',
+          padding: '10px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid rgba(255,255,255,0.15)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          fontFamily: '"Outfit", sans-serif'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', fontWeight: 700 }}>
+            <Shield size={16} color="#ffffff" />
+            <span>Support-Sitzung aktiv für <strong>{user?.schools?.name || 'Musikschule'}</strong> (SOC 2 protokolliert)</span>
+          </div>
+          <button
+            onClick={() => {
+              sessionStorage.removeItem('groovelab_support_ghost');
+              sessionStorage.removeItem('groovelab_ghost_school_id');
+              window.location.href = window.location.origin;
+            }}
+            style={{
+              background: '#ffffff',
+              color: '#0f172a',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              border: 'none',
+              fontWeight: 800,
+              fontSize: '0.80rem',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+            }}
+          >
+            Zurück zum Master Leitstand
+          </button>
+        </div>
+      )}
+
       {/* Sidebar Navigation (iPad/Desktop) */}
       <aside className="sidebar-nav" style={{ display: windowWidth > 1024 ? 'flex' : 'none' }}>
         <div className="sidebar-logo" style={{ padding: '8px 0px', display: 'flex', alignItems: 'center', gap: '8px' }}>

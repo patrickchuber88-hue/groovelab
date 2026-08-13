@@ -7367,10 +7367,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   {/* Cost & Billing Transparency Hero Card */}
                   {(() => {
                     const isExempt = profile?.exempt_from_direct_billing === true;
+                    const isBypass = Boolean(schoolData?.subscription_bypass);
                     const opt = schoolData?.student_billing_option;
 
-                    // Option 1: School covers all costs OR student is exempt
-                    const isSchoolCovered = isExempt || !opt || opt === 'school_covered' || opt === 'sammelzahler' || opt === 'school_pays' || opt === 'option1' || opt === 'both';
+                    // Option 1: School covers all costs OR student is exempt OR subscription bypass is active
+                    const isSchoolCovered = isBypass || isExempt || !opt || opt === 'school_covered' || opt === 'sammelzahler' || opt === 'school_pays' || opt === 'option1' || opt === 'both';
                     
                     if (isSchoolCovered) {
                       return (
@@ -7443,18 +7444,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             Transparente Abrechnung
                           </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>
-                            {monthlyPrice} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>/ Monat</span>
+                            {annualPrice} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>/ Schuljahr</span>
                           </span>
                           <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>
-                            ({annualPrice} / Jahr als Einmalbeitrag)
+                            (Einmalzahlung, entspricht {monthlyPrice} / Monat)
                           </span>
                         </div>
                         <span style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.35, fontWeight: 500 }}>
                           {isPartial 
-                            ? 'Deine Musikschule bezuschusst deinen Zugang. Der Aktivierungsbeitrag wird als Einmalzahlung für das Schuljahr abgerechnet.' 
-                            : 'Direktabrechnung für deinen vollen Campus-Zugang. Der Aktivierungsbeitrag wird als Einmalzahlung für das Schuljahr abgerechnet.'}
+                            ? 'Deine Musikschule bezuschusst deinen Zugang. Der Aktivierungsbeitrag wird als transparente Einmalzahlung für das Schuljahr abgerechnet (keine automatische Verlängerung).' 
+                            : 'Direktabrechnung für deinen vollen Campus-Zugang. Der Aktivierungsbeitrag wird als transparente Einmalzahlung für das Schuljahr abgerechnet (keine automatische Verlängerung).'}
                         </span>
 
                         {/* 🛡️ Treue-Preisgarantie Badge */}

@@ -466,7 +466,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {(invoice.storageAddonGb ?? 0) > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>🎙️ Audio-Tresor Cloud-Speicher Kontingent (+{invoice.storageAddonGb} GB)</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Audio-Tresor Cloud-Speicher (+{invoice.storageAddonGb} GB)</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
                               Zusatz-Speichervolumen für Bandaufnahmen &amp; Audio-Loops ({(invoice.storageAddonMonthlyFee || 0).toFixed(2).replace('.', ',')} € / Mo.){freeLabel}
                             </span>

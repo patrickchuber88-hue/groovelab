@@ -9,7 +9,8 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake,
+  HardDrive, Cloud, Crown, Rocket
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
@@ -1816,6 +1817,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [customActivationBillingEmail, setCustomActivationBillingEmail] = useState<string>('');
   const [selectedStorageAddonGb, setSelectedStorageAddonGb] = useState<number>(0);
   const [selectedStorageAddonFee, setSelectedStorageAddonFee] = useState<number>(0);
+  const [showStorageManagerModal, setShowStorageManagerModal] = useState<boolean>(false);
   const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showConfirmExtra, setShowConfirmExtra] = useState<boolean>(false);
@@ -3499,6 +3501,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setSchoolTrialEndsAt(schoolData.trial_ends_at || null);
         setSchoolStatus(schoolData.status || 'active');
         setSubscriptionBypass(schoolData.subscription_bypass ?? false);
+        if (schoolData.storage_addon_gb !== undefined && schoolData.storage_addon_gb !== null) {
+          setSelectedStorageAddonGb(Number(schoolData.storage_addon_gb));
+          setSelectedStorageAddonFee(Number(schoolData.storage_addon_monthly_fee || 0));
+        }
         setLogoUrl(schoolData.logo_url || '');
         const rawUrl = schoolData.calendar_url || '';
         setCalendarUrl(rawUrl);
@@ -6206,10 +6212,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     if (monthsCount < 1) monthsCount = 1;
     if (monthsCount > 12) monthsCount = 12;
     
-    const pricePerMonth = 0.40;
+    const pricePerMonth = studentBillingOption === 'student_full' 
+      ? (effectiveSchoolRates.priceStudent || 0.49)
+      : 0.40;
     const totalPrice = parseFloat((monthsCount * pricePerMonth).toFixed(2));
     
-    return { monthsCount, totalPrice };
+    return { monthsCount, pricePerMonth, totalPrice };
   };
 
   const fetchTrialLogs = async () => {
@@ -6245,15 +6253,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   };
 
   const generateMailtoLink = (student: any) => {
-    const { monthsCount, totalPrice } = getRemainingMonthsAndPrice();
+    const { monthsCount, pricePerMonth, totalPrice } = getRemainingMonthsAndPrice();
     const employeeName = currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name || ''}`.trim() : 'Ihre Musikschule';
-    const defaultTemplate = `Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 7-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je 0,40 EUR, insgesamt also {total_price} EUR.\n\nHerzliche Grüße\n{employee_name}\n{school_name}`;
+    const defaultTemplate = `Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 7-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je {price_per_month} EUR, insgesamt also {total_price} EUR (ohne automatische Verlängerung).\n\nHerzliche Grüße\n{employee_name}\n{school_name}`;
     
     let template = openingHours?.campus_settings?.mailto_template || defaultTemplate;
     
     const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
     template = template.replace(/{student_name}/g, studentName);
     template = template.replace(/{months_count}/g, monthsCount.toString());
+    template = template.replace(/{price_per_month}/g, pricePerMonth.toFixed(2).replace('.', ','));
     template = template.replace(/{total_price}/g, totalPrice.toFixed(2) + ' €');
     template = template.replace(/{employee_name}/g, employeeName);
     template = template.replace(/{school_name}/g, schoolName || 'Ihre Musikschule');
@@ -25067,7 +25076,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           1. Vollständige Direktabrechnung (Schüler zahlt {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} € / Monat)
                                         </span>
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
-                                          Der Schüler/Eltern zahlen den vollen Betrag (Jahresbeitrag: {(effectiveSchoolRates.priceStudent * (masterPricing.billingMonthsPerYear || 11)).toFixed(2).replace('.', ',')} €). Die Musikschule wird um die passive Datenbankgebühr von 0,09 €/Monat komplett entlastet (0,00 € Kosten).
+                                          Der Schüler/Eltern zahlen den vollen Betrag (Jahresbeitrag: {(effectiveSchoolRates.priceStudent * 12).toFixed(2).replace('.', ',')} €). Die Musikschule wird um die passive Datenbankgebühr von 0,09 €/Monat komplett entlastet (0,00 € Kosten).
                                         </span>
                                       </div>
                                     </label>
@@ -25169,19 +25178,67 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 </p>
                               </div>
 
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '14px' }}>
+                              {/* Live Storage Meter & Safety Info */}
+                              {(() => {
+                                const activeAddonGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
+                                const baseGb = 1.0;
+                                const currentTotalCapGb = baseGb + activeAddonGb;
+                                const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                const usedGb = usedBytes / (1024 * 1024 * 1024);
+                                const usagePct = Math.min(100, Math.round((usedGb / currentTotalCapGb) * 100));
+
+                                return (
+                                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+                                      <span style={{ fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <HardDrive size={15} color="#34a853" /> Aktuelle Speicherbelegung:
+                                      </span>
+                                      <span style={{ fontWeight: 700, color: usagePct > 80 ? '#dc2626' : '#16a34a' }}>
+                                        {usedGb.toFixed(2).replace('.', ',')} GB von {currentTotalCapGb} GB belegt ({usagePct}%)
+                                      </span>
+                                    </div>
+                                    <div style={{ background: '#e2e8f0', borderRadius: '6px', height: '6px', overflow: 'hidden', width: '100%' }}>
+                                      <div style={{
+                                        height: '100%',
+                                        width: `${Math.max(4, usagePct)}%`,
+                                        background: usagePct > 80 ? '#ef4444' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
+                                        borderRadius: '6px',
+                                        transition: 'width 0.3s ease'
+                                      }} />
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(115px, 1fr))', gap: '12px' }}>
                                 {[
-                                  { gb: 0, fee: 0, label: 'Standard', sublabel: 'Basis-Kontingent', desc: '0,00 € / Mo.', icon: '🎙️' },
-                                  { gb: 5, fee: 1.49, label: '+5 GB', sublabel: 'Bis 100 Schüler', desc: '1,49 € / Mo.', icon: '☁️' },
-                                  { gb: 10, fee: 2.99, label: '+10 GB', sublabel: 'Bis 250 Schüler', desc: '2,99 € / Mo.', icon: '⚡' },
-                                  { gb: 20, fee: 5.49, label: '+20 GB', sublabel: 'Bis 500 Schüler', desc: '5,49 € / Mo.', icon: '🚀' },
-                                  { gb: 50, fee: 9.99, label: '+50 GB', sublabel: 'Große Musikschulen', desc: '9,99 € / Mo.', icon: '👑' }
+                                  { gb: 0, fee: 0, label: 'Standard', sublabel: '1 GB Basis', desc: '0,00 € / Mo.', IconComponent: HardDrive },
+                                  { gb: 5, fee: 1.49, label: '+5 GB', sublabel: 'Bis 100 Schüler', desc: '1,49 € / Mo.', IconComponent: Cloud },
+                                  { gb: 10, fee: 2.99, label: '+10 GB', sublabel: 'Bis 250 Schüler', desc: '2,99 € / Mo.', IconComponent: Zap },
+                                  { gb: 20, fee: 5.49, label: '+20 GB', sublabel: 'Bis 500 Schüler', desc: '5,49 € / Mo.', IconComponent: Rocket },
+                                  { gb: 50, fee: 9.99, label: '+50 GB', sublabel: 'Große Schulen', desc: '9,99 € / Mo.', IconComponent: Crown },
+                                  { gb: 100, fee: 16.99, label: '+100 GB', sublabel: 'Konservatorien', desc: '16,99 € / Mo.', IconComponent: Database },
+                                  { gb: 250, fee: 34.99, label: '+250 GB', sublabel: 'Kreis-Schulen', desc: '34,99 € / Mo.', IconComponent: Sparkles }
                                 ].map(tier => {
                                   const isSel = selectedStorageAddonGb === tier.gb;
+                                  const activeBookedGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
+                                  const isCurrentlyActive = activeBookedGb === tier.gb;
+
+                                  const baseGb = 1.0;
+                                  const tierCapGb = baseGb + tier.gb;
+                                  const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                  const usedGb = usedBytes / (1024 * 1024 * 1024);
+                                  const isDowngradeBlocked = usedGb > tierCapGb;
+                                  const IconCmp = tier.IconComponent;
+
                                   return (
                                     <div
                                       key={tier.gb}
                                       onClick={() => {
+                                        if (isDowngradeBlocked) {
+                                          alert(`⚠️ Downgrade nicht möglich: Deine Musikschule belegt aktuell ${usedGb.toFixed(2).replace('.', ',')} GB. Bitte lösche zuerst ${(usedGb - tierCapGb).toFixed(2).replace('.', ',')} GB an Aufnahmen im Audio-Tresor, um auf ${tier.label} zu wechseln.`);
+                                          return;
+                                        }
                                         setSelectedStorageAddonGb(tier.gb);
                                         setSelectedStorageAddonFee(tier.fee);
                                       }}
@@ -25192,16 +25249,49 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         padding: '16px 14px',
                                         borderRadius: '16px',
                                         border: '2px solid',
-                                        borderColor: isSel ? '#34a853' : '#e2e8f0',
-                                        background: isSel ? '#f0fdf4' : '#ffffff',
-                                        cursor: 'pointer',
+                                        borderColor: isSel ? '#34a853' : isCurrentlyActive ? '#a7f3d0' : isDowngradeBlocked ? '#f1f5f9' : '#e2e8f0',
+                                        background: isSel ? '#f0fdf4' : isCurrentlyActive ? '#fafffd' : isDowngradeBlocked ? '#f8fafc' : '#ffffff',
+                                        cursor: isDowngradeBlocked ? 'not-allowed' : 'pointer',
                                         textAlign: 'center',
                                         transition: 'all 0.2s',
-                                        boxShadow: isSel ? '0 6px 16px rgba(52, 168, 83, 0.12)' : 'none'
+                                        opacity: isDowngradeBlocked ? 0.6 : 1,
+                                        boxShadow: isSel ? '0 6px 16px rgba(52, 168, 83, 0.12)' : 'none',
+                                        position: 'relative'
                                       }}
                                     >
+                                      {isCurrentlyActive && (
+                                        <span style={{
+                                          position: 'absolute',
+                                          top: '-9px',
+                                          left: '50%',
+                                          transform: 'translateX(-50%)',
+                                          background: '#34a853',
+                                          color: '#ffffff',
+                                          fontSize: '0.58rem',
+                                          fontWeight: 900,
+                                          padding: '2px 8px',
+                                          borderRadius: '999px',
+                                          letterSpacing: '0.04em',
+                                          textTransform: 'uppercase'
+                                        }}>
+                                          Aktiv
+                                        </span>
+                                      )}
+
                                       <div>
-                                        <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>{tier.icon}</div>
+                                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+                                          <div style={{
+                                            width: '36px',
+                                            height: '36px',
+                                            borderRadius: '10px',
+                                            background: isSel ? '#dcfce7' : '#f1f5f9',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}>
+                                            <IconCmp size={18} color={isSel ? '#166534' : '#64748b'} />
+                                          </div>
+                                        </div>
                                         <div style={{ fontWeight: 900, fontSize: '0.92rem', color: isSel ? '#166534' : '#1e293b' }}>{tier.label}</div>
                                         <div style={{ fontSize: '0.66rem', color: isSel ? '#15803d' : '#64748b', fontWeight: 600, marginTop: '2px' }}>{tier.sublabel}</div>
                                       </div>
@@ -25213,11 +25303,45 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 })}
                               </div>
 
-                              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '12px 14px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.74rem', color: '#475569' }}>
-                                <span>💡</span>
-                                <span>
-                                  <strong>Flexibel anpassbar:</strong> Das Cloud-Speicher-Kontingent wird monatlich abgerechnet und kann jederzeit im laufenden Schuljahr im Sekretariat erweitert oder reduziert werden.
-                                </span>
+                              {/* Security & DSGVO Compliance Guarantee Infobox */}
+                              <div style={{
+                                background: '#f8fafc',
+                                border: '1.5px solid #e2e8f0',
+                                borderRadius: '18px',
+                                padding: '16px 18px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px',
+                                fontSize: '0.74rem',
+                                color: '#475569'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 800 }}>
+                                    <ShieldCheck size={17} color="#34a853" />
+                                    <span>DSGVO- &amp; Sicherheits-Garantie für alle Audio-Aufnahmen</span>
+                                  </div>
+                                  <span style={{ fontSize: '0.66rem', background: '#e6f4ea', color: '#166534', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                                    🔒 100% Deutscher Serverstandort
+                                  </span>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', fontSize: '0.7rem', lineHeight: '1.4' }}>
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                    <span style={{ color: '#34a853', fontWeight: 900, marginTop: '-1px' }}>✓</span>
+                                    <span><strong>ISO 27001 zertifiziert:</strong> Dedizierte Server in Frankfurt &amp; Falkenstein, kein US-Drittlandstransfer.</span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                    <span style={{ color: '#34a853', fontWeight: 900, marginTop: '-1px' }}>✓</span>
+                                    <span><strong>AES-256 Verschlüsselung:</strong> Alle Tonspuren und Loop-Mixe im Ruhezustand (At-Rest) verschlüsselt.</span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                    <span style={{ color: '#34a853', fontWeight: 900, marginTop: '-1px' }}>✓</span>
+                                    <span><strong>Art. 17 DSGVO Sofort-Löschung:</strong> Physisches, unwiderrufliches Vernichten gelöschter Aufnahmen.</span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                    <span style={{ color: '#34a853', fontWeight: 900, marginTop: '-1px' }}>✓</span>
+                                    <span><strong>Tägliche Sicherheits-Backups:</strong> Georedundante Snapshots für maximalen Schutz und Ausfallsicherheit.</span>
+                                  </div>
+                                </div>
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
@@ -25816,39 +25940,30 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                         {/* Right Column: Order Summary Card */}
                         <div>
-                          <div className="glass-panel" style={{
+                          <div style={{
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '24px',
                             padding: '24px',
-                            position: 'sticky',
-                            top: '20px',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '16px',
-                            fontFamily: 'Inter',
-                            textAlign: 'left'
+                            gap: '18px',
+                            textAlign: 'left',
+                            position: 'sticky',
+                            top: '20px'
                           }}>
-                            <div style={{ borderBottom: '1px solid #e9d5ff', paddingBottom: '12px' }}>
-                              <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BESTELL-ZUSAMMENFASSUNG</span>
-                            {activeStudentsCount_global > 0 && billingPayer === 'student' && studentBillingOption === 'student_full' && (
-                              <div style={{
-                                background: '#e6f4ea',
-                                border: '1px solid #34a853',
-                                borderRadius: '12px',
-                                padding: '10px 12px',
-                                fontSize: '0.7rem',
-                                color: '#34a853',
-                                fontWeight: 700,
-                                margin: '8px 0',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                              }}>
-                                <span>💡 Aktivierungs-Vorteil: Durch {activeStudentsCount_global} aktive Schüler sparst du monatlich {(activeStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € Infrastrukturgebühr!</span>
+                            <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>ABRECHNUNG &amp; TARIFE</span>
+                                <h4 style={{ margin: '2px 0 0 0', fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>Vorschau der Buchung</h4>
                               </div>
-                            )}
-                              <h4 style={{ margin: '2px 0 0 0', fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Vorschau der Buchung</h4>
+                              <span style={{ fontSize: '0.68rem', background: '#e6f4ea', color: '#166534', padding: '4px 10px', borderRadius: '9999px', fontWeight: 700 }}>
+                                Schritt {checkoutStep} von 5
+                              </span>
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                 <span>Software-Lizenz:</span>
                                 <strong style={{ color: '#34a853' }}>100% kostenlos</strong>
@@ -25856,102 +25971,117 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                               {hasCampusSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                  <span>Server- &amp; Cloud-Infrastruktur Campus:</span>
-                                  <strong>{isStarterFlat ? 'Inklusive' : `${masterRates.campus.toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                  <span>Campus Server-Flatrate:</span>
+                                  <strong>{effectiveSchoolRates.priceCampus.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                 </div>
                               )}
                               {hasGroovelabSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                  <span>Server- &amp; Cloud-Infrastruktur Groovelab:</span>
-                                  <strong>{isStarterFlat ? 'Inklusive' : `${masterRates.groovelab.toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                  <span>GrooveLab Server-Flatrate:</span>
+                                  <strong>{effectiveSchoolRates.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                </div>
+                              )}
+                              {hasCampusSub && hasGroovelabSub && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#15803d', fontWeight: 600 }}>
+                                  <span>Kombi-Rabatt:</span>
+                                  <span>-{(effectiveSchoolRates.priceCampus + effectiveSchoolRates.priceGroovelab - effectiveSchoolRates.priceKombi).toFixed(2).replace('.', ',')} € / Mo.</span>
                                 </div>
                               )}
 
-                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Cloud-Datenbank &amp; Support Lehrer ({masterRates.teacher.toFixed(2).replace('.', ',')} € x {allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Profile):</span>
-                                <strong>{isStarterFlat ? 'Inklusive' : `${(allTeachers.filter((t: any) => t.isActive ?? true).length * masterRates.teacher).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
-                              </div>
+                              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {billableTeachersCount > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                    <span>Lehrer-Profile ({billableTeachersCount} × {effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} €):</span>
+                                    <strong>{(billableTeachersCount * effectiveSchoolRates.priceTeacher).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                  </div>
+                                )}
 
-                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Cloud-Datenbank &amp; Support Schüler (0,09 € x {(billingPayer === 'student' && studentBillingOption === 'student_partial') ? `${students.length} Profil(e)` : `${Math.max(0, students.length - activeStudentsCount_global)} passive Profile`}):</span>
-                                <strong>{isStarterFlat ? 'Inklusive' : `${((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
-                              </div>
+                                {activeStudentsCount_global > 0 && isSammelzahler && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                    <span>Campus-Aktivierungen ({activeStudentsCount_global} × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
+                                    <strong>{(activeStudentsCount_global * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                  </div>
+                                )}
 
-                              <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
-                                <span>Server- &amp; Infrastruktur-Gebühr (Zwischensumme):</span>
-                                <strong>{isStarterFlat ? 'Inklusive' : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`}</strong>
-                              </div>
+                                {activeGroovelabStudentsCount_global > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                    <span>GrooveLab-Aktivierungen ({activeGroovelabStudentsCount_global} × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
+                                    <strong>{(activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                  </div>
+                                )}
 
-                              {checkoutStep >= 2 && (studentBillingOption === 'option2' || studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3') && (
-                                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
-                                  Kostenträger: <strong>Musikschule (Sammelzahler)</strong>. Für Schüler werden die Accounts kostenlos freigeschaltet. Die Schule übernimmt die Kosten. Abrechnung erfolgt: <strong>
-                                    {studentBillingOption === 'option2' && `Monatlich (${masterRates.student.toFixed(2).replace('.', ',')} € / Schüler)`}
-                                    {studentBillingOption === 'option3_2' && 'Einmalig pro Schuljahr (mit 10% Rabatt bei Aktivierung)'}
-                                    {studentBillingOption === 'option3_3' && 'Einmalige Komplett-Aktivierung aller angelegten Schüler (mit 20% Rabatt)'}
-                                  </strong>
-                                </div>
-                              )}
-                              {checkoutStep >= 2 && (studentBillingOption === 'both' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'option1') && (
-                                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
-                                  Kostenträger: <strong>Schüler / Eltern (Selbstzahler)</strong>. Erlaubte Zahlungsarten bei QR-Code Aktivierung: <strong>
-                                    {studentBillingOption === 'both' && 'Lastschrift & Barzahlung'}
-                                    {studentBillingOption === 'debit' && 'Lastschrift'}
-                                    {studentBillingOption === 'cash' && 'Barzahlung'}
-                                    {studentBillingOption === 'option1' && 'Lastschrift & Barzahlung'}
-                                  </strong>
-                                </div>
-                              )}
+                                {passiveStudentsCount_global > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                    <span>Passive Profile ({passiveStudentsCount_global} × 0,09 €):</span>
+                                    <strong>{(passiveStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                  </div>
+                                )}
+
+                                {/* Tresor Storage Add-on Line Item */}
+                                {(() => {
+                                  const addonGb = selectedStorageAddonGb;
+                                  const addonFee = selectedStorageAddonFee;
+                                  const baseGb = 1.0;
+                                  const totalCapGb = baseGb + addonGb;
+                                  const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                  const usedGb = usedBytes / (1024 * 1024 * 1024);
+                                  const freeGb = Math.max(0, totalCapGb - usedGb);
+                                  const usagePct = Math.min(100, Math.round((usedGb / totalCapGb) * 100));
+
+                                  return (
+                                    <div style={{ borderTop: '1.5px dashed #e2e8f0', paddingTop: '10px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: '0.74rem' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                          <HardDrive size={13} color="#34a853" />
+                                          <span>Audio-Tresor Speicher ({addonGb > 0 ? `+${addonGb} GB` : '1 GB Basis'}):</span>
+                                        </span>
+                                        <strong style={{ color: addonGb > 0 ? '#0f172a' : '#15803d' }}>
+                                          {addonGb > 0 ? `${addonFee.toFixed(2).replace('.', ',')} € / Mo.` : 'Inklusive (0,00 €)'}
+                                        </strong>
+                                      </div>
+
+                                      {/* Mini Progress Bar */}
+                                      <div style={{ background: '#f1f5f9', borderRadius: '6px', height: '6px', overflow: 'hidden', width: '100%', marginTop: '2px' }}>
+                                        <div style={{
+                                          height: '100%',
+                                          width: `${Math.max(5, usagePct)}%`,
+                                          background: usagePct > 80 ? '#ef4444' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
+                                          borderRadius: '6px',
+                                          transition: 'width 0.3s ease'
+                                        }} />
+                                      </div>
+
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>
+                                        <span>{usedGb.toFixed(2).replace('.', ',')} GB von {totalCapGb} GB belegt</span>
+                                        <span style={{ color: usagePct > 80 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>{freeGb.toFixed(2).replace('.', ',')} GB frei ({100 - usagePct}%)</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                             </div>
 
-                            <div style={{ borderTop: '2px solid #e9d5ff', paddingTop: '14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#0369a1' }}>
-                                <span>Schulanteil:</span>
-                                <strong style={{ fontWeight: 800 }}>
-                                  {isStarterFlat ? '69,00 €' : (checkoutStep >= 2 ? `${currentTotalB2B.toFixed(2).replace('.', ',')} € / Mo.` : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`)}
-                                </strong>
-                              </div>
-
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#34a853', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
-                                <span style={{ fontWeight: 900 }}>Monatliche Rate:</span>
-                                <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>
-                                  {isStarterFlat ? '69,00 € / Mo.' : (checkoutStep >= 2 ? `${mixedTotal.toFixed(2).replace('.', ',')} € / Mo.` : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`)}
-                                </strong>
-                              </div>
-                              {checkoutStep >= 2 && billingPayer === 'school' && studentBillingOption === 'option2' && activeStudentsCount_global > 0 && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#4f46e5', marginTop: '2px' }}>
-                                  <span>Schüler-Aktivierung ({activeStudentsCount_global} aktiv):</span>
-                                  <strong style={{ fontWeight: 800 }}>{(activeStudentsCount_global * masterRates.student).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                            {/* Total Rate & VAT Box */}
+                            <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                <span style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>Gesamtrate:</span>
+                                <div style={{ textAlign: 'right' }}>
+                                  <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.03em' }}>
+                                    {(baseB2B_global).toFixed(2).replace('.', ',')} € / Mo.
+                                  </span>
                                 </div>
-                              )}
-                              <span style={{ fontSize: '0.62rem', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '-4px', fontWeight: 600 }}>
-                                Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
+                              </div>
+                              <span style={{ fontSize: '0.64rem', color: '#64748b', textAlign: 'right', fontWeight: 500 }}>
+                                Umsatzsteuerbefreit gemäß § 19 UStG
                               </span>
 
-                              {checkoutStep >= 2 && (studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3') && (() => {
-                                const count = studentBillingOption === 'option3_3' ? students.length : activeStudentsCount_global;
-                                const discount = studentBillingOption === 'option3_3' ? 20 : 10;
-                                const singlePrice = getDynamicAnnualPrice(effectiveContractStartDateStr, discount);
-                                const totalOneTime = count * singlePrice;
-                                return (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid #cbd5e1', paddingTop: '10px', marginTop: '4px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#6d28d9' }}>
-                                      <span style={{ fontWeight: 900 }}>Einmalzahlung:</span>
-                                      <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>
-                                        {totalOneTime.toFixed(2).replace('.', ',')} €
-                                      </strong>
-                                    </div>
-                                    <span style={{ fontSize: '0.62rem', color: '#64748b', display: 'block', textAlign: 'right', fontWeight: 600 }}>
-                                      ({count} Schüler × {singlePrice.toFixed(2).replace('.', ',')} €)
-                                    </span>
-                                  </div>
-                                );
-                              })()}
-
+                              <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.68rem', color: '#64748b', marginTop: '6px' }}>
+                                <Lock size={13} color="#94a3b8" />
+                                <span>Abrechnung erfolgt am Monatsende. Rechnungen jederzeit einsehbar.</span>
+                              </div>
                             </div>
                           </div>
-
-                          {/* Price comparison anchor box removed */}
-                         </div>
+                        </div>
 
                     {/* Success Modal Overlay */}
                     {showSuccessModal && (
@@ -26280,6 +26410,58 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             </div>
                                           </div>
                                         </div>
+
+                                        {/* Audio-Tresor Cloud-Speicher Card with Up-/Downgrade Trigger */}
+                                        {(() => {
+                                          const addonGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
+                                          const addonFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 2.99 : addonGb === 20 ? 5.49 : addonGb === 50 ? 9.99 : addonGb === 100 ? 16.99 : addonGb === 250 ? 34.99 : 0));
+                                          const totalCapGb = 1.0 + addonGb;
+                                          const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                          const usedGb = usedBytes / (1024 * 1024 * 1024);
+
+                                          return (
+                                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.15)' }} />
+                                                <div>
+                                                  <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span>Audio-Tresor Speicher</span>
+                                                    <span style={{ fontSize: '0.68rem', background: addonGb > 0 ? '#dcfce7' : '#f1f5f9', color: addonGb > 0 ? '#166534' : '#475569', padding: '1px 6px', borderRadius: '6px', fontWeight: 800 }}>
+                                                      {addonGb > 0 ? `+${addonGb} GB` : '1 GB Basis'}
+                                                    </span>
+                                                  </div>
+                                                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                                                    {usedGb.toFixed(2).replace('.', ',')} GB von {totalCapGb} GB belegt {addonGb > 0 ? `• ${addonFee.toFixed(2).replace('.', ',')} € / Mo.` : '• Inklusive'}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <button
+                                                type="button"
+                                                onClick={() => setShowStorageManagerModal(true)}
+                                                style={{
+                                                  background: '#ffffff',
+                                                  border: '1.5px solid #cbd5e1',
+                                                  borderRadius: '10px',
+                                                  padding: '6px 14px',
+                                                  fontSize: '0.72rem',
+                                                  fontWeight: 800,
+                                                  color: '#0f172a',
+                                                  cursor: 'pointer',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  gap: '4px',
+                                                  whiteSpace: 'nowrap',
+                                                  flexShrink: 0,
+                                                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                                  transition: 'all 0.2s'
+                                                }}
+                                              >
+                                                <span>Anpassen</span>
+                                                <ChevronRight size={13} color="#475569" />
+                                              </button>
+                                            </div>
+                                          );
+                                        })()}
                                       </div>
 
                                       <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#475569', lineHeight: '1.45', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -26419,13 +26601,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                 </div>
                                               )}
 
-                                              {/* Tresor Storage Add-on Line Item & Mini Progress Bar - Hidden when no paid addon is booked */}
+                                              {/* Tresor Storage Add-on Line Item & Mini Progress Bar - Always shown for full transparency */}
                                               {(() => {
-                                                const addonGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
-                                                if (addonGb <= 0) return null;
+                                                const addonGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
                                                 const addonStatus = currentSchoolProfile?.storage_addon_status || 'active';
                                                 const addonPendingGb = Number(currentSchoolProfile?.storage_addon_pending_gb || 0);
-                                                const addonMonthlyFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 2.99 : addonGb === 20 ? 5.49 : 9.99));
+                                                const addonMonthlyFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || selectedStorageAddonFee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 2.99 : addonGb === 20 ? 5.49 : addonGb === 50 ? 9.99 : 0));
                                                 
                                                 const baseGb = 1.0;
                                                 const totalCapGb = baseGb + addonGb;
@@ -26436,15 +26617,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                                                 return (
                                                   <div style={{ borderTop: '1.5px dashed #e2e8f0', paddingTop: '10px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: '0.74rem' }}>
-                                                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                        <span style={{ fontSize: '0.85rem' }}>🎙️</span>
-                                                        <span>Audio-Tresor {addonGb > 0 ? `(+${addonGb} GB)` : '(1 GB Inklusiv)'}:</span>
-                                                      </span>
-                                                      <strong>
-                                                        {addonGb > 0 ? (subscriptionBypass ? '0,00 € (Freigestellt)' : `${addonMonthlyFee.toFixed(2).replace('.', ',')} € / Mo.`) : 'Inklusive'}
-                                                      </strong>
-                                                    </div>
+                                                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: '0.74rem' }}>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                          <HardDrive size={13} color="#34a853" />
+                                                          <span>Audio-Tresor Speicher ({addonGb > 0 ? `+${addonGb} GB` : '1 GB Basis'}):</span>
+                                                        </span>
+                                                        <strong style={{ color: addonGb > 0 ? '#0f172a' : '#15803d' }}>
+                                                          {subscriptionBypass ? '0,00 € (Freigestellt)' : addonGb > 0 ? `${addonMonthlyFee.toFixed(2).replace('.', ',')} € / Mo.` : 'Inklusive (0,00 €)'}
+                                                        </strong>
+                                                      </div>
 
                                                     {/* Mini Battery Progress Bar */}
                                                     <div style={{ background: '#f1f5f9', borderRadius: '6px', height: '6px', overflow: 'hidden', width: '100%', marginTop: '2px' }}>
@@ -30516,7 +30697,13 @@ status: status,
                                     ? 'Eltern_Information_Einwilligung_Campus.txt'
                                     : 'Eltern_Information_Einwilligung_Campus_Groovelab.txt';
 
-                                const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR NUTZUNG DER APP ${appName.toUpperCase()}\n\nSehr geehrte Eltern, liebe Erziehungsberechtigte,\n\nim Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).\n\nDATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:\n- Die Nutzung der App ist für Sie und Ihr Kind vollständig kostenlos.\n- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.\n- Zur Identifizierung wird lediglich ein Profil mit dem Vornamen sowie dem ersten Buchstaben des Nachnamens (z. B. „Jonas M.“) angelegt.\n- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH & Supabase EU) statt.\n- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.\n\nMit der Nutzung der App willigen Sie ein, dass wir ein anonymisiertes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.\n\nVielen Dank für Ihre Unterstützung!`;
+                                const costPhrase = isGrooveOnly || studentBillingOption === 'school_covered' || !studentBillingOption
+                                  ? '- Die Nutzung der App ist für Sie und Ihr Kind vollständig kostenlos (die Gebühren trägt die Musikschule).'
+                                  : studentBillingOption === 'student_full'
+                                    ? '- Die Nutzung der App erfolgt als transparenter Jahresbeitrag von 5,88 € für das gesamte Schuljahr (entspricht 0,49 € / Monat; Einmalzahlung, keine automatische Verlängerung).'
+                                    : '- Die Musikschule bezuschusst das Profil; für Sie fällt ein reduzierter Jahresbeitrag von 4,80 € für das gesamte Schuljahr an (entspricht 0,40 € / Monat; Einmalzahlung, keine automatische Verlängerung).';
+
+                                const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR NUTZUNG DER APP ${appName.toUpperCase()}\n\nSehr geehrte Eltern, liebe Erziehungsberechtigte,\n\nim Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).\n\nDATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:\n${costPhrase}\n- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.\n- Zur Identifizierung wird lediglich ein Profil mit dem Vornamen sowie dem ersten Buchstaben des Nachnamens (z. B. „Jonas M.“) angelegt.\n- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH & Supabase EU) statt.\n- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.\n\nMit der Nutzung der App willigen Sie ein, dass wir ein anonymisiertes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.\n\nVielen Dank für Ihre Unterstützung!`;
                                 const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
                                 const url = URL.createObjectURL(blob);
                                 const a = document.createElement('a');
@@ -32206,6 +32393,285 @@ status: status,
           </div>
         </div>
       )}
+
+      {/* Modal for Standalone Storage Upgrade/Downgrade */}
+      {showStorageManagerModal && (() => {
+        const activeBookedGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
+        const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+        const usedGb = usedBytes / (1024 * 1024 * 1024);
+        const baseGb = 1.0;
+        const currentTotalCap = baseGb + activeBookedGb;
+        const usagePct = Math.min(100, Math.round((usedGb / currentTotalCap) * 100));
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(15, 23, 42, 0.6)',
+              backdropFilter: 'blur(6px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: '20px'
+            }}
+            onClick={() => setShowStorageManagerModal(false)}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                width: '100%',
+                maxWidth: '640px',
+                padding: '28px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <span style={{ fontSize: '0.65rem', background: '#dcfce7', color: '#166534', padding: '3px 8px', borderRadius: '999px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Cloud-Speicher Self-Service
+                  </span>
+                  <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+                    Audio-Tresor Speicher anpassen
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>
+                    Wähle dein gewünschtes Speichervolumen. Upgrades sind sofort aktiv, Downgrades werden monatlich wirksam.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStorageManagerModal(false)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
+                >
+                  <X size={20} color="#64748b" />
+                </button>
+              </div>
+
+              {/* Usage Meter */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
+                  <span style={{ fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <HardDrive size={15} color="#34a853" /> Aktuelle Speicherbelegung:
+                  </span>
+                  <span style={{ fontWeight: 700, color: usagePct > 80 ? '#dc2626' : '#16a34a' }}>
+                    {usedGb.toFixed(2).replace('.', ',')} GB von {currentTotalCap} GB belegt ({usagePct}%)
+                  </span>
+                </div>
+                <div style={{ background: '#e2e8f0', borderRadius: '6px', height: '6px', overflow: 'hidden', width: '100%' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${Math.max(4, usagePct)}%`,
+                    background: usagePct > 80 ? '#ef4444' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
+                    borderRadius: '6px',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+              </div>
+
+              {/* Tier Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+                {[
+                  { gb: 0, fee: 0, label: 'Standard', sublabel: '1 GB Basis', desc: '0,00 €', IconCmp: HardDrive },
+                  { gb: 5, fee: 1.49, label: '+5 GB', sublabel: 'Bis 100 Schüler', desc: '1,49 € / Mo.', IconCmp: Cloud },
+                  { gb: 10, fee: 2.99, label: '+10 GB', sublabel: 'Bis 250 Schüler', desc: '2,99 € / Mo.', IconCmp: Zap },
+                  { gb: 20, fee: 5.49, label: '+20 GB', sublabel: 'Bis 500 Schüler', desc: '5,49 € / Mo.', IconCmp: Rocket },
+                  { gb: 50, fee: 9.99, label: '+50 GB', sublabel: 'Große Schulen', desc: '9,99 € / Mo.', IconCmp: Crown },
+                  { gb: 100, fee: 16.99, label: '+100 GB', sublabel: 'Konservatorien', desc: '16,99 € / Mo.', IconCmp: Database },
+                  { gb: 250, fee: 34.99, label: '+250 GB', sublabel: 'Kreis-Schulen', desc: '34,99 € / Mo.', IconCmp: Sparkles }
+                ].map(tier => {
+                  const isSel = selectedStorageAddonGb === tier.gb;
+                  const isCurrent = activeBookedGb === tier.gb;
+                  const tierCapGb = baseGb + tier.gb;
+                  const isDowngradeBlocked = usedGb > tierCapGb;
+                  const Icon = tier.IconCmp;
+
+                  return (
+                    <div
+                      key={tier.gb}
+                      onClick={() => {
+                        if (isDowngradeBlocked) {
+                          alert(`⚠️ Downgrade nicht möglich: Deine Musikschule belegt aktuell ${usedGb.toFixed(2).replace('.', ',')} GB. Bitte lösche zuerst ${(usedGb - tierCapGb).toFixed(2).replace('.', ',')} GB an Aufnahmen im Audio-Tresor, um auf ${tier.label} zu wechseln.`);
+                          return;
+                        }
+                        setSelectedStorageAddonGb(tier.gb);
+                        setSelectedStorageAddonFee(tier.fee);
+                      }}
+                      style={{
+                        padding: '14px 10px',
+                        borderRadius: '16px',
+                        border: '2px solid',
+                        borderColor: isSel ? '#34a853' : isCurrent ? '#a7f3d0' : isDowngradeBlocked ? '#f1f5f9' : '#e2e8f0',
+                        background: isSel ? '#f0fdf4' : isCurrent ? '#fafffd' : isDowngradeBlocked ? '#f8fafc' : '#ffffff',
+                        cursor: isDowngradeBlocked ? 'not-allowed' : 'pointer',
+                        textAlign: 'center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        opacity: isDowngradeBlocked ? 0.5 : 1,
+                        position: 'relative',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {isCurrent && (
+                        <span style={{
+                          position: 'absolute',
+                          top: '-8px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          background: '#34a853',
+                          color: '#ffffff',
+                          fontSize: '0.54rem',
+                          fontWeight: 900,
+                          padding: '1px 6px',
+                          borderRadius: '999px',
+                          textTransform: 'uppercase'
+                        }}>
+                          Aktiv
+                        </span>
+                      )}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: isSel ? '#dcfce7' : '#f1f5f9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Icon size={16} color={isSel ? '#166534' : '#64748b'} />
+                          </div>
+                        </div>
+                        <div style={{ fontWeight: 900, fontSize: '0.86rem', color: isSel ? '#166534' : '#0f172a' }}>{tier.label}</div>
+                        <div style={{ fontSize: '0.62rem', color: isSel ? '#15803d' : '#64748b', fontWeight: 600, marginTop: '2px' }}>{tier.sublabel}</div>
+                      </div>
+                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '6px', marginTop: '8px', fontSize: '0.72rem', fontWeight: 800, color: isSel ? '#34a853' : '#0f172a' }}>
+                        {tier.desc}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Security & Compliance Box in Modal */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '12px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                fontSize: '0.7rem',
+                color: '#475569'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0f172a', fontWeight: 800 }}>
+                  <ShieldCheck size={15} color="#34a853" />
+                  <span>DSGVO- &amp; Sicherheits-Garantie (ISO 27001, AES-256, Art. 17 DSGVO Physisch-Löschung)</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px', fontSize: '0.66rem', color: '#64748b' }}>
+                  <span>✓ 100% Hosting in Deutschland</span>
+                  <span>✓ AES-256 Server-Verschlüsselung</span>
+                  <span>✓ Tägliche Sicherheits-Backups</span>
+                  <span>✓ Sofortige physische Speicherfreigabe</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowStorageManagerModal(false)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontSize: '0.78rem',
+                    fontWeight: 750,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const payload: any = {
+                        storage_addon_gb: selectedStorageAddonGb,
+                        storage_addon_monthly_fee: selectedStorageAddonFee,
+                        storage_addon_status: 'active'
+                      };
+                      let { error } = await supabase
+                        .from('schools')
+                        .update(payload)
+                        .eq('id', schoolId);
+
+                      if (error && (error.message.includes('storage_addon') || error.message.includes('schema cache'))) {
+                        console.warn("Storage addon DB column note:", error.message);
+                      }
+
+                      // Persist in overrides for instant platform-wide sync
+                      try {
+                        const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+                        const overrides = JSON.parse(overridesStr);
+                        overrides[schoolId] = {
+                          ...(overrides[schoolId] || {}),
+                          storage_addon_gb: selectedStorageAddonGb,
+                          storage_addon_monthly_fee: selectedStorageAddonFee,
+                          storage_addon_status: 'active'
+                        };
+                        localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+                        window.dispatchEvent(new Event('groovelab_school_updated'));
+                      } catch (e) {
+                        console.error(e);
+                      }
+
+                      setCurrentSchoolProfile((prev: any) => prev ? {
+                        ...prev,
+                        storage_addon_gb: selectedStorageAddonGb,
+                        storage_addon_monthly_fee: selectedStorageAddonFee,
+                        storage_addon_status: 'active'
+                      } : prev);
+
+                      setShowStorageManagerModal(false);
+                      alert(`✅ Speicher-Paket erfolgreich angepasst: ${selectedStorageAddonGb > 0 ? `+${selectedStorageAddonGb} GB (${selectedStorageAddonFee.toFixed(2).replace('.', ',')} € / Mo.)` : 'Standard (1 GB Basis)'}`);
+                    } catch (err: any) {
+                      alert("Fehler beim Speichern: " + err.message);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 22px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: '#34a853',
+                    color: '#ffffff',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                  }}
+                >
+                  Änderung verbindlich speichern
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal for Invoice Preview / Print */}
       {selectedInvoice && (

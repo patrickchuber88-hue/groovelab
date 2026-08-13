@@ -1347,7 +1347,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 lineHeight: 1.6,
                 fontWeight: 550
               }}>
-                Keine Einrichtungsgebühr, keine Vertragskosten für die Softwarenutzung und unbegrenzte Admin-, Lehrer- & Schülerkonten in der Basisversion. Du bezahlst ausschließlich das dedizierte Cloud-Hosting oder aktive Service-Funktionen.
+                Keine Einrichtungsgebühr und keine Lizenzkosten für die Softwarenutzung. Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab 4,99 € / Mo.) und aktive Profile.
               </p>
             </div>
 

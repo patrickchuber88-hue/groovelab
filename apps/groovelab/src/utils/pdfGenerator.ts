@@ -38,13 +38,13 @@ export const generateConsentPDF = async (
   let costDetailText = 'Die Nutzung dieser App ist für Sie und Ihr Kind vollständig kostenlos. Sämtliche Lizenz-, Hosting- und Bereitstellungsgebühren werden im Rahmen des Schulbetriebs zu 100% von der Musikschule getragen. Es entstehen Ihnen keine versteckten Kosten.';
 
   if (studentBillingOption === 'student_full') {
-    costTitle = '0,49 € / MONAT';
-    costDesc = 'Monatsbeitrag für den App-Zugang (Direktabrechnung).';
-    costDetailText = 'Für die Nutzung der App fällt ein geringer Betrag von 0,49 € inkl. MwSt. pro Monat an (bzw. 5,88 € als Jahresbeitrag). Die Abrechnung erfolgt direkt mit den Erziehungsberechtigten gemäß den Vorgaben der Musikschule.';
+    costTitle = '5,88 € / SCHULJAHR';
+    costDesc = 'Jahres-Einmalbeitrag für den App-Zugang (entspricht 0,49 € / Monat).';
+    costDetailText = 'Für die Nutzung der App fällt ein transparenter Jahresbeitrag von 5,88 € inkl. MwSt. für das gesamte Schuljahr an (entspricht 0,49 € / Monat). Die Abrechnung erfolgt als Einmalzahlung direkt mit den Erziehungsberechtigten gemäß den Vorgaben der Musikschule (keine automatische Verlängerung).';
   } else if (studentBillingOption === 'student_partial') {
-    costTitle = '0,40 € / MONAT';
-    costDesc = 'Eigenanteil der Eltern (Musikschule bezuschusst 0,09 €).';
-    costDetailText = 'Für die Nutzung der App fällt für Sie ein Eigenanteil von 0,40 € inkl. MwSt. pro Monat an (bzw. 4,80 € als Jahresbeitrag). Die verbleibenden 0,09 € monatlich übernimmt die Musikschule als Zuschuss für das Profil.';
+    costTitle = '4,80 € / SCHULJAHR';
+    costDesc = 'Eigenanteil als Jahresbeitrag (entspricht 0,40 € / Monat; Schule bezuschusst).';
+    costDetailText = 'Für die Nutzung der App fällt für Sie ein reduzierter Jahresbeitrag von 4,80 € inkl. MwSt. für das gesamte Schuljahr an (entspricht 0,40 € / Monat; die verbleibenden 0,09 € monatlich übernimmt die Musikschule als Zuschuss). Die Abrechnung erfolgt als Einmalzahlung (keine automatische Verlängerung).';
   }
 
   // GrooveLab is always covered by the school, override if platform is solely GrooveLab

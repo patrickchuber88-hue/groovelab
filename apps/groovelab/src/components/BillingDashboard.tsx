@@ -1397,7 +1397,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                         {inv.storageAddonGb > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                              <span style={{ color: '#0f172a', fontWeight: 600 }}>🎙️ Audio-Tresor &amp; Speicher (+{inv.storageAddonGb} GB)</span>
+                              <span style={{ color: '#0f172a', fontWeight: 600 }}>Audio-Tresor Speicher (+{inv.storageAddonGb} GB)</span>
                               <span style={{ color: '#64748b', fontSize: '0.65rem' }}>Zusatz-Speichervolumen</span>
                             </div>
                             <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.storageAddonMonthlyFee.toFixed(2).replace('.', ',')} €</span>
@@ -1459,10 +1459,12 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
                   // Define packages with price & recommendation logic
                   const storagePackages = [
-                    { gb: 5, price: 1.99, label: '5 GB Tresor-Paket', recMax: 100, desc: 'Empfehlung: Bis zu 100 Schüler' },
-                    { gb: 10, price: 2.99, label: '10 GB Tresor-Paket', recMax: 250, desc: 'Empfehlung: Bis zu 250 Schüler' },
-                    { gb: 20, price: 4.99, label: '20 GB Tresor-Paket', recMax: 500, desc: 'Empfehlung: Bis zu 500 Schüler' },
-                    { gb: 40, price: 7.99, label: '40 GB Tresor-Paket', recMax: 1000, desc: 'Empfehlung: Bis zu 1.000 Schüler' }
+                    { gb: 5, price: 1.49, label: '+5 GB Tresor-Paket', recMax: 100, desc: 'Empfehlung: Bis zu 100 Schüler' },
+                    { gb: 10, price: 2.99, label: '+10 GB Tresor-Paket', recMax: 250, desc: 'Empfehlung: Bis zu 250 Schüler' },
+                    { gb: 20, price: 5.49, label: '+20 GB Tresor-Paket', recMax: 500, desc: 'Empfehlung: Bis zu 500 Schüler' },
+                    { gb: 50, price: 9.99, label: '+50 GB Tresor-Paket', recMax: 1000, desc: 'Empfehlung: Große Musikschulen' },
+                    { gb: 100, price: 16.99, label: '+100 GB Tresor-Paket', recMax: 2000, desc: 'Empfehlung: Groß-Institute & Konservatorien' },
+                    { gb: 250, price: 34.99, label: '+250 GB Tresor-Paket', recMax: 5000, desc: 'Empfehlung: Kreis-Musikschulen' }
                   ];
 
                   return (

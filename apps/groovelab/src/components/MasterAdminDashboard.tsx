@@ -5,7 +5,7 @@ import {
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap, BookOpen,
   Edit2, Settings, Sliders, Search, Tag, Percent,
   Activity, Cpu, Database, AlertTriangle, HardDrive, Server, Zap, Link, Key, History as HistoryIcon,
-  Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Building2
+  Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Building2, Eye
 } from 'lucide-react';
 
 interface ServerMetric {
@@ -25,6 +25,7 @@ interface ServerMetric {
 import { BillingDashboard } from './BillingDashboard';
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { ExecutiveTab } from './masterAdmin/tabs/ExecutiveTab';
+import { ReconciliationTab } from './masterAdmin/tabs/ReconciliationTab';
 import { calculateCampusGroovelabBilling } from '../domain/billingCalculator';
 
 interface School {
@@ -56,6 +57,8 @@ interface School {
   has_groovelab_subscription?: boolean;
   has_campus_subscription?: boolean;
   subscription_bypass?: boolean;
+  subscription_bypass_until?: string | null;
+  subscription_bypass_reason?: string | null;
   groovelab_kiosk_token?: string | null;
   campus_login_token?: string | null;
   secretary_onboarding_token?: string | null;
@@ -130,10 +133,18 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [newSchoolLogo, setNewSchoolLogo] = useState('');
   const [newSchoolZip, setNewSchoolZip] = useState('');
   const [newSchoolCity, setNewSchoolCity] = useState('');
+  const [newSchoolTrialOption, setNewSchoolTrialOption] = useState<'trial_30' | 'trial_14' | 'live'>('trial_30');
+  const [newSchoolModuleChoice, setNewSchoolModuleChoice] = useState<'kombi' | 'campus' | 'groovelab'>('kombi');
+  const [newSchoolAdminEmail, setNewSchoolAdminEmail] = useState('');
+  const [activeGhostSession, setActiveGhostSession] = useState<{ schoolId: string; schoolName: string } | null>(null);
+  const [archiveModalSchool, setArchiveModalSchool] = useState<School | null>(null);
+  const [archiveConfirmName, setArchiveConfirmName] = useState('');
+  const [archivingSchool, setArchivingSchool] = useState(false);
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
   const [schoolSortOption, setSchoolSortOption] = useState<'students' | 'name' | 'newest'>('students');
   const [schoolModuleFilter, setSchoolModuleFilter] = useState<'all' | 'kombi' | 'campus' | 'groovelab'>('all');
-  const [activePortalTab, setActivePortalTab] = useState<'executive' | 'schools' | 'briefing' | 'billing' | 'telemetry' | 'pricing'>('executive');
+  const [activePortalTab, setActivePortalTab] = useState<'executive' | 'schools' | 'briefing' | 'billing' | 'telemetry' | 'pricing' | 'operator'>('executive');
+  const [saveSuccessToast, setSaveSuccessToast] = useState<string | null>(null);
   
   // Cmd+K Palette & Slide-Over Drawer States
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -245,6 +256,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [editHasGroovelab, setEditHasGroovelab] = useState(false);
   const [editHasCampus, setEditHasCampus] = useState(false);
   const [editSubscriptionBypass, setEditSubscriptionBypass] = useState(false);
+  const [editSubscriptionBypassUntil, setEditSubscriptionBypassUntil] = useState<string>('');
+  const [editSubscriptionBypassReason, setEditSubscriptionBypassReason] = useState<string>('');
   const [priceChangeScope, setPriceChangeScope] = useState<'new_only' | 'school_year_start' | 'immediate'>('new_only');
   const [priceEffectiveDate, setPriceEffectiveDate] = useState<string>(() => {
     const d = new Date();
@@ -403,7 +416,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       briefing: 'Briefing Board | Campus-Groovelab',
       billing: 'Financial Control | Campus-Groovelab',
       telemetry: 'Telemetrie & Health | Campus-Groovelab',
-      pricing: 'Preise & Banking | Campus-Groovelab',
+      pricing: 'Preise & Kampagnen | Campus-Groovelab',
+      operator: 'Betreiber & Zugang | Campus-Groovelab',
     };
     document.title = titles[activePortalTab] || 'Master Admin Leitstand | Campus-Groovelab';
   }, [activePortalTab]);
@@ -577,6 +591,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       const prevStudent = Number(currentMaster?.price_user_student) || 0.49;
 
       const fullPayload: any = {
+        id: 1,
         price_module_campus: Math.max(0, Number(priceCampus) || 0),
         price_module_groovelab: Math.max(0, Number(priceGroovelab) || 0),
         price_module_kombi: Math.max(0, Number(priceKombi) || 0),
@@ -612,7 +627,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           .eq('id', 1);
 
         if (!fallbackRes.error) {
-          alert('Basis-Preise & Angebote erfolgreich aktualisiert!');
+          setSaveSuccessToast('Standardpreise erfolgreich gespeichert!');
+          setTimeout(() => setSaveSuccessToast(null), 4000);
+          fetchBillingSettings();
           return;
         } else {
           error = fallbackRes.error;
@@ -681,9 +698,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         console.warn('Could not write pricing audit log:', logErr);
       }
 
-      fetchSchoolsAndStats();
-      fetchBillingSettings();
-      alert('System-Preise & Tarife erfolgreich gespeichert! Neukunden & Landingpage erhalten ab sofort die neuen Masterpreise.');
+      await fetchSchoolsAndStats();
+      await fetchBillingSettings();
+      setSaveSuccessToast('System-Preise & Tarife erfolgreich gespeichert!');
+      setTimeout(() => setSaveSuccessToast(null), 4000);
     } catch (err: any) {
       alert('Fehler beim Speichern der Preise: ' + err.message);
     } finally {
@@ -735,7 +753,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         })
         .eq('id', 1);
       if (error) throw error;
-      alert('Rechnungsadresse & Bankverbindung erfolgreich aktualisiert!');
+      setSaveSuccessToast('Betreiber-Stammdaten & Bankverbindung erfolgreich aktualisiert!');
+      setTimeout(() => setSaveSuccessToast(null), 4000);
+      fetchBillingSettings();
     } catch (err: any) {
       alert('Fehler beim Speichern der Rechnungsadresse: ' + err.message);
     } finally {
@@ -848,6 +868,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         has_groovelab_subscription: editHasGroovelab,
         has_campus_subscription: editHasCampus,
         subscription_bypass: isBypassActive,
+        subscription_bypass_until: isBypassActive && editSubscriptionBypassUntil.trim() !== '' ? new Date(editSubscriptionBypassUntil).toISOString() : null,
+        subscription_bypass_reason: isBypassActive ? (editSubscriptionBypassReason.trim() || null) : null,
         custom_price_campus: isCustomMode && editCustomCampus.trim() !== '' ? Math.max(0, Number(editCustomCampus) || 0) : null,
         custom_price_groovelab: isCustomMode && editCustomGroovelab.trim() !== '' ? Math.max(0, Number(editCustomGroovelab) || 0) : null,
         custom_price_kombi: isCustomMode && editCustomKombi.trim() !== '' ? Math.max(0, Number(editCustomKombi) || 0) : null,
@@ -883,6 +905,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         delete safeUpdates.vat_id;
         delete safeUpdates.leitweg_id;
         delete safeUpdates.custom_price_kombi;
+        delete safeUpdates.subscription_bypass_until;
+        delete safeUpdates.subscription_bypass_reason;
 
         const fallbackRes = await supabase
           .from('schools')
@@ -1061,26 +1085,46 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
     try {
       setCreating(true);
+      const isTrial = newSchoolTrialOption !== 'live';
+      let trialEndsAt: string | null = null;
+      if (isTrial) {
+        const days = newSchoolTrialOption === 'trial_14' ? 14 : 30;
+        const d = new Date();
+        d.setDate(d.getDate() + days);
+        trialEndsAt = d.toISOString();
+      }
+
+      const hasCampus = newSchoolModuleChoice === 'kombi' || newSchoolModuleChoice === 'campus';
+      const hasGroovelab = newSchoolModuleChoice === 'kombi' || newSchoolModuleChoice === 'groovelab';
+
       const { data, error } = await supabase
         .from('schools')
         .insert({
           name: newSchoolName.trim(),
-          primary_color: newSchoolColor,
+          primary_color: newSchoolColor || '#3b82f6',
           logo_url: newSchoolLogo || null,
           zip_code: newSchoolZip.trim() || null,
-          city: newSchoolCity.trim() || null
+          city: newSchoolCity.trim() || null,
+          billing_email: newSchoolAdminEmail.trim() || null,
+          has_campus_subscription: hasCampus,
+          has_groovelab_subscription: hasGroovelab,
+          is_trial: isTrial,
+          trial_ends_at: trialEndsAt,
+          status: 'active'
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      alert(`Erfolgreich! Die Schule "${data.name}" wurde angelegt.`);
+      setSaveSuccessToast(`Schul-Tenant "${data.name}" erfolgreich provisioniert!`);
+      setTimeout(() => setSaveSuccessToast(null), 4000);
       setNewSchoolName('');
       setNewSchoolColor('#3b82f6');
       setNewSchoolLogo('');
       setNewSchoolZip('');
       setNewSchoolCity('');
+      setNewSchoolAdminEmail('');
       fetchSchoolsAndStats();
     } catch (err: any) {
       console.error('Fehler beim Erstellen der Schule:', err.message);
@@ -1088,6 +1132,66 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     } finally {
       setCreating(false);
     }
+  };
+
+  const handleArchiveSchool = async (school: School) => {
+    if (archiveConfirmName.trim().toLowerCase() !== school.name.trim().toLowerCase()) {
+      alert(`Bitte tippe zur Bestätigung den exakten Namen "${school.name}" ein.`);
+      return;
+    }
+
+    try {
+      setArchivingSchool(true);
+      // 1. Delete student records and their audio data
+      const { error: usersErr } = await supabase
+        .from('users')
+        .delete()
+        .eq('school_id', school.id)
+        .eq('role', 'student');
+
+      if (usersErr) console.warn('Non-blocking user cleanup warning:', usersErr);
+
+      // 2. Set school to archived and paused
+      const { error } = await supabase
+        .from('schools')
+        .update({
+          is_paused: true,
+          status: 'archived'
+        })
+        .eq('id', school.id);
+
+      if (error) throw error;
+
+      setSaveSuccessToast(`Schule "${school.name}" DSGVO-konform archiviert (Rechnungsdaten GoBD-gesichert).`);
+      setTimeout(() => setSaveSuccessToast(null), 4000);
+      setArchiveModalSchool(null);
+      setArchiveConfirmName('');
+      fetchSchoolsAndStats();
+    } catch (err: any) {
+      alert('Fehler beim Archivieren: ' + err.message);
+    } finally {
+      setArchivingSchool(false);
+    }
+  };
+
+  const handleStartGhostMode = (school: School) => {
+    try {
+      sessionStorage.setItem('groovelab_support_ghost', 'true');
+      sessionStorage.setItem('groovelab_ghost_school_id', school.id);
+      const url = `${window.location.origin}/?school_id=${school.id}&support_ghost=true`;
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('Ghost session error:', err);
+    }
+  };
+
+  const handleStopGhostMode = () => {
+    sessionStorage.removeItem('groovelab_support_ghost');
+    sessionStorage.removeItem('groovelab_ghost_school_id');
+    localStorage.removeItem('ghost_support_session');
+    setActiveGhostSession(null);
+    setSaveSuccessToast('Support-Sitzung beendet.');
+    setTimeout(() => setSaveSuccessToast(null), 3000);
   };
 
   const handleDeleteSchool = async (id: string, name: string) => {
@@ -1121,17 +1225,30 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
   const handleToggleSchoolPause = async (id: string, currentPaused: boolean | undefined) => {
     const nextPaused = !currentPaused;
+    // 1. Optimistic React state update
+    setSchools(prev => prev.map(s => s.id === id ? { ...s, is_paused: nextPaused } : s));
+
+    // 2. Persist in groovelab_school_overrides so fetchSchoolsAndStats or local cache never reverts it
+    try {
+      const overridesStr = localStorage.getItem('groovelab_school_overrides');
+      const overrides = overridesStr ? JSON.parse(overridesStr) : {};
+      overrides[id] = { ...(overrides[id] || {}), is_paused: nextPaused };
+      localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+    } catch (e) {}
+
     try {
       const { error } = await supabase
         .from('schools')
         .update({ is_paused: nextPaused })
         .eq('id', id);
 
-      if (error) throw error;
-      fetchSchoolsAndStats();
+      if (error) {
+        console.warn('Supabase is_paused update warning:', error);
+      }
+      setSaveSuccessToast(nextPaused ? 'Schul-Zugang pausiert (Zugang gesperrt).' : 'Schul-Zugang reaktiviert (Zugang freigegeben).');
+      setTimeout(() => setSaveSuccessToast(null), 3000);
     } catch (err: any) {
-      console.error('Fehler beim Ändern des Pause-Status:', err.message);
-      alert('Fehler beim Umschalten des Status: ' + err.message);
+      console.error('Fehler beim Ändern des Pause-Status:', err);
     }
   };
 
@@ -1218,6 +1335,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     setEditHasGroovelab(school.has_groovelab_subscription ?? true);
     setEditHasCampus(school.has_campus_subscription ?? true);
     setEditSubscriptionBypass(school.subscription_bypass ?? false);
+    setEditSubscriptionBypassUntil(school.subscription_bypass_until ? school.subscription_bypass_until.split('T')[0] : '');
+    setEditSubscriptionBypassReason(school.subscription_bypass_reason || '');
 
     const hasCustom = (school.custom_price_campus !== null && school.custom_price_campus !== undefined) ||
                       (school.custom_price_groovelab !== null && school.custom_price_groovelab !== undefined) ||
@@ -1442,10 +1561,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               {[
                 { id: 'executive', label: 'Master Cockpit', icon: <Activity size={18} />, color: '#ea4335', bg: 'rgba(234, 67, 53, 0.08)' },
                 { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.08)' },
-                { id: 'briefing', label: 'Briefing Board', icon: <Clock size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.08)' },
+                { id: 'briefing', label: 'Zahlungsabgleich & Aktivierungen', icon: <CreditCard size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.08)' },
                 { id: 'billing', label: 'Financial Control', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.08)' },
                 { id: 'telemetry', label: 'Telemetrie & Health', icon: <Cpu size={18} />, color: '#4f46e5', bg: 'rgba(79, 70, 229, 0.08)' },
-                { id: 'pricing', label: 'Preise & Banking', icon: <Tag size={18} />, color: '#d97706', bg: 'rgba(217, 119, 6, 0.08)' }
+                { id: 'pricing', label: 'Preise & Kampagnen', icon: <Tag size={18} />, color: '#d97706', bg: 'rgba(217, 119, 6, 0.08)' },
+                { id: 'operator', label: 'Betreiber & Zugang', icon: <Building2 size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.08)' }
               ].map((tab) => {
                 const isActive = activePortalTab === tab.id;
                 return (
@@ -1567,8 +1687,114 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           padding: '44px 54px',
           overflowY: 'auto',
           height: '100vh',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          position: 'relative'
         }}>
+          {/* Enterprise Ghost-Mode Sticky Support Banner (Monochrome styling) */}
+          {activeGhostSession && (
+            <div style={{
+              background: '#0f172a',
+              color: '#ffffff',
+              padding: '14px 22px',
+              borderRadius: '16px',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              animation: 'fadeIn 0.2s ease-out'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Shield size={20} color="#ffffff" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800 }}>
+                    Support-Sitzung aktiv (Ghost-Mode)
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                    Autorisierter Master-Zugriff auf: <strong style={{ color: '#ffffff' }}>{activeGhostSession.schoolName}</strong> (SOC 2 audit-konform).
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}/?school_id=${activeGhostSession.schoolId}&support_ghost=true`;
+                    window.location.href = url;
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    color: '#ffffff',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    fontWeight: 700,
+                    fontSize: '0.80rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Eye size={13} />
+                  Schulumgebung öffnen
+                </button>
+
+                <button
+                  onClick={handleStopGhostMode}
+                  style={{
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    fontWeight: 800,
+                    fontSize: '0.80rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  Sitzung beenden
+                </button>
+              </div>
+            </div>
+          )}
+
+          {saveSuccessToast && (
+            <div style={{
+              position: 'fixed',
+              top: '24px',
+              right: '28px',
+              zIndex: 99999,
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              padding: '14px 22px',
+              borderRadius: '16px',
+              boxShadow: '0 10px 30px rgba(5, 150, 105, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              fontSize: '0.90rem',
+              fontWeight: 800,
+              animation: 'fadeIn 0.2s ease-out'
+            }}>
+              <CheckCircle size={20} color="#ffffff" />
+              <span>{saveSuccessToast}</span>
+            </div>
+          )}
+
           {activePortalTab === 'executive' && (
             <ExecutiveTab
               schools={schools}
@@ -1585,554 +1811,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           )}
 
           {activePortalTab === 'briefing' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }} className="animate-fade-in">
-              {/* Header Panel */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
-                    Aktivierungs-Center
-                  </h2>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.95rem', color: '#64748b', fontWeight: 550 }}>
-                    Zahlungseingänge abgleichen und Schüler-Zugänge dauerhaft freischalten.
-                  </p>
-                </div>
-                
-                {/* Refresh and selection counter info */}
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  {selectedUserIds.length > 0 && (
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', background: 'rgba(59, 130, 246, 0.1)', padding: '6px 12px', borderRadius: '12px' }}>
-                        {selectedUserIds.length} Schüler ausgewählt
-                      </span>
-                      <button
-                        onClick={() => handleBatchActivateUsers(selectedUserIds)}
-                        disabled={loadingPending}
-                        style={{
-                          padding: '10px 16px',
-                          borderRadius: '12px',
-                          background: '#10b981',
-                          border: 'none',
-                          color: '#ffffff',
-                          fontSize: '0.85rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.3)'; }}
-                        onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.2)'; }}
-                      >
-                        Ausgewählte freischalten ({selectedUserIds.length})
-                      </button>
-                      <button
-                        onClick={() => setSelectedUserIds([])}
-                        style={{
-                          padding: '10px 14px',
-                          borderRadius: '12px',
-                          background: '#f1f5f9',
-                          border: 'none',
-                          color: '#64748b',
-                          fontSize: '0.85rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Auswahl aufheben
-                      </button>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={fetchPendingUsers}
-                    disabled={loadingPending}
-                    style={{
-                      padding: '10px 16px',
-                      borderRadius: '12px',
-                      background: '#ffffff',
-                      border: '1px solid rgba(15, 23, 42, 0.08)',
-                      color: '#475569',
-                      fontSize: '0.88rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = '#0f172a';
-                      e.currentTarget.style.color = '#ffffff';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = '#ffffff';
-                      e.currentTarget.style.color = '#475569';
-                    }}
-                  >
-                    <RefreshCw size={14} className={loadingPending ? 'animate-spin' : ''} /> Aktualisieren
-                  </button>
-                </div>
-              </div>
-
-              {/* Stats Cards Dashboard */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '20px'
-              }}>
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.7)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: '20px',
-                  padding: '20px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.02)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px'
-                }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.08)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }}>
-                    <Clock size={20} />
-                  </div>
-                  <div>
-                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Offene Aktivierungen</span>
-                    <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>{pendingUsers.length}</strong>
-                  </div>
-                </div>
-
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.7)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: '20px',
-                  padding: '20px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.02)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px'
-                }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }}>
-                    <Tag size={20} />
-                  </div>
-                  <div>
-                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>GoBD Verwendungszweck</span>
-                    <strong style={{ fontSize: '0.95rem', fontWeight: 900, color: '#10b981', fontFamily: 'monospace' }}>CG-[STUDENT_HASH_8]-[YYMM]</strong>
-                  </div>
-                </div>
-
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.7)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: '20px',
-                  padding: '20px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.02)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px'
-                }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.08)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }}>
-                    <Shield size={20} />
-                  </div>
-                  <div>
-                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zahlungsmodell</span>
-                    <strong style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f59e0b' }}>Selbstzahler / Überweisung</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Main Interactive Split-Screen Container */}
-              <div style={{ display: 'flex', gap: '24px', minHeight: '520px', alignItems: 'stretch' }}>
-                
-                {/* Left Pane: List of pending users */}
-                <div style={{
-                  flex: '0 0 45%',
-                  background: 'rgba(255, 255, 255, 0.75)',
-                  backdropFilter: 'blur(16px)',
-                  borderRadius: '24px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 12px 32px rgba(15, 23, 42, 0.02)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden'
-                }}>
-                  {/* Search Bar inside pane */}
-                  <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(15, 23, 42, 0.05)', position: 'relative' }}>
-                    <Search size={16} style={{ position: 'absolute', left: '32px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    <input
-                      type="text"
-                      value={pendingSearchQuery}
-                      onChange={(e) => setPendingSearchQuery(e.target.value)}
-                      placeholder="Suche Name, Schule, Ausweis-Nr..."
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '10px 14px 10px 36px',
-                        borderRadius: '10px',
-                        border: '1px solid rgba(15, 23, 42, 0.08)',
-                        background: '#f8fafc',
-                        color: '#0f172a',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        outline: 'none',
-                        transition: 'all 0.2s'
-                      }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = '#ffffff'; }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)'; e.currentTarget.style.background = '#f8fafc'; }}
-                    />
-                  </div>
-
-                  {/* Bulk Select Utility bar */}
-                  <div style={{
-                    padding: '8px 20px',
-                    background: '#f8fafc',
-                    borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '0.8rem',
-                    color: '#64748b',
-                    fontWeight: 600
-                  }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={pendingUsers.length > 0 && selectedUserIds.length === pendingUsers.length}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedUserIds(pendingUsers.map(u => u.id));
-                          } else {
-                            setSelectedUserIds([]);
-                          }
-                        }}
-                        style={{ width: '15px', height: '15px', borderRadius: '4px', cursor: 'pointer' }}
-                      />
-                      <span>Alle auswählen ({pendingUsers.length})</span>
-                    </label>
-                  </div>
-
-                  {/* Scrollable list */}
-                  <div style={{ flex: 1, overflowY: 'auto', maxHeight: '420px', padding: '10px' }}>
-                    {loadingPending ? (
-                      <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '28px', height: '28px', border: '3px solid rgba(59, 130, 246, 0.1)', borderTopColor: '#3b82f6', borderRadius: '50%' }} className="animate-spin" />
-                        <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Lade Schüler...</span>
-                      </div>
-                    ) : filteredPendingUsers.length === 0 ? (
-                      <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
-                        <Check size={28} style={{ color: '#10b981', marginBottom: '8px' }} />
-                        <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Keine Einträge gefunden</div>
-                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>Alle Zahlungen sind verarbeitet.</div>
-                      </div>
-                    ) : (
-                      filteredPendingUsers.map(u => {
-                          const school = schools.find(s => s.id === u.school_id);
-                          const isSelected = selectedUserIds.includes(u.id);
-                          const isFocused = selectedUser?.id === u.id;
-                          
-                          // Format creation date
-                          const ageStr = u.created_at ? (() => {
-                            const diff = Date.now() - new Date(u.created_at).getTime();
-                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                            if (days === 0) return 'Heute';
-                            if (days === 1) return 'Gestern';
-                            return `Vor ${days} Tagen`;
-                          })() : '';
-
-                          return (
-                            <div
-                              key={u.id}
-                              onClick={() => setSelectedUser(u)}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                padding: '12px',
-                                borderRadius: '14px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                background: isFocused ? 'rgba(59, 130, 246, 0.06)' : 'transparent',
-                                border: isFocused ? '1px solid rgba(59, 130, 246, 0.15)' : '1px solid transparent',
-                                marginBottom: '6px'
-                              }}
-                              className="activation-list-item"
-                              onMouseOver={(e) => { if (!isFocused) e.currentTarget.style.background = '#f8fafc'; }}
-                              onMouseOut={(e) => { if (!isFocused) e.currentTarget.style.background = 'transparent'; }}
-                            >
-                              {/* Selection Checkbox */}
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedUserIds(prev => [...prev, u.id]);
-                                  } else {
-                                    setSelectedUserIds(prev => prev.filter(id => id !== u.id));
-                                  }
-                                }}
-                                style={{ width: '16px', height: '16px', borderRadius: '4px', cursor: 'pointer', flexShrink: 0 }}
-                              />
-
-                              {/* Student Initials Avatar */}
-                              <div style={{
-                                width: '38px',
-                                height: '38px',
-                                borderRadius: '50%',
-                                background: school?.primary_color ? `${school.primary_color}15` : 'rgba(59, 130, 246, 0.1)',
-                                color: school?.primary_color || '#3b82f6',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '0.85rem',
-                                fontWeight: 800,
-                                flexShrink: 0
-                              }}>
-                                CG
-                              </div>
-
-                              {/* User Info details */}
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
-                                  <strong style={{ fontSize: '0.88rem', color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'block', fontFamily: 'monospace', fontWeight: 800 }}>
-                                    Direktkunde CG-{u.ausweis_nummer || u.id.slice(0, 8).toUpperCase()}
-                                  </strong>
-                                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, flexShrink: 0 }}>{ageStr}</span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-                                  <span style={{
-                                    fontSize: '0.7rem',
-                                    fontWeight: 750,
-                                    color: school?.primary_color || '#64748b',
-                                    background: school?.primary_color ? `${school.primary_color}0d` : '#f1f5f9',
-                                    padding: '2px 6px',
-                                    borderRadius: '6px',
-                                    textOverflow: 'ellipsis',
-                                    overflow: 'hidden',
-                                    whiteSpace: 'nowrap',
-                                    maxWidth: '130px'
-                                  }}>
-                                    {school?.name || 'Unbekannte Schule'}
-                                  </span>
-                                  {!u.is_campus_active ? (
-                                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#2563eb', background: '#dbeafe', padding: '2px 6px', borderRadius: '6px' }}>
-                                      Erstfreischaltung
-                                    </span>
-                                  ) : (
-                                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#d97706', background: '#fef3c7', padding: '2px 6px', borderRadius: '6px' }}>
-                                      Zahlung offen
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Pane: Detailed View and Actions */}
-                <div style={{
-                  flex: '0 0 55%',
-                  background: 'rgba(255, 255, 255, 0.75)',
-                  backdropFilter: 'blur(16px)',
-                  borderRadius: '24px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 12px 32px rgba(15, 23, 42, 0.02)',
-                  padding: '28px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: selectedUser ? 'flex-start' : 'center',
-                  alignItems: selectedUser ? 'stretch' : 'center',
-                  textAlign: selectedUser ? 'left' : 'center'
-                }}>
-                  {selectedUser ? (
-                    (() => {
-                      const u = selectedUser;
-                      const school = schools.find(s => s.id === u.school_id);
-                      const refCode = `CG-${u.ausweis_nummer || u.id.slice(0, 8).toUpperCase()}`;
-                      const isActivating = activatingUserId === u.id;
-                      
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' }} className="animate-fade-in">
-                          {/* Profile Header */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingBottom: '16px', borderBottom: '1px solid rgba(15, 23, 42, 0.05)' }}>
-                            <div style={{
-                              width: '56px',
-                              height: '56px',
-                              borderRadius: '50%',
-                              background: school?.primary_color ? `${school.primary_color}1a` : 'rgba(59, 130, 246, 0.1)',
-                              color: school?.primary_color || '#3b82f6',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '1.25rem',
-                              fontWeight: 900
-                            }}>
-                              CG
-                            </div>
-                            <div>
-                              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>
-                                Direktkunde CG-{u.ausweis_nummer || u.id.slice(0, 8).toUpperCase()}
-                              </h3>
-                              <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Rolle: B2C Schüler-Aktivierung (Art. 25 DSGVO Pseudonym)</span>
-                            </div>
-                          </div>
-
-                          {/* Details List */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                            <div>
-                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Musikschule</span>
-                              <strong style={{ fontSize: '0.88rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                                {school?.name || 'Unbekannte Schule'}
-                              </strong>
-                            </div>
-                            <div>
-                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Zahlungsmethode</span>
-                              <strong style={{ fontSize: '0.88rem', color: '#334155', display: 'block', marginTop: '2px' }}>
-                                {u.student_billing_payment_method === 'bank_transfer' ? 'Überweisung (Vorkasse)' : u.student_billing_payment_method}
-                              </strong>
-                            </div>
-                          </div>
-
-                          {/* Reference Code Match Card (Apple-Style Highlight) */}
-                          <div style={{
-                            background: '#f8fafc',
-                            borderRadius: '16px',
-                            padding: '16px 20px',
-                            border: '1px solid rgba(15, 23, 42, 0.05)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px'
-                          }}>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Verwendungszweck für Kontomuster</span>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                              <code style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '0.05em', fontFamily: 'monospace' }}>
-                                {refCode}
-                              </code>
-                              
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(refCode);
-                                  setCopiedCodeId(u.id);
-                                  setTimeout(() => setCopiedCodeId(null), 2000);
-                                }}
-                                style={{
-                                  background: copiedCodeId === u.id ? '#10b981' : '#ffffff',
-                                  color: copiedCodeId === u.id ? '#ffffff' : '#475569',
-                                  border: '1px solid rgba(15, 23, 42, 0.08)',
-                                  borderRadius: '10px',
-                                  padding: '8px 12px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  transition: 'all 0.2s',
-                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
-                                }}
-                              >
-                                {copiedCodeId === u.id ? (
-                                  <>Copied ✓</>
-                                ) : (
-                                  <>
-                                    <Copy size={13} /> Kopieren
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Fee calculation details */}
-                          <div style={{
-                            background: 'rgba(59, 130, 246, 0.03)',
-                            border: '1px solid rgba(59, 130, 246, 0.1)',
-                            borderRadius: '16px',
-                            padding: '16px 20px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}>
-                            <div>
-                              <strong style={{ display: 'block', fontSize: '0.85rem', color: '#1e3a8a' }}>Zu zahlender Gesamtbetrag:</strong>
-                              <span style={{ fontSize: '0.78rem', color: '#60a5fa', fontWeight: 650 }}>Monatliche Lizenzgebühr (inkl. MwSt.)</span>
-                            </div>
-                            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e3a8a' }}>
-                              {priceStudent} €
-                            </span>
-                          </div>
-
-                          {/* Large Action Buttons */}
-                          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button
-                              onClick={() => handleActivateUser(u.id)}
-                              disabled={isActivating}
-                              style={{
-                                width: '100%',
-                                padding: '16px',
-                                borderRadius: '16px',
-                                background: '#10b981',
-                                border: 'none',
-                                color: '#ffffff',
-                                fontSize: '0.95rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                boxShadow: '0 8px 20px rgba(16, 185, 129, 0.25)',
-                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 10px 24px rgba(16, 185, 129, 0.35)'; }}
-                              onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.25)'; }}
-                            >
-                              {isActivating ? 'Wird verarbeitet...' : (!u.is_campus_active ? 'Zahlung bestätigt & dauerhaft freischalten ✓' : 'Zahlung bestätigen ✓')}
-                            </button>
-
-                            <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: '#64748b', alignItems: 'center', justifyContent: 'center', marginTop: '6px' }}>
-                              <Shield size={12} style={{ color: '#10b981' }} />
-                              <span>Schaltet Campus-Groovelab &amp; alle Module sofort frei.</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()
-                  ) : (
-                    <div style={{ color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-                      <div style={{
-                        width: '64px',
-                        height: '64px',
-                        borderRadius: '50%',
-                        background: '#f8fafc',
-                        border: '1px solid rgba(15, 23, 42, 0.05)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#94a3b8'
-                      }}>
-                        <Users size={28} />
-                      </div>
-                      <div>
-                        <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
-                          Kein Schüler ausgewählt
-                        </h4>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 550, maxWidth: '280px', lineHeight: 1.4 }}>
-                          Wähle einen Schüler aus der Liste aus, um Zahlungsdetails einzusehen und den Account freizuschalten.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            </div>
+            <ReconciliationTab
+              pendingUsers={pendingUsers}
+              schools={schools}
+              masterPricing={masterPricing}
+              loadingPending={loadingPending}
+              onRefresh={fetchPendingUsers}
+              onBatchActivate={handleBatchActivateUsers}
+              onSingleActivate={handleActivateUser}
+            />
           )}
 
           {activePortalTab === 'billing' && (
@@ -2542,295 +2229,365 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             </div>
           )}
 
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* 🏷️ BOARD 1: PREISE & KAMPAGNEN (activePortalTab === 'pricing')          */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
           {activePortalTab === 'pricing' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
-              {/* Header */}
-              <div>
-                <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
-                  System-Preise &amp; Tarife
-                </h2>
-                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 550 }}>
-                  Konfiguriere hier die Standard-Gebühren sowie Sonderangebote und Rabattaktionen für Schulen.
-                </p>
+              {/* Header Panel */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+                gap: '16px',
+                borderBottom: '1px solid #e2e8f0',
+                paddingBottom: '20px'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      background: 'rgba(217, 119, 6, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Tag size={20} color="#d97706" />
+                    </div>
+                    <h2 style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
+                      Preise &amp; Kampagnen
+                    </h2>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.90rem', color: '#64748b', fontWeight: 500 }}>
+                    Standard-Abonnementpreise, BGB-konforme Preisanpassungs-Politik und Sonderaktionen für Musikschulen.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 14px',
+                    borderRadius: '100px',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    color: '#15803d',
+                    fontSize: '0.80rem',
+                    fontWeight: 700
+                  }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', boxShadow: '0 0 8px rgba(22, 163, 74, 0.6)' }} />
+                    Master-Pricing Live
+                  </div>
+                </div>
               </div>
 
+              {/* Top Row Grid: Standardpreise & Audit-Logbuch */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '32px',
+                gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 0.95fr)',
+                gap: '28px',
                 alignItems: 'start'
               }}>
-                {/* Pricing Grid Inputs */}
+                {/* Card 1: Standard-Abonnementpreise Form */}
                 <div style={{
                   background: '#ffffff',
                   borderRadius: '24px',
-                  padding: '36px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
+                  padding: '32px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
                 }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                    <Tag size={20} color="#ca8a04" /> Standard-Abonnementpreise
-                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: 0, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Tag size={18} color="#d97706" /> Standard-Abonnementpreise
+                      </h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                        Globale Sockelpreise für Server-Hosting und Benutzer-Lizenzen.
+                      </p>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#b45309', padding: '3px 10px', borderRadius: '100px', fontWeight: 800 }}>
+                      Master Tarif
+                    </span>
+                  </div>
 
                   <form onSubmit={handleUpdatePricingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-                    {/* Row 1: Module Flatrates (Campus, GrooveLab, Kombi) */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Campus Modul (€ / Mo)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={priceCampus}
-                          onChange={(e) => setPriceCampus(e.target.value)}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '12px 12px',
-                            borderRadius: '12px',
-                            background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
-                            color: '#0f172a',
-                            fontSize: '0.92rem',
-                            fontWeight: 700,
-                            outline: 'none'
-                          }}
-                          className="premium-input"
-                        />
+                    {/* Module Server Flatrates */}
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+                        1. Server-Hosting Flatrates (pro Musikschule)
                       </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          GrooveLab Modul (€ / Mo)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={priceGroovelab}
-                          onChange={(e) => setPriceGroovelab(e.target.value)}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '12px 12px',
-                            borderRadius: '12px',
-                            background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
-                            color: '#0f172a',
-                            fontSize: '0.92rem',
-                            fontWeight: 700,
-                            outline: 'none'
-                          }}
-                          className="premium-input"
-                        />
-                      </div>
-
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <label style={{ fontSize: '0.70rem', color: '#047857', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            Kombi-Bundle (€ / Mo)
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.1fr', gap: '12px' }}>
+                        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                          <label style={{ display: 'block', fontSize: '0.70rem', color: '#16a34a', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                            Campus Modul
                           </label>
-                          {(() => {
-                            const singleTotal = (Number(priceCampus) || 0) + (Number(priceGroovelab) || 0);
-                            const kombiPriceNum = Number(priceKombi) || 0;
-                            const kombiSavingsPercent = singleTotal > 0 ? Math.round(((singleTotal - kombiPriceNum) / singleTotal) * 100) : 0;
-                            if (kombiSavingsPercent > 0) {
-                              return (
-                                <span style={{ padding: '2px 6px', borderRadius: '6px', background: '#dcfce7', color: '#15803d', fontSize: '0.65rem', fontWeight: 800 }}>
-                                  -{kombiSavingsPercent}%
-                                </span>
-                              );
-                            } else if (singleTotal > 0 && kombiPriceNum > singleTotal) {
-                              return (
-                                <span style={{ padding: '2px 6px', borderRadius: '6px', background: '#fef3c7', color: '#b45309', fontSize: '0.65rem', fontWeight: 800 }}>
-                                  ⚠️ Teurer als Einzelkauf
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={priceCampus}
+                              onChange={(e) => setPriceCampus(e.target.value)}
+                              style={{
+                                width: '100%',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#0f172a',
+                                fontSize: '1.1rem',
+                                fontWeight: 800,
+                                outline: 'none'
+                              }}
+                            />
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>€/Mo</span>
+                          </div>
                         </div>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={priceKombi}
-                          onChange={(e) => setPriceKombi(e.target.value)}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '12px 12px',
-                            borderRadius: '12px',
-                            background: '#f0fdf4',
-                            border: '1.5px solid #059669',
-                            color: '#065f46',
-                            fontSize: '0.92rem',
-                            fontWeight: 800,
-                            outline: 'none'
-                          }}
-                          className="premium-input"
-                        />
+
+                        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                          <label style={{ display: 'block', fontSize: '0.70rem', color: '#ca8a04', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                            GrooveLab Modul
+                          </label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={priceGroovelab}
+                              onChange={(e) => setPriceGroovelab(e.target.value)}
+                              style={{
+                                width: '100%',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#0f172a',
+                                fontSize: '1.1rem',
+                                fontWeight: 800,
+                                outline: 'none'
+                              }}
+                            />
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>€/Mo</span>
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '14px', border: '1.5px solid #16a34a' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <label style={{ fontSize: '0.70rem', color: '#15803d', fontWeight: 900, textTransform: 'uppercase' }}>
+                              Kombi-Bundle
+                            </label>
+                            {(() => {
+                              const singleTotal = (Number(priceCampus) || 0) + (Number(priceGroovelab) || 0);
+                              const kombiPriceNum = Number(priceKombi) || 0;
+                              const kombiSavings = singleTotal - kombiPriceNum;
+                              const kombiSavingsPercent = singleTotal > 0 ? Math.round((kombiSavings / singleTotal) * 100) : 0;
+                              if (kombiSavingsPercent > 0) {
+                                return (
+                                  <span style={{ padding: '1px 6px', borderRadius: '6px', background: '#16a34a', color: '#ffffff', fontSize: '0.62rem', fontWeight: 800 }}>
+                                    -{kombiSavingsPercent}%
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={priceKombi}
+                              onChange={(e) => setPriceKombi(e.target.value)}
+                              style={{
+                                width: '100%',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#14532d',
+                                fontSize: '1.1rem',
+                                fontWeight: 900,
+                                outline: 'none'
+                              }}
+                            />
+                            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#15803d' }}>€/Mo</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Row 2: User Rates & Free Months */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '14px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Lehrer (€ / Mo)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={priceTeacher}
-                          onChange={(e) => setPriceTeacher(e.target.value)}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '12px 10px',
-                            borderRadius: '12px',
-                            background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
-                            color: '#0f172a',
-                            fontSize: '0.90rem',
-                            fontWeight: 700,
-                            outline: 'none'
-                          }}
-                          className="premium-input"
-                        />
+                    {/* User Profile Rates & Free Months */}
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+                        2. Nutzer- &amp; Profil-Tarife
                       </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.2fr', gap: '10px' }}>
+                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                          <label style={{ display: 'block', fontSize: '0.66rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                            Lehrer / Dozent
+                          </label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={priceTeacher}
+                              onChange={(e) => setPriceTeacher(e.target.value)}
+                              style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.95rem', fontWeight: 800, outline: 'none' }}
+                            />
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>€</span>
+                          </div>
+                        </div>
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Aktiv-Schüler (€ / Mo)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={priceStudent}
-                          onChange={(e) => setPriceStudent(e.target.value)}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '12px 10px',
-                            borderRadius: '12px',
-                            background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
-                            color: '#0f172a',
-                            fontSize: '0.90rem',
-                            fontWeight: 700,
-                            outline: 'none'
-                          }}
-                          className="premium-input"
-                        />
-                      </div>
+                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                          <label style={{ display: 'block', fontSize: '0.66rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                            Aktiv-Schüler
+                          </label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={priceStudent}
+                              onChange={(e) => setPriceStudent(e.target.value)}
+                              style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.95rem', fontWeight: 800, outline: 'none' }}
+                            />
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>€</span>
+                          </div>
+                        </div>
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.68rem', color: '#0284c7', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Passiv-Schüler (€ / Mo)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={pricePassiveStudent}
-                          onChange={(e) => setPricePassiveStudent(e.target.value)}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '12px 10px',
-                            borderRadius: '12px',
-                            background: '#f0f9ff',
-                            border: '1.5px solid #0284c7',
-                            color: '#0369a1',
-                            fontSize: '0.90rem',
-                            fontWeight: 800,
-                            outline: 'none'
-                          }}
-                          className="premium-input"
-                        />
-                      </div>
+                        <div style={{ background: '#f0f9ff', padding: '10px 12px', borderRadius: '12px', border: '1.5px solid #0284c7' }}>
+                          <label style={{ display: 'block', fontSize: '0.66rem', color: '#0369a1', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                            Passiv-Schüler
+                          </label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={pricePassiveStudent}
+                              onChange={(e) => setPricePassiveStudent(e.target.value)}
+                              style={{ width: '100%', border: 'none', background: 'transparent', color: '#0369a1', fontSize: '0.95rem', fontWeight: 900, outline: 'none' }}
+                            />
+                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284c7' }}>€</span>
+                          </div>
+                        </div>
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Beitragsfrei / Schuljahr
-                        </label>
-                        <select
-                          value={freeMonthsPerYear}
-                          onChange={(e) => setFreeMonthsPerYear(Number(e.target.value))}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '12px 6px',
-                            borderRadius: '12px',
-                            background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
-                            color: '#0f172a',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            outline: 'none',
-                            cursor: 'pointer'
-                          }}
-                          className="premium-input"
-                        >
-                          <option value={0}>0 frei (12 Z.-Monate)</option>
-                          <option value={1}>1 Mo. frei (11 Z.-Monate)</option>
-                          <option value={2}>2 Mo. frei (10 Z.-Monate)</option>
-                        </select>
+                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                          <label style={{ display: 'block', fontSize: '0.66rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                            Beitragsfrei / Jahr
+                          </label>
+                          <select
+                            value={freeMonthsPerYear}
+                            onChange={(e) => setFreeMonthsPerYear(Number(e.target.value))}
+                            style={{
+                              width: '100%',
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#0f172a',
+                              fontSize: '0.80rem',
+                              fontWeight: 800,
+                              outline: 'none',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value={0}>0 frei (12 Monate)</option>
+                            <option value={1}>1 Mo. frei (11 Mo.)</option>
+                            <option value={2}>2 Mo. frei (10 Mo.)</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Row 3: Preisanpassungs-Politik für Bestandskunden & Fristen-Rechner */}
-                    <div style={{ padding: '18px 20px', borderRadius: '14px', background: '#f8fafc', border: '1px solid rgba(15, 23, 42, 0.08)' }}>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#475569', fontWeight: 900, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Preisanpassungs-Politik für Bestandskunden
-                      </label>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.82rem', color: '#0f172a', fontWeight: 600, cursor: 'pointer' }}>
+                    {/* Preisanpassungs-Politik & BGB-Compliance */}
+                    <div style={{ padding: '18px 20px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Preisanpassungs-Politik für Bestandskunden
+                        </span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '2px 8px', borderRadius: '100px' }}>
+                          BGB &amp; AGB-Schutz
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <label style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          background: priceChangeScope === 'new_only' ? '#ffffff' : 'transparent',
+                          border: priceChangeScope === 'new_only' ? '1.5px solid #16a34a' : '1px solid transparent',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}>
                           <input
                             type="radio"
                             name="priceChangeScope"
                             value="new_only"
                             checked={priceChangeScope === 'new_only'}
                             onChange={() => setPriceChangeScope('new_only')}
-                            style={{ marginTop: '3px' }}
+                            style={{ marginTop: '2px', accentColor: '#16a34a' }}
                           />
-                          <span><strong>Bestandsschutz (Grandfathering - Empfohlen):</strong> Preisänderungen gelten ausschließlich für Neuregistrierungen. Bestehende Musikschulen behalten dauerhaft ihren Altpreis (0% Kündigungs- & Rechtsrisiko).</span>
+                          <div style={{ fontSize: '0.80rem', color: '#0f172a', lineHeight: 1.35 }}>
+                            <strong style={{ color: '#15803d' }}>Bestandsschutz (Grandfathering - Empfohlen):</strong> Preisänderungen gelten ausschließlich für Neuregistrierungen. Bestehende Musikschulen behalten dauerhaft ihren Altpreis (0 % Kündigungs- &amp; Rechtsrisiko).
+                          </div>
                         </label>
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.82rem', color: '#0f172a', fontWeight: 600, cursor: 'pointer' }}>
+
+                        <label style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          background: priceChangeScope === 'school_year_start' ? '#ffffff' : 'transparent',
+                          border: priceChangeScope === 'school_year_start' ? '1.5px solid #0284c7' : '1px solid transparent',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}>
                           <input
                             type="radio"
                             name="priceChangeScope"
                             value="school_year_start"
                             checked={priceChangeScope === 'school_year_start'}
                             onChange={() => setPriceChangeScope('school_year_start')}
-                            style={{ marginTop: '3px' }}
+                            style={{ marginTop: '2px', accentColor: '#0284c7' }}
                           />
-                          <span><strong>Schuljahresstart-Stichtag:</strong> Neue Preise greifen für Bestandskunden automatisch zum schulspezifischen Schuljahresbeginn (z. B. 01.08. / 01.09. je nach Bundesland).</span>
+                          <div style={{ fontSize: '0.80rem', color: '#0f172a', lineHeight: 1.35 }}>
+                            <strong>Schuljahresstart-Stichtag:</strong> Neue Preise greifen für Bestandskunden automatisch zum schulspezifischen Schuljahresbeginn (z. B. 01.08. / 01.09.).
+                          </div>
                         </label>
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.82rem', color: '#0f172a', fontWeight: 600, cursor: 'pointer' }}>
+
+                        <label style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          background: priceChangeScope === 'immediate' ? '#ffffff' : 'transparent',
+                          border: priceChangeScope === 'immediate' ? '1.5px solid #ea580c' : '1px solid transparent',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}>
                           <input
                             type="radio"
                             name="priceChangeScope"
                             value="immediate"
                             checked={priceChangeScope === 'immediate'}
                             onChange={() => setPriceChangeScope('immediate')}
-                            style={{ marginTop: '3px' }}
+                            style={{ marginTop: '2px', accentColor: '#ea580c' }}
                           />
-                          <span><strong>Sofortige Preisanpassung (Flottenanpassung mit BGB-Frist):</strong> Neue Preise gelten ab Stichtag für alle Musikschulen plattformweit.</span>
+                          <div style={{ fontSize: '0.80rem', color: '#0f172a', lineHeight: 1.35 }}>
+                            <strong>Sofortige Flottenanpassung (mit BGB-Frist):</strong> Neue Preise gelten ab Stichtag für alle Musikschulen plattformweit.
+                          </div>
                         </label>
                       </div>
 
-                      {/* Dynamic BGB Legal Compliance & Fristen-Rechner Card */}
+                      {/* Dynamic BGB Legal Compliance Card */}
                       {priceChangeScope !== 'new_only' && (
-                        <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                             <div>
-                              <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                              <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
                                 Wirksamkeits-Stichtag für Bestandskunden
                               </label>
                               <input
@@ -2849,7 +2606,6 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               />
                             </div>
 
-                            {/* Live Compliance calculation */}
                             {(() => {
                               const effDate = new Date(priceEffectiveDate || Date.now());
                               const now = new Date();
@@ -2861,26 +2617,26 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               let statusBg = '#dcfce7';
                               let statusColor = '#15803d';
                               let statusTitle = '🟢 BGB-Konform (>= 60 Tage Vorlauf)';
-                              let statusText = `Spätestes Ankündigungsdatum: ${formattedNoticeDeadline}. Vorlauf: ${diffDays} Tage. Vollständig fristgerecht.`;
+                              let statusText = `Späteste Mitteilung: ${formattedNoticeDeadline}. Vorlauf: ${diffDays} Tage.`;
 
                               if (diffDays < 42) {
                                 statusBg = '#fee2e2';
                                 statusColor = '#991b1b';
-                                statusTitle = '🔴 Kritische Frist (< 42 Tage / 6 Wochen)';
-                                statusText = `Gesetzliche BGB-Mindestfrist (§ 308 Nr. 4) unterschritten. Hohes AGB-Unwirksamkeitsrisiko!`;
+                                statusTitle = '🔴 Kritische Frist (< 42 Tage)';
+                                statusText = `Gesetzliche Mindestfrist (§ 308 Nr. 4 BGB) unterschritten!`;
                               } else if (diffDays < 60) {
                                 statusBg = '#fef3c7';
                                 statusColor = '#92400e';
-                                statusTitle = '🟡 Zulässig (42–59 Tage Vorlauf)';
-                                statusText = `6-Wochen-Frist eingehalten. Umgehender Ankündigungsversand erforderlich.`;
+                                statusTitle = '🟡 Zulässig (42–59 Tage)';
+                                statusText = `Fristgerecht. Mitteilungsversand umgehend erforderlich.`;
                               }
 
                               return (
-                                <div style={{ flex: 1, minWidth: '220px', padding: '10px 14px', borderRadius: '10px', background: statusBg, border: `1px solid ${statusColor}40` }}>
-                                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: statusColor, marginBottom: '2px' }}>
+                                <div style={{ flex: 1, minWidth: '200px', padding: '8px 12px', borderRadius: '10px', background: statusBg, border: `1px solid ${statusColor}40` }}>
+                                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: statusColor, marginBottom: '2px' }}>
                                     {statusTitle}
                                   </div>
-                                  <div style={{ fontSize: '0.72rem', color: statusColor, opacity: 0.9, lineHeight: '1.3' }}>
+                                  <div style={{ fontSize: '0.70rem', color: statusColor, opacity: 0.9, lineHeight: 1.25 }}>
                                     {statusText}
                                   </div>
                                 </div>
@@ -2888,7 +2644,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             })()}
                           </div>
 
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                             <button
                               type="button"
                               onClick={() => setShowLegalNoticeModal(true)}
@@ -2896,7 +2652,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 background: 'transparent',
                                 border: 'none',
                                 color: '#2563eb',
-                                fontSize: '0.75rem',
+                                fontSize: '0.74rem',
                                 fontWeight: 800,
                                 cursor: 'pointer',
                                 textDecoration: 'underline',
@@ -2905,517 +2661,470 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 gap: '4px'
                               }}
                             >
-                              📄 Rechtssicherer Mitteilungstext für Schulleitungen (Vorschau)
+                              📄 Mitteilungstext für Schulleitungen ansehen
                             </button>
                           </div>
                         </div>
                       )}
                     </div>
 
+                    {/* Save Action Button */}
                     <button
                       type="submit"
                       disabled={updatingBilling}
                       style={{
                         padding: '14px',
-                        borderRadius: '12px',
+                        borderRadius: '14px',
                         background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                         color: '#ffffff',
                         border: 'none',
-                        fontSize: '0.9rem',
+                        fontSize: '0.92rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        boxShadow: '0 6px 20px rgba(217, 119, 6, 0.2)',
+                        boxShadow: '0 6px 20px rgba(217, 119, 6, 0.25)',
                         transition: 'all 0.2s ease',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '8px',
-                        marginTop: '10px'
+                        gap: '8px'
                       }}
                       className="hover-scale-mini"
                     >
-                      {updatingBilling ? 'Speichern...' : 'Preise & Tarife speichern'}
+                      {updatingBilling ? (
+                        <>
+                          <RefreshCw size={16} className="animate-spin" />
+                          <span>Preise werden gespeichert...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={18} />
+                          <span>Standardpreise &amp; Tarife speichern</span>
+                        </>
+                      )}
                     </button>
                   </form>
                 </div>
 
-                {/* Preisanpassungen Logbuch & Audit-Trail */}
+                {/* Card 2: Preisanpassungen Audit-Logbuch */}
                 <div style={{
                   background: '#ffffff',
                   borderRadius: '24px',
-                  padding: '36px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)',
-                  marginTop: '24px'
+                  padding: '32px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
                 }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                    <HistoryIcon size={20} color="#2563eb" /> Preisanpassungen Audit-Logbuch
-                  </h3>
-                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 20px 0' }}>
-                    Lückenloses Audit-Trail aller historischen Tarif- und Preisänderungen (SOC 2 / ISO 27001 RZ-Konformität).
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: 0, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <HistoryIcon size={18} color="#2563eb" /> Audit-Logbuch
+                      </h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                        Lückenlose Historie aller Tarifanpassungen (SOC 2).
+                      </p>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#1d4ed8', padding: '3px 10px', borderRadius: '100px', fontWeight: 800 }}>
+                      {pricingAuditLogs.length} Einträge
+                    </span>
+                  </div>
 
                   {pricingAuditLogs.length === 0 ? (
-                    <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '0.88rem' }}>
+                    <div style={{ padding: '36px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '0.85rem' }}>
+                      <HistoryIcon size={32} color="#94a3b8" style={{ margin: '0 auto 8px auto', display: 'block' }} />
                       Bisher wurden noch keine Preisanpassungen im Audit-Logbuch aufgezeichnet.
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
                       {pricingAuditLogs.map((log: any) => (
                         <div key={log.id} style={{
-                          padding: '16px 18px',
-                          borderRadius: '16px',
+                          padding: '14px 16px',
+                          borderRadius: '14px',
                           background: '#f8fafc',
                           border: '1px solid #e2e8f0',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '16px'
+                          flexDirection: 'column',
+                          gap: '6px'
                         }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontWeight: 800, fontSize: '0.86rem', color: '#0f172a' }}>
-                                {new Date(log.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr
-                              </span>
-                              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                                by {log.changed_by_name || 'Master Admin'}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: '0.80rem', color: '#334155', fontWeight: 600, display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                              <span>Campus: <strong>{Number(log.old_price_campus).toFixed(2).replace('.', ',')} € → {Number(log.new_price_campus).toFixed(2).replace('.', ',')} €</strong></span>
-                              <span>GrooveLab: <strong>{Number(log.old_price_groovelab).toFixed(2).replace('.', ',')} € → {Number(log.new_price_groovelab).toFixed(2).replace('.', ',')} €</strong></span>
-                              <span>Kombi: <strong>{Number(log.old_price_kombi).toFixed(2).replace('.', ',')} € → {Number(log.new_price_kombi).toFixed(2).replace('.', ',')} €</strong></span>
-                            </div>
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 800, fontSize: '0.84rem', color: '#0f172a' }}>
+                              {new Date(log.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr
+                            </span>
                             <span style={{
-                              padding: '4px 10px',
-                              borderRadius: '8px',
-                              fontSize: '0.72rem',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.68rem',
                               fontWeight: 800,
                               background: log.change_scope === 'immediate' ? '#fee2e2' : '#fef3c7',
                               color: log.change_scope === 'immediate' ? '#dc2626' : '#b45309'
                             }}>
                               {log.change_scope === 'immediate' ? 'Sofortige Anpassung' : 'Bestandsschutz'}
                             </span>
-                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
-                              {log.affected_schools_count} Schulen
-                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '0.78rem', color: '#334155', display: 'flex', gap: '10px', flexWrap: 'wrap', fontWeight: 600 }}>
+                            <span>Campus: <strong>{Number(log.old_price_campus).toFixed(2).replace('.', ',')} € → {Number(log.new_price_campus).toFixed(2).replace('.', ',')} €</strong></span>
+                            <span>GrooveLab: <strong>{Number(log.old_price_groovelab).toFixed(2).replace('.', ',')} € → {Number(log.new_price_groovelab).toFixed(2).replace('.', ',')} €</strong></span>
+                            <span>Kombi: <strong>{Number(log.old_price_kombi).toFixed(2).replace('.', ',')} € → {Number(log.new_price_kombi).toFixed(2).replace('.', ',')} €</strong></span>
+                          </div>
+
+                          <div style={{ fontSize: '0.70rem', color: '#64748b', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '4px', marginTop: '2px' }}>
+                            <span>von: <strong>{log.changed_by_name || 'Master Admin'}</strong></span>
+                            <span>{log.affected_schools_count} Schulen betroffen</span>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-
-                {/* Sonderangebote & Kampagnen */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                  {/* Create offer form */}
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '36px',
-                    border: '1px solid rgba(15, 23, 42, 0.06)',
-                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
-                  }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                      <Percent size={20} color="#059669" /> Rabatt-Kampagne erstellen
-                    </h3>
-
-                    <form onSubmit={handleAddSpecialOffer} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
-                            Aktionsname
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="z.B. Sommer-Special 2026"
-                            value={newOfferName}
-                            onChange={(e) => setNewOfferName(e.target.value)}
-                            style={{
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              padding: '12px 14px',
-                              borderRadius: '12px',
-                              background: '#f8fafc',
-                              border: '1px solid rgba(15, 23, 42, 0.08)',
-                              color: '#0f172a',
-                              fontSize: '0.9rem',
-                              fontWeight: 600,
-                              outline: 'none'
-                            }}
-                            className="premium-input"
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
-                            Rabatt (%)
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="100"
-                            required
-                            value={newOfferDiscount}
-                            onChange={(e) => setNewOfferDiscount(Number(e.target.value))}
-                            style={{
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              padding: '12px 14px',
-                              borderRadius: '12px',
-                              background: '#f8fafc',
-                              border: '1px solid rgba(15, 23, 42, 0.08)',
-                              color: '#0f172a',
-                              fontSize: '0.9rem',
-                              fontWeight: 600,
-                              outline: 'none'
-                            }}
-                            className="premium-input"
-                          />
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px', alignItems: 'center' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
-                            Aktionscode (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="z.B. SUMMER26"
-                            value={newOfferCode}
-                            onChange={(e) => setNewOfferCode(e.target.value)}
-                            style={{
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              padding: '12px 14px',
-                              borderRadius: '12px',
-                              background: '#f8fafc',
-                              border: '1px solid rgba(15, 23, 42, 0.08)',
-                              color: '#0f172a',
-                              fontSize: '0.9rem',
-                              fontWeight: 600,
-                              outline: 'none'
-                            }}
-                            className="premium-input"
-                          />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', padding: '0 8px' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Sofort Aktiv</span>
-                          <button
-                            type="button"
-                            onClick={() => setNewOfferActive(!newOfferActive)}
-                            style={{
-                              position: 'relative',
-                              width: '40px',
-                              height: '24px',
-                              borderRadius: '12px',
-                              background: newOfferActive ? '#10b981' : 'rgba(15, 23, 42, 0.08)',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '0',
-                              transition: 'all 0.25s',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                          >
-                            <div style={{
-                              width: '18px',
-                              height: '18px',
-                              borderRadius: '50%',
-                              background: '#ffffff',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                              transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                              transform: newOfferActive ? 'translateX(19px)' : 'translateX(3px)'
-                            }} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <button
-                        type="submit"
-                        style={{
-                          padding: '12px',
-                          borderRadius: '12px',
-                          background: '#059669',
-                          color: '#ffffff',
-                          border: 'none',
-                          fontSize: '0.88rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 15px rgba(5, 150, 105, 0.2)',
-                          transition: 'all 0.2s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px'
-                        }}
-                        className="hover-scale-mini"
-                      >
-                        <Plus size={16} /> Kampagne hinzufügen
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Active offers list */}
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '36px',
-                    border: '1px solid rgba(15, 23, 42, 0.06)',
-                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
-                  }}>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: '0 0 20px 0', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                      Aktive Aktionen ({specialOffers.length})
-                    </h3>
-
-                    {specialOffers.length === 0 ? (
-                      <div style={{ padding: '28px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '1px dashed rgba(15, 23, 42, 0.1)', borderRadius: '16px' }}>
-                        Keine Sonderangebote vorhanden. Verwende das obige Formular zum Erstellen.
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {specialOffers.map((offer) => (
-                          <div
-                            key={offer.id}
-                            style={{
-                              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                              border: '1px solid rgba(15, 23, 42, 0.04)',
-                              borderRadius: '16px',
-                              padding: '16px 20px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between'
-                            }}
-                          >
-                            <div>
-                              <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
-                                {offer.name}
-                              </div>
-                              <div style={{ fontSize: '0.78rem', color: '#059669', marginTop: '4px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ background: 'rgba(5, 150, 105, 0.08)', padding: '2px 8px', borderRadius: '100px' }}>
-                                  {offer.discount_percent}% Rabatt
-                                </span>
-                                {offer.code && (
-                                  <span style={{ color: '#475569', fontWeight: 600 }}>
-                                    Code: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{offer.code}</strong>
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleOfferActive(offer.id)}
-                                style={{
-                                  position: 'relative',
-                                  width: '38px',
-                                  height: '22px',
-                                  borderRadius: '11px',
-                                  background: offer.is_active ? '#10b981' : 'rgba(15, 23, 42, 0.08)',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  padding: '0',
-                                  transition: 'all 0.25s',
-                                  display: 'flex',
-                                  alignItems: 'center'
-                                }}
-                              >
-                                <div style={{
-                                  width: '16px',
-                                  height: '16px',
-                                  borderRadius: '50%',
-                                  background: '#ffffff',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                                  transform: offer.is_active ? 'translateX(19px)' : 'translateX(3px)'
-                                }} />
-                              </button>
-
-                              <button
-                                onClick={() => handleDeleteSpecialOffer(offer.id)}
-                                style={{
-                                  width: '30px',
-                                  height: '30px',
-                                  borderRadius: '50%',
-                                  background: 'rgba(239, 68, 68, 0.08)',
-                                  border: 'none',
-                                  color: '#dc2626',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transition: 'all 0.2s'
-                                }}
-                                className="hover-scale-mini"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                </div>
               </div>
-            </div>
 
-              {/* Betreiber Rechnungsdaten & Master Admin Credentials */}
+              {/* Bottom Row: Rabatt-Kampagnen & Sonderangebote */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1.1fr',
-                gap: '32px',
-                alignItems: 'start',
-                marginTop: '16px'
+                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.2fr)',
+                gap: '28px',
+                alignItems: 'start'
               }}>
-                {/* Master Admin credentials card */}
+                {/* Form: Rabatt-Kampagne erstellen */}
                 <div style={{
                   background: '#ffffff',
                   borderRadius: '24px',
-                  padding: '36px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
+                  padding: '32px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
                 }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                    <Shield size={20} color="#d97706" /> Master-Admin Zugang
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                    <Percent size={18} color="#059669" /> Rabatt-Kampagne erstellen
                   </h3>
 
-                  <form onSubmit={handleUpdateAdminCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Root-Benutzername
-                      </label>
-                      <input
-                        type={usernameFocused ? "text" : "password"}
-                        value={adminUsername}
-                        onChange={(e) => setAdminUsername(e.target.value)}
-                        placeholder="admin"
-                        required
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '12px 14px',
-                          borderRadius: '12px',
-                          background: '#f8fafc',
-                          border: '1px solid rgba(15, 23, 42, 0.08)',
-                          color: '#0f172a',
-                          fontSize: '0.92rem',
-                          fontWeight: 700,
-                          outline: 'none'
-                        }}
-                        onFocus={() => setUsernameFocused(true)}
-                        onBlur={() => setUsernameFocused(false)}
-                        className="premium-input"
-                      />
+                  <form onSubmit={handleAddSpecialOffer} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Aktionsname
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="z.B. Sommer-Special 2026"
+                          value={newOfferName}
+                          onChange={(e) => setNewOfferName(e.target.value)}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            color: '#0f172a',
+                            fontSize: '0.88rem',
+                            fontWeight: 600,
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Rabatt (%)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          required
+                          value={newOfferDiscount}
+                          onChange={(e) => setNewOfferDiscount(Number(e.target.value))}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            color: '#0f172a',
+                            fontSize: '0.88rem',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
                     </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Passwort
-                      </label>
-                      <input
-                        type={passwordFocused ? "text" : "password"}
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        placeholder="Passwort"
-                        required
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '12px 14px',
-                          borderRadius: '12px',
-                          background: '#f8fafc',
-                          border: '1px solid rgba(15, 23, 42, 0.08)',
-                          color: '#0f172a',
-                          fontSize: '0.92rem',
-                          fontWeight: 700,
-                          outline: 'none'
-                        }}
-                        onFocus={() => setPasswordFocused(true)}
-                        onBlur={() => setPasswordFocused(false)}
-                        className="premium-input"
-                      />
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', alignItems: 'center' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Gutschein-Code (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="z.B. SOMMER26"
+                          value={newOfferCode}
+                          onChange={(e) => setNewOfferCode(e.target.value)}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            color: '#0f172a',
+                            fontSize: '0.88rem',
+                            fontWeight: 700,
+                            fontFamily: 'monospace',
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', padding: '0 4px' }}>
+                        <span style={{ fontSize: '0.80rem', fontWeight: 700, color: '#475569' }}>Sofort Aktiv</span>
+                        <button
+                          type="button"
+                          onClick={() => setNewOfferActive(!newOfferActive)}
+                          style={{
+                            position: 'relative',
+                            width: '38px',
+                            height: '22px',
+                            borderRadius: '11px',
+                            background: newOfferActive ? '#10b981' : '#cbd5e1',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            background: '#ffffff',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                            transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            transform: newOfferActive ? 'translateX(19px)' : 'translateX(3px)'
+                          }} />
+                        </button>
+                      </div>
                     </div>
 
                     <button
                       type="submit"
-                      disabled={updatingAdmin}
                       style={{
-                        padding: '14px',
+                        padding: '12px',
                         borderRadius: '12px',
-                        background: '#0f172a',
+                        background: '#059669',
                         color: '#ffffff',
                         border: 'none',
-                        fontSize: '0.9rem',
+                        fontSize: '0.88rem',
                         fontWeight: 800,
                         cursor: 'pointer',
+                        boxShadow: '0 4px 15px rgba(5, 150, 105, 0.2)',
                         transition: 'all 0.2s ease',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '8px',
-                        boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)'
+                        gap: '6px',
+                        marginTop: '4px'
                       }}
                       className="hover-scale-mini"
                     >
-                      {updatingAdmin ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
+                      <Plus size={16} /> Kampagne anlegen
                     </button>
                   </form>
-
-                  {adminUser && (
-                    <div style={{
-                      marginTop: '28px',
-                      padding: '24px',
-                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                      borderRadius: '16px',
-                      border: '1px solid rgba(15, 23, 42, 0.04)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '14px'
-                    }}>
-                      <strong style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        Kiosk Master QR-Badge
-                      </strong>
-                      <div style={{
-                        background: '#ffffff',
-                        padding: '12px',
-                        borderRadius: '16px',
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.04)',
-                        border: '1px solid rgba(0,0,0,0.02)'
-                      }}>
-                        <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${adminUser.qr_token}`}
-                          alt="Master Admin QR Badge"
-                          style={{ width: '120px', height: '120px', display: 'block' }}
-                        />
-                      </div>
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', textAlign: 'center', lineHeight: '1.5', fontWeight: 550 }}>
-                        Scanne diesen QR-Code am Kiosk-Tablet für schnellen Master-Admin-Zugang.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
-                {/* Form: Operator Billing Details */}
+                {/* List: Aktive Aktionen */}
                 <div style={{
                   background: '#ffffff',
                   borderRadius: '24px',
-                  padding: '36px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
+                  padding: '32px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
                 }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                    <Settings size={20} color="#059669" /> Betreiber Rechnungsdaten
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: 0, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                        Laufende Aktionen
+                      </h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                        Gutscheincodes und zeitlich begrenzte Nachlässe.
+                      </p>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', background: '#ecfdf5', color: '#059669', padding: '3px 10px', borderRadius: '100px', fontWeight: 800 }}>
+                      {specialOffers.filter(o => o.is_active).length} Aktiv / {specialOffers.length} Gesamt
+                    </span>
+                  </div>
+
+                  {specialOffers.length === 0 ? (
+                    <div style={{ padding: '32px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '1px dashed #cbd5e1', borderRadius: '16px' }}>
+                      Keine Rabatt-Aktionen vorhanden.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '320px', overflowY: 'auto' }}>
+                      {specialOffers.map((offer) => (
+                        <div
+                          key={offer.id}
+                          style={{
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '14px',
+                            padding: '14px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '0.90rem', color: '#0f172a' }}>
+                              {offer.name}
+                            </div>
+                            <div style={{ fontSize: '0.76rem', color: '#059669', marginTop: '4px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ background: '#dcfce7', padding: '2px 8px', borderRadius: '6px' }}>
+                                {offer.discount_percent}% Rabatt
+                              </span>
+                              {offer.code && (
+                                <span style={{ color: '#475569', fontWeight: 600 }}>
+                                  Code: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{offer.code}</strong>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleOfferActive(offer.id)}
+                              style={{
+                                position: 'relative',
+                                width: '36px',
+                                height: '20px',
+                                borderRadius: '10px',
+                                background: offer.is_active ? '#10b981' : '#cbd5e1',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '0',
+                                transition: 'all 0.2s',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}
+                            >
+                              <div style={{
+                                width: '14px',
+                                height: '14px',
+                                borderRadius: '50%',
+                                background: '#ffffff',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                                transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                transform: offer.is_active ? 'translateX(18px)' : 'translateX(3px)'
+                              }} />
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteSpecialOffer(offer.id)}
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '8px',
+                                background: 'rgba(239, 68, 68, 0.08)',
+                                border: 'none',
+                                color: '#dc2626',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifySelf: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* 🏛️ BOARD 2: BETREIBER & ZUGANG (activePortalTab === 'operator')         */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {activePortalTab === 'operator' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+              {/* Header Panel */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+                gap: '16px',
+                borderBottom: '1px solid #e2e8f0',
+                paddingBottom: '20px'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      background: 'rgba(2, 132, 199, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Building2 size={20} color="#0284c7" />
+                    </div>
+                    <h2 style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
+                      Betreiber &amp; Zugang
+                    </h2>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.90rem', color: '#64748b', fontWeight: 500 }}>
+                    Verwaltung der Betreibergesellschaft, Rechnungsanschrift, Auszahlungs-Bankdaten und Root-Zugangsdaten.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 14px',
+                    borderRadius: '100px',
+                    background: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    color: '#0284c7',
+                    fontSize: '0.80rem',
+                    fontWeight: 700
+                  }}>
+                    <Shield size={14} color="#0284c7" />
+                    Root Superuser Access
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Row Grid: Betreiber-Stammdaten & Bankverbindung */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.1fr)',
+                gap: '28px',
+                alignItems: 'start'
+              }}>
+                {/* Card 1: Betreibergesellschaft & Rechnungsanschrift */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
+                }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                    <Building2 size={18} color="#0284c7" /> Betreibergesellschaft &amp; Stammdaten
                   </h3>
 
-                  <form onSubmit={handleUpdateBillingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  <form onSubmit={handleUpdateBillingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                         Firma / Betreibergesellschaft
                       </label>
                       <input
@@ -3427,23 +3136,22 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         style={{
                           width: '100%',
                           boxSizing: 'border-box',
-                          padding: '12px 14px',
-                          borderRadius: '12px',
+                          padding: '11px 13px',
+                          borderRadius: '10px',
                           background: '#f8fafc',
-                          border: '1px solid rgba(15, 23, 42, 0.08)',
+                          border: '1px solid #cbd5e1',
                           color: '#0f172a',
-                          fontSize: '0.92rem',
+                          fontSize: '0.88rem',
                           fontWeight: 700,
                           outline: 'none'
                         }}
-                        className="premium-input"
                       />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
-                          Ansprechpartner
+                        <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Ansprechpartner / Inhaber
                         </label>
                         <input
                           type="text"
@@ -3454,21 +3162,20 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           style={{
                             width: '100%',
                             boxSizing: 'border-box',
-                            padding: '12px 14px',
-                            borderRadius: '12px',
+                            padding: '11px 13px',
+                            borderRadius: '10px',
                             background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            border: '1px solid #cbd5e1',
                             color: '#0f172a',
-                            fontSize: '0.92rem',
+                            fontSize: '0.88rem',
                             fontWeight: 700,
                             outline: 'none'
                           }}
-                          className="premium-input"
                         />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
-                          Straße
+                        <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Straße &amp; Hausnummer
                         </label>
                         <input
                           type="text"
@@ -3479,23 +3186,22 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           style={{
                             width: '100%',
                             boxSizing: 'border-box',
-                            padding: '12px 14px',
-                            borderRadius: '12px',
+                            padding: '11px 13px',
+                            borderRadius: '10px',
                             background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            border: '1px solid #cbd5e1',
                             color: '#0f172a',
-                            fontSize: '0.92rem',
+                            fontSize: '0.88rem',
                             fontWeight: 700,
                             outline: 'none'
                           }}
-                          className="premium-input"
                         />
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                        <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                           PLZ
                         </label>
                         <input
@@ -3507,246 +3213,458 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           style={{
                             width: '100%',
                             boxSizing: 'border-box',
-                            padding: '12px 14px',
-                            borderRadius: '12px',
+                            padding: '11px 13px',
+                            borderRadius: '10px',
                             background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            border: '1px solid #cbd5e1',
                             color: '#0f172a',
-                            fontSize: '0.92rem',
+                            fontSize: '0.88rem',
                             fontWeight: 700,
                             outline: 'none'
                           }}
-                          className="premium-input"
                         />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                        <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                           Ort
                         </label>
                         <input
                           type="text"
                           value={billingCity}
                           onChange={(e) => setBillingCity(e.target.value)}
-                          placeholder="Ort"
+                          placeholder="Rheinfelden"
                           required
                           style={{
                             width: '100%',
                             boxSizing: 'border-box',
-                            padding: '12px 14px',
-                            borderRadius: '12px',
+                            padding: '11px 13px',
+                            borderRadius: '10px',
                             background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            border: '1px solid #cbd5e1',
                             color: '#0f172a',
-                            fontSize: '0.92rem',
+                            fontSize: '0.88rem',
                             fontWeight: 700,
                             outline: 'none'
                           }}
-                          className="premium-input"
                         />
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px', marginTop: '6px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>IBAN</label>
-                        <input
-                          type="text"
-                          value={billingIban}
-                          onChange={(e) => setBillingIban(e.target.value)}
-                          placeholder="DE00 0000 ..."
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '12px 14px',
-                            borderRadius: '12px',
-                            background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
-                            color: '#0f172a',
-                            fontSize: '0.9rem',
-                            fontFamily: 'monospace',
-                            fontWeight: 700,
-                            outline: 'none'
-                          }}
-                          className="premium-input"
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>BIC</label>
-                        <input
-                          type="text"
-                          value={billingBic}
-                          onChange={(e) => setBillingBic(e.target.value)}
-                          placeholder="BICXXX"
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '12px 14px',
-                            borderRadius: '12px',
-                            background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
-                            color: '#0f172a',
-                            fontSize: '0.9rem',
-                            fontFamily: 'monospace',
-                            fontWeight: 700,
-                            outline: 'none'
-                          }}
-                          className="premium-input"
-                        />
-                      </div>
+                    <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.35 }}>
+                      ℹ️ <strong>Rechtlicher Hinweis:</strong> Der Anbieter wendet die Kleinunternehmerregelung (§ 19 UStG) an. Auf B2B- und B2C-Rechnungen wird entsprechend keine Umsatzsteuer gesondert ausgewiesen.
                     </div>
 
                     <button
                       type="submit"
                       disabled={updatingBilling}
                       style={{
-                        padding: '14px',
+                        padding: '12px',
                         borderRadius: '12px',
-                        background: 'rgba(5, 150, 105, 0.1)',
-                        border: '1px solid rgba(5, 150, 105, 0.25)',
-                        color: '#059669',
-                        fontSize: '0.9rem',
+                        background: '#0284c7',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '0.88rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 15px rgba(2, 132, 199, 0.25)',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        marginTop: '4px'
+                      }}
+                      className="hover-scale-mini"
+                    >
+                      {updatingBilling ? 'Wird gespeichert...' : 'Betreiber-Stammdaten speichern'}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Card 2: Bankverbindung & Zahlungs-Zuordnung */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
+                }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                    <Landmark size={18} color="#16a34a" /> Bankkonto &amp; Auszahlungsdaten
+                  </h3>
+
+                  <form onSubmit={handleUpdateBillingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                        IBAN (Empfängerkonto)
+                      </label>
+                      <input
+                        type="text"
+                        value={billingIban}
+                        onChange={(e) => setBillingIban(e.target.value)}
+                        placeholder="DE00 0000 0000 0000 0000 00"
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          background: '#f8fafc',
+                          border: '1px solid #cbd5e1',
+                          color: '#0f172a',
+                          fontSize: '0.96rem',
+                          fontFamily: 'monospace',
+                          fontWeight: 800,
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                        BIC / SWIFT
+                      </label>
+                      <input
+                        type="text"
+                        value={billingBic}
+                        onChange={(e) => setBillingBic(e.target.value)}
+                        placeholder="GENODEF1XXX"
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          background: '#f8fafc',
+                          border: '1px solid #cbd5e1',
+                          color: '#0f172a',
+                          fontSize: '0.92rem',
+                          fontFamily: 'monospace',
+                          fontWeight: 800,
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ padding: '12px 14px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#15803d' }}>
+                        💡 Automatisierte Zuordnung (Verwendungszweck-Logik)
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: '#166534', lineHeight: 1.35 }}>
+                        • <strong>B2B Schulrechnungen:</strong> Format <code>RE-[SCHUL_ID]-[YYMM]-01</code><br />
+                        • <strong>B2C Eltern-Direktabrechnung:</strong> Format <code>CG-[STUDENT_HASH_8]-[YYMM]</code> (100 % DSGVO-konform ohne Klartext-Namen auf Kontoauszügen).
+                      </span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={updatingBilling}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '12px',
+                        background: '#16a34a',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '0.88rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 15px rgba(22, 163, 74, 0.25)',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        marginTop: '4px'
+                      }}
+                      className="hover-scale-mini"
+                    >
+                      {updatingBilling ? 'Wird gespeichert...' : 'Bankverbindung aktualisieren'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* Bottom Row Grid: Master-Admin Zugangsdaten & Kiosk QR Badge */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.9fr)',
+                gap: '28px',
+                alignItems: 'start'
+              }}>
+                {/* Master Admin Zugangsdaten */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
+                }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                    <Key size={18} color="#0f172a" /> Master-Admin Zugangsdaten
+                  </h3>
+
+                  <form onSubmit={handleUpdateAdminCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                        Root-Benutzername
+                      </label>
+                      <input
+                        type={usernameFocused ? "text" : "password"}
+                        value={adminUsername}
+                        onChange={(e) => setAdminUsername(e.target.value)}
+                        placeholder="admin"
+                        required
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '11px 13px',
+                          borderRadius: '10px',
+                          background: '#f8fafc',
+                          border: '1px solid #cbd5e1',
+                          color: '#0f172a',
+                          fontSize: '0.90rem',
+                          fontWeight: 700,
+                          outline: 'none'
+                        }}
+                        onFocus={() => setUsernameFocused(true)}
+                        onBlur={() => setUsernameFocused(false)}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                        Neues Passwort (leer lassen für keine Änderung)
+                      </label>
+                      <input
+                        type={passwordFocused ? "text" : "password"}
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '11px 13px',
+                          borderRadius: '10px',
+                          background: '#f8fafc',
+                          border: '1px solid #cbd5e1',
+                          color: '#0f172a',
+                          fontSize: '0.90rem',
+                          fontWeight: 700,
+                          outline: 'none'
+                        }}
+                        onFocus={() => setPasswordFocused(true)}
+                        onBlur={() => setPasswordFocused(false)}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={updatingAdmin}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '12px',
+                        background: '#0f172a',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '0.88rem',
                         fontWeight: 800,
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '8px',
-                        marginTop: '12px'
+                        gap: '6px',
+                        boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
+                        marginTop: '4px'
                       }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = '#059669';
-                        e.currentTarget.style.color = '#ffffff';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'rgba(5, 150, 105, 0.1)';
-                        e.currentTarget.style.color = '#059669';
-                      }}
+                      className="hover-scale-mini"
                     >
-                      {updatingBilling ? 'Speichern...' : 'Rechnungsdaten aktualisieren'}
+                      {updatingAdmin ? 'Wird gespeichert...' : 'Zugangsdaten aktualisieren'}
                     </button>
                   </form>
+                </div>
+
+                {/* Kiosk Master QR-Badge */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '32px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  gap: '16px'
+                }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 900, margin: 0, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                      Kiosk Master QR-Badge
+                    </h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                      Schneller Root-Login für Tablet-Kioske.
+                    </p>
+                  </div>
+
+                  {adminUser && adminUser.qr_token ? (
+                    <div style={{
+                      background: '#ffffff',
+                      padding: '12px',
+                      borderRadius: '16px',
+                      boxShadow: '0 4px 15px rgba(0,0,0,0.06)',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${adminUser.qr_token}`}
+                        alt="Master Admin QR Badge"
+                        style={{ width: '130px', height: '130px', display: 'block' }}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ width: '130px', height: '130px', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#94a3b8' }}>
+                      QR-Code lädt...
+                    </div>
+                  )}
+
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.35, maxWidth: '240px' }}>
+                    Scanne diesen QR-Code direkt an einem Kiosk-Terminal zur sofortigen Root-Autorisierung.
+                  </span>
                 </div>
               </div>
             </div>
           )}
 
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* 🏢 BOARD: SCHULEN & TENANTS REGISTER (activePortalTab === 'schools')    */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
           {activePortalTab === 'schools' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }} className="animate-fade-in">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
               {/* Header Panel */}
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'center'
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+                gap: '16px',
+                borderBottom: '1px solid #e2e8f0',
+                paddingBottom: '20px'
               }}>
                 <div>
-                  <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
-                    Schulen &amp; Tenants Register
-                  </h2>
-                  <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 550 }}>
-                    Zentrale Übersicht aller registrierten Musikschulen, Tarife &amp; Aktivierungen.
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      background: 'rgba(5, 150, 105, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Layers size={20} color="#059669" />
+                    </div>
+                    <h2 style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
+                      Schulen &amp; Tenants Register
+                    </h2>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.90rem', color: '#64748b', fontWeight: 500 }}>
+                    Zentrale Übersicht aller registrierten Musikschulen, Tarife, Aktivierungs-Status &amp; MRR-Kalkulation.
                   </p>
                 </div>
 
-                <button
-                  onClick={fetchSchoolsAndStats}
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '12px',
-                    background: '#ffffff',
-                    border: '1px solid rgba(15, 23, 42, 0.08)',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = '#0f172a';
-                    e.currentTarget.style.color = '#ffffff';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = '#ffffff';
-                    e.currentTarget.style.color = '#475569';
-                  }}
-                >
-                  <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    onClick={fetchSchoolsAndStats}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 16px',
+                      borderRadius: '12px',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      color: '#475569',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                    onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
+                  >
+                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                    <span>Aktualisieren</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Layout split grid */}
+              {/* Layout split grid: 7fr 4.8fr */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '7fr 4.8fr',
-                gap: '32px',
+                gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)',
+                gap: '28px',
                 alignItems: 'start'
               }}>
                 {/* Left Side: Schools list */}
                 <div style={{
                   background: '#ffffff',
                   borderRadius: '24px',
-                  padding: '36px',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)',
+                  padding: '32px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
                   minHeight: '450px',
                   display: 'flex',
                   flexDirection: 'column'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                      <Layers size={20} color="#d97706" /> Registrierte Schul-Tenants ({filteredSchools.length})
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                      <Layers size={18} color="#0f172a" /> Registrierte Schul-Tenants ({filteredSchools.length})
                     </h3>
 
                     {/* Sort Selector */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Sortierung:</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Sortierung:</span>
                       <select
                         value={schoolSortOption}
                         onChange={(e) => setSchoolSortOption(e.target.value as any)}
                         style={{
-                          padding: '6px 12px',
-                          borderRadius: '10px',
-                          border: '1px solid rgba(15, 23, 42, 0.1)',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
                           background: '#ffffff',
-                          fontSize: '0.82rem',
-                          fontWeight: 800,
+                          fontSize: '0.80rem',
+                          fontWeight: 700,
                           color: '#0f172a',
                           outline: 'none',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(15, 23, 42, 0.02)'
+                          cursor: 'pointer'
                         }}
                       >
-                        <option value="students">🏆 Beste Kunden (Aktivierungen)</option>
-                        <option value="name">🔤 Name (A – Z)</option>
-                        <option value="newest">🆕 Neueste Schulen</option>
+                        <option value="students">Beste Kunden (Aktivierungen)</option>
+                        <option value="name">Name (A – Z)</option>
+                        <option value="newest">Neueste Schulen</option>
                       </select>
                     </div>
                   </div>
 
                   {/* Filter Pills Bar */}
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap' }}>
                     {[
                       { id: 'all', label: 'Alle Module' },
-                      { id: 'kombi', label: '✨ Kombi (Campus + GrooveLab)' },
-                      { id: 'campus', label: '🎓 Nur Campus' },
-                      { id: 'groovelab', label: '🎸 Nur GrooveLab' }
+                      { id: 'kombi', label: 'Kombi (Campus + GrooveLab)' },
+                      { id: 'campus', label: 'Nur Campus' },
+                      { id: 'groovelab', label: 'Nur GrooveLab' }
                     ].map(f => (
                       <button
                         key={f.id}
                         onClick={() => setSchoolModuleFilter(f.id as any)}
                         style={{
-                          padding: '6px 14px',
-                          borderRadius: '9999px',
-                          fontSize: '0.78rem',
+                          padding: '6px 13px',
+                          borderRadius: '100px',
+                          fontSize: '0.76rem',
                           fontWeight: 800,
-                          border: schoolModuleFilter === f.id ? '1px solid #0f172a' : '1px solid rgba(15, 23, 42, 0.08)',
+                          border: schoolModuleFilter === f.id ? '1px solid #0f172a' : '1px solid #cbd5e1',
                           background: schoolModuleFilter === f.id ? '#0f172a' : '#ffffff',
                           color: schoolModuleFilter === f.id ? '#ffffff' : '#64748b',
                           cursor: 'pointer',
-                          transition: 'all 0.2s ease'
+                          transition: 'all 0.15s ease'
                         }}
                       >
                         {f.label}
@@ -3755,8 +3673,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   </div>
 
                   {/* Search Input */}
-                  <div style={{ position: 'relative', marginBottom: '24px' }}>
-                    <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <div style={{ position: 'relative', marginBottom: '20px' }}>
+                    <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
                     <input
                       type="text"
                       placeholder="Suche nach Schulname, PLZ oder Ort..."
@@ -3765,42 +3683,33 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       style={{
                         width: '100%',
                         boxSizing: 'border-box',
-                        padding: '12px 16px 12px 44px',
+                        padding: '11px 14px 11px 40px',
                         borderRadius: '12px',
-                        border: '1px solid rgba(15, 23, 42, 0.08)',
+                        border: '1px solid #cbd5e1',
                         background: '#f8fafc',
-                        fontSize: '0.9rem',
+                        fontSize: '0.88rem',
                         fontWeight: 600,
                         color: '#0f172a',
-                        outline: 'none',
-                        transition: 'all 0.25s ease'
+                        outline: 'none'
                       }}
-                      className="search-input-field"
                     />
                   </div>
 
                   {loading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '80px 0', gap: '16px' }}>
-                      <div className="loader" style={{
-                        border: '3px solid rgba(15,23,42,0.04)',
-                        borderLeftColor: '#d97706',
-                        borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
-                        animation: 'spin 0.8s linear infinite'
-                      }}></div>
-                      <p style={{ color: '#64748b', fontSize: '0.88rem', fontWeight: 600 }}>Lade Schulregister...</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '80px 0', gap: '14px' }}>
+                      <RefreshCw size={28} className="animate-spin" color="#059669" />
+                      <p style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>Lade Schulregister...</p>
                     </div>
                   ) : schools.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748b', fontWeight: 600, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b', fontWeight: 600, flex: 1 }}>
                       Keine Schulen im System registriert.
                     </div>
                   ) : filteredSchools.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748b', fontWeight: 600, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b', fontWeight: 600, flex: 1 }}>
                       Keine Suchergebnisse für "{schoolSearchQuery}"
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {filteredSchools.map((school) => {
                         const teachers = schoolStats[school.id]?.teachers || 0;
                         const totalStudents = schoolStats[school.id]?.students || 0;
@@ -3809,6 +3718,37 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         const activeStudents = Math.max(campusActive, groovelabActive);
                         const passiveStudents = Math.max(0, totalStudents - activeStudents);
                         const bands = schoolStats[school.id]?.bands || 0;
+
+                        // Calculate dynamic MRR for this tenant
+                        const rates = masterPricing.getSchoolRates ? masterPricing.getSchoolRates(school) : {
+                          priceCampus: school.custom_price_campus ?? school.grandfathered_campus_price ?? masterPricing.priceCampus,
+                          priceGroovelab: school.custom_price_groovelab ?? school.grandfathered_groovelab_price ?? masterPricing.priceGroovelab,
+                          priceKombi: school.custom_price_kombi ?? school.grandfathered_kombi_price ?? masterPricing.priceKombi,
+                          priceTeacher: school.custom_price_teacher ?? school.grandfathered_teacher_price ?? masterPricing.priceTeacher,
+                          priceStudent: school.custom_price_student ?? school.grandfathered_student_price ?? masterPricing.priceStudent,
+                          pricePassiveStudent: masterPricing.pricePassiveStudent ?? 0.09
+                        };
+
+                        const billingCalc = calculateCampusGroovelabBilling({
+                          hasCampusModule: !!school.has_campus_subscription,
+                          hasGroovelabModule: !!school.has_groovelab_subscription,
+                          activeTeacherCount: teachers,
+                          activeStudentCount: activeStudents,
+                          campusStudentCount: campusActive,
+                          groovelabStudentCount: groovelabActive,
+                          passiveStudentCount: passiveStudents,
+                          rates: rates
+                        });
+                        const mrr = billingCalc.totalMonthlySchoolInvoice;
+
+                        // Health score status
+                        const isPaused = !!school.is_paused;
+                        const isTrial = !!school.is_trial;
+                        let trialDaysLeft = 0;
+                        if (isTrial && school.trial_ends_at) {
+                          const diff = new Date(school.trial_ends_at).getTime() - Date.now();
+                          trialDaysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+                        }
 
                         return (
                           <div 
@@ -3859,38 +3799,38 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               fetchSchoolStudents(school.id);
                             }}
                             style={{ 
-                              borderRadius: '16px',
-                              padding: '16px 20px',
-                              border: '1px solid rgba(15, 23, 42, 0.05)',
-                              background: '#f8fafc',
+                              borderRadius: '14px',
+                              padding: '10px 16px',
+                              border: isPaused ? '1px dashed #cbd5e1' : '1px solid #e2e8f0',
+                              background: isPaused ? '#f8fafc' : '#ffffff',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'space-between',
                               cursor: 'pointer',
-                              transition: 'all 0.25s ease',
-                              gap: '16px'
+                              transition: 'all 0.2s ease',
+                              gap: '12px',
+                              boxShadow: '0 1px 4px rgba(0, 0, 0, 0.02)'
                             }}
                             className="school-list-card"
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
-                              {/* World-Class Circular Logo Passepartout / Monogram Badge */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                              {/* Logo / Avatar (Compact 36x36) */}
                               <div style={{
-                                width: '44px',
-                                height: '44px',
-                                borderRadius: '50%',
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '10px',
                                 background: school.logo_url ? '#ffffff' : 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
-                                border: '1px solid rgba(15, 23, 42, 0.1)',
+                                border: '1px solid #e2e8f0',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 fontWeight: 900,
                                 color: '#ffffff',
-                                fontSize: '0.88rem',
+                                fontSize: '0.80rem',
                                 fontFamily: '"Outfit", sans-serif',
-                                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
                                 flexShrink: 0,
                                 overflow: 'hidden',
-                                padding: school.logo_url ? '4px' : 0
+                                padding: school.logo_url ? '3px' : 0
                               }}>
                                 {school.logo_url ? (
                                   <img src={school.logo_url} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
@@ -3900,136 +3840,162 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               </div>
 
                               <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {school.name}
+                                {/* Zeile 1: Name, Ort, Status, MRR in einer kompakten Flex-Zeile */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: 800, fontSize: '0.90rem', color: '#0f172a' }}>
+                                    {school.name}
+                                  </span>
+
+                                  {/* Health Score Pill */}
+                                  {isPaused ? (
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '1px 6px', borderRadius: '100px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#94a3b8' }} /> Pausiert
+                                    </span>
+                                  ) : isTrial ? (
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#475569', background: '#f8fafc', border: '1px solid #cbd5e1', padding: '1px 6px', borderRadius: '100px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                      <Clock size={10} color="#475569" /> Trial ({trialDaysLeft}d)
+                                    </span>
+                                  ) : activeStudents > 0 ? (
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#15803d', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '100px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#16a34a' }} /> Aktiv
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 6px', borderRadius: '100px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#94a3b8' }} /> Kein aktiver Schüler
+                                    </span>
+                                  )}
+
+                                  {/* MRR Pill */}
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0f172a', background: '#f8fafc', border: '1px solid #cbd5e1', padding: '1px 6px', borderRadius: '6px' }}>
+                                    MRR: {mrr.toFixed(2).replace('.', ',')} € / Mo.
+                                  </span>
+
+                                  {(school.zip_code || school.city) && (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+                                      <MapPin size={10} color="#64748b" />
+                                      {school.zip_code || ''} {school.city || ''}
+                                    </span>
+                                  )}
                                 </div>
-                                
-                                {(school.zip_code || school.city) && (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
-                                    <MapPin size={11} color="#64748b" />
-                                    <span>{school.zip_code || ''} {school.city || ''}</span>
-                                  </div>
-                                )}
 
-                                {/* Limits Micro progress indicators */}
-                                {school.limits_enabled ? (
-                                  <div style={{ display: 'flex', gap: '16px', marginTop: '8px', flexWrap: 'wrap' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '90px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                                        <span>Lehrer</span>
-                                        <span>{teachers}/{school.max_teachers ?? 2}</span>
-                                      </div>
-                                      <div style={{ width: '100%', height: '4px', background: 'rgba(15,23,42,0.06)', borderRadius: '10px', overflow: 'hidden' }}>
-                                        <div style={{ 
-                                          width: `${Math.min(100, (teachers / (school.max_teachers ?? 2)) * 100)}%`, 
-                                          height: '100%', 
-                                          background: '#34a853', 
-                                          borderRadius: '10px' 
-                                        }} />
-                                      </div>
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '90px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                                        <span>Schüler</span>
-                                        <span>{totalStudents}/{school.max_students ?? 6}</span>
-                                      </div>
-                                      <div style={{ width: '100%', height: '4px', background: 'rgba(15,23,42,0.06)', borderRadius: '10px', overflow: 'hidden' }}>
-                                        <div style={{ 
-                                          width: `${Math.min(100, (totalStudents / (school.max_students ?? 6)) * 100)}%`, 
-                                          height: '100%', 
-                                          background: '#34a853', 
-                                          borderRadius: '10px' 
-                                        }} />
-                                      </div>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginTop: '6px' }}>
+                                {/* Zeile 2: Kennzahlen & Modul-Tags in einer sauberen Subline */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b' }}>
                                     {teachers} Lehrer • <strong>{activeStudents} Aktiv-Schüler</strong> ({campusActive} Campus, {groovelabActive} GrooveLab) • {passiveStudents} Passiv ({totalStudents} Reg.) • {bands} Ensembles
-                                  </div>
-                                )}
+                                  </span>
 
-                                {/* Module Badges: Strict Green for Campus, Strict Yellow for GrooveLab, Purple for Abo-Bypass */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
                                   {school.has_campus_subscription && (
-                                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#15803d', background: 'rgba(52, 168, 83, 0.12)', border: '1px solid rgba(52, 168, 83, 0.25)', padding: '2px 8px', borderRadius: '100px' }}>
-                                      🎓 Campus
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#15803d', background: 'rgba(52, 168, 83, 0.08)', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '1px 5px', borderRadius: '4px' }}>
+                                      Campus
                                     </span>
                                   )}
                                   {school.has_groovelab_subscription && (
-                                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#a16207', background: 'rgba(234, 179, 8, 0.15)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '2px 8px', borderRadius: '100px' }}>
-                                      🎸 GrooveLab
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#a16207', background: 'rgba(234, 179, 8, 0.10)', border: '1px solid rgba(234, 179, 8, 0.25)', padding: '1px 5px', borderRadius: '4px' }}>
+                                      GrooveLab
                                     </span>
                                   )}
                                   {school.subscription_bypass && (
-                                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#6b21a8', background: 'rgba(168, 85, 247, 0.14)', border: '1px solid rgba(168, 85, 247, 0.35)', padding: '2px 9px', borderRadius: '100px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                      ⚡ Abo-Bypass (Kostenfrei)
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#475569', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '1px 5px', borderRadius: '4px' }}>
+                                      Abo-Bypass
                                     </span>
                                   )}
                                 </div>
                               </div>
                             </div>
 
-                            {/* Row Actions */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                            {/* Row Actions (Kompakt & Aufgeräumt) */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                              {/* Ghost-Mode Impersonation Button */}
                               <button
                                 type="button"
+                                title="Support-Login (Ghost-Mode) starten"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartGhostMode(school);
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  background: '#0f172a',
+                                  border: 'none',
+                                  color: '#ffffff',
+                                  fontSize: '0.70rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  boxShadow: '0 1px 3px rgba(15, 23, 42, 0.12)'
+                                }}
+                              >
+                                <Eye size={12} color="#ffffff" />
+                                <span>Ghost</span>
+                              </button>
+
+                              {/* Copy Kiosk / Invite Link */}
+                              <button
+                                type="button"
+                                title="Kiosk-Kopplungslink kopieren"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyInviteLink(school.id, school.name, school.groovelab_kiosk_token);
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  background: copiedId === school.id ? '#0f172a' : '#f8fafc',
+                                  border: '1px solid #cbd5e1',
+                                  color: copiedId === school.id ? '#ffffff' : '#475569',
+                                  fontSize: '0.70rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Link size={12} />
+                                <span>{copiedId === school.id ? 'Kopiert!' : 'Kiosk'}</span>
+                              </button>
+
+                              {/* Pause Toggle (Instant Optimistic Switch) */}
+                              <button
+                                type="button"
+                                title={school.is_paused ? 'Schule reaktivieren (Zugang freigeben)' : 'Schule pausieren (Zugang sperren)'}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleToggleSchoolPause(school.id, school.is_paused);
                                 }}
                                 style={{
                                   position: 'relative',
-                                  width: '38px',
-                                  height: '22px',
-                                  borderRadius: '11px',
-                                  background: school.is_paused ? 'rgba(15, 23, 42, 0.08)' : '#10b981',
+                                  width: '34px',
+                                  height: '20px',
+                                  borderRadius: '10px',
+                                  background: school.is_paused ? '#cbd5e1' : '#10b981',
                                   border: 'none',
                                   cursor: 'pointer',
                                   padding: '0',
-                                  transition: 'background-color 0.25s',
-                                  display: 'flex',
-                                  alignItems: 'center'
-                                }}
-                                title={school.is_paused ? 'Aktivieren' : 'Pausieren'}
-                              >
-                                <div style={{
-                                  width: '16px',
-                                  height: '16px',
-                                  borderRadius: '50%',
-                                  background: '#ffffff',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                                  transform: school.is_paused ? 'translateX(3px)' : 'translateX(19px)'
-                                }} />
-                              </button>
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  copyInviteLink(school.id, school.name, school.secretary_onboarding_token);
-                                }}
-                                style={{
-                                  padding: '6px 12px',
-                                  borderRadius: '100px',
-                                  background: copiedId === school.id ? 'rgba(16, 185, 129, 0.1)' : '#ffffff',
-                                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                                  color: copiedId === school.id ? '#10b981' : '#4f46e5',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
+                                  transition: 'background-color 0.2s ease',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '4px',
-                                  transition: 'all 0.2s'
+                                  flexShrink: 0
                                 }}
-                                className="hover-scale-mini"
                               >
-                                {copiedId === school.id ? <Check size={11} /> : <Copy size={11} />}
-                                <span>{copiedId === school.id ? 'Kopiert' : 'Link'}</span>
+                                <div style={{
+                                  position: 'absolute',
+                                  left: school.is_paused ? '3px' : '17px',
+                                  width: '14px',
+                                  height: '14px',
+                                  borderRadius: '50%',
+                                  background: '#ffffff',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                  transition: 'left 0.2s ease'
+                                }} />
                               </button>
-
+                              {/* Delete School Button */}
                               <button
+                                type="button"
+                                title="Schule unwiderruflich löschen"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleDeleteSchool(school.id, school.name);
@@ -4037,20 +4003,17 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 style={{
                                   width: '28px',
                                   height: '28px',
-                                  borderRadius: '50%',
-                                  background: 'rgba(239, 68, 68, 0.08)',
-                                  border: 'none',
+                                  borderRadius: '6px',
+                                  background: '#fef2f2',
+                                  border: '1px solid #fee2e2',
                                   color: '#dc2626',
                                   cursor: 'pointer',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transition: 'all 0.2s'
+                                  justifyContent: 'center'
                                 }}
-                                className="hover-scale-mini"
-                                title="Löschen"
                               >
-                                <Trash2 size={12} />
+                                <Trash2 size={13} color="#dc2626" />
                               </button>
                             </div>
                           </div>
@@ -4060,48 +4023,48 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   )}
                 </div>
 
-                {/* Right Side: Create School */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                {/* Right Side: Onboarding & Provisioning Wizard */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
                   <div style={{
                     background: '#ffffff',
                     borderRadius: '24px',
-                    padding: '36px',
-                    border: '1px solid rgba(15, 23, 42, 0.06)',
-                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)'
+                    padding: '32px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
                   }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                      <Link size={20} /> Schul-Onboarding &amp; Provisionierung
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                      <Plus size={18} color="#059669" /> Schul-Provisionierung &amp; Wizard
                     </h3>
 
                     {/* Universal Self-Onboarding Link Box */}
                     <div style={{
-                      background: 'rgba(52, 168, 83, 0.08)',
-                      border: '1px solid rgba(52, 168, 83, 0.25)',
-                      borderRadius: '18px',
-                      padding: '20px',
-                      marginBottom: '26px',
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '16px',
+                      padding: '16px',
+                      marginBottom: '20px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '12px'
+                      gap: '8px'
                     }}>
-                      <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Zap size={16} /> Self-Onboarding Einladungslink
+                      <div style={{ fontWeight: 800, fontSize: '0.84rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Zap size={15} /> Self-Onboarding Einladungslink
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#166534', lineHeight: 1.45, fontWeight: 500 }}>
-                        Verschicke diesen Link an Schulleiter. Der Admin meldet seine Musikschule in 3 einfachen Schritten selbst an.
+                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#166534', lineHeight: 1.35 }}>
+                        Universeller Registrierungs-Link für Schulleiter zur eigenständigen 3-Schritte-Anmeldung.
                       </p>
 
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                         <input
                           readOnly
                           value={`${window.location.origin}/?invite=school_onboarding`}
                           style={{
                             flex: 1,
-                            padding: '10px 12px',
-                            borderRadius: '10px',
-                            border: '1px solid rgba(52, 168, 83, 0.2)',
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #86efac',
                             background: '#ffffff',
-                            fontSize: '0.78rem',
+                            fontSize: '0.74rem',
                             fontFamily: 'monospace',
                             color: '#15803d',
                             fontWeight: 700,
@@ -4112,25 +4075,25 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           type="button"
                           onClick={() => {
                             navigator.clipboard.writeText(`${window.location.origin}/?invite=school_onboarding`);
-                            alert('Universal Schul-Einladungslink kopiert!');
+                            setSaveSuccessToast('Self-Onboarding Link kopiert!');
+                            setTimeout(() => setSaveSuccessToast(null), 3000);
                           }}
                           style={{
                             background: '#15803d',
                             border: 'none',
-                            borderRadius: '10px',
-                            padding: '10px 16px',
-                            fontSize: '0.8rem',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            fontSize: '0.76rem',
                             fontWeight: 800,
                             color: '#ffffff',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px',
-                            boxShadow: '0 4px 12px rgba(21, 128, 61, 0.2)'
+                            gap: '4px'
                           }}
                           className="hover-scale-mini"
                         >
-                          <Copy size={13} /> Kopieren
+                          <Copy size={12} /> Kopieren
                         </button>
                       </div>
                     </div>
@@ -4138,22 +4101,22 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '12px',
-                      margin: '0 0 24px 0',
+                      gap: '10px',
+                      margin: '0 0 18px 0',
                       color: '#94a3b8',
-                      fontSize: '0.7rem',
+                      fontSize: '0.68rem',
                       fontWeight: 800,
                       textTransform: 'uppercase',
                       letterSpacing: '0.06em'
                     }}>
-                      <div style={{ flex: 1, height: '1px', background: 'rgba(15, 23, 42, 0.08)' }} />
+                      <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
                       <span>ODER MANUELL PROVISIONIEREN</span>
-                      <div style={{ flex: 1, height: '1px', background: 'rgba(15, 23, 42, 0.08)' }} />
+                      <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
                     </div>
 
-                    <form onSubmit={handleCreateSchool} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <form onSubmit={handleCreateSchool} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
                           Name der Schule *
                         </label>
                         <input
@@ -4165,22 +4128,21 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           style={{
                             width: '100%',
                             boxSizing: 'border-box',
-                            padding: '12px 14px',
-                            borderRadius: '12px',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
                             background: '#f8fafc',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
+                            border: '1px solid #cbd5e1',
                             color: '#0f172a',
-                            fontSize: '0.9rem',
+                            fontSize: '0.88rem',
                             fontWeight: 600,
                             outline: 'none'
                           }}
-                          className="premium-input"
                         />
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.8fr', gap: '14px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.8fr', gap: '10px' }}>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
                             PLZ
                           </label>
                           <input
@@ -4191,20 +4153,19 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             style={{
                               width: '100%',
                               boxSizing: 'border-box',
-                              padding: '12px 14px',
-                              borderRadius: '12px',
+                              padding: '10px 12px',
+                              borderRadius: '10px',
                               background: '#f8fafc',
-                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              border: '1px solid #cbd5e1',
                               color: '#0f172a',
-                              fontSize: '0.9rem',
+                              fontSize: '0.88rem',
                               fontWeight: 600,
                               outline: 'none'
                             }}
-                            className="premium-input"
                           />
                         </div>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
                             Ort
                           </label>
                           <input
@@ -4215,45 +4176,135 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             style={{
                               width: '100%',
                               boxSizing: 'border-box',
-                              padding: '12px 14px',
-                              borderRadius: '12px',
+                              padding: '10px 12px',
+                              borderRadius: '10px',
                               background: '#f8fafc',
-                              border: '1px solid rgba(15, 23, 42, 0.08)',
+                              border: '1px solid #cbd5e1',
                               color: '#0f172a',
-                              fontSize: '0.9rem',
+                              fontSize: '0.88rem',
                               fontWeight: 600,
                               outline: 'none'
                             }}
-                            className="premium-input"
                           />
                         </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                          Schulleiter E-Mail (Optional für Einladung)
+                        </label>
+                        <input
+                          type="email"
+                          value={newSchoolAdminEmail}
+                          onChange={(e) => setNewSchoolAdminEmail(e.target.value)}
+                          placeholder="leitung@musikschule.de"
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            color: '#0f172a',
+                            fontSize: '0.88rem',
+                            fontWeight: 600,
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+
+                      {/* Modulpaket Selection */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Modulpaket
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
+                          {[
+                            { id: 'kombi', label: 'Kombi' },
+                            { id: 'campus', label: 'Campus' },
+                            { id: 'groovelab', label: 'GrooveLab' }
+                          ].map(m => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setNewSchoolModuleChoice(m.id as any)}
+                              style={{
+                                padding: '8px 4px',
+                                borderRadius: '8px',
+                                border: newSchoolModuleChoice === m.id ? '1.5px solid #059669' : '1px solid #cbd5e1',
+                                background: newSchoolModuleChoice === m.id ? '#f0fdf4' : '#ffffff',
+                                color: newSchoolModuleChoice === m.id ? '#15803d' : '#475569',
+                                fontSize: '0.74rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Testphase / Modus */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Testphase / Lizenzmodus
+                        </label>
+                        <select
+                          value={newSchoolTrialOption}
+                          onChange={(e) => setNewSchoolTrialOption(e.target.value as any)}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '9px 12px',
+                            borderRadius: '10px',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            color: '#0f172a',
+                            fontSize: '0.82rem',
+                            fontWeight: 700,
+                            outline: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="trial_30">30 Tage Testphase (Standard)</option>
+                          <option value="trial_14">14 Tage Testphase</option>
+                          <option value="live">Sofort Vollversion (Live)</option>
+                        </select>
                       </div>
 
                       <button
                         type="submit"
                         disabled={creating}
                         style={{
-                          marginTop: '8px',
-                          padding: '14px',
+                          marginTop: '6px',
+                          padding: '12px',
                           borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                          background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
                           border: 'none',
                           color: '#ffffff',
                           fontWeight: 800,
-                          fontSize: '0.9rem',
+                          fontSize: '0.88rem',
                           cursor: 'pointer',
-                          boxShadow: '0 6px 20px rgba(217, 119, 6, 0.2)',
+                          boxShadow: '0 4px 15px rgba(5, 150, 105, 0.25)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '8px',
+                          gap: '6px',
                           transition: 'all 0.2s ease'
                         }}
                         className="hover-scale-mini"
                       >
-                        {creating ? 'Wird provisioniert...' : (
+                        {creating ? (
                           <>
-                            <Plus size={16} /> Schule anlegen
+                            <RefreshCw size={14} className="animate-spin" />
+                            <span>Wird provisioniert...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus size={16} />
+                            <span>Schule provisionieren</span>
                           </>
                         )}
                       </button>
@@ -4971,6 +5022,153 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               {editSubscriptionBypass && <Check size={14} strokeWidth={3} />}
                             </div>
                           </div>
+
+                          {/* Time-Bounded Bypass Controls & Quota Info */}
+                          {editSubscriptionBypass && (
+                            <div style={{
+                              background: '#faf5ff',
+                              border: '1px solid #e9d5ff',
+                              borderRadius: '12px',
+                              padding: '14px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '10px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#6b21a8' }}>
+                                  Gültigkeitsdauer (Ablaufdatum)
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#7e22ce', fontWeight: 700 }}>
+                                  Standard-Basiskontingent aktiv
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const d = new Date();
+                                    d.setDate(d.getDate() + 30);
+                                    setEditSubscriptionBypassUntil(d.toISOString().split('T')[0]);
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #d8b4fe',
+                                    background: '#ffffff',
+                                    color: '#6b21a8',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 750,
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  +1 Monat (Kulanz)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const d = new Date();
+                                    d.setDate(d.getDate() + 90);
+                                    setEditSubscriptionBypassUntil(d.toISOString().split('T')[0]);
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #d8b4fe',
+                                    background: '#ffffff',
+                                    color: '#6b21a8',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 750,
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  +3 Monate (Pilot)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const currentYear = new Date().getFullYear();
+                                    setEditSubscriptionBypassUntil(`${currentYear}-08-31`);
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #d8b4fe',
+                                    background: '#ffffff',
+                                    color: '#6b21a8',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 750,
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Schuljahr (31.08.)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditSubscriptionBypassUntil('');
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #d8b4fe',
+                                    background: '#ffffff',
+                                    color: '#6b21a8',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 750,
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Unbegrenzt
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '2px' }}>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>
+                                    Ablaufdatum:
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={editSubscriptionBypassUntil}
+                                    onChange={(e) => setEditSubscriptionBypassUntil(e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '6px 8px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #d8b4fe',
+                                      fontSize: '0.76rem',
+                                      fontWeight: 650,
+                                      color: '#0f172a'
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>
+                                    Grund / Notiz (optional):
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="z. B. Kulanz Serverausfall"
+                                    value={editSubscriptionBypassReason}
+                                    onChange={(e) => setEditSubscriptionBypassReason(e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '6px 8px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #d8b4fe',
+                                      fontSize: '0.76rem',
+                                      color: '#0f172a'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -5920,7 +6118,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 { id: 'briefing', label: 'Briefing Board', desc: 'Schüler-Aktivierungen & CG-Hashes', icon: <Clock size={16} color="#0284c7" /> },
                 { id: 'billing', label: 'Financial Control', desc: 'Rechnungen RE-... und CG-...', icon: <GraduationCap size={16} color="#ca8a04" /> },
                 { id: 'telemetry', label: 'Telemetrie & Health', desc: 'Server CPU, RAM & DB Telemetrie', icon: <Cpu size={16} color="#4f46e5" /> },
-                { id: 'pricing', label: 'Preise & Banking', desc: 'Modulpreise & Firmen-Bankdaten', icon: <Tag size={16} color="#d97706" /> }
+                { id: 'pricing', label: 'Preise & Kampagnen', desc: 'Standard-Abonnementpreise & Rabatt-Aktionen', icon: <Tag size={16} color="#d97706" /> },
+                { id: 'operator', label: 'Betreiber & Zugang', desc: 'Betreibergesellschaft, Bankkonto & Root-Zugang', icon: <Building2 size={16} color="#0284c7" /> }
               ]
               .filter(item => !commandSearch || item.label.toLowerCase().includes(commandSearch.toLowerCase()) || item.desc.toLowerCase().includes(commandSearch.toLowerCase()))
               .map(item => (

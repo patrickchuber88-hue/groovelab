@@ -1,8 +1,8 @@
 import React from 'react';
-import { Activity, Search, RefreshCw, AlertTriangle, CheckCircle, Cpu, Users, Layers, ShieldCheck, Tag } from 'lucide-react';
+import { Activity, Search, RefreshCw, AlertTriangle, CheckCircle, Cpu, Users, Layers, ShieldCheck, Tag, Building2, HardDrive } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { School, SchoolStat, PendingUser } from '../MasterAdminTypes';
-import { MasterPricingRates } from '../../../domain/pricingEngine';
+import { MasterPricingRates, isSchoolBypassActive } from '../../../domain/pricingEngine';
 
 interface ExecutiveTabProps {
   schools: School[];
@@ -31,53 +31,99 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
 }) => {
   const validSchools = schools.filter(s => !s.name?.toLowerCase().includes('groove academy'));
 
-  // B2B MRR: Only active, non-trial, NON-BYPASS schools generate B2B software license fees
-  const b2bMrr = validSchools.reduce((acc, s) => {
-    const isBypass = s.subscription_bypass;
+  // 1. Committed Base MRR (Fixed School Subscription Flatrates)
+  let payingSchoolsCount = 0;
+  const committedBaseMrr = validSchools.reduce((acc, s) => {
+    const isBypass = isSchoolBypassActive(s);
     const isTrial = s.is_trial || s.status === 'trial';
     const isPaused = s.is_paused || s.status === 'suspended';
-
     if (isBypass || isTrial || isPaused) return acc;
 
+    payingSchoolsCount++;
     const priceCampus = s.custom_price_campus ?? s.grandfathered_campus_price ?? masterPricing.priceCampus;
     const priceGroovelab = s.custom_price_groovelab ?? s.grandfathered_groovelab_price ?? masterPricing.priceGroovelab;
     const priceKombi = s.custom_price_kombi ?? s.grandfathered_kombi_price ?? masterPricing.priceKombi;
-    const priceTeacher = s.custom_price_teacher ?? s.grandfathered_teacher_price ?? masterPricing.priceTeacher;
-    const priceStudent = s.custom_price_student ?? s.grandfathered_student_price ?? masterPricing.priceStudent;
 
     let baseFlat = 0;
     if (s.has_campus_subscription && s.has_groovelab_subscription) baseFlat = priceKombi;
     else if (s.has_campus_subscription) baseFlat = priceCampus;
     else if (s.has_groovelab_subscription) baseFlat = priceGroovelab;
 
+    return acc + baseFlat;
+  }, 0);
+
+  // 2. Seat & Usage MRR (Teachers & Active Students: B2B + B2C)
+  let totalB2bTeachers = 0;
+  let totalB2bStudents = 0;
+  let totalB2cStudents = 0;
+
+  const b2bSeatMrr = validSchools.reduce((acc, s) => {
+    const isBypass = isSchoolBypassActive(s);
+    const isTrial = s.is_trial || s.status === 'trial';
+    const isPaused = s.is_paused || s.status === 'suspended';
+    if (isBypass || isTrial || isPaused) return acc;
+
+    const priceTeacher = s.custom_price_teacher ?? s.grandfathered_teacher_price ?? masterPricing.priceTeacher;
+    const priceStudent = s.custom_price_student ?? s.grandfathered_student_price ?? masterPricing.priceStudent;
+
     const stats: any = schoolStats[s.id] || {};
     const teachers = stats.teachers ?? stats.totalTeachers ?? s.teachers_count ?? 0;
     const students = stats.activeStudents ?? stats.students ?? s.active_students_count ?? 0;
 
-    const teacherFee = teachers * priceTeacher;
-    const studentFee = students * priceStudent;
+    totalB2bTeachers += teachers;
+    totalB2bStudents += students;
 
-    return acc + baseFlat + teacherFee + studentFee;
+    return acc + (teachers * priceTeacher) + (students * priceStudent);
   }, 0);
 
-  // B2C MRR: Only active paid self-payers in non-bypassed schools generate B2C student revenue
-  const b2cMrr = pendingUsers.reduce((acc, u) => {
+  const b2cSeatMrr = pendingUsers.reduce((acc, u) => {
     const school = validSchools.find(s => s.id === u.school_id);
     if (!school) return acc;
-    const isBypass = school.subscription_bypass;
+    const isBypass = isSchoolBypassActive(school);
     const isTrial = school.is_trial || school.status === 'trial';
     if (isBypass || isTrial) return acc;
 
     if ((u as any).student_billing_payment_method && (u as any).student_billing_cash_paid && !(u as any).exempt_from_direct_billing) {
+      totalB2cStudents++;
       return acc + Number(masterPricing.priceStudent);
     }
     return acc;
   }, 0);
 
-  const totalMrr = b2bMrr + b2cMrr;
+  const seatUsageMrr = b2bSeatMrr + b2cSeatMrr;
+
+  // 3. Storage Add-on MRR (Hetzner Audio-Tresor expansions)
+  let activeStorageAddonCount = 0;
+  let activeStorageAddonGb = 0;
+  const storageAddonMrr = validSchools.reduce((acc, s: any) => {
+    const isBypass = isSchoolBypassActive(s);
+    const isTrial = s.is_trial || s.status === 'trial';
+    const isPaused = s.is_paused || s.status === 'suspended';
+    if (isBypass || isTrial || isPaused) return acc;
+
+    if (s.storage_addon_status === 'active' && s.storage_addon_monthly_fee) {
+      activeStorageAddonCount++;
+      activeStorageAddonGb += Number(s.storage_addon_gb || 0);
+      return acc + Number(s.storage_addon_monthly_fee || 0);
+    }
+    return acc;
+  }, 0);
+
+  const b2bMrr = committedBaseMrr + b2bSeatMrr + storageAddonMrr;
+  const b2cMrr = b2cSeatMrr;
+  const totalMrr = committedBaseMrr + seatUsageMrr + storageAddonMrr;
+
+  const committedBaseArr = committedBaseMrr * 12;
+  const seatUsageArr = seatUsageMrr * 12;
+  const storageAddonArr = storageAddonMrr * 12;
   const totalArr = totalMrr * 12;
-  const bypassedSchools = validSchools.filter(s => s.subscription_bypass);
+  const bypassedSchools = validSchools.filter(s => isSchoolBypassActive(s));
   const bypassedCount = bypassedSchools.length;
+  const expiringBypassSchools = bypassedSchools.filter(s => {
+    if (!s.subscription_bypass_until) return false;
+    const diffDays = Math.ceil((new Date(s.subscription_bypass_until).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays <= 14;
+  });
   const currentYear = new Date().getFullYear();
 
   const latestMetric = serverMetrics[0] || { cpu_load: 0.12, mem_used_mb: 1420, mem_total_mb: 4096, active_connections: 4 };
@@ -178,8 +224,18 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             gap: '14px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '26px' }}>📦</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '12px',
+                  background: 'rgba(120, 53, 15, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <HardDrive size={20} color="#78350f" />
+                </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#78350f', letterSpacing: '-0.02em' }}>
                     {pendingStorageSchools.length} Ausstehende Speicher-Aktivierung{pendingStorageSchools.length > 1 ? 'en' : ''} (Hetzner Server)
@@ -253,10 +309,14 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                           fontSize: '0.78rem',
                           fontWeight: 800,
                           cursor: 'pointer',
-                          boxShadow: '0 2px 8px rgba(52, 168, 83, 0.25)'
+                          boxShadow: '0 2px 8px rgba(52, 168, 83, 0.25)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
                         }}
                       >
-                        🚀 Auf Hetzner bereitgestellt &amp; Freischalten
+                        <CheckCircle size={13} color="#ffffff" />
+                        <span>Auf Hetzner freischalten</span>
                       </button>
 
                       <button
@@ -318,9 +378,23 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
           <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
             {totalMrr.toFixed(2)} €
           </h3>
-          <span style={{ fontSize: '0.72rem', opacity: 0.9, marginTop: '4px', display: 'block', fontWeight: 600 }}>
-            B2B: {b2bMrr.toFixed(2)} € • B2C: {b2cMrr.toFixed(2)} €
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', fontSize: '0.72rem', opacity: 0.95, fontWeight: 650 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Building2 size={12} /> {committedBaseMrr.toFixed(2)} €
+            </span>
+            <span style={{ opacity: 0.6 }}>•</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Users size={12} /> {seatUsageMrr.toFixed(2)} €
+            </span>
+            {storageAddonMrr > 0 && (
+              <>
+                <span style={{ opacity: 0.6 }}>•</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <HardDrive size={12} /> {storageAddonMrr.toFixed(2)} €
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
         {/* ARR Card */}
@@ -337,9 +411,23 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
           <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
             {totalArr.toFixed(2)} €
           </h3>
-          <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 700, marginTop: '4px', display: 'block' }}>
-            Dynamischer MRR × 12 Faktor
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', fontSize: '0.72rem', color: '#64748b', fontWeight: 650 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Building2 size={12} color="#64748b" /> {committedBaseArr.toFixed(2)} €
+            </span>
+            <span style={{ opacity: 0.4 }}>•</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Users size={12} color="#64748b" /> {seatUsageArr.toFixed(2)} €
+            </span>
+            {storageAddonArr > 0 && (
+              <>
+                <span style={{ opacity: 0.4 }}>•</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <HardDrive size={12} color="#64748b" /> {storageAddonArr.toFixed(2)} €
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Bypassed Free Partner Schools Scorecard */}
@@ -356,8 +444,10 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
           <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', color: '#6b21a8', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
             {bypassedCount} <span style={{ fontSize: '0.9rem', color: '#7e22ce', fontWeight: 700 }}>Schulen</span>
           </h3>
-          <span style={{ fontSize: '0.72rem', color: '#7e22ce', fontWeight: 700, marginTop: '4px', display: 'block' }}>
-            0,00 € Sponsoring / Partner
+          <span style={{ fontSize: '0.72rem', color: expiringBypassSchools.length > 0 ? '#b45309' : '#7e22ce', fontWeight: 700, marginTop: '4px', display: 'block' }}>
+            {expiringBypassSchools.length > 0
+              ? `⚠️ ${expiringBypassSchools.length} läuft bald ab`
+              : '0,00 € Sponsoring / Kulanz'}
           </span>
         </div>
 
@@ -467,17 +557,21 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button
                 onClick={() => onNavigateTab('schools')}
-                style={{ width: '100%', padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', fontWeight: 750, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', fontWeight: 750, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
-                <span>🏢 Schulen-Verwaltung öffnen</span>
-                <span>→</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Building2 size={15} color="#475569" /> Schulen-Verwaltung öffnen
+                </span>
+                <span style={{ color: '#94a3b8' }}>→</span>
               </button>
               <button
                 onClick={() => onNavigateTab('pricing')}
-                style={{ width: '100%', padding: '12px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', fontWeight: 750, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', fontWeight: 750, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
-                <span>🏷️ Preismatrix & Bestandsschutz</span>
-                <span>→</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Tag size={15} color="#475569" /> Preismatrix &amp; Bestandsschutz
+                </span>
+                <span style={{ color: '#94a3b8' }}>→</span>
               </button>
             </div>
           </div>

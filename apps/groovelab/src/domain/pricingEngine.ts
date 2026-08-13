@@ -32,9 +32,22 @@ export interface SchoolPricingData {
   grandfathered_passive_student_price?: number | null;
   price_grandfathered_at?: string | null;
   subscription_bypass?: boolean;
+  subscription_bypass_until?: string | null;
+  subscription_bypass_reason?: string | null;
 }
 
 export type SchoolPricingProfile = SchoolPricingData;
+
+/**
+ * Checks if a school has an active Abo-Bypass.
+ * If subscription_bypass_until is set, it checks if the date has not yet expired.
+ */
+export function isSchoolBypassActive(school: SchoolPricingData | null | undefined): boolean {
+  if (!school?.subscription_bypass) return false;
+  if (!school.subscription_bypass_until) return true;
+  const until = new Date(school.subscription_bypass_until);
+  return !isNaN(until.getTime()) && until.getTime() > Date.now();
+}
 
 export interface EffectiveRates {
   priceCampus: number;
@@ -107,8 +120,8 @@ export function calculateSchoolEffectiveRates(
 
   if (!school) return defaultRates;
 
-  // Abo-Bypass (Sponsoring / Free Partner School Override)
-  if (school.subscription_bypass) {
+  // Abo-Bypass (Sponsoring / Free Partner School / SLA-Credit Override)
+  if (isSchoolBypassActive(school)) {
     return {
       priceCampus: 0,
       priceGroovelab: 0,
@@ -117,6 +130,7 @@ export function calculateSchoolEffectiveRates(
       priceStudent: 0,
       pricePassiveStudent: 0,
       priceStorageAddon: 0,
+      // During active bypass, standard base quota applies (2 GB baseline)
       storageAddonGb: Number(school.storage_addon_gb || 0),
       storageUsedBytes: Number(school.storage_used_bytes || 0),
       studentSavings: 0,
