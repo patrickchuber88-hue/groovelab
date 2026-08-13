@@ -1940,10 +1940,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     setIsCancelled(false);
     setHasCampusSub(false);
     setHasGroovelabSub(false);
+    setSelectedStorageAddonGb(0);
+    setSelectedStorageAddonFee(0);
     setCampusActivatedThisMonth(false);
     setGroovelabActivatedThisMonth(false);
     setCheckoutStep(1);
     setAgreedToSepa(false);
+    setAgreedToTerms(false);
 
     if (typeof window !== 'undefined') {
       localStorage.setItem(`isBillingBooked_${schoolId}`, 'false');
@@ -3600,11 +3603,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           localStorage.removeItem(`isCancelled_${schoolId}`);
         }
         
-        const dbIsBooked = schoolData.is_billing_booked ?? false;
-        const storedIsBooked = localStorage.getItem(`isBillingBooked_${schoolId}`) === 'true';
-        if (dbIsBooked || storedIsBooked) {
+        const storedIsBookedStr = typeof window !== 'undefined' ? localStorage.getItem(`isBillingBooked_${schoolId}`) : null;
+        const isExplicitlyReset = storedIsBookedStr === 'false';
+        const dbIsBooked = schoolData.is_billing_booked === true;
+        const storedIsBooked = storedIsBookedStr === 'true';
+
+        if (!isExplicitlyReset && (dbIsBooked || storedIsBooked)) {
           setIsBillingBooked(true);
-          localStorage.setItem(`isBillingBooked_${schoolId}`, 'true');
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`isBillingBooked_${schoolId}`, 'true');
+          }
           setHasCampusSub(hasCampus);
           setHasGroovelabSub(hasGroove);
           const billingOpt = schoolData.student_billing_option || 'option2';
@@ -3612,9 +3620,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           setBillingPayer((billingOpt === 'option2' || billingOpt === 'option3_2' || billingOpt === 'option3_3') ? 'school' : 'student');
         } else {
           setIsBillingBooked(false);
-          localStorage.removeItem(`isBillingBooked_${schoolId}`);
-          setHasCampusSub(hasCampus);
-          setHasGroovelabSub(hasGroove);
+          if (typeof window !== 'undefined' && storedIsBookedStr !== 'false') {
+            localStorage.removeItem(`isBillingBooked_${schoolId}`);
+          }
         }
         
         setPendingUserQuota(schoolData.pending_user_quota);
