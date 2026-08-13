@@ -24506,13 +24506,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         {/* Left Column: Wizard Steps */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                           
-                          {/* Visual Step Progress Line */}
-                          <div className="glass-panel" style={{
+                          {/* Visual Step Progress Bar - Apple HIG Enterprise Standard */}
+                          <div style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            padding: '18px 24px',
-                            boxShadow: '0 2px 12px rgba(0,0,0,0.02)'
+                            padding: '16px 28px',
+                            background: 'rgba(255, 255, 255, 0.85)',
+                            backdropFilter: 'blur(20px) saturate(180%)',
+                            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                            border: '1px solid rgba(226, 232, 240, 0.8)',
+                            borderRadius: '24px',
+                            boxShadow: '0 8px 30px -4px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)'
                           }}>
                             {[
                               { step: 1, label: 'Module wählen' },
@@ -24527,28 +24532,41 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 <div key={s.step} style={{ display: 'flex', alignItems: 'center', flex: index < arr.length - 1 ? 1 : 'none' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <span style={{
-                                      width: '28px',
-                                      height: '28px',
+                                      width: '30px',
+                                      height: '30px',
                                       borderRadius: '50%',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 900,
-                                      background: isCurrent ? 'linear-gradient(135deg, #34a853 0%, #eab308 100%)' : isPassed ? '#34a853' : '#e2e8f0',
-                                      color: isCurrent || isPassed ? '#ffffff' : '#64748b',
-                                      boxShadow: isCurrent ? '0 4px 10px rgba(52, 168, 83, 0.2)' : 'none',
-                                      transition: 'all 0.25s ease'
+                                      fontSize: '0.78rem',
+                                      fontWeight: 800,
+                                      background: isPassed 
+                                        ? '#34a853' 
+                                        : (isCurrent ? '#ffffff' : '#f1f5f9'),
+                                      color: isPassed 
+                                        ? '#ffffff' 
+                                        : (isCurrent ? '#0f172a' : '#94a3b8'),
+                                      border: isCurrent 
+                                        ? '2.5px solid #34a853' 
+                                        : (isPassed ? 'none' : '1.5px solid #e2e8f0'),
+                                      boxShadow: isCurrent 
+                                        ? '0 0 0 4px rgba(52, 168, 83, 0.15), 0 4px 14px rgba(52, 168, 83, 0.25)' 
+                                        : (isPassed ? '0 3px 10px rgba(52, 168, 83, 0.2)' : 'none'),
+                                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                                     }}>
                                       {isPassed ? (
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                          <polyline points="20 6 9 17 4 12"/>
+                                        </svg>
                                       ) : s.step}
                                     </span>
                                     <span style={{ 
-                                      fontSize: '0.78rem', 
-                                      fontWeight: isCurrent ? 900 : 700, 
-                                      color: isCurrent ? '#1e293b' : isPassed ? '#34a853' : '#94a3b8',
-                                      fontFamily: 'Urbanist, sans-serif'
+                                      fontSize: '0.8rem', 
+                                      fontWeight: isCurrent ? 800 : (isPassed ? 700 : 550), 
+                                      color: isCurrent ? '#0f172a' : (isPassed ? '#15803d' : '#94a3b8'),
+                                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Outfit", sans-serif',
+                                      letterSpacing: '-0.01em',
+                                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                                     }}>
                                       {s.label}
                                     </span>
@@ -24557,10 +24575,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     <div style={{ 
                                       flex: 1, 
                                       height: '3px', 
-                                      background: isPassed ? '#34a853' : '#e2e8f0', 
+                                      background: isPassed ? 'linear-gradient(90deg, #34a853 0%, #15803d 100%)' : '#e2e8f0', 
                                       margin: '0 16px', 
                                       borderRadius: '9999px',
-                                      transition: 'all 0.25s ease' 
+                                      transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)' 
                                     }} />
                                   )}
                                 </div>
