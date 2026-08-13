@@ -9319,16 +9319,23 @@ export function TeacherDashboard({
         activePlatform={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all'}
         onClose={() => setDeleteStudentModalData(null)}
         onConfirm={async (studentId) => {
+          const sName = deleteStudentModalData?.name;
           const res = await deleteStudentFully(studentId, {
             activePlatform: activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all',
             isCampusActive: deleteStudentModalData?.isCampusActive,
-            isGroovelabActive: deleteStudentModalData?.isGroovelabActive
+            isGroovelabActive: deleteStudentModalData?.isGroovelabActive,
+            studentName: sName
           });
           if (!res.success) {
             throw new Error(res.error);
           }
-          setAllStudents(prev => prev.filter(s => s.id !== studentId));
-          fetchData();
+          const fName = sName ? sName.trim().split(/\s+/)[0].toLowerCase() : '';
+          setAllStudents(prev => prev.filter(s => {
+            if (s.id === studentId) return false;
+            if (fName && s.first_name && s.first_name.toLowerCase().trim() === fName) return false;
+            return true;
+          }));
+          await fetchData();
         }}
       />
        {docStudent && (

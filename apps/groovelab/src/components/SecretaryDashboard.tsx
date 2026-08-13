@@ -1499,24 +1499,30 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const handleUpdateTeacher = async (updatedData: any) => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          first_name: updatedData.firstName,
-          last_name: updatedData.lastName,
-          email: (updatedData.email && updatedData.email.trim()) ? updatedData.email.trim() : null,
-          instrument: updatedData.instrument,
-          required_equipment: updatedData.requiredEquipment || [],
-          ausweis_nummer: updatedData.ausweisNummer,
-          is_campus_active: updatedData.isCampusActive,
-          is_groovelab_active: updatedData.isGroovelabActive,
-          is_active: updatedData.isActive,
-          role: updatedData.role,
-          contract_ends_at: updatedData.contractEndsAt || null
-        })
+      const teacherPayload = {
+        first_name: updatedData.firstName,
+        last_name: updatedData.lastName,
+        email: (updatedData.email && updatedData.email.trim()) ? updatedData.email.trim() : null,
+        instrument: updatedData.instrument,
+        required_equipment: updatedData.requiredEquipment || [],
+        ausweis_nummer: updatedData.ausweisNummer,
+        is_campus_active: updatedData.isCampusActive,
+        is_groovelab_active: updatedData.isGroovelabActive,
+        is_active: updatedData.isActive,
+        role: updatedData.role,
+        contract_ends_at: updatedData.contractEndsAt || null
+      };
+
+      const { error: rawErr } = await supabase
+        .from('users_raw')
+        .update(teacherPayload)
         .eq('id', updatedData.id);
 
-      if (error) throw error;
+      try {
+        await supabase.from('users').update(teacherPayload).eq('id', updatedData.id);
+      } catch (e) {}
+
+      if (rawErr) throw rawErr;
       setManageTeacher(null);
       fetchDashboardData();
     } catch (err: any) {
@@ -1532,15 +1538,21 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       const newCampusValue = moduleType === 'campus' ? !isCampus : isCampus;
       const newGrooveValue = moduleType === 'groovelab' ? !isGroove : isGroove;
 
-      const { error } = await supabase
-        .from('users')
-        .update({
-          is_campus_active: newCampusValue,
-          is_groovelab_active: newGrooveValue,
-        })
+      const moduleUpdates = {
+        is_campus_active: newCampusValue,
+        is_groovelab_active: newGrooveValue,
+      };
+
+      const { error: rawErr } = await supabase
+        .from('users_raw')
+        .update(moduleUpdates)
         .eq('id', teacher.id);
 
-      if (error) throw error;
+      try {
+        await supabase.from('users').update(moduleUpdates).eq('id', teacher.id);
+      } catch (e) {}
+
+      if (rawErr) throw rawErr;
       
       if (manageTeacher && manageTeacher.id === teacher.id) {
         setManageTeacher({
@@ -1576,16 +1588,37 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         return;
       }
 
-      const { error } = await supabase
-        .from('users')
-        .update({
+      const moduleUpdates = {
+        is_campus_active: newCampusValue,
+        is_groovelab_active: newGrooveValue,
+      };
+
+      const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', student.id).maybeSingle();
+      if (!existingUser) {
+        await supabase.from('users_raw').insert({
+          id: student.id,
+          school_id: student.school_id || schoolId,
+          role: 'student',
+          first_name: student.first_name || 'Schüler',
+          last_name: student.last_name || '',
+          instrument: student.instrument || 'Musiker',
+          teacher_id: student.teacher_id || null,
+          lesson_duration: student.lesson_duration || 30,
           is_campus_active: newCampusValue,
           is_groovelab_active: newGrooveValue,
-        })
-        .eq('id', student.id);
+          is_active: false
+        });
+      } else {
+        const { error: rawErr } = await supabase
+          .from('users_raw')
+          .update(moduleUpdates)
+          .eq('id', student.id);
+        if (rawErr) throw rawErr;
+        try {
+          await supabase.from('users').update(moduleUpdates).eq('id', student.id);
+        } catch (e) {}
+      }
 
-      if (error) throw error;
-      
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Umschalten: ' + err.message);
@@ -10108,7 +10141,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           style={{ 
                             width: '100%', 
                             padding: '4px 8px', 
-                            height: '32px',
+                            height: '32px', 
                             borderRadius: '8px', 
                             fontSize: '0.82rem', 
                             fontWeight: 700, 
@@ -10132,17 +10165,39 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         <select
                           value={student.lesson_duration || 30}
                           onChange={async (e) => {
-                            const { error } = await supabase
-                              .from('users')
-                              .update({ lesson_duration: parseInt(e.target.value) })
-                              .eq('id', student.id);
-                            if (error) alert(error.message);
-                            else fetchDashboardData();
+                            const newDur = parseInt(e.target.value);
+                            try {
+                              const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', student.id).maybeSingle();
+                              if (!existingUser) {
+                                await supabase.from('users_raw').insert({
+                                  id: student.id,
+                                  school_id: student.school_id || schoolId,
+                                  role: 'student',
+                                  first_name: student.first_name || 'Schüler',
+                                  last_name: student.last_name || '',
+                                  instrument: student.instrument || 'Musiker',
+                                  teacher_id: student.teacher_id || null,
+                                  lesson_duration: newDur,
+                                  is_campus_active: !!student.is_campus_active,
+                                  is_groovelab_active: !!student.is_groovelab_active,
+                                  is_active: false
+                                });
+                              } else {
+                                await supabase.from('users_raw').update({ lesson_duration: newDur }).eq('id', student.id);
+                              }
+                              try {
+                                await supabase.from('students').update({ lesson_duration: newDur }).eq('id', student.id);
+                              } catch (e) {}
+                              fetchDashboardData();
+                            } catch (err: any) {
+                              console.warn('duration update warning:', err);
+                              fetchDashboardData();
+                            }
                           }}
                           style={{ 
                             width: '100%', 
                             padding: '4px 6px', 
-                            height: '32px',
+                            height: '32px', 
                             borderRadius: '8px', 
                             fontSize: '0.82rem', 
                             fontWeight: 700, 
@@ -10203,9 +10258,29 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 userUpdates.exempt_from_direct_billing = false;
                               }
 
-                              await supabase.from('users').update(userUpdates).eq('id', student.id);
-                              await supabase.from('students').update({ is_campus_active: newVal }).eq('id', student.id);
-                              await supabase.from('pending_students').update({ is_campus_active: newVal }).eq('id', student.id);
+                              const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', student.id).maybeSingle();
+                              if (!existingUser) {
+                                await supabase.from('users_raw').insert({
+                                  id: student.id,
+                                  school_id: student.school_id || schoolId,
+                                  role: 'student',
+                                  first_name: student.first_name || 'Schüler',
+                                  last_name: student.last_name || '',
+                                  instrument: student.instrument || 'Musiker',
+                                  teacher_id: student.teacher_id || null,
+                                  lesson_duration: student.lesson_duration || 30,
+                                  is_campus_active: newVal,
+                                  is_groovelab_active: !!student.is_groovelab_active,
+                                  is_active: false,
+                                  exempt_from_direct_billing: !!userUpdates.exempt_from_direct_billing
+                                });
+                              } else {
+                                await supabase.from('users_raw').update(userUpdates).eq('id', student.id);
+                                try {
+                                  await supabase.from('users').update(userUpdates).eq('id', student.id);
+                                } catch (e) {}
+                              }
+
                               fetchDashboardData();
                             } catch (err: any) {
                               alert("Fehler beim Umschalten: " + err.message);
@@ -10272,9 +10347,28 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             if (!window.confirm(`GrooveLab-Modul für ${sName} ${actionWord}?`)) return;
                             try {
                               const newVal = !student.is_groovelab_active;
-                              await supabase.from('users').update({ is_groovelab_active: newVal }).eq('id', student.id);
-                              await supabase.from('students').update({ is_groovelab_active: newVal }).eq('id', student.id);
-                              await supabase.from('pending_students').update({ is_groovelab_active: newVal }).eq('id', student.id);
+                              const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', student.id).maybeSingle();
+                              if (!existingUser) {
+                                await supabase.from('users_raw').insert({
+                                  id: student.id,
+                                  school_id: student.school_id || schoolId,
+                                  role: 'student',
+                                  first_name: student.first_name || 'Schüler',
+                                  last_name: student.last_name || '',
+                                  instrument: student.instrument || 'Musiker',
+                                  teacher_id: student.teacher_id || null,
+                                  lesson_duration: student.lesson_duration || 30,
+                                  is_campus_active: !!student.is_campus_active,
+                                  is_groovelab_active: newVal,
+                                  is_active: false
+                                });
+                              } else {
+                                await supabase.from('users_raw').update({ is_groovelab_active: newVal }).eq('id', student.id);
+                                try {
+                                  await supabase.from('users').update({ is_groovelab_active: newVal }).eq('id', student.id);
+                                } catch (e) {}
+                              }
+
                               fetchDashboardData();
                             } catch (err: any) {
                               alert("Fehler beim Umschalten: " + err.message);
@@ -10786,25 +10880,52 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       // Physically purge assets from Supabase Storage
       await deleteUserStorageAssets([id]);
 
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
+      try {
+        await supabase.rpc('delete_user_fully', {
+          p_user_id: id,
+          p_school_id: schoolId || null
+        });
+      } catch (e) {}
+
+      try { await supabase.from('user_email_prefixes').delete().eq('user_id', id); } catch (e) {}
+      try { await supabase.from('user_email_suffixes').delete().eq('user_id', id); } catch (e) {}
+      try { await supabase.from('activation_days').delete().eq('student_id', id); } catch (e) {}
+      try { await supabase.from('student_first_names').delete().eq('student_id', id); } catch (e) {}
+      try { await supabase.from('student_last_names').delete().eq('student_id', id); } catch (e) {}
+      try { await supabase.from('schedules').delete().or(`teacher_id.eq.${id},student_id.eq.${id}`); } catch (e) {}
+      try { await supabase.from('schedule_occurrences').delete().or(`teacher_id.eq.${id},student_id.eq.${id}`); } catch (e) {}
+      try { await supabase.from('cooperations').update({ teacher_id: null }).eq('teacher_id', id); } catch (e) {}
+      try { await supabase.from('bands').update({ coach_id: null }).eq('coach_id', id); } catch (e) {}
+      try { await supabase.from('band_members').delete().eq('user_id', id); } catch (e) {}
+      try { await supabase.from('chat_messages').delete().or(`sender_id.eq.${id},recipient_id.eq.${id}`); } catch (e) {}
+      try { await supabase.from('direct_messages').delete().or(`sender_id.eq.${id},recipient_id.eq.${id}`); } catch (e) {}
+      try { await supabase.from('duties').delete().eq('teacher_id', id); } catch (e) {}
+      try { await supabase.from('pending_students').delete().eq('id', id); } catch (e) {}
+
+      const { error: rawErr } = await supabase.from('users_raw').delete().eq('id', id);
+      try { await supabase.from('students').delete().eq('id', id); } catch (e) {}
+      try { await supabase.from('users').delete().eq('id', id); } catch (e) {}
+
+      if (rawErr && rawErr.code !== 'PGRST116') {
+        console.warn('Users raw delete notice:', rawErr);
+      }
       fetchDashboardData();
     } catch (err: any) {
-      alert('Fehler: ' + err.message);
+      alert('Fehler beim Löschen: ' + err.message);
     }
   };
 
   // Drag and Drop Helpers
   const handleUpdateTeacherInstrument = async (teacherId: string, newInstrument: string) => {
     try {
-      const { error } = await supabase
-        .from('users')
+      const { error: rawErr } = await supabase
+        .from('users_raw')
         .update({ instrument: newInstrument })
         .eq('id', teacherId);
-      if (error) throw error;
+      try {
+        await supabase.from('users').update({ instrument: newInstrument }).eq('id', teacherId);
+      } catch (e) {}
+      if (rawErr) throw rawErr;
       fetchDashboardData();
     } catch (err: any) {
       alert("Fehler beim Zuweisen des Unterrichtsfachs: " + err.message);
@@ -10874,22 +10995,42 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setStudentFilterTeacher('All');
       }
 
-      // 1. Update users table by ID and by name
-      await supabase.from('users').update(updatePayload).eq('id', studentId);
-      if (sFirstName && sLastName) {
-        await supabase.from('users').update(updatePayload).eq('first_name', sFirstName).eq('last_name', sLastName);
+      // 1. Update or create in users_raw
+      try {
+        const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', studentId).maybeSingle();
+        if (!existingUser) {
+          const stObj = students.find((s: any) => s.id === studentId);
+          await supabase.from('users_raw').insert({
+            id: studentId,
+            school_id: stObj?.school_id || schoolId,
+            role: 'student',
+            first_name: sFirstName || stObj?.first_name || 'Schüler',
+            last_name: sLastName || stObj?.last_name || '',
+            instrument: updatePayload.instrument,
+            teacher_id: teacherId,
+            lesson_duration: stObj?.lesson_duration || 30,
+            is_campus_active: !!stObj?.is_campus_active,
+            is_groovelab_active: !!stObj?.is_groovelab_active,
+            is_active: false
+          });
+        } else {
+          await supabase.from('users_raw').update(updatePayload).eq('id', studentId);
+          try {
+            await supabase.from('users').update(updatePayload).eq('id', studentId);
+          } catch (e) {}
+        }
+      } catch (e) {
+        console.warn('users_raw teacher update warning:', e);
       }
 
-      // 2. Update students table by ID and by name
-      await supabase.from('students').update(updatePayload).eq('id', studentId);
-      if (sFirstName && sLastName) {
-        await supabase.from('students').update(updatePayload).eq('first_name', sFirstName).eq('last_name', sLastName);
-      }
-
-      // 3. Update pending_students table by ID and by name
-      await supabase.from('pending_students').update(updatePayload).eq('id', studentId);
-      if (sFirstName && sLastName) {
-        await supabase.from('pending_students').update(updatePayload).eq('first_name', sFirstName).eq('last_name', sLastName);
+      // 2. Update students table (only valid columns: teacher_id and instrument)
+      try {
+        await supabase.from('students').update({
+          teacher_id: teacherId,
+          instrument: updatePayload.instrument
+        }).eq('id', studentId);
+      } catch (e) {
+        console.warn('students teacher update warning:', e);
       }
 
       await fetchDashboardData();
@@ -31182,16 +31323,23 @@ status: status,
         activePlatform={activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all'}
         onClose={() => setDeleteStudentModalData(null)}
         onConfirm={async (studentId) => {
+          const sName = deleteStudentModalData?.name;
           const res = await deleteStudentFully(studentId, {
             activePlatform: activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all',
             isCampusActive: deleteStudentModalData?.isCampusActive,
-            isGroovelabActive: deleteStudentModalData?.isGroovelabActive
+            isGroovelabActive: deleteStudentModalData?.isGroovelabActive,
+            studentName: sName
           });
           if (!res.success) {
             throw new Error(res.error);
           }
-          setStudents((prev: any[]) => prev.filter((s: any) => s.id !== studentId));
-          fetchDashboardData();
+          const fName = sName ? sName.trim().split(/\s+/)[0].toLowerCase() : '';
+          setStudents((prev: any[]) => prev.filter((s: any) => {
+            if (s.id === studentId) return false;
+            if (fName && s.first_name && s.first_name.toLowerCase().trim() === fName) return false;
+            return true;
+          }));
+          await fetchDashboardData();
         }}
       />
       {showBulkDeleteModal && (
@@ -33283,6 +33431,9 @@ status: status,
                     is_pin_activated: false,
                     status: 'offen' 
                   };
+                  try {
+                    await supabase.from('users_raw').update(userResetPayload).eq('id', s.id);
+                  } catch (e) {}
                   const { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', s.id);
                   if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
                     delete userResetPayload.onboarding_pin;

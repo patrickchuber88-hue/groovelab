@@ -4,6 +4,7 @@ export interface DeleteStudentOptions {
   activePlatform?: 'campus' | 'groovelab' | 'all';
   isCampusActive?: boolean;
   isGroovelabActive?: boolean;
+  studentName?: string;
 }
 
 /**
@@ -14,86 +15,171 @@ export async function deleteStudentFully(
   studentId: string,
   options: DeleteStudentOptions = {}
 ): Promise<{ success: boolean; softDeleted?: boolean; error?: string }> {
-  const { activePlatform = 'all', isCampusActive, isGroovelabActive } = options;
-
   try {
-    const isCampus = activePlatform === 'campus';
-    const isGroovelab = activePlatform === 'groovelab';
+    const allTargetIds = new Set<string>();
+    if (studentId) allTargetIds.add(studentId);
 
-    const currentPlatformActive = isCampus ? !!isCampusActive : (isGroovelab ? !!isGroovelabActive : true);
-    const siblingPlatformActive = isCampus ? !!isGroovelabActive : (isGroovelab ? !!isCampusActive : false);
+    let fName: string | undefined = undefined;
+    let schId: string | undefined = undefined;
 
-    // Only soft-delete (deactivate current platform) if the student is active on BOTH platforms.
-    // If the student is already inactive on the current platform (e.g. isCampusActive = false),
-    // soft-deactivating would be a no-op, so we must hard-delete the student.
-    if (activePlatform !== 'all' && currentPlatformActive && siblingPlatformActive) {
-      const updatePayload = isCampus
-        ? { is_campus_active: false }
-        : { is_groovelab_active: false };
-      const { error } = await supabase.from('users').update(updatePayload).eq('id', studentId);
-      if (error) throw error;
-      return { success: true, softDeleted: true };
+    // 1. Try resolving from users table
+    try {
+      const { data: uRec } = await supabase
+        .from('users')
+        .select('id, school_id, first_name, last_name')
+        .eq('id', studentId)
+        .maybeSingle();
+
+      if (uRec) {
+        fName = uRec.first_name;
+        schId = uRec.school_id;
+      }
+    } catch (e) {
+      console.warn('[studentDeletionService] Users ID resolution notice:', e);
     }
 
-    // Hard delete: purge storage assets and clean up all foreign key references
+    // 2. Try resolving from pending_students_decrypted if not found
+    if (!fName) {
+      try {
+        const { data: pRec } = await supabase
+          .from('pending_students_decrypted')
+          .select('id, school_id, first_name, last_name')
+          .eq('id', studentId)
+          .maybeSingle();
+
+        if (pRec) {
+          fName = pRec.first_name;
+          schId = pRec.school_id;
+        }
+      } catch (e) {
+        console.warn('[studentDeletionService] Pending ID resolution notice:', e);
+      }
+    }
+
+    // 3. Fallback: Parse from options.studentName if provided
+    if (!fName && options.studentName) {
+      const parts = options.studentName.trim().split(/\s+/);
+      if (parts.length > 0) {
+        fName = parts[0];
+      }
+    }
+
+    // 4. If we have a first name, locate all matching student records (users & pending)
+    if (fName) {
+      try {
+        let uQuery = supabase.from('users').select('id, school_id').ilike('first_name', fName);
+        if (schId) uQuery = uQuery.eq('school_id', schId);
+        const { data: otherUsers } = await uQuery;
+        otherUsers?.forEach(u => {
+          allTargetIds.add(u.id);
+          if (!schId && u.school_id) schId = u.school_id;
+        });
+
+        let pQuery = supabase.from('pending_students_decrypted').select('id, school_id').ilike('first_name', fName);
+        if (schId) pQuery = pQuery.eq('school_id', schId);
+        const { data: otherPend } = await pQuery;
+        otherPend?.forEach(p => allTargetIds.add(p.id));
+      } catch (e) {
+        console.warn('[studentDeletionService] Cross-table resolution notice:', e);
+      }
+    }
+
+    // 5. Call atomic SECURITY DEFINER RPC
     try {
-      await deleteUserStorageAssets([studentId]);
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('delete_student_fully', {
+        p_student_id: studentId,
+        p_school_id: schId || null,
+        p_first_name: fName || null
+      });
+
+      if (!rpcErr && rpcRes === true) {
+        const idsArray = Array.from(allTargetIds);
+        try {
+          await deleteUserStorageAssets(idsArray);
+        } catch (e) {}
+        return { success: true, softDeleted: false };
+      }
+      if (rpcErr) {
+        console.warn('[studentDeletionService] RPC delete notice (falling back to direct delete):', rpcErr);
+      }
+    } catch (e) {
+      console.warn('[studentDeletionService] RPC invoke warning:', e);
+    }
+
+    const idsArray = Array.from(allTargetIds);
+    if (idsArray.length === 0) {
+      return { success: true, softDeleted: false };
+    }
+
+    try {
+      await deleteUserStorageAssets(idsArray);
     } catch (e) {
       console.warn('[studentDeletionService] Storage purge warning:', e);
     }
 
-    const safeDelete = async (table: string, column: string = 'user_id') => {
+    const safeDeleteIds = async (table: string, column: string = 'user_id') => {
       try {
-        await supabase.from(table).delete().eq(column, studentId);
+        const { error } = await supabase.from(table).delete().in(column, idsArray);
+        if (error) {
+          console.warn(`[studentDeletionService] Warning deleting from ${table}.${column}:`, error);
+        }
       } catch (err) {
         console.warn(`[studentDeletionService] Warning deleting from ${table}:`, err);
       }
     };
 
-    const safeNullify = async (table: string, column: string) => {
+    const safeNullifyIds = async (table: string, column: string) => {
       try {
-        await supabase.from(table).update({ [column]: null }).eq(column, studentId);
+        const { error } = await supabase.from(table).update({ [column]: null }).in(column, idsArray);
+        if (error) {
+          console.warn(`[studentDeletionService] Warning nullifying ${table}.${column}:`, error);
+        }
       } catch (err) {
         console.warn(`[studentDeletionService] Warning nullifying ${table}.${column}:`, err);
       }
     };
 
     // Clean up references in all related tables
-    await safeNullify('bands', 'coach_id');
-    await safeDelete('user_song_skills', 'user_id');
-    await safeNullify('user_song_skills', 'verified_by_id');
-    await safeDelete('band_members', 'user_id');
-    await safeDelete('sessions', 'user_id');
-    await safeNullify('band_songs', 'suggested_by');
-    await safeDelete('lab_planning', 'user_id');
-    await safeDelete('band_shoutbox', 'user_id');
-    await safeDelete('band_song_slots', 'user_id');
-    await safeDelete('help_requests', 'user_id');
-    await safeDelete('schedule_occurrences', 'student_id');
-    await safeDelete('student_teachers', 'student_id');
-    await safeDelete('student_schedule_preferences', 'student_id');
-    await safeDelete('schedules', 'student_id');
-    await safeDelete('student_notes', 'student_id');
-    await safeDelete('student_logs', 'student_id');
-    await safeDelete('meisterwerk_documentation', 'student_id');
-    await safeDelete('meisterwerk_logs', 'student_id');
-    await safeDelete('chat_messages', 'sender_id');
-    await safeDelete('chat_messages', 'recipient_id');
-    await safeDelete('direct_messages', 'sender_id');
-    await safeDelete('direct_messages', 'recipient_id');
-    await safeDelete('kiosks', 'student_id');
-    await safeDelete('user_xp', 'user_id');
-    await safeDelete('user_badges', 'user_id');
-
-    // Delete from users table (view/table)
-    const { error: userError } = await supabase.from('users').delete().eq('id', studentId);
-    
-    // Delete from students table (cascades to names, activation_days, prefixes, suffixes)
-    const { error: studentError } = await supabase.from('students').delete().eq('id', studentId);
-
-    if (userError && studentError) {
-      throw userError || studentError;
-    }
+    await safeNullifyIds('bands', 'coach_id');
+    await safeDeleteIds('user_song_skills', 'user_id');
+    await safeNullifyIds('user_song_skills', 'verified_by_id');
+    await safeDeleteIds('band_members', 'user_id');
+    await safeDeleteIds('sessions', 'user_id');
+    await safeNullifyIds('band_songs', 'suggested_by');
+    await safeDeleteIds('lab_planning', 'user_id');
+    await safeDeleteIds('band_shoutbox', 'user_id');
+    await safeDeleteIds('band_song_slots', 'user_id');
+    await safeDeleteIds('help_requests', 'user_id');
+    await safeDeleteIds('schedule_occurrences', 'student_id');
+    await safeDeleteIds('schedule_occurrences', 'teacher_id');
+    await safeDeleteIds('student_teachers', 'student_id');
+    await safeDeleteIds('student_schedule_preferences', 'student_id');
+    await safeDeleteIds('schedules', 'student_id');
+    await safeDeleteIds('schedules', 'teacher_id');
+    await safeDeleteIds('student_notes', 'student_id');
+    await safeDeleteIds('student_logs', 'student_id');
+    await safeDeleteIds('meisterwerk_documentation', 'student_id');
+    await safeDeleteIds('meisterwerk_logs', 'student_id');
+    await safeDeleteIds('chat_messages', 'sender_id');
+    await safeDeleteIds('chat_messages', 'recipient_id');
+    await safeDeleteIds('direct_messages', 'sender_id');
+    await safeDeleteIds('direct_messages', 'recipient_id');
+    await safeDeleteIds('kiosks', 'student_id');
+    await safeDeleteIds('user_xp', 'user_id');
+    await safeDeleteIds('user_badges', 'user_id');
+    await safeDeleteIds('activation_days', 'student_id');
+    await safeDeleteIds('student_first_names', 'student_id');
+    await safeDeleteIds('student_last_names', 'student_id');
+    await safeDeleteIds('student_onboarding_tokens', 'student_id');
+    await safeDeleteIds('onboarding_attempts', 'student_id');
+    await safeDeleteIds('parent_email_prefixes', 'student_id');
+    await safeDeleteIds('parent_email_suffixes', 'student_id');
+    await safeDeleteIds('user_email_prefixes', 'user_id');
+    await safeDeleteIds('user_email_suffixes', 'user_id');
+    await safeDeleteIds('pending_students', 'id');
+    await safeDeleteIds('users_raw', 'id');
+    await safeDeleteIds('students', 'id');
+    await safeDeleteIds('users', 'id');
 
     return { success: true, softDeleted: false };
   } catch (err: any) {

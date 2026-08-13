@@ -297,6 +297,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         is_pin_activated: false,
         status: 'offen'
       };
+      try {
+        await supabase.from('users_raw').update(userResetPayload).eq('id', student.id);
+      } catch (e) {}
       const { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', student.id);
       if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
         delete userResetPayload.onboarding_pin;
@@ -736,13 +739,42 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   };
 
+  const ensureUserRawRecord = async (st: any) => {
+    try {
+      const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', st.id).maybeSingle();
+      if (!existingUser) {
+        await supabase.from('users_raw').insert({
+          id: st.id,
+          school_id: st.school_id || st.schoolId,
+          role: 'student',
+          first_name: st.first_name || 'Schüler',
+          last_name: st.last_name || '',
+          instrument: st.instrument || 'Musiker',
+          teacher_id: st.teacher_id || null,
+          lesson_duration: st.lesson_duration || 30,
+          is_campus_active: !!st.is_campus_active,
+          is_groovelab_active: !!st.is_groovelab_active,
+          is_active: false,
+          exempt_from_direct_billing: !!st.exempt_from_direct_billing
+        });
+      }
+    } catch (e) {
+      console.warn('ensureUserRawRecord error:', e);
+    }
+  };
+
   const handleToggleCampus = async (newVal: boolean) => {
     try {
-      const { error } = await supabase
-        .from('users')
+      await ensureUserRawRecord(student);
+      const { error: rawErr } = await supabase
+        .from('users_raw')
         .update({ is_campus_active: newVal })
         .eq('id', student.id);
-      if (error) throw error;
+      try {
+        await supabase.from('users').update({ is_campus_active: newVal }).eq('id', student.id);
+      } catch (e) {}
+
+      if (rawErr) throw rawErr;
       setIsCampusActive(newVal);
       student.is_campus_active = newVal;
       if (!newVal && isGroovelabActive) {
@@ -759,11 +791,16 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const handleToggleExemption = async (newVal: boolean) => {
     try {
-      const { error } = await supabase
-        .from('users')
+      await ensureUserRawRecord(student);
+      const { error: rawErr } = await supabase
+        .from('users_raw')
         .update({ exempt_from_direct_billing: newVal })
         .eq('id', student.id);
-      if (error) throw error;
+      try {
+        await supabase.from('users').update({ exempt_from_direct_billing: newVal }).eq('id', student.id);
+      } catch (e) {}
+
+      if (rawErr) throw rawErr;
       setExemptFromDirectBilling(newVal);
       student.exempt_from_direct_billing = newVal;
     } catch (err: any) {
@@ -778,11 +815,16 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         alert('Bitte geben Sie einen gültigen Betrag in € ein.');
         return;
       }
-      const { error } = await supabase
-        .from('users')
+      await ensureUserRawRecord(student);
+      const { error: rawErr } = await supabase
+        .from('users_raw')
         .update({ custom_student_price: numericVal })
         .eq('id', student.id);
-      if (error) throw error;
+      try {
+        await supabase.from('users').update({ custom_student_price: numericVal }).eq('id', student.id);
+      } catch (e) {}
+
+      if (rawErr) throw rawErr;
       setCustomStudentPrice(numericVal !== null ? String(numericVal) : '');
       student.custom_student_price = numericVal;
       alert(numericVal !== null 
@@ -795,11 +837,16 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const handleToggleGroovelab = async (newVal: boolean) => {
     try {
-      const { error } = await supabase
-        .from('users')
+      await ensureUserRawRecord(student);
+      const { error: rawErr } = await supabase
+        .from('users_raw')
         .update({ is_groovelab_active: newVal })
         .eq('id', student.id);
-      if (error) throw error;
+      try {
+        await supabase.from('users').update({ is_groovelab_active: newVal }).eq('id', student.id);
+      } catch (e) {}
+
+      if (rawErr) throw rawErr;
       setIsGroovelabActive(newVal);
       student.is_groovelab_active = newVal;
       if (newVal) {
@@ -813,14 +860,17 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const handleUpdateDuration = async (duration: number) => {
     try {
+      await ensureUserRawRecord(student);
       await supabase
-        .from('users')
+        .from('users_raw')
         .update({ lesson_duration: duration })
         .eq('id', student.id);
-      await supabase
-        .from('students')
-        .update({ lesson_duration: duration })
-        .eq('id', student.id);
+      try {
+        await supabase.from('users').update({ lesson_duration: duration }).eq('id', student.id);
+      } catch (e) {}
+      try {
+        await supabase.from('students').update({ lesson_duration: duration }).eq('id', student.id);
+      } catch (e) {}
       setLessonDuration(duration);
       student.lesson_duration = duration;
       localStorage.removeItem(`req_duration_${student.id}`);
@@ -833,11 +883,16 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const handleUpdateAppUsageMode = async (mode: string) => {
     try {
-      const { error } = await supabase
-        .from('users')
+      await ensureUserRawRecord(student);
+      const { error: rawErr } = await supabase
+        .from('users_raw')
         .update({ app_usage_mode: mode })
         .eq('id', student.id);
-      if (error) throw error;
+      try {
+        await supabase.from('users').update({ app_usage_mode: mode }).eq('id', student.id);
+      } catch (e) {}
+
+      if (rawErr) throw rawErr;
       setAppUsageMode(mode);
       student.app_usage_mode = mode;
     } catch (err: any) {
@@ -851,11 +906,16 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         alert('Die Eltern-PIN muss genau 4 Ziffern lang sein.');
         return;
       }
-      const { error } = await supabase
-        .from('users')
+      await ensureUserRawRecord(student);
+      const { error: rawErr } = await supabase
+        .from('users_raw')
         .update({ parent_pin: newPin || null })
         .eq('id', student.id);
-      if (error) throw error;
+      try {
+        await supabase.from('users').update({ parent_pin: newPin || null }).eq('id', student.id);
+      } catch (e) {}
+
+      if (rawErr) throw rawErr;
       setParentPin(newPin);
       student.parent_pin = newPin;
     } catch (err: any) {
@@ -868,23 +928,30 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     try {
       const newGroupId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); });
       
+      await ensureUserRawRecord(student);
       await supabase
-        .from('users')
+        .from('users_raw')
         .update({ group_id: newGroupId })
         .eq('id', student.id);
-      await supabase
-        .from('students')
-        .update({ group_id: newGroupId })
-        .eq('id', student.id);
+      try {
+        await supabase.from('users').update({ group_id: newGroupId }).eq('id', student.id);
+      } catch (e) {}
+      try {
+        await supabase.from('students').update({ group_id: newGroupId }).eq('id', student.id);
+      } catch (e) {}
 
-      await supabase
-        .from('users')
-        .update({ group_id: newGroupId })
-        .eq('id', selectedStudentToLink);
-      await supabase
-        .from('students')
-        .update({ group_id: newGroupId })
-        .eq('id', selectedStudentToLink);
+      try {
+        const { data: otherUser } = await supabase.from('users_raw').select('id').eq('id', selectedStudentToLink).maybeSingle();
+        if (otherUser) {
+          await supabase.from('users_raw').update({ group_id: newGroupId }).eq('id', selectedStudentToLink);
+        }
+      } catch (e) {}
+      try {
+        await supabase.from('users').update({ group_id: newGroupId }).eq('id', selectedStudentToLink);
+      } catch (e) {}
+      try {
+        await supabase.from('students').update({ group_id: newGroupId }).eq('id', selectedStudentToLink);
+      } catch (e) {}
 
       alert('Gruppenunterricht erfolgreich eingerichtet!');
       setSelectedStudentToLink('');
@@ -901,23 +968,26 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     try {
       const targetGroupId = groupId || student.group_id;
       if (targetGroupId) {
-        await supabase
-          .from('users')
-          .update({ group_id: null })
-          .eq('group_id', targetGroupId);
-        await supabase
-          .from('students')
-          .update({ group_id: null })
-          .eq('group_id', targetGroupId);
+        try {
+          await supabase.from('users_raw').update({ group_id: null }).eq('group_id', targetGroupId);
+        } catch (e) {}
+        try {
+          await supabase.from('users').update({ group_id: null }).eq('group_id', targetGroupId);
+        } catch (e) {}
+        try {
+          await supabase.from('students').update({ group_id: null }).eq('group_id', targetGroupId);
+        } catch (e) {}
       } else {
-        await supabase
-          .from('users')
-          .update({ group_id: null })
-          .eq('id', student.id);
-        await supabase
-          .from('students')
-          .update({ group_id: null })
-          .eq('id', student.id);
+        await ensureUserRawRecord(student);
+        try {
+          await supabase.from('users_raw').update({ group_id: null }).eq('id', student.id);
+        } catch (e) {}
+        try {
+          await supabase.from('users').update({ group_id: null }).eq('id', student.id);
+        } catch (e) {}
+        try {
+          await supabase.from('students').update({ group_id: null }).eq('id', student.id);
+        } catch (e) {}
       }
 
       alert('Schüler erfolgreich aus der Gruppe entfernt!');
