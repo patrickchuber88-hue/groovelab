@@ -29,9 +29,22 @@
     - *Vollständige Direktabrechnung*: Student/parent pays the full amount of 0,49 € / Mo. (annual fee: 5,88 €). School is relieved of the passive database fee (school pays 0,00 €).
     - *Teilweise Direktabrechnung*: Student/parent pays 0,40 € / Mo. (annual fee: 4,80 €). School covers the passive database fee of 0,09 € / Mo. per student.
     - *Härtefälle & Geschwisterrabatte*: Individual students can be manually marked in the student administration to exempt them from direct billing (costs remain with the school, no contribution is collected).
-- **Invoice Numbering Format (Rechnungsnummer-Logik)**:
-  - **B2C Student Activations (Direktabrechnung)**: Format `CG-[STUDENT_HASH_8]-[YYMM]` (e.g., `CG-F63B8EDE-2607`). Uses the platform prefix `CG-`, the first 8 uppercase hex characters of the student ID, and 2-digit year + 2-digit month. Ensures 100% GDPR compliance (no plain text names on bank statements), unique idempotency, and exact 1:1 match with the transfer reference (`Verwendungszweck`).
-  - **B2B School Invoices (Musikschul-Sammelrechnung)**: Format `RE-[SCHOOL_ID]-[YYMM]-01` (e.g., `RE-104-2607-01`). Uses regular invoice prefix `RE-`, numeric school ID, year/month, and monthly sequence number.
+## Canonical Billing Sequence & Legal SaaS Nomenclature (Verbindlicher Standard)
+- **Plattformweites Master-Wording**: Für alle Gebührenaufstellungen, Gebühren-Vorschauen, Ratenübersichten, Rechnungs-PDFs, Onboarding-Karten und Modals innerhalb der gesamten Plattform MUSS immer die exakt gleiche kanonische Reihenfolge und das gleiche juristisch wasserdichte Wording verwendet werden:
+  1. **`Campus-Groovelab Software-Nutzungslizenz`**: `100% kostenlos (0,00 €)`
+  2. **`Cloud- & Datenbank-Hosting: Modul Campus`**: `7,99 € / Mo.` (sofern Modul Campus aktiv)
+  3. **`Cloud- & Datenbank-Hosting: Modul GrooveLab`**: `4,99 € / Mo.` (sofern Modul GrooveLab aktiv)
+  4. **`Kombi-Vorteilsrabatt (Infrastruktur-Bündel)`**: `-2,99 € / Mo.` (sofern beide Module aktiv)
+  5. **`Service- & Administrationspauschale`**: `[X] Lehrkräfte & Verwaltung aktiv × 0,49 € / Mo.`
+  6. **`Basis-Bereitstellung`**: `[X] Schüler × 0,09 € / Mo.` (QR-Landingpages, Stundenplan-, Termin-, Raumänderungs- und Hausaufgabenheft-Sync sowie DSGVO-Datensatz-Hosting)
+  7. **`Cloud- & Modul-Bereitstellung: Campus`**: `[X] Schüler × 0,49 € / Mo.` (Interaktive App-Nutzung: Übe-Timer, Loopstation, Meisterwerk-Protokoll)
+  8. **`Cloud- & Modul-Bereitstellung: GrooveLab`**: `[X] Schüler × 0,49 € / Mo.` (Interaktive Band-Nutzung: Song-Bibliotheken, Band-Rooms, Repertoire)
+  9. **`Zusatz-Speichervolumen: Audio-Tresor (+[X] GB)`**: `[X,XX] € / Mo.` (sofern Speicher-Add-on gebucht)
+- **Verbotene Begriffe**: Niemals dürfen die Begriffe „Passiv-Lizenz“, „Karteileichen-Gebühr“, „Schüler-Lizenz“ oder „Profilaktivierung“ verwendet werden. Die Software-Lizenz ist immer 100% kostenlos; Kosten entstehen ausschließlich für Cloud-, Datenbank-, Bereitstellungs- und Service-Infrastruktur.
+
+## Invoice Numbering Format (Rechnungsnummer-Logik)
+- **B2C Student Activations (Direktabrechnung)**: Format `CG-[STUDENT_HASH_8]-[YYMM]` (e.g., `CG-F63B8EDE-2607`). Uses the platform prefix `CG-`, the first 8 uppercase hex characters of the student ID, and 2-digit year + 2-digit month. Ensures 100% GDPR compliance (no plain text names on bank statements), unique idempotency, and exact 1:1 match with the transfer reference (`Verwendungszweck`).
+- **B2B School Invoices (Musikschul-Sammelrechnung)**: Format `RE-[SCHOOL_ID]-[YYMM]-01` (e.g., `RE-104-2607-01`). Uses regular invoice prefix `RE-`, numeric school ID, year/month, and monthly sequence number.
 
 ## Module Feature Inclusions (Leistungsumfang der Module)
 - **Verwaltungs- und Sekretariats-Nutzer**: Administrations- und Sekretariats-Benutzer (Rollen `admin` und `secretary`) sind in den Lizenzen für das **Campus-Modul** und das **GrooveLab-Modul** vollständig inklusive und verursachen keine zusätzlichen Lizenzgebühren.
@@ -99,6 +112,11 @@
 - **Prompt Isolation**: Das Abschicken eines Prompts darf NIEMALS Einfluss auf die Aktivierung/Deaktivierung von Modulen (z. B. Campus, GrooveLab, Abo-Bypass) oder User-Profilen haben.
 - **Live In-App Execution**: Aktivierungen und Deaktivierungen müssen ausschließlich live bei der direkten Verwendung der Web-App durch den Nutzer ausgeführt werden und dürfen niemals durch KI-Prompts oder Agenten-Interaktionen getriggert oder überschrieben werden.
 - **Dynamic User Limits**: Quota- und Speicher-Limits (z. B. für den Audio-Tresor) gelten dynamisch für jeden aktiven User und werden nicht über vorgefertigte, starre Inklusiv-GB-Zahlen gesteuert.
+- **Database Mutation Immunity (Unantastbarkeit des Datenbank-Zustands)**:
+  - Der KI-Agent darf NIEMALS Schreiboperationen, SQL-Mutationen (`.update()`, `.insert()`, `.delete()`) oder Skripte ausführen, die Benutzer-, Modul- oder Abrechnungszustände in Supabase verändern.
+  - Alle Agenten-Analysen und Debugging-Skripte MÜSSEN zu 100% read-only (`.select()`) sein.
+- **Deterministic State Reflection (Keine UI-Inferenz-Drifts)**:
+  - Frontend-Komponenten dürfen niemals heuristische Defaults (wie `?? true`) verwenden, die den tatsächlichen Datenbankzustand verschleiern. Der in der UI angezeigte und abgerechnete Zustand muss immer der exakte, unmanipulierte Boolean-Wert (`Boolean(u.is_campus_active)`) aus der Datenbank sein.
 
 
 

@@ -143,7 +143,7 @@ export const generateConsentPDF = async (
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('RECHTLICHE GARANTIEN & DATENSCHUTZ-STANDARDS:', 20, currentY);
+  doc.text('RECHTLICHE ZUSAGEN & DATENSCHUTZ-STANDARDS:', 20, currentY);
   currentY += 8;
 
   const bulletPoints = [
@@ -293,7 +293,7 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(22, 101, 52);
-  doc.text('[COMPLIANCE-GARANTIE] 22 / 22 SICHERHEITS- & DATENSCHUTZ-STANDARDS ERFÜLLT', 25, y + 8);
+  doc.text('[COMPLIANCE-NACHWEIS] 22 / 22 SICHERHEITS- & DATENSCHUTZ-STANDARDS ERFÜLLT', 25, y + 8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.2);

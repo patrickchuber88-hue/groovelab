@@ -704,7 +704,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
               {/* Financial Calculation */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.78rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Monatliche Schülerlizenz (Campus)</span>
+                  <span>Cloud- & Modul-Bereitstellung (Campus)</span>
                   <strong style={{ color: '#0f172a' }}>0,49 € / Mo.</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>

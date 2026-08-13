@@ -1031,13 +1031,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
       const [
         { data: statsData },
-        { data: staffUsers },
+        { data: allUsersDb },
+        { data: pendingStudentsDb },
         { data: songs },
         { data: bands },
         { count: sessionCount }
       ] = await Promise.all([
         supabase.from('school_user_statistics').select('*'),
-        supabase.from('users').select('id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, ausweis_nummer, teacher_qr_token, is_pin_activated').or('role.eq.secretary,role.eq.admin,role.eq.teacher'),
+        supabase.from('users').select('id, first_name, last_name, role, roles, school_id, is_active, is_campus_active, is_groovelab_active, ausweis_nummer, teacher_qr_token, is_pin_activated'),
+        supabase.from('pending_students_decrypted').select('id, school_id, first_name, last_name'),
         supabase.from('songs').select('school_id'),
         supabase.from('bands').select('school_id, name'),
         supabase.from('sessions').select('*', { count: 'exact', head: true })
@@ -1055,18 +1057,72 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
       const sStats: Record<string, any> = {};
       schoolData?.forEach(school => {
-        const schoolStatsRow = statsData?.find(s => s.school_id === school.id) || {};
-        const schoolStaff = staffUsers?.filter(u => u.school_id === school.id) || [];
-        sStats[school.id] = {
-          teachers: schoolStatsRow.teachers || 0,
-          students: schoolStatsRow.students || 0,
-          teachersCampus: schoolStatsRow.teachers_campus || 0,
-          teachersGroovelab: schoolStatsRow.teachers_groovelab || 0,
-          studentsCampus: schoolStatsRow.students_campus || 0,
-          studentsGroovelab: schoolStatsRow.students_groovelab || 0,
-          songs: songs?.filter(s => s.school_id === school.id).length || 0,
-          bands: bands?.filter(b => b.school_id === school.id && b.name !== '__SYSTEM_ANNOUNCEMENTS__').length || 0,
-          adminUsers: schoolStaff.filter(u => u.role === 'secretary' || u.role === 'admin')
+        const schId = school.id;
+        const schoolStatsRow = statsData?.find(s => s.school_id === schId) || {};
+        const schoolUsers = (allUsersDb || []).filter(u => u.school_id === schId);
+        const schoolPending = (pendingStudentsDb || []).filter(p => p.school_id === schId);
+
+        const studentsList: any[] = [];
+        schoolUsers.forEach(u => {
+          const isStudent = u.role === 'student' || (Array.isArray(u.roles) && u.roles.includes('student'));
+          if (isStudent) {
+            studentsList.push({
+              id: u.id,
+              first_name: u.first_name,
+              last_name: u.last_name,
+              is_campus_active: Boolean(u.is_campus_active || (u as any).isCampusActive),
+              is_groovelab_active: Boolean(u.is_groovelab_active || (u as any).isGroovelabActive)
+            });
+          }
+        });
+
+        schoolPending.forEach(ps => {
+          const userMatch = schoolUsers.find(u => u.id === ps.id || (u.first_name && ps.first_name && u.first_name.toLowerCase().trim() === ps.first_name.toLowerCase().trim()));
+          const exists = studentsList.some(s => s.id === ps.id || (s.first_name && ps.first_name && s.first_name.toLowerCase().trim() === ps.first_name.toLowerCase().trim()));
+          if (!exists) {
+            const isCampusAct = userMatch ? Boolean(userMatch.is_campus_active) : true;
+            const isGrooveAct = userMatch ? Boolean(userMatch.is_groovelab_active) : false;
+            studentsList.push({
+              id: ps.id,
+              first_name: ps.first_name,
+              last_name: ps.last_name,
+              is_campus_active: isCampusAct,
+              is_groovelab_active: isGrooveAct
+            });
+          }
+        });
+
+        const totalStudents = studentsList.length || schoolStatsRow.students || 0;
+        const studentsCampus = studentsList.filter(s => s.is_campus_active).length || schoolStatsRow.students_campus || 0;
+        const studentsGroovelab = studentsList.filter(s => s.is_groovelab_active).length || schoolStatsRow.students_groovelab || 0;
+
+        let freeDoubleRoleCount = 0;
+        let billableTeacherCount = 0;
+        schoolUsers.forEach(u => {
+          const isMgmt = u.role === 'admin' || u.role === 'secretary' || (Array.isArray(u.roles) && (u.roles.includes('admin') || u.roles.includes('secretary')));
+          const isTch = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
+
+          if (isMgmt && isTch) {
+            if (freeDoubleRoleCount < 2) {
+              freeDoubleRoleCount++;
+            } else {
+              billableTeacherCount++;
+            }
+          } else if (!isMgmt && isTch) {
+            billableTeacherCount++;
+          }
+        });
+
+        sStats[schId] = {
+          teachers: billableTeacherCount || schoolStatsRow.teachers || 0,
+          students: totalStudents,
+          teachersCampus: billableTeacherCount || schoolStatsRow.teachers_campus || 0,
+          teachersGroovelab: billableTeacherCount || schoolStatsRow.teachers_groovelab || 0,
+          studentsCampus: studentsCampus,
+          studentsGroovelab: studentsGroovelab,
+          songs: songs?.filter(s => s.school_id === schId).length || 0,
+          bands: bands?.filter(b => b.school_id === schId && b.name !== '__SYSTEM_ANNOUNCEMENTS__').length || 0,
+          adminUsers: schoolUsers.filter(u => u.role === 'secretary' || u.role === 'admin')
         };
       });
       setSchoolStats(sStats);

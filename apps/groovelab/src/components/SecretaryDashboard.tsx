@@ -3830,8 +3830,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             map[ps.id] = fullName;
             userInstrumentMap[ps.id] = ps.instrument || '';
 
-            const isCampusAct = userMatch ? !!userMatch.is_campus_active : ((ps as any).is_campus_active ?? true);
-            const isGrooveAct = userMatch ? !!userMatch.is_groovelab_active : ((ps as any).is_groovelab_active ?? false);
+            const isCampusAct = userMatch ? !!userMatch.is_campus_active : ((ps as any).is_campus_active === true);
+            const isGrooveAct = userMatch ? !!userMatch.is_groovelab_active : ((ps as any).is_groovelab_active === true);
 
             const effectiveTeacherId = ps.teacher_id || (userMatch ? userMatch.teacher_id : null);
             let resolvedInstrument = ps.instrument || (userMatch ? userMatch.instrument : null);
@@ -25318,7 +25318,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 800 }}>
                                     <ShieldCheck size={17} color="#34a853" />
-                                    <span>DSGVO- &amp; Sicherheits-Garantie für alle Audio-Aufnahmen</span>
+                                    <span>DSGVO- &amp; Sicherheitsstandards für alle Audio-Aufnahmen</span>
                                   </div>
                                   <span style={{ fontSize: '0.66rem', background: '#e6f4ea', color: '#166534', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
                                     🔒 100% Deutscher Serverstandort
@@ -25965,25 +25965,25 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Software-Lizenz:</span>
+                                <span>Campus-Groovelab Software-Nutzungslizenz:</span>
                                 <strong style={{ color: '#34a853' }}>100% kostenlos</strong>
                               </div>
 
                               {hasCampusSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                  <span>Campus Server-Flatrate:</span>
+                                  <span>Cloud- & Datenbank-Hosting: Modul Campus:</span>
                                   <strong>{effectiveSchoolRates.priceCampus.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                 </div>
                               )}
                               {hasGroovelabSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                  <span>GrooveLab Server-Flatrate:</span>
+                                  <span>Cloud- & Datenbank-Hosting: Modul GrooveLab:</span>
                                   <strong>{effectiveSchoolRates.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                 </div>
                               )}
                               {hasCampusSub && hasGroovelabSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#15803d', fontWeight: 600 }}>
-                                  <span>Kombi-Rabatt:</span>
+                                  <span>Kombi-Vorteilsrabatt (Infrastruktur-Bündel):</span>
                                   <span>-{(effectiveSchoolRates.priceCampus + effectiveSchoolRates.priceGroovelab - effectiveSchoolRates.priceKombi).toFixed(2).replace('.', ',')} € / Mo.</span>
                                 </div>
                               )}
@@ -25991,29 +25991,29 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {billableTeachersCount > 0 && (
                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                    <span>Lehrer-Profile ({billableTeachersCount} × {effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} €):</span>
+                                    <span>Service- & Administrationspauschale ({billableTeachersCount} Lehrkräfte × {effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} €):</span>
                                     <strong>{(billableTeachersCount * effectiveSchoolRates.priceTeacher).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                  </div>
+                                )}
+
+                                {passiveStudentsCount_global > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                    <span>Basis-Bereitstellung ({passiveStudentsCount_global} Schüler × 0,09 €):</span>
+                                    <strong>{(passiveStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                   </div>
                                 )}
 
                                 {activeStudentsCount_global > 0 && isSammelzahler && (
                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                    <span>Campus-Aktivierungen ({activeStudentsCount_global} × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
+                                    <span>Cloud- & Modul-Bereitstellung: Campus ({activeStudentsCount_global} Schüler × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
                                     <strong>{(activeStudentsCount_global * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                   </div>
                                 )}
 
                                 {activeGroovelabStudentsCount_global > 0 && (
                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                    <span>GrooveLab-Aktivierungen ({activeGroovelabStudentsCount_global} × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
+                                    <span>Cloud- & Modul-Bereitstellung: GrooveLab ({activeGroovelabStudentsCount_global} Schüler × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
                                     <strong>{(activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                  </div>
-                                )}
-
-                                {passiveStudentsCount_global > 0 && (
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                    <span>Passive Profile ({passiveStudentsCount_global} × 0,09 €):</span>
-                                    <strong>{(passiveStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                   </div>
                                 )}
 
@@ -26356,121 +26356,123 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                     
                                     {/* Apple HIG Standard: Module & Payment Status Widget */}
-                                    <div className="glass-panel" style={{ padding: '24px', background: '#ffffff', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-                                        <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>Aktive Module &amp; Kosten-Übernahme</h4>
-                                        <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '9999px', fontWeight: 600 }}>macOS Sequoia Standard</span>
-                                      </div>
-                                      
-                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-                                        {/* Campus Module */}
-                                        {hasCampusSub && (
-                                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#34a853', boxShadow: '0 0 0 3px rgba(52, 168, 83, 0.15)' }} />
-                                            <div>
-                                              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>Campus Modul</div>
-                                              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>Stundenplan &amp; Protokoll</div>
+                                      <div className="glass-panel" style={{ padding: '24px', background: '#ffffff', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>Aktive Module &amp; Kosten-Übernahme</h4>
+                                        </div>
+                                        
+                                        {/* Row 1: The 2 Main Platform Modules (Campus & GrooveLab) */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                                          {/* Campus Module */}
+                                          {hasCampusSub && (
+                                            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', padding: '14px 18px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                              <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#34a853', boxShadow: '0 0 0 3px rgba(52, 168, 83, 0.25)' }} />
+                                              <div>
+                                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#166534' }}>Campus Modul</div>
+                                                <div style={{ fontSize: '0.74rem', color: '#15803d', fontWeight: 500 }}>Stundenplan &amp; Protokoll</div>
+                                              </div>
                                             </div>
-                                          </div>
-                                        )}
+                                          )}
 
-                                        {/* GrooveLab Module */}
-                                        {hasGroovelabSub && (
-                                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#eab308', boxShadow: '0 0 0 3px rgba(234, 179, 8, 0.15)' }} />
-                                            <div>
-                                              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>GrooveLab Modul</div>
-                                              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>Live-Lab &amp; Bands</div>
+                                          {/* GrooveLab Module */}
+                                          {hasGroovelabSub && (
+                                            <div style={{ background: '#fefce8', border: '1.5px solid #fef08a', padding: '14px 18px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                              <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#eab308', boxShadow: '0 0 0 3px rgba(234, 179, 8, 0.25)' }} />
+                                              <div>
+                                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#854d0e' }}>GrooveLab Modul</div>
+                                                <div style={{ fontSize: '0.74rem', color: '#a16207', fontWeight: 500 }}>Live-Lab &amp; Bands</div>
+                                              </div>
                                             </div>
-                                          </div>
-                                        )}
-
-                                        {/* Who pays */}
-                                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#7e22ce', boxShadow: '0 0 0 3px rgba(126, 34, 206, 0.15)' }} />
-                                          <div>
-                                            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
-                                              {billingPayer === 'school' ? 'Zahlung: Musikschule' : 'Zahlung: Eltern'}
-                                            </div>
-                                            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                                              {billingPayer === 'school' ? 'Sammelabrechnung Träger' : 'Direktabrechnung'}
-                                            </div>
-                                          </div>
+                                          )}
                                         </div>
 
-                                        {/* Student cost */}
-                                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: billingPayer === 'school' ? '#34a853' : '#0284c7', boxShadow: `0 0 0 3px ${billingPayer === 'school' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(2, 132, 199, 0.15)'}` }} />
-                                          <div>
-                                            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
-                                              Beitrag für Schüler
-                                            </div>
-                                            <div style={{ fontSize: '0.72rem', color: billingPayer === 'school' ? '#15803d' : '#0369a1', fontWeight: 600 }}>
-                                              {billingPayer === 'school' ? '0,00 € (100% Kostenfrei)' : 'Direktbeitrag der Eltern'}
+                                        {/* Row 2: Billing Payer, Student Fee, and Audio-Tresor Storage (3 Columns) */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+                                          {/* Who pays */}
+                                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#7e22ce', boxShadow: '0 0 0 3px rgba(126, 34, 206, 0.15)' }} />
+                                            <div>
+                                              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                                                {billingPayer === 'school' ? 'Zahlung: Musikschule' : 'Zahlung: Eltern'}
+                                              </div>
+                                              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                                                {billingPayer === 'school' ? 'Sammelabrechnung Träger' : 'Direktabrechnung'}
+                                              </div>
                                             </div>
                                           </div>
-                                        </div>
 
-                                        {/* Audio-Tresor Cloud-Speicher Card with Up-/Downgrade Trigger */}
-                                        {(() => {
-                                          const addonGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
-                                          const addonFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 2.99 : addonGb === 20 ? 5.49 : addonGb === 50 ? 9.99 : addonGb === 100 ? 16.99 : addonGb === 250 ? 34.99 : 0));
-                                          const totalCapGb = 1.0 + addonGb;
-                                          const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
-                                          const usedGb = usedBytes / (1024 * 1024 * 1024);
+                                          {/* Student cost */}
+                                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: billingPayer === 'school' ? '#34a853' : '#0284c7', boxShadow: `0 0 0 3px ${billingPayer === 'school' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(2, 132, 199, 0.15)'}` }} />
+                                            <div>
+                                              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                                                Beitrag für Schüler
+                                              </div>
+                                              <div style={{ fontSize: '0.72rem', color: billingPayer === 'school' ? '#15803d' : '#0369a1', fontWeight: 600 }}>
+                                                {billingPayer === 'school' ? '0,00 € (100% Kostenfrei)' : 'Direktbeitrag der Eltern'}
+                                              </div>
+                                            </div>
+                                          </div>
 
-                                          return (
-                                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.15)' }} />
-                                                <div>
-                                                  <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <span>Audio-Tresor Speicher</span>
-                                                    <span style={{ fontSize: '0.68rem', background: addonGb > 0 ? '#dcfce7' : '#f1f5f9', color: addonGb > 0 ? '#166534' : '#475569', padding: '1px 6px', borderRadius: '6px', fontWeight: 800 }}>
-                                                      {addonGb > 0 ? `+${addonGb} GB` : '1 GB Basis'}
-                                                    </span>
+                                          {/* Audio-Tresor Cloud-Speicher Card */}
+                                          {(() => {
+                                            const addonGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
+                                            const addonFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 2.99 : addonGb === 20 ? 5.49 : addonGb === 50 ? 9.99 : addonGb === 100 ? 16.99 : addonGb === 250 ? 34.99 : 0));
+                                            const totalCapGb = 1.0 + addonGb;
+                                            const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                            const usedGb = usedBytes / (1024 * 1024 * 1024);
+
+                                            return (
+                                              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.15)' }} />
+                                                    <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>Audio-Tresor Speicher</div>
                                                   </div>
+                                                  <span style={{ fontSize: '0.68rem', background: addonGb > 0 ? '#dcfce7' : '#f1f5f9', color: addonGb > 0 ? '#166534' : '#475569', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
+                                                    {addonGb > 0 ? `+${addonGb} GB` : '1 GB Basis'}
+                                                  </span>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
                                                   <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                                                    {usedGb.toFixed(2).replace('.', ',')} GB von {totalCapGb} GB belegt {addonGb > 0 ? `• ${addonFee.toFixed(2).replace('.', ',')} € / Mo.` : '• Inklusive'}
+                                                    {usedGb.toFixed(2).replace('.', ',')} von {totalCapGb} GB {addonGb > 0 ? `• ${addonFee.toFixed(2).replace('.', ',')} € / Mo.` : '• Inklusive'}
                                                   </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setShowStorageManagerModal(true)}
+                                                    style={{
+                                                      background: '#ffffff',
+                                                      border: '1.5px solid #cbd5e1',
+                                                      borderRadius: '8px',
+                                                      padding: '3px 8px',
+                                                      fontSize: '0.68rem',
+                                                      fontWeight: 700,
+                                                      color: '#0f172a',
+                                                      cursor: 'pointer',
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      gap: '2px',
+                                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                                      transition: 'all 0.15s ease'
+                                                    }}
+                                                  >
+                                                    <span>Anpassen</span>
+                                                    <ChevronRight size={11} color="#64748b" />
+                                                  </button>
                                                 </div>
                                               </div>
-                                              <button
-                                                type="button"
-                                                onClick={() => setShowStorageManagerModal(true)}
-                                                style={{
-                                                  background: '#ffffff',
-                                                  border: '1.5px solid #cbd5e1',
-                                                  borderRadius: '10px',
-                                                  padding: '6px 14px',
-                                                  fontSize: '0.72rem',
-                                                  fontWeight: 800,
-                                                  color: '#0f172a',
-                                                  cursor: 'pointer',
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  gap: '4px',
-                                                  whiteSpace: 'nowrap',
-                                                  flexShrink: 0,
-                                                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                                                  transition: 'all 0.2s'
-                                                }}
-                                              >
-                                                <span>Anpassen</span>
-                                                <ChevronRight size={13} color="#475569" />
-                                              </button>
-                                            </div>
-                                          );
-                                        })()}
+                                            );
+                                          })()}
+                                        </div>
+
+                                        {/* Kombi-Vorteil Notice Banner */}
+                                        <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#475569', lineHeight: '1.45', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <span style={{ color: '#34a853', fontWeight: 800 }}>✓</span>
+                                          <span><strong>Schuljahr 2026/2027 aktiv:</strong> Durch die Kombination von Campus &amp; GrooveLab spart eure Musikschule jeden Monat <strong>2,99 € Kombi-Vorteil</strong>.</span>
+                                        </div>
                                       </div>
 
-                                      <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#475569', lineHeight: '1.45', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ color: '#34a853', fontWeight: 800 }}>✓</span>
-                                        <span><strong>Schuljahr 2026/2027 aktiv:</strong> Durch die Kombination von Campus &amp; GrooveLab spart eure Musikschule jeden Monat <strong>2,99 € Kombi-Vorteil</strong>.</span>
-                                      </div>
-                                    </div>
-
-                                    {/* Apple Segmented Student Progress Bar */}
+                                      {/* Apple Segmented Student Progress Bar */}
                                     <div className="glass-panel" style={{ padding: '24px', background: '#ffffff', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', gap: '18px' }}>
                                       <div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
@@ -26540,7 +26542,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>Software-Lizenz:</span>
+                                              <span>Campus-Groovelab Software-Nutzungslizenz:</span>
                                               <strong style={{ color: '#34a853' }}>100% kostenlos</strong>
                                             </div>
 
@@ -26553,19 +26555,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                               <>
                                                 {hasCampusSub && (
                                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                    <span>Campus Server-Flatrate:</span>
+                                                    <span>Cloud- &amp; Datenbank-Hosting: Modul Campus:</span>
                                                     <strong>{effectiveSchoolRates.priceCampus.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                                   </div>
                                                 )}
                                                 {hasGroovelabSub && (
                                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                    <span>GrooveLab Server-Flatrate:</span>
+                                                    <span>Cloud- &amp; Datenbank-Hosting: Modul GrooveLab:</span>
                                                     <strong>{effectiveSchoolRates.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                                   </div>
                                                 )}
                                                 {hasCampusSub && hasGroovelabSub && (
                                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#15803d', fontWeight: 600 }}>
-                                                    <span>Kombi-Rabatt:</span>
+                                                    <span>Kombi-Vorteilsrabatt (Infrastruktur-Bündel):</span>
                                                     <span>-{(effectiveSchoolRates.priceCampus + effectiveSchoolRates.priceGroovelab - effectiveSchoolRates.priceKombi).toFixed(2).replace('.', ',')} € / Mo.</span>
                                                   </div>
                                                 )}
@@ -26575,28 +26577,28 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                               {!subscriptionBypass && billableTeachersCount > 0 && (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>Lehrer-Profile ({billableTeachersCount} × {effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} €):</span>
+                                                  <span>Service- &amp; Administrationspauschale ({billableTeachersCount} Lehrkräfte × {effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} €):</span>
                                                   <strong>{(billableTeachersCount * effectiveSchoolRates.priceTeacher).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                                 </div>
                                               )}
 
                                               {!subscriptionBypass && activeStudentsCount_global > 0 && isSammelzahler && (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>Campus-Aktivierungen ({activeStudentsCount_global} × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
+                                                  <span>Cloud- & Modul-Bereitstellung: Campus ({activeStudentsCount_global} Schüler × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
                                                   <strong>{(activeStudentsCount_global * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                                 </div>
                                               )}
 
                                               {!subscriptionBypass && activeGroovelabStudentsCount_global > 0 && (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>GrooveLab-Aktivierungen ({activeGroovelabStudentsCount_global} × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
+                                                  <span>Cloud- & Modul-Bereitstellung: GrooveLab ({activeGroovelabStudentsCount_global} Schüler × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
                                                   <strong>{(activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                                 </div>
                                               )}
 
                                               {passiveStudentsCount_global > 0 && (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>Passive Profile ({passiveStudentsCount_global} × 0,09 €):</span>
+                                                  <span>Basis-Bereitstellung ({passiveStudentsCount_global} Schüler × 0,09 €):</span>
                                                   <strong>{subscriptionBypass ? '0,00 € (Freigestellt)' : `${(passiveStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                                                 </div>
                                               )}
@@ -32578,7 +32580,7 @@ status: status,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0f172a', fontWeight: 800 }}>
                   <ShieldCheck size={15} color="#34a853" />
-                  <span>DSGVO- &amp; Sicherheits-Garantie (ISO 27001, AES-256, Art. 17 DSGVO Physisch-Löschung)</span>
+                  <span>DSGVO- &amp; Sicherheitsstandards (ISO 27001, AES-256, Art. 17 DSGVO Physisch-Löschung)</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px', fontSize: '0.66rem', color: '#64748b' }}>
                   <span>✓ 100% Hosting in Deutschland</span>

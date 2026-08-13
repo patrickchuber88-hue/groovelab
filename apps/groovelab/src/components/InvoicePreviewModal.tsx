@@ -328,8 +328,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {/* Position 1: 100% Kostenlose Software Lizenz */}
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '8px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 700 }}>Software-Infrastruktur 100% kostenlos</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Software-Nutzungslizenz</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 700 }}>Pädagogische Schulplattform &amp; Web-App (100% kostenfrei / inklusive)</span>
                         </td>
                         <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
                         <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>0,00 €</td>
@@ -340,9 +340,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {campusCost > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Server-Hosting-Flatrate Campus</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Datenbank-Hosting: Modul Campus</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                              Bereitstellung, Betrieb &amp; Hosting (Campus){freeLabel}
+                              Dedizierte Schul-Instanz, Server-Bereitstellung &amp; Hosting (Campus){freeLabel}
                             </span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
@@ -359,9 +359,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {groovelabCost > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Server-Hosting-Flatrate GrooveLab</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Datenbank-Hosting: Modul GrooveLab</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                              Bereitstellung, Betrieb &amp; Hosting (GrooveLab){freeLabel}
+                              Echtzeit-Bandmodul, Server-Infrastruktur &amp; Audio-Routing (GrooveLab){freeLabel}
                             </span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
@@ -378,8 +378,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {invoice.hasCampus && invoice.hasGroovelab && !isFree && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9', color: '#137333' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block' }}>Kombinations-Rabatt (Campus &amp; GrooveLab)</strong>
-                            <span style={{ fontSize: '0.68rem', color: '#137333' }}>Vorteilsbündel für parallele Modulnutzung</span>
+                            <strong style={{ display: 'block' }}>Kombi-Vorteilsrabatt (Infrastruktur-Bündel)</strong>
+                            <span style={{ fontSize: '0.68rem', color: '#137333' }}>Preisvorteil bei paralleler Bereitstellung von Campus + GrooveLab</span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right' }}>1 Monat</td>
                           <td style={{ padding: '8px', textAlign: 'right' }}>-2,99 €</td>
@@ -391,9 +391,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {invoice.totalTeachersCount > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Infrastruktur- &amp; Server-Hosting (Lehrkräfte)</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Service- &amp; Administrationspauschale: Lehrkräfte &amp; Verwaltung</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                              {invoice.totalTeachersCount} Lehrkräfte ({masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. pro User)
+                              {invoice.totalTeachersCount} aktive Profile ({masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. pro Profil)
                               {freeLabel}
                             </span>
                           </td>
@@ -411,9 +411,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {(invoice.activeCampusCount ?? 0) > 0 && (invoice.isSammelzahler ?? true) && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Aktivierungen (Schüler-Accounts)</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Modul-Bereitstellung: Schüler (Campus)</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                              {invoice.activeCampusCount} freigeschaltete Campus-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro User){freeLabel}
+                              {invoice.activeCampusCount} freigeschaltete Campus-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil){freeLabel}
                             </span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
@@ -430,9 +430,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {(invoice.activeGroovelabCount ?? 0) > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>GrooveLab-Aktivierungen (Schüler-Accounts)</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Modul-Bereitstellung: Schüler (GrooveLab)</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                              {invoice.activeGroovelabCount} freigeschaltete GrooveLab-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro User){freeLabel}
+                              {invoice.activeGroovelabCount} freigeschaltete GrooveLab-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil){freeLabel}
                             </span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
@@ -445,12 +445,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         </tr>
                       )}
 
-                      {/* Position 6: Passive Student Database Profiles */}
+                      {/* Position 5.5: Basis-Bereitstellung */}
                       {(invoice.passiveStudentsCount ?? 0) > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Datenbank- &amp; Speicher-Hosting (passive Profile)</strong>
-                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>Speicher- &amp; Datenbank-Hosting für {invoice.passiveStudentsCount} passive Schüler-Accounts (0,09 € / Mo. pro User){freeLabel}</span>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Basis-Bereitstellung</strong>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
+                              {invoice.passiveStudentsCount} Schüler-Accounts (0,09 € / Mo. pro Schüler){freeLabel}
+                            </span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
@@ -462,13 +464,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         </tr>
                       )}
 
-                      {/* Position 7: Audio-Tresor Cloud-Speicher Add-on */}
+                      {/* Position 6: Audio-Tresor Cloud-Speicher Add-on */}
                       {(invoice.storageAddonGb ?? 0) > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Audio-Tresor Cloud-Speicher (+{invoice.storageAddonGb} GB)</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Zusatz-Speichervolumen: Audio-Tresor (+{invoice.storageAddonGb} GB)</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                              Zusatz-Speichervolumen für Bandaufnahmen &amp; Audio-Loops ({(invoice.storageAddonMonthlyFee || 0).toFixed(2).replace('.', ',')} € / Mo.){freeLabel}
+                              Dedizierter Cloud-Speicher für hochauflösende Audio-Aufnahmen &amp; Masterpieces ({(invoice.storageAddonMonthlyFee || 0).toFixed(2).replace('.', ',')} € / Mo.){freeLabel}
                             </span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>

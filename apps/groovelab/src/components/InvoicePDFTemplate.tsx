@@ -261,8 +261,8 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   {/* Position 1: 100% Kostenlose Software Lizenz */}
                   <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: dynamicTdPadding }}>
-                      <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
-                      <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 700 }}>Software-Infrastruktur 100% kostenlos</span>
+                      <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Software-Nutzungslizenz</strong>
+                      <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 700 }}>100% kostenlos (0,00 €)</span>
                     </td>
                     <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                       1 Monat
@@ -275,7 +275,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   {campusCost > 0 && (
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: dynamicTdPadding }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>Server-Hosting-Flatrate Campus</strong>
+                        <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Datenbank-Hosting: Modul Campus</strong>
                         <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (Campus)</span>
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
@@ -294,7 +294,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   {groovelabCost > 0 && (
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: dynamicTdPadding }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>Server-Hosting-Flatrate GrooveLab</strong>
+                        <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Datenbank-Hosting: Modul GrooveLab</strong>
                         <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Bereitstellung, Betrieb &amp; Hosting (GrooveLab)</span>
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
@@ -313,7 +313,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   {(school.totalTeachers || 0) > 0 && (
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: dynamicTdPadding }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>Infrastruktur- &amp; Server-Hosting (Lehrkräfte)</strong>
+                        <strong style={{ display: 'block', color: '#0f172a' }}>Service- &amp; Administrationspauschale</strong>
                         <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{school.totalTeachers} Lehrkräfte ({masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. pro User)</span>
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
@@ -334,8 +334,8 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     return (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Aktivierungen (Schüler-Accounts)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{campusCnt} freigeschaltete Campus-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro User)</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Modul-Bereitstellung: Campus</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{campusCnt} aktive Campus-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil)</span>
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           1 Monat
@@ -356,8 +356,8 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     return (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>GrooveLab-Aktivierungen (Schüler-Accounts)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{glCnt} freigeschaltete GrooveLab-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro User)</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Modul-Bereitstellung: GrooveLab</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{glCnt} aktive GrooveLab-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil)</span>
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           1 Monat
@@ -378,8 +378,8 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     return (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Datenbank- &amp; Speicher-Hosting (passive Profile)</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Speicher- &amp; Datenbank-Hosting für {passCnt} passive Schüler-Accounts (0,09 € / Mo. pro User)</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Basis-Bereitstellung</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Cloud-Speicher, Termin-/Hausaufgaben-Sync & QR-Schnittstelle ({passCnt} Schüler × 0,09 € / Mo.)</span>
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           1 Monat
@@ -398,7 +398,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   {hasKombi && (
                     <tr style={{ borderBottom: '1px solid #f1f5f9', color: '#34a853' }}>
                       <td style={{ padding: dynamicTdPadding }}>
-                        <strong style={{ display: 'block' }}>Kombinations-Rabatt (Campus &amp; GrooveLab)</strong>
+                        <strong style={{ display: 'block' }}>Kombi-Vorteilsrabatt (Infrastruktur-Bündel)</strong>
                         <span style={{ fontSize: '0.68rem', color: '#34a853' }}>Sonderkondition für Doppel-Modulnutzung</span>
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>

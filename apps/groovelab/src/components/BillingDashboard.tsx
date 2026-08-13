@@ -63,6 +63,8 @@ interface Invoice {
   passiveStudentsCount: number;
   teachersHostingFee: number;
   passiveStudentsHostingFee: number;
+  activeCampusCount?: number;
+  activeGroovelabCount?: number;
   storageAddonGb: number;
   storageUsedBytes: number;
   storageAddonMonthlyFee: number;
@@ -423,106 +425,103 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         metricsMap[m.school_id] = m.active_campus_users || 0;
       });
 
-      // 4. Fetch users to compute actual student & teacher counts (Optimized payload without large text columns)
+      // 4. Fetch users to compute actual student & teacher counts
       const { data: users, error: usersErr } = await supabase
         .from('users')
-        .select('school_id, role, roles, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing');
+        .select('id, school_id, role, roles, first_name, last_name, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing');
 
       if (usersErr) {
         console.warn('⚠️ users fetch warning:', usersErr.message);
       }
       setAllUsers([]);
 
-      // 4b. Fetch pending students (Graceful fallback)
+      // 4b. Fetch pending onboarding students
       const { data: pendingStudentsDb, error: pendingErr } = await supabase
         .from('pending_students_decrypted')
-        .select('id, school_id');
-      
+        .select('id, school_id, first_name, last_name');
+
       if (pendingErr) {
         console.warn('⚠️ pending_students_decrypted fetch warning:', pendingErr.message);
       }
-      
-      const pendingCountMap: Record<string, number> = {};
-      pendingStudentsDb?.forEach(p => {
-        if (p.school_id) {
-          pendingCountMap[p.school_id] = (pendingCountMap[p.school_id] || 0) + 1;
-        }
-      });
 
       const userStatsMap: Record<string, { 
         totalStudents: number; 
         activeStudents: number; 
-        activeCampusStudents: number;
-        activeGroovelabStudents: number;
-        premiumStudents: number;
-        exemptActiveStudents: number;
-        totalTeachers: number;
-        activeTeachers: number;
-        totalEmployees: number;
-        activeEmployees: number;
+        activeCampusStudents: number; 
+        activeGroovelabStudents: number; 
+        premiumStudents: number; 
+        exemptActiveStudents: number; 
+        totalTeachers: number; 
+        activeTeachers: number; 
+        totalEmployees: number; 
+        activeEmployees: number; 
       }> = {};
 
-      users?.forEach(u => {
-        if (!userStatsMap[u.school_id]) {
-          userStatsMap[u.school_id] = { 
-            totalStudents: 0, 
-            activeStudents: 0, 
-            activeCampusStudents: 0,
-            activeGroovelabStudents: 0,
-            premiumStudents: 0,
-            exemptActiveStudents: 0,
-            totalTeachers: 0,
-            activeTeachers: 0,
-            totalEmployees: 0,
-            activeEmployees: 0
-          };
-        }
-        const isStudent = u.role === 'student' || (Array.isArray(u.roles) && u.roles.includes('student'));
-        if (isStudent) {
-          userStatsMap[u.school_id].totalStudents++;
-          const isCampusAct = Boolean(u.is_campus_active || (u as any).isCampusActive);
-          const isGroovelabAct = Boolean(u.is_groovelab_active || (u as any).isGroovelabActive);
+      (schools || []).forEach(school => {
+        const schId = school.id;
+        const schoolUsers = (users || []).filter(u => u.school_id === schId);
+        const schoolPending = (pendingStudentsDb || []).filter(p => p.school_id === schId);
 
-          if (isCampusAct) {
-            userStatsMap[u.school_id].activeCampusStudents++;
+        const studentsList: any[] = [];
+
+        schoolUsers.forEach(u => {
+          const isStudent = u.role === 'student' || (Array.isArray(u.roles) && u.roles.includes('student'));
+          if (isStudent) {
+            studentsList.push({
+              id: u.id,
+              first_name: u.first_name,
+              last_name: u.last_name,
+              is_campus_active: Boolean(u.is_campus_active || (u as any).isCampusActive),
+              is_groovelab_active: Boolean(u.is_groovelab_active || (u as any).isGroovelabActive),
+              exempt_from_direct_billing: Boolean(u.exempt_from_direct_billing)
+            });
           }
-          if (isGroovelabAct) {
-            userStatsMap[u.school_id].activeGroovelabStudents++;
-          }
-          if (isCampusAct || isGroovelabAct) {
-            userStatsMap[u.school_id].activeStudents++;
-            userStatsMap[u.school_id].premiumStudents++;
-            if (u.exempt_from_direct_billing) {
-              userStatsMap[u.school_id].exemptActiveStudents++;
+        });
+
+        // Merge pending onboarding students with non-generic names (1:1 dynamic with SecretaryDashboard)
+        if (schoolPending) {
+          schoolPending.forEach(ps => {
+            const fName = (ps.first_name || '').trim();
+            const isGenericName = !fName || ['ausstehendes', 'unbekannt', 'onboarding', 'test'].includes(fName.toLowerCase());
+            if (isGenericName) return;
+
+            const userMatch = schoolUsers.find(u => u.id === ps.id || (u.first_name && fName && u.first_name.toLowerCase().trim() === fName.toLowerCase()));
+            const exists = studentsList.some(s => s.id === ps.id || (s.first_name && fName && s.first_name.toLowerCase().trim() === fName.toLowerCase()));
+            if (!exists) {
+              const isCampusAct = userMatch ? Boolean(userMatch.is_campus_active) : ((ps as any).is_campus_active === true);
+              const isGrooveAct = userMatch ? Boolean(userMatch.is_groovelab_active) : ((ps as any).is_groovelab_active === true);
+              studentsList.push({
+                id: ps.id,
+                first_name: fName,
+                last_name: ps.last_name || '',
+                is_campus_active: isCampusAct,
+                is_groovelab_active: isGrooveAct,
+                exempt_from_direct_billing: false
+              });
             }
-          }
+          });
         }
-        
-        // Count employees matching Secretary logic (admins & secretaries are free)
-        const isEmployee = u.role === 'admin' || u.role === 'secretary' ||
-          (u.roles && (u.roles.includes('admin') || u.roles.includes('secretary')));
-        if (isEmployee) {
-          userStatsMap[u.school_id].totalEmployees++;
-          if (u.is_active) {
-            userStatsMap[u.school_id].activeEmployees++;
+
+        const totalStudents = studentsList.length;
+        const activeCampusStudents = studentsList.filter(s => s.is_campus_active).length;
+        const activeGroovelabStudents = studentsList.filter(s => s.is_groovelab_active).length;
+        const activeStudents = Math.max(activeCampusStudents, activeGroovelabStudents);
+        const exemptActiveStudents = studentsList.filter(s => s.is_campus_active && s.exempt_from_direct_billing).length;
+
+        // Employees & Teachers
+        let totalEmployees = 0;
+        let activeEmployees = 0;
+        schoolUsers.forEach(u => {
+          const isEmployee = u.role === 'admin' || u.role === 'secretary' || (Array.isArray(u.roles) && (u.roles.includes('admin') || u.roles.includes('secretary')));
+          if (isEmployee) {
+            totalEmployees++;
+            if (u.is_active) activeEmployees++;
           }
-        }
-        
-      });
+        });
 
-      // Recalculate billable teachers applying Anti-Abuse 2 Cap (Max 2 free double-roles per school)
-      const schoolUsersMap: { [schoolId: string]: any[] } = {};
-      users?.forEach(u => {
-        if (!schoolUsersMap[u.school_id]) schoolUsersMap[u.school_id] = [];
-        schoolUsersMap[u.school_id].push(u);
-      });
-
-      Object.keys(schoolUsersMap).forEach(schId => {
-        const schUsers = schoolUsersMap[schId];
         let freeDoubleRoleCount = 0;
         let billableTeacherCount = 0;
-
-        schUsers.forEach(u => {
+        schoolUsers.forEach(u => {
           const isMgmt = u.role === 'admin' || u.role === 'secretary' || (Array.isArray(u.roles) && (u.roles.includes('admin') || u.roles.includes('secretary')));
           const isTch = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
 
@@ -537,10 +536,18 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           }
         });
 
-        if (userStatsMap[schId]) {
-          userStatsMap[schId].activeTeachers = billableTeacherCount;
-          userStatsMap[schId].totalTeachers = billableTeacherCount;
-        }
+        userStatsMap[schId] = {
+          totalStudents,
+          activeStudents,
+          activeCampusStudents,
+          activeGroovelabStudents,
+          premiumStudents: activeStudents,
+          exemptActiveStudents,
+          totalTeachers: billableTeacherCount,
+          activeTeachers: billableTeacherCount,
+          totalEmployees,
+          activeEmployees
+        };
       });
 
       const calculatedInvoices: Invoice[] = (schools || [])
@@ -656,6 +663,8 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           passiveStudentsCount,
           teachersHostingFee: parseFloat(calcResult.teacherServiceFeeTotal.toFixed(2)),
           passiveStudentsHostingFee: parseFloat(calcResult.passiveStudentFeeTotal.toFixed(2)),
+          activeCampusCount: activeCampusStudents,
+          activeGroovelabCount: activeGroovelabStudents,
           storageAddonGb: Number(school.storage_addon_gb || 0),
           storageUsedBytes: Number(school.storage_used_bytes || 0),
           storageAddonMonthlyFee: storageAddonFee
@@ -905,7 +914,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
             <CreditCard style={{ color: '#34a853' }} size={28} /> Abrechnungen &amp; Abonnements
           </h2>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 550 }}>
-            Globale Übersicht über alle Schul-Lizenzgebühren und privaten App-Upgrades von Campus-Groovelab.
+            Globale Übersicht über alle Schul-Infrastruktur- und Bereitstellungsgebühren von Campus-Groovelab.
           </p>
         </div>
         
@@ -977,7 +986,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
             <School size={18} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Monatlicher Lizenzumsatz</span>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Monatliche Bereitstellungs- &amp; Servicegebühren</span>
             <span style={{ display: 'block', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginTop: '2px', letterSpacing: '-0.02em' }}>
               {summary.totalB2BRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </span>
@@ -1025,7 +1034,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
             <TrendingUp size={18} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Upgrade-Umsatz (Eltern)</span>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schüler-Direktabrechnungen (B2C)</span>
             <span style={{ display: 'block', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginTop: '2px', letterSpacing: '-0.02em' }}>
               {summary.totalB2CRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </span>
@@ -1049,7 +1058,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
             <Users size={18} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Aktive Schülerlizenzen</span>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Aktive Schüler-Bereitstellungen</span>
             <span style={{ display: 'flex', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginTop: '2px', letterSpacing: '-0.02em', alignItems: 'baseline', gap: '4px' }}>
               {summary.totalStudents} <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>aktiv</span>
             </span>
@@ -1336,12 +1345,12 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '20px' }}>
                   {/* Subscription card */}
                   <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '16px', border: '1px solid rgba(15, 23, 42, 0.04)' }}>
-                    <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>Lizenz-Abonnement</h4>
+                    <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>Infrastruktur- &amp; Service-Abonnement</h4>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px' }}>
                         <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Tariftyp</span>
-                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>{inv.subscriptionType === 'solo' ? 'Solo-Lizenz' : 'Standard-Tarif'}</span>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>{inv.subscriptionType === 'solo' ? 'Solo-Infrastruktur' : 'Standard-Infrastruktur'}</span>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px' }}>
                         <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Freigeschaltete Module</span>
@@ -1368,50 +1377,91 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                   {/* Pricing Breakdown Card */}
                   <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '16px', border: '1px solid rgba(15, 23, 42, 0.04)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
-                      <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0' }}>Gebührenaufstellung</h4>
+                      <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0' }}>Gebühren- &amp; Leistungsaufstellung</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {/* 1. Software Lizenz */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem' }}>
-                          <span style={{ color: '#0f172a', fontWeight: 600 }}>Modul-Grundpreis</span>
-                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.baseFee.toFixed(2).replace('.', ',')} €</span>
+                          <span style={{ color: '#0f172a', fontWeight: 600 }}>Campus-Groovelab Software-Nutzungslizenz</span>
+                          <span style={{ fontWeight: 700, color: '#34a853' }}>100% kostenlos (0,00 €)</span>
                         </div>
-                        {inv.hasKombiDiscount && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#34a853' }}>
-                            <span style={{ fontWeight: 600 }}>Kombi-Vorteilsrabatt</span>
-                            <span style={{ fontWeight: 600 }}>-{masterPricing.kombiSavings.toFixed(2).replace('.', ',')} €</span>
+
+                        {/* 2. Campus Module Hosting */}
+                        {inv.hasCampus && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem' }}>
+                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Cloud- &amp; Datenbank-Hosting: Modul Campus</span>
+                            <span style={{ fontWeight: 650, color: '#0f172a' }}>{masterPricing.priceCampus.toFixed(2).replace('.', ',')} € / Mo.</span>
                           </div>
                         )}
+
+                        {/* 3. GrooveLab Module Hosting */}
+                        {inv.hasGroovelab && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem' }}>
+                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Cloud- &amp; Datenbank-Hosting: Modul GrooveLab</span>
+                            <span style={{ fontWeight: 650, color: '#0f172a' }}>{masterPricing.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo.</span>
+                          </div>
+                        )}
+
+                        {/* 4. Kombi Rabatt */}
+                        {inv.hasKombiDiscount && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#34a853' }}>
+                            <span style={{ fontWeight: 600 }}>Kombi-Vorteilsrabatt (Infrastruktur-Bündel)</span>
+                            <span style={{ fontWeight: 600 }}>-{masterPricing.kombiSavings.toFixed(2).replace('.', ',')} € / Mo.</span>
+                          </div>
+                        )}
+
+                        {/* 5. Teachers & Staff Service Fee */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Infrastruktur- &amp; Server-Hosting</span>
+                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Service- &amp; Administrationspauschale</span>
                             <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.totalTeachersCount} Lehrkräfte aktiv × {masterPricing.priceTeacher.toFixed(2).replace('.', ',')} €</span>
                           </div>
-                          <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.teachersHostingFee.toFixed(2).replace('.', ',')} €</span>
+                          <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.teachersHostingFee.toFixed(2).replace('.', ',')} € / Mo.</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Datenbank- &amp; Speicher-Hosting</span>
-                            <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.passiveStudentsCount} Schüler passiv × 0,09 €</span>
+
+                        {/* 6. Cloud- & Modul-Bereitstellung: Campus (0,49 €) */}
+                        {(inv.activeCampusCount || 0) > 0 && !isSelbstzahler && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                              <span style={{ color: '#0f172a', fontWeight: 600 }}>Cloud- &amp; Modul-Bereitstellung: Campus</span>
+                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.activeCampusCount || 0} Schüler × {masterPricing.priceStudent.toFixed(2).replace('.', ',')} €</span>
+                            </div>
+                            <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{((inv.activeCampusCount || 0) * masterPricing.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</span>
                           </div>
-                          <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.passiveStudentsHostingFee.toFixed(2).replace('.', ',')} €</span>
-                        </div>
+                        )}
+
+                        {/* 7. Cloud- & Modul-Bereitstellung: GrooveLab (0,49 €) */}
+                        {(inv.activeGroovelabCount || 0) > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                              <span style={{ color: '#0f172a', fontWeight: 600 }}>Cloud- &amp; Modul-Bereitstellung: GrooveLab</span>
+                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.activeGroovelabCount || 0} Schüler × {masterPricing.priceStudent.toFixed(2).replace('.', ',')} €</span>
+                            </div>
+                            <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{((inv.activeGroovelabCount || 0) * masterPricing.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</span>
+                          </div>
+                        )}
+
+                        {/* 8. Basis-Bereitstellung (0,09 €) */}
+                        {inv.passiveStudentsCount > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                              <span style={{ color: '#0f172a', fontWeight: 600 }}>Basis-Bereitstellung</span>
+                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.passiveStudentsCount} Schüler × 0,09 €</span>
+                            </div>
+                            <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.passiveStudentsHostingFee.toFixed(2).replace('.', ',')} € / Mo.</span>
+                          </div>
+                        )}
+
+                        {/* 9. Audio-Tresor Storage Add-on */}
                         {inv.storageAddonGb > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                              <span style={{ color: '#0f172a', fontWeight: 600 }}>Audio-Tresor Speicher (+{inv.storageAddonGb} GB)</span>
-                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>Zusatz-Speichervolumen</span>
+                              <span style={{ color: '#0f172a', fontWeight: 600 }}>Zusatz-Speichervolumen: Audio-Tresor (+{inv.storageAddonGb} GB)</span>
+                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>Dedizierter Cloud-Speicher</span>
                             </div>
-                            <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.storageAddonMonthlyFee.toFixed(2).replace('.', ',')} €</span>
+                            <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.storageAddonMonthlyFee.toFixed(2).replace('.', ',')} € / Mo.</span>
                           </div>
                         )}
-                        {inv.activeStudentFee > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                              <span style={{ color: '#0f172a', fontWeight: 600 }}>Infrastruktur-Bereitstellung</span>
-                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{Math.round(inv.activeStudentFee / (masterPricing.priceStudent || 0.49))} Schüler aktiv × {(masterPricing.priceStudent || 0.49).toFixed(2).replace('.', ',')} €</span>
-                            </div>
-                            <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.activeStudentFee.toFixed(2).replace('.', ',')} €</span>
-                          </div>
-                        )}
+
                         {inv.status === 'bypass' && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#dc2626', fontWeight: 600 }}>
                             <span>Bypass-Gebührenfreistellung</span>
@@ -1434,7 +1484,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                     </div>
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: '10px', borderTop: '1px solid rgba(0,0,0,0.06)', marginTop: '8px' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>Monatlicher Beitrag:</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>Monatlicher Gesamtbeitrag:</span>
                       <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: '#34a853' }}>
                         {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                       </strong>
@@ -1446,7 +1496,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                 {(() => {
                   const storageGb = Number(inv.storageAddonGb || 0);
                   const storageUsedBytes = Number(inv.storageUsedBytes || 0);
-                  const baseGb = 5; // Standard 5 GB base volume
+                  const baseGb = 1.0; // Standard 1.0 GB base volume
                   const totalGb = baseGb + storageGb;
                   const totalBytes = totalGb * 1024 * 1024 * 1024;
                   const usedGb = storageUsedBytes / (1024 * 1024 * 1024);
@@ -1483,7 +1533,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                           <div>
                             <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>Audio-Tresor &amp; Cloud-Speicher Kontingent</h4>
                             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
-                              Inklusiv-Speicher ({baseGb} GB) {storageGb > 0 ? `+ ${storageGb} GB gebuchtes Zusatz-Volumen` : ''}
+                              1 GB Basis-Inklusivvolumen {storageGb > 0 ? `+ ${storageGb} GB gebuchtes Zusatz-Volumen` : ''}
                             </span>
                           </div>
                         </div>
@@ -1628,7 +1678,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                         {/* Basic Students */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
-                            <span style={{ fontSize: '0.74rem', color: '#0f172a', fontWeight: 700 }}>Basic Lizenzen (Kostenlos) ({freeStudents.length})</span>
+                            <span style={{ fontSize: '0.74rem', color: '#0f172a', fontWeight: 700 }}>Inaktive Profile (Kostenfrei) ({freeStudents.length})</span>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '140px', overflowY: 'auto' }}>
                             {freeStudents.length === 0 ? (
