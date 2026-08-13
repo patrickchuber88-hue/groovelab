@@ -14,10 +14,18 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
   const [step, setStep] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Step 1: School Data
+  // Step 1: School & B2B Billing Data
   const [schoolName, setSchoolName] = useState<string>('');
+  const [legalName, setLegalName] = useState<string>('');
+  const [billingContactPerson, setBillingContactPerson] = useState<string>('');
+  const [billingEmail, setBillingEmail] = useState<string>('');
+  const [street, setStreet] = useState<string>('');
+  const [houseNumber, setHouseNumber] = useState<string>('');
+  const [addressAddition, setAddressAddition] = useState<string>('');
   const [zipCode, setZipCode] = useState<string>('');
   const [city, setCity] = useState<string>('');
+  const [country, setCountry] = useState<string>('Deutschland');
+  const [vatId, setVatId] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
 
@@ -36,13 +44,21 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
     try {
       setLoading(true);
 
-      // 1. Create School Record
+      // 1. Create School Record with Complete B2B Billing Address
       const { data: school, error: schoolErr } = await supabase
         .from('schools')
         .insert({
           name: schoolName.trim(),
+          legal_name: legalName.trim() || schoolName.trim(),
+          billing_contact_person: billingContactPerson.trim() || null,
+          billing_email: billingEmail.trim() || email.trim() || null,
+          street: street.trim() || null,
+          house_number: houseNumber.trim() || null,
+          address_addition: addressAddition.trim() || null,
           zip_code: zipCode.trim(),
           city: city.trim(),
+          country: country.trim() || 'Deutschland',
+          vat_id: vatId.trim() || null,
           email: email.trim() || null,
           logo_url: logoUrl.trim() || null,
           primary_color: '#34a853',
@@ -223,31 +239,88 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 </h3>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                  Name der Musikschule *
-                </label>
-                <input
-                  type="text"
-                  value={schoolName}
-                  onChange={(e) => setSchoolName(e.target.value)}
-                  placeholder="z.B. Musikschule Bad Säckingen"
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(15,23,42,0.1)',
-                    background: '#f8fafc',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    outline: 'none'
-                  }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Name der Musikschule *
+                  </label>
+                  <input
+                    type="text"
+                    value={schoolName}
+                    onChange={(e) => setSchoolName(e.target.value)}
+                    placeholder="z.B. Musikschule Bad Säckingen"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Rechtlicher Trägername
+                  </label>
+                  <input
+                    type="text"
+                    value={legalName}
+                    onChange={(e) => setLegalName(e.target.value)}
+                    placeholder="z.B. Stadtmusikschule e.V. / Stadt Bad Säckingen"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a', outline: 'none' }}
+                  />
+                </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Rechnungs-E-Mail (E-Invoicing)
+                  </label>
+                  <input
+                    type="email"
+                    value={billingEmail}
+                    onChange={(e) => setBillingEmail(e.target.value)}
+                    placeholder="buchhaltung@musaek.de"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Ansprechpartner Buchhaltung
+                  </label>
+                  <input
+                    type="text"
+                    value={billingContactPerson}
+                    onChange={(e) => setBillingContactPerson(e.target.value)}
+                    placeholder="z.B. Fr. Maria Muster (Finanzen)"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a', outline: 'none' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Straße
+                  </label>
+                  <input
+                    type="text"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    placeholder="z.B. Friedrichstraße"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a', outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Nr.
+                  </label>
+                  <input
+                    type="text"
+                    value={houseNumber}
+                    onChange={(e) => setHouseNumber(e.target.value)}
+                    placeholder="12a"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a', outline: 'none' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                     PLZ *
@@ -257,18 +330,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                     value={zipCode}
                     onChange={(e) => setZipCode(e.target.value)}
                     placeholder="79713"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '12px 16px',
-                      borderRadius: '12px',
-                      border: '1px solid rgba(15,23,42,0.1)',
-                      background: '#f8fafc',
-                      fontSize: '0.95rem',
-                      fontWeight: 700,
-                      color: '#0f172a',
-                      outline: 'none'
-                    }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
                   />
                 </div>
                 <div>
@@ -280,20 +342,34 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     placeholder="Bad Säckingen"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '12px 16px',
-                      borderRadius: '12px',
-                      border: '1px solid rgba(15,23,42,0.1)',
-                      background: '#f8fafc',
-                      fontSize: '0.95rem',
-                      fontWeight: 700,
-                      color: '#0f172a',
-                      outline: 'none'
-                    }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
                   />
                 </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Land
+                  </label>
+                  <input
+                    type="text"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    placeholder="Deutschland"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                  USt-IdNr. / Steuernummer (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={vatId}
+                  onChange={(e) => setVatId(e.target.value)}
+                  placeholder="DE123456789 oder Steuer-Nr."
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a', outline: 'none' }}
+                />
               </div>
 
               <div>

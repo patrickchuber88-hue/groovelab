@@ -5,20 +5,29 @@ export interface JanitorReport {
   orphansRemoved: number;
   bytesFreed: number;
   errors: string[];
+  lastRunTimestamp: string;
 }
 
+/**
+ * Robust Storage Janitor Service
+ * Automatically scans Supabase Storage for unreferenced orphan audio files
+ * that have been deleted in the database or UI and are older than 24 hours.
+ */
 export const runStorageJanitor = async (bucketName = 'campus-assets'): Promise<JanitorReport> => {
   const report: JanitorReport = {
     scannedFiles: 0,
     orphansRemoved: 0,
     bytesFreed: 0,
-    errors: []
+    errors: [],
+    lastRunTimestamp: new Date().toISOString()
   };
 
   try {
-    console.log(`[StorageJanitor] Starting audit for bucket: ${bucketName}...`);
-    const { data: files, error: listErr } = await supabase.storage.from(bucketName).list('audio', {
-      limit: 100,
+    console.log(`[StorageJanitor] Starting automated audio storage audit for bucket: ${bucketName}...`);
+
+    // 1. Fetch files in 'audio' folder
+    const { data: audioFolderFiles, error: listErr } = await supabase.storage.from(bucketName).list('audio', {
+      limit: 500,
       sortBy: { column: 'created_at', order: 'asc' }
     });
 
@@ -27,16 +36,21 @@ export const runStorageJanitor = async (bucketName = 'campus-assets'): Promise<J
       return report;
     }
 
-    if (!files || files.length === 0) {
-      console.log('[StorageJanitor] No audio files found in storage.');
+    const allFiles = (audioFolderFiles || []).map(f => ({ ...f, path: `audio/${f.name}` }));
+
+    if (allFiles.length === 0) {
+      console.log('[StorageJanitor] No audio files found in storage bucket.');
       return report;
     }
 
-    report.scannedFiles = files.length;
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    report.scannedFiles = allFiles.length;
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const filesToDelete: string[] = [];
 
-    // Fetch active audio references from database to ensure no active files are deleted
+    // 2. Fetch all active audio references across DB tables
+    const activeAudioUrls = new Set<string>();
+
+    // Table A: student_notes
     const { data: activeNotes, error: notesErr } = await supabase
       .from('student_notes')
       .select('audio_url')
@@ -44,37 +58,76 @@ export const runStorageJanitor = async (bucketName = 'campus-assets'): Promise<J
 
     if (notesErr) {
       console.warn('[StorageJanitor] Could not fetch student_notes audio references:', notesErr.message);
+    } else if (activeNotes) {
+      activeNotes.forEach(n => {
+        if (n.audio_url) activeAudioUrls.add(String(n.audio_url));
+      });
     }
 
-    const activeAudioUrls = new Set((activeNotes || []).map(n => n.audio_url).filter(Boolean));
+    // Table B: progress_matrix (homework_notes with AUDIO: or LOOP: or direct URLs)
+    const { data: progressNotes, error: progressErr } = await supabase
+      .from('progress_matrix')
+      .select('homework_notes')
+      .not('homework_notes', 'is', null);
 
-    for (const file of files) {
+    if (progressErr) {
+      console.warn('[StorageJanitor] Could not fetch progress_matrix audio references:', progressErr.message);
+    } else if (progressNotes) {
+      progressNotes.forEach(p => {
+        if (p.homework_notes) {
+          const notesStr = typeof p.homework_notes === 'string' ? p.homework_notes : JSON.stringify(p.homework_notes);
+          // Match any file names or URLs
+          activeAudioUrls.add(notesStr);
+        }
+      });
+    }
+
+    // 3. Compare each storage file against active DB references
+    for (const file of allFiles) {
       const createdAt = file.created_at ? new Date(file.created_at) : new Date();
-      const isOlderThan7Days = createdAt < sevenDaysAgo;
-      const filePath = `audio/${file.name}`;
-      const isReferenced = Array.from(activeAudioUrls).some(url => url && typeof url === 'string' && url.includes(file.name));
+      const isOlderThan24h = createdAt < twentyFourHoursAgo;
+      const fileName = file.name;
+      const filePath = file.path;
 
-      if (isOlderThan7Days && !isReferenced) {
+      // Check if file.name or filePath is referenced in activeAudioUrls
+      let isReferenced = false;
+      for (const ref of activeAudioUrls) {
+        if (ref.includes(fileName) || ref.includes(filePath)) {
+          isReferenced = true;
+          break;
+        }
+      }
+
+      if (isOlderThan24h && !isReferenced) {
         filesToDelete.push(filePath);
         report.bytesFreed += (file.metadata?.size || 0);
       }
     }
 
+    // 4. Physically delete unreferenced orphan audio files
     if (filesToDelete.length > 0) {
-      console.log(`[StorageJanitor] Removing ${filesToDelete.length} unreferenced orphan audio files...`);
+      console.log(`[StorageJanitor] Removing ${filesToDelete.length} unreferenced orphan audio files from ${bucketName}...`);
       const { error: removeErr } = await supabase.storage.from(bucketName).remove(filesToDelete);
       if (removeErr) {
         report.errors.push(`Failed to remove orphan files: ${removeErr.message}`);
       } else {
         report.orphansRemoved = filesToDelete.length;
-        console.log(`[StorageJanitor] Successfully deleted ${filesToDelete.length} orphan files (${(report.bytesFreed / 1024).toFixed(2)} KB freed).`);
+        console.log(`[StorageJanitor] Successfully physically deleted ${filesToDelete.length} orphan audio files (${(report.bytesFreed / 1024).toFixed(2)} KB freed).`);
       }
     } else {
-      console.log('[StorageJanitor] No orphan files eligible for deletion.');
+      console.log('[StorageJanitor] Storage audit complete: 0 orphan audio files eligible for deletion.');
     }
   } catch (e: any) {
-    console.error('[StorageJanitor] Error running storage janitor:', e);
+    console.error('[StorageJanitor] Unexpected error running storage janitor:', e);
     report.errors.push(e.message || String(e));
+  }
+
+  // Save last run report in localStorage for audit transparency
+  try {
+    localStorage.setItem('groovelab_storage_janitor_last_report', JSON.stringify(report));
+    localStorage.setItem('groovelab_storage_janitor_last_run', Date.now().toString());
+  } catch (err) {
+    // Ignore localStorage errors
   }
 
   return report;

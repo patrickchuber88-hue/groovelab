@@ -11,6 +11,32 @@
   font-family: "Helvetica Neue Light", "Helvetica Neue", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, "Plus Jakarta Sans", "Inter", "Segoe UI", Roboto, Arial, sans-serif !important;
 }
 
+/* Master Admin Enterprise Utilities */
+.master-glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.02);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.master-glass-card:hover {
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08), 0 8px 20px -4px rgba(0, 0, 0, 0.04);
+}
+
+.master-stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
 :root {
   /* Safe Area Insets & Touch Targets */
   --safe-top: env(safe-area-inset-top, 0px);

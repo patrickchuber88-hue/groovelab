@@ -226,6 +226,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [avatar, setAvatar] = useState<any>(null);
   const [studentStats, setStudentStats] = useState<any>(null);
   const [exemptFromDirectBilling, setExemptFromDirectBilling] = useState<boolean>(student.exempt_from_direct_billing ?? false);
+  const [customStudentPrice, setCustomStudentPrice] = useState<string>(student.custom_student_price !== null && student.custom_student_price !== undefined ? String(student.custom_student_price) : '');
+  const [lockedStudentPrice, setLockedStudentPrice] = useState<number | null>(student.locked_student_price ?? null);
   const [isPremiumActive, setIsPremiumActive] = useState<boolean>(false);
   const [campusHomeworkItems, setCampusHomeworkItems] = useState<any[]>([]);
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
@@ -769,6 +771,28 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   };
 
+  const handleSaveCustomStudentPrice = async (overrideValue: string) => {
+    try {
+      const numericVal = overrideValue.trim() === '' ? null : parseFloat(overrideValue.replace(',', '.'));
+      if (numericVal !== null && (isNaN(numericVal) || numericVal < 0)) {
+        alert('Bitte geben Sie einen gültigen Betrag in € ein.');
+        return;
+      }
+      const { error } = await supabase
+        .from('users')
+        .update({ custom_student_price: numericVal })
+        .eq('id', student.id);
+      if (error) throw error;
+      setCustomStudentPrice(numericVal !== null ? String(numericVal) : '');
+      student.custom_student_price = numericVal;
+      alert(numericVal !== null 
+        ? `Individueller Sondertarif von ${numericVal.toFixed(2).replace('.', ',')} € / Monat für ${firstName} gespeichert.` 
+        : `Sondertarif zurückgesetzt. Es gilt wieder der Standard-Tarif.`);
+    } catch (err: any) {
+      alert('Fehler beim Speichern des Sondertarifs: ' + err.message);
+    }
+  };
+
   const handleToggleGroovelab = async (newVal: boolean) => {
     try {
       const { error } = await supabase
@@ -984,7 +1008,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       // 1. Fetch latest user details (including group_id and school_id)
       const { data: latestUser } = await supabase
         .from('users')
-        .select('first_name, last_name, is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, group_id, school_id, parent_pin')
+        .select('first_name, last_name, is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, custom_student_price, locked_student_price, group_id, school_id, parent_pin')
         .eq('id', student.id)
         .maybeSingle();
 
@@ -1004,6 +1028,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         setIsCampusActive(latestUser.is_campus_active ?? false);
         setIsGroovelabActive(latestUser.is_groovelab_active ?? false);
         setExemptFromDirectBilling(latestUser.exempt_from_direct_billing ?? false);
+        setCustomStudentPrice(latestUser.custom_student_price !== null && latestUser.custom_student_price !== undefined ? String(latestUser.custom_student_price) : '');
+        setLockedStudentPrice(latestUser.locked_student_price ?? null);
         setLessonDuration(latestUser.lesson_duration || 30);
         setAppUsageMode(latestUser.app_usage_mode || 'student_only');
         setParentPin(latestUser.parent_pin || '');
@@ -3353,6 +3379,117 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     </span>
                   )}
                 </div>
+
+                {/* 🛡️ Tarif & Preisanpassung (Enterprise Per-Profile Pricing Control) */}
+                {(currentUserRole === 'admin' || currentUserRole === 'secretary' || activePlatform === 'secretary') && (
+                  <>
+                    <div style={{ height: '1px', background: '#f1f5f9' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          🛡️ Profil-Tarif &amp; Preisgarantie
+                        </span>
+                        {exemptFromDirectBilling ? (
+                          <span style={{ background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            0,00 € (Befreit)
+                          </span>
+                        ) : customStudentPrice !== '' ? (
+                          <span style={{ background: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            {parseFloat(customStudentPrice).toFixed(2).replace('.', ',')} € / Mo (Sondertarif)
+                          </span>
+                        ) : lockedStudentPrice !== null ? (
+                          <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '3px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            {lockedStudentPrice.toFixed(2).replace('.', ',')} € / Mo (Bestandsschutz)
+                          </span>
+                        ) : (
+                          <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            Standard-Masterpreis
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Sondertarif Override Input */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Sondertarif:</span>
+                        <input
+                          type="text"
+                          placeholder="z.B. 0.35"
+                          value={customStudentPrice}
+                          onChange={(e) => setCustomStudentPrice(e.target.value)}
+                          style={{
+                            width: '85px',
+                            padding: '5px 8px',
+                            borderRadius: '8px',
+                            border: '1.5px solid #cbd5e1',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            color: '#0f172a',
+                            background: '#ffffff'
+                          }}
+                        />
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>€ / Mo.</span>
+
+                        <button
+                          onClick={() => handleSaveCustomStudentPrice(customStudentPrice)}
+                          style={{
+                            background: '#34a853',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '5px 12px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 4px rgba(52, 168, 83, 0.3)'
+                          }}
+                        >
+                          Speichern
+                        </button>
+
+                        {customStudentPrice !== '' && (
+                          <button
+                            onClick={() => handleSaveCustomStudentPrice('')}
+                            style={{
+                              background: '#ffffff',
+                              color: '#64748b',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '8px',
+                              padding: '5px 10px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Zurücksetzen
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Härtefall / Geschwister Befreiung Toggle */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
+                          Härtefall- / Geschwisterbefreiung (0,00 €):
+                        </span>
+                        <button
+                          onClick={() => handleToggleExemption(!exemptFromDirectBilling)}
+                          style={{
+                            background: exemptFromDirectBilling ? '#ef4444' : '#e2e8f0',
+                            color: exemptFromDirectBilling ? '#ffffff' : '#475569',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '4px 10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          {exemptFromDirectBilling ? 'Befreit (0,00 €)' : 'Nein'}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div style={{ height: '1px', background: '#f1f5f9' }} />
 

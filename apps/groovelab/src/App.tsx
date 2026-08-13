@@ -42,6 +42,8 @@ import { flushOfflineSyncQueue } from './services/offlineSyncService';
 import { SchoolSelfOnboardingModal } from './components/SchoolSelfOnboardingModal';
 import { DeviceSimulator } from './components/ui/DeviceSimulator';
 import { MobileTopHeader } from './components/ui/MobileTopHeader';
+import { useMasterPricing } from './context/MasterPricingContext';
+import { runStorageJanitor } from './services/storageJanitorService';
 import './App.css';
 
 // --- GLOBAL CAMERA KILL SWITCH ---
@@ -1506,6 +1508,7 @@ async function safeSupabaseQuery<T>(
 }
 
 function App() {
+  const masterPricing = useMasterPricing();
 
   // Declarative definition of renderLegalModals to ensure availability across all routes/landing pages
   const renderLegalModals = () => {
@@ -1755,10 +1758,10 @@ function App() {
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 7 VERTRAGSLAUFZEIT, PREISE &amp; KÜNDIGUNG</h4>
                         <p style={{ margin: 0 }}><strong>1. Schuljahres-Kopplung &amp; Kündigung:</strong> Die Vertragslaufzeit für den Serverbetrieb orientiert sich am Schuljahr (Kündigungsfrist 1 Monat zum 31. August). Ohne Kündigung verlängert sich die Laufzeit automatisch um ein weiteres Schuljahr.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Software-Lizenz:</strong> Die Bereitstellung der Basis-Softwarelizenz von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Zusatzlizenzen und aktive Schüler-Freischaltungen.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ 7,99 € und für das Modul „GrooveLab“ 4,99 €. Werden beide Module gebucht, gilt der Kombi-Vorteil von 9,99 € (Ersparnis von 2,99 €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit 0,49 €/Monat berechnet.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ {masterPricing.priceCampus.toFixed(2).replace('.', ',')} € und für das Modul „GrooveLab“ {masterPricing.priceGroovelab.toFixed(2).replace('.', ',')} €. Werden beide Module gebucht, gilt der Kombi-Vorteil von {masterPricing.priceKombi.toFixed(2).replace('.', ',')} € (Ersparnis von {masterPricing.kombiSavings.toFixed(2).replace('.', ',')} €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit {masterPricing.priceTeacher.toFixed(2).replace('.', ',')} €/Monat berechnet.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
-                          <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit 0,49 €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
-                          <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern (0,49 €/Monat bzw. 5,88 € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen 0,40 €/Monat, Schule trägt 0,09 €/Monat). Härtefälle/Geschwisterrabatte können von der Schule manuell befreit werden.
+                          <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit {masterPricing.priceStudent.toFixed(2).replace('.', ',')} €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
+                          <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} €/Monat bzw. {(masterPricing.priceStudent * 12).toFixed(2).replace('.', ',')} € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen 0,40 €/Monat, Schule trägt 0,09 €/Monat). Härtefälle/Geschwisterrabatte können von der Schule manuell befreit werden.
                           <br /><em>Hinweis:</em> GrooveLab-Schülerfreischaltungen werden immer vollumfänglich von der Musikschule getragen (keine Direktabrechnung mit Eltern).
                         </p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>5. Schüler-Deaktivierung:</strong> Bei monatlicher Abrechnung entfällt die Gebühr ab dem Folgemonat der Deaktivierung. Bei jährlicher Vorauszahlung verbleiben das Profil und alle Funktionen bis zum Ende des laufenden Schuljahres aktiv und erlöschen erst zum Schuljahreswechsel.</p>
@@ -2424,6 +2427,21 @@ function App() {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Automated Audio Storage Janitor 24h Background Task
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const lastRunStr = localStorage.getItem('groovelab_storage_janitor_last_run');
+    const lastRun = lastRunStr ? parseInt(lastRunStr, 10) : 0;
+    const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+
+    if (Date.now() - lastRun > twentyFourHoursMs) {
+      console.log('[StorageJanitor] Triggering scheduled 24h background audio storage audit...');
+      runStorageJanitor('campus-assets').catch(err => {
+        console.warn('[StorageJanitor] Background storage audit error:', err);
+      });
+    }
   }, []);
 
   const [loading, setLoading] = useState(false);

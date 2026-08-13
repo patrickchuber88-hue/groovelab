@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import { MasterPricingProvider } from './context/MasterPricingContext'
 import './index.css'
 
 // Automatically redirect localhost subdomains to the main localhost origin with query parameters to bypass CORS and script import errors.
@@ -18,7 +19,9 @@ if (typeof window !== 'undefined' && window.location.hostname.includes('localhos
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <MasterPricingProvider>
+        <App />
+      </MasterPricingProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )

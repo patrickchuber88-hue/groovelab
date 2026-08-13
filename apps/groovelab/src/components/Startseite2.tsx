@@ -4,6 +4,7 @@ import {
   Layers, ChevronDown, Check, ArrowRight, X, Menu, BookOpen, Sparkles
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useMasterPricing } from '../context/MasterPricingContext';
 
 interface Startseite2Props {
   onLogin: () => void;
@@ -14,6 +15,7 @@ interface Startseite2Props {
 }
 
 export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
+  const masterPricing = useMasterPricing();
   const [activeTab, setActiveTab] = useState<number>(0);
   const [email, setEmail] = useState<string>('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -23,52 +25,95 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
   const [calcGroovelab, setCalcGroovelab] = useState<boolean>(true);
   const [calcStudents, setCalcStudents] = useState<number>(80);
   const [calcTeachers, setCalcTeachers] = useState<number>(8);
+
+  const pricing = {
+    campus: masterPricing.priceCampus,
+    groovelab: masterPricing.priceGroovelab,
+    kombi: masterPricing.priceKombi,
+    teacher: masterPricing.priceTeacher,
+    student: masterPricing.priceStudent,
+    freeMonthsPerYear: masterPricing.freeMonthsPerYear,
+    billingMonthsPerYear: masterPricing.billingMonthsPerYear,
+    kombiSavings: masterPricing.kombiSavings,
+    kombiSavingsPercent: masterPricing.kombiSavingsPercent
+  };
+
   const [calcBillingModel, setCalcBillingModel] = useState<'parent' | 'school'>('parent');
   const [showPrivacyAudits, setShowPrivacyAudits] = useState<boolean>(false);
   const [showFullTomCatalog, setShowFullTomCatalog] = useState<boolean>(false);
 
-  // Dynamic pricing state (loaded from master_billing_settings in MasterAdminDashboard)
-  const [pricing, setPricing] = useState({
-    campus: 7.99,
-    groovelab: 4.99,
-    kombi: 9.99,
-    teacher: 0.49,
-    student: 0.49
-  });
+  // Interactive Target-Group FAQ State
+  const [activeFaqTab, setActiveFaqTab] = useState<'parents' | 'directors' | 'teachers'>('parents');
+  const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(0);
 
-  useEffect(() => {
-    const fetchGlobalPricing = async () => {
-      try {
-        const { data } = await supabase
-          .from('master_billing_settings')
-          .select('*')
-          .eq('id', 1)
-          .maybeSingle();
-
-        if (data) {
-          const c = Number(data.price_module_campus) || 7.99;
-          const g = Number(data.price_module_groovelab) || 4.99;
-          // Dynamic 20% discount formula for Kombi-Vorteil
-          const calculatedKombi = Math.round((c + g) * 0.8 * 100) / 100;
-          const k = data.price_module_kombi ? Number(data.price_module_kombi) : calculatedKombi;
-          const t = Number(data.price_user_teacher) || 0.49;
-          const s = Number(data.price_user_student) || 0.49;
-
-          setPricing({
-            campus: c,
-            groovelab: g,
-            kombi: k,
-            teacher: t,
-            student: s
-          });
-        }
-      } catch (e) {
-        console.warn('Could not fetch dynamic pricing:', e);
+  const faqItems = {
+    parents: [
+      {
+        q: 'Sind die Unterrichtszeiten und der Schulweg meines Kindes vor Fremden geschützt?',
+        a: 'Ja, lückenlos. Wir speichern weder Wohnadressen noch Telefonnummern oder Anfahrtswege Ihres Kindes. Auf jedem neuen Handy oder Computer muss einmalig eine 4-stellige Sicherheits-PIN eingegeben werden. Ohne diese PIN hat niemand Zugriff auf die Daten. Zudem werden Nachnamen in Übersichten automatisch abgekürzt (z. B. „Max M.“).'
+      },
+      {
+        q: 'Welche persönlichen Daten meines Kindes werden auf den Servern gespeichert?',
+        a: 'Ausschließlich die Daten, die für den Musikunterricht nötig sind – sonst nichts: 1. Was wir speichern: Der Vorname und der erste Buchstabe des Nachnamens (z. B. „Max M.“), das Musikinstrument (z. B. „Gitarre“) sowie Hausaufgaben, Übe-Zeiten und Auszeichnungen im Hausaufgabenheft. 2. Was wir NIEMALS abfragen oder speichern: Keine E-Mail-Adresse, keine Handynummer, keine Wohnadresse, kein Geburtsdatum und keine Bankdaten. Alle Daten liegen sicher in Deutschland und werden niemals für Werbung genutzt.'
+      },
+      {
+        q: 'Was passiert, wenn mein Kind seinen ausgedruckten QR-Code verliert?',
+        a: 'Keine Sorge: Die Musikschule oder Lehrkraft kann den QR-Code mit einem Klick erneuern. Der alte gedruckte Zettel wird dabei sofort ungültig. Wenn jemand den alten Zettel findet, führt der Link einfach ins Leere.'
+      },
+      {
+        q: 'Fallen für Eltern oder Schüler versteckte Kosten oder Abo-Fallen an?',
+        a: `Nein, niemals. Wenn Ihre Musikschule die Zugänge übernimmt, ist die Nutzung für Sie zu 100 % kostenlos. Falls Eltern direkt zahlen, kostet der Zugang transparente ${pricing.student.toFixed(2).replace('.', ',')} € im Monat (oder ${(pricing.student * 12 * 0.816).toFixed(2).replace('.', ',')} € im Jahr) – ohne Vertragslaufzeit. Es gibt keine Werbung und keine In-App-Käufe.`
+      },
+      {
+        q: 'Gibt es eine Regelung für Familien mit wenig Einkommen oder mehreren Kindern?',
+        a: 'Ja! Bei der Campus-Aktivierung gilt unser autom. Geschwister-Vorteil: Für Familien mit mehreren Kindern sind alle weiteren Kinder ab dem 3. Kind 100 % KOSTENLOS für die Eltern (0,00 €/Monat). Die Musikschule übernimmt hierbei lediglich den passiven Server-Beitrag von 0,09 €/Monat. Zusätzlich schaltet unser Solidaritätsversprechen für je 20 aktive Schüler 1 kostenfreie Lizenz für Härtefälle frei.'
       }
-    };
-
-    fetchGlobalPricing();
-  }, []);
+    ],
+    directors: [
+      {
+        q: 'Ist Campus-Groovelab rechtssicher und DSGVO-konform?',
+        a: 'Ja, lückenlos nach deutschen und europäischen Datenschutzgesetzen: 1. Keine Datenübertragung in die USA: Schriftarten werden direkt von Ihrem Gerät geladen (kein Risiko durch Google Fonts). 2. Server in Deutschland: Alle Daten liegen sicher in Rechenzentren in Deutschland (geschützt vor US-Behörden). 3. Keine Werbung & kein Tracking: Wir nutzen keine Analyse-Tools oder Werbe-Cookies. 4. Fertiger Vertrag: Den rechtlich vorgeschriebenen Datenschutz-Vertrag (AVV) laden Sie mit 1 Klick direkt im System herunter.'
+      },
+      {
+        q: 'Wie schnell gelingt die Einrichtung für unsere Musikschule?',
+        a: 'In unter 5 Minuten ohne IT-Kenntnisse. Sie müssen keine Software installieren oder Server mieten. Sie erhalten Ihren Zugangs-Link und können Lehrkräfte, Räume und Schüler direkt anlegen oder per Excel-Datei importieren.'
+      },
+      {
+        q: 'Wie flexibel sind die Preise und was ist der Kombi-Vorteil?',
+        a: `Sie buchen nur, was Sie brauchen: Das Campus-Modul (${pricing.campus.toFixed(2).replace('.', ',')} €/Monat Schul-Flatrate) oder das GrooveLab-Modul (${pricing.groovelab.toFixed(2).replace('.', ',')} €/Monat Schul-Flatrate). Wenn Sie beide Module zusammen nutzen, sparen Sie jeden Monat ${pricing.kombiSavings.toFixed(2).replace('.', ',')} € (Kombi-Vorteil: ${pricing.kombi.toFixed(2).replace('.', ',')} €/Monat). Sie können jeden Monat kündigen.`
+      },
+      {
+        q: 'Gilt das Preisversprechen auch für neue Funktionen und neue Schuljahre?',
+        a: `Ja, zu 100%! Der vereinbarte Grundtarif Ihrer Musikschule (Server-Flatrate von ${pricing.kombi.toFixed(2).replace('.', ',')} €/Monat beim Kombi-Vorteil) sowie bestehende aktive Lehrer- und Schülerprofile bleiben dauerhaft vor Preiserhöhungen geschützt – selbst wenn wir die Plattform um neue Funktionen erweitern. Wenn im neuen Schuljahr neue Schüler hinzukommen, wird für deren Aktivierung der jeweils aktuell gültige Schüler-Tarif abgerechnet.`
+      },
+      {
+        q: 'Sind unsere Daten vor anderen Musikschulen oder Fremden geschützt?',
+        a: 'Ja. Die Datenbank besitzt eine digitale Schutzmauer: Jede Musikschule sieht ausschließlich ihre eigenen Daten. Selbst wenn jemand versucht, Daten abzugreifen, blockiert der Server die Anfrage sofort.'
+      },
+      {
+        q: 'Wie hilft das System bei Krankmeldungen von Lehrkräften?',
+        a: 'Meldet sich eine Lehrkraft ab, sagt das System die betroffenen Stunden automatisch ab. Betroffene Schüler und Eltern sehen sofort einen Hinweis auf ihrem Handy. Aufwendige Telefonketten im Sekretariat gehören damit der Vergangenheit an.'
+      }
+    ],
+    teachers: [
+      {
+        q: 'Entsteht für mich zusätzlicher Papierkram oder Schreibarbeit im Unterricht?',
+        a: 'Nein, im Gegenteil: Das digitale Hausaufgabenheft bietet fertige Bausteine und Sprach-/Audio-Notizen. Eine Stunde ist in unter 30 Sekunden dokumentiert – so bleibt mehr Zeit für den Musikunterricht.'
+      },
+      {
+        q: 'Können Kolleginnen oder andere Lehrkräfte meine Schüler oder Notizen sehen?',
+        a: 'Nein. Aus Datenschutzgründen sieht jede Lehrkraft nur die eigenen Schüler und Unterrichtsstunden. Kolleginnen haben keinen Zugriff auf Ihre Einträge.'
+      },
+      {
+        q: 'Wie funktioniert die Abmeldung, wenn ich einmal krank bin?',
+        a: 'Sie tragen im Lehrer-Dashboard einfach den Zeitraum ein. Das System markiert Ihre Stunden automatisch als Ausfall, informiert das Büro und schickt den Schülern eine Nachricht. Wenn Sie wieder gesund sind, schalten Sie den Stundenplan mit 1 Klick wieder frei.'
+      },
+      {
+        q: 'Wie hilft die App beim Üben zu Hause?',
+        a: 'Durch spielerische Funktionen wie den Übe-Timer, Punkte, Abzeichen und die Audio-Loopstation werden Schüler motiviert, zu Hause freiwillig zu üben – ganz ohne Druck.'
+      }
+    ]
+  };
 
   const getPaidMonthsUntilAugust = () => {
     const now = new Date();
@@ -1513,6 +1558,45 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 </div>
 
               </div>
+
+              {/* 🛡️ Das Campus-Groovelab Preisversprechen Banner */}
+              <div style={{
+                marginTop: '32px',
+                padding: '24px 28px',
+                borderRadius: '20px',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                border: '1.5px solid #86efac',
+                boxShadow: '0 4px 16px rgba(34, 197, 94, 0.08)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '16px',
+                textAlign: 'left'
+              }}>
+                <div style={{
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 900,
+                  fontSize: '20px',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 8px rgba(22, 165, 74, 0.3)'
+                }}>
+                  🛡️
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 900, color: '#14532d', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Das Campus-Groovelab Preisversprechen: 100 % Bestandsschutz & Garantie
+                  </div>
+                  <div style={{ fontSize: '13.5px', color: '#166534', lineHeight: 1.5, fontWeight: 500 }}>
+                    <strong>Sichern Sie sich den Tarif von heute – inklusive aller Innovationen von morgen!</strong> Der gebuchte Grundtarif Ihrer Musikschule (Server-Flatrate) sowie bestehende Lehrer- und Schüler-Profile sind dauerhaft vor Preiserhöhungen geschützt. Auch bei neuen KI-Funktionen, Raumplanern oder Modul-Updates steigt Ihr Sockelpreis um keinen Cent. Für neu angemeldete Schüler im neuen Schuljahr gilt transparent der jeweils aktuell gültige Schüler-Tarif.
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Split Details Section: Service Fees & Flex billing options */}
@@ -1538,14 +1622,14 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Lehrkräfte</div>
                     <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                      <strong>0,49 € / Monat</strong> je aktives Lehrer-Profil. Verwaltungs- und Sekretariats-Accounts (Rollen admin &amp; secretary) sind vollständig kostenfrei inklusive.
+                      <strong>{pricing.teacher.toFixed(2).replace('.', ',')} € / Monat</strong> je aktives Lehrer-Profil. Verwaltungs- und Sekretariats-Accounts (Rollen admin &amp; secretary) sind vollständig kostenfrei inklusive.
                     </div>
                   </div>
 
                   <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Schüler-Aktivierungen &amp; Deaktivierung</div>
                     <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                      <strong>0,49 € / Monat</strong> je aktiver Schüler-Zugang. Bei Deaktivierung (monatlich) entfällt die Gebühr zum Monatsende. Bereits bezahlte Jahresbeiträge bleiben bis zum Schuljahresende aktiv und werden dann inaktiviert.
+                      <strong>{pricing.student.toFixed(2).replace('.', ',')} € / Monat</strong> je aktiver Schüler-Zugang. Bei Deaktivierung (monatlich) entfällt die Gebühr zum Monatsende. Bereits bezahlte Jahresbeiträge bleiben bis zum Schuljahresende aktiv und werden dann inaktiviert.
                     </div>
                   </div>
                 </div>
@@ -1567,17 +1651,19 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       Entlaste das Schulbudget auf <strong>0,00 € Schülergebühren</strong>. Die Eltern übernehmen den Kleinstbetrag direkt über die Plattform.
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span>• <strong>Vollständig:</strong> Eltern zahlen 0,49 €/Mo. Schule zahlt 0,00 € Schülergebühr.</span>
+                      <span>• <strong>Vollständig:</strong> Eltern zahlen {pricing.student.toFixed(2).replace('.', ',')} €/Mo. Schule zahlt 0,00 € Schülergebühr.</span>
                       <span>• <strong>Teilweise:</strong> Eltern zahlen 0,40 €/Mo, Schule stützt mit 0,09 €/Mo.</span>
                     </div>
 
                     {/* Solidaritätsversprechen Highlight Box */}
                     <div style={{ marginTop: '12px', background: '#ffffff', padding: '12px 14px', borderRadius: '12px', border: '1px solid #bbf7d0', boxShadow: '0 2px 8px rgba(52, 168, 83, 0.05)' }}>
                       <div style={{ fontSize: '13px', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        <span>💚 Das Solidaritätsversprechen deiner Musikschule: Das 20:1 Prinzip</span>
+                        <span>💚 Geschwister-Vorteil &amp; 20:1 Solidaritätsversprechen</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#334155', lineHeight: 1.45 }}>
-                        Kein Kind soll aus finanziellen Gründen vom Musiklernen ausgeschlossen werden. Bei der Eltern-Direktabrechnung schaltet das System für <strong>je 20 aktivierte Schüler-Profile automatisch 1 kostenfreie Freilizenz für Härtefälle &amp; Geschwisterkinder</strong> frei. Wer ein aktives Profil bezahlt, unterstützt so solidarisch benachteiligte Familien!
+                        Kein Kind soll aus finanziellen Gründen vom Musiklernen ausgeschlossen werden:
+                        <br />• <strong>Geschwister-Vorteil:</strong> Ab dem 3. Kind ist die Campus-Aktivierung für Eltern <strong>100 % KOSTENLOS (0,00 €)</strong>!
+                        <br />• <strong>Solidaritäts-Prinzip:</strong> Für je 20 aktivierte Schüler-Profile schaltet das System automatisch 1 weitere kostenfreie Freilizenz für Härtefälle frei.
                       </div>
                     </div>
                   </div>
@@ -1588,7 +1674,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       Die Musikschule zahlt gesammelt für alle Schüler. Hier profitierst du von exzellenten Skalierungsrabatten:
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl (0,49 €/Schüler). Konten ohne Login für mehr als 2 Monate werden automatisch inaktiviert – Kosten fallen somit nur bei tatsächlicher Nutzung an.</span>
+                      <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl ({pricing.student.toFixed(2).replace('.', ',')} €/Schüler). Konten ohne Login für mehr als 2 Monate werden automatisch inaktiviert – Kosten fallen somit nur bei tatsächlicher Nutzung an.</span>
                       <span>• <strong>Jahresbeitrag (10% Rabatt):</strong> Die Aktivierung eines Schülerprofils löst den Jahresbeitrag aus. Unterjährige Neuanmeldungen lassen sich jederzeit flexibel hinzufügen – der Beitrag wird dabei automatisiert auf die verbleibende Restlaufzeit berechnet.</span>
                       <span>• <strong>Aktivierung aller Schüler zum Schuljahresstart (September) (20% Rabatt):</strong> Einmalige, gesammelte Aktivierung aller Schüler im September für das gesamte Schuljahr.</span>
                     </div>
@@ -1637,6 +1723,203 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               </button>
             </div>
 
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ SECTION (Häufig gestellte Fragen für Eltern, Schulleiter & Lehrer) ── */}
+      <section id="faq" style={{
+        padding: '96px 24px',
+        background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
+        borderTop: '1px solid #e2e8f0',
+        position: 'relative'
+      }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 16px',
+              borderRadius: '9999px',
+              background: '#e6f4ea',
+              color: '#34a853',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              marginBottom: '16px'
+            }}>
+              <ShieldCheck size={16} /> FAQ &amp; Transparenz
+            </div>
+            <h2 style={{
+              fontFamily: '"Helvetica Neue Light", "Helvetica Neue", -apple-system, sans-serif',
+              fontSize: 'clamp(2rem, 4vw, 2.75rem)',
+              fontWeight: 900,
+              color: '#0f172a',
+              letterSpacing: '-0.03em',
+              margin: '0 0 16px 0'
+            }}>
+              Häufig gestellte Fragen &amp; Antworten
+            </h2>
+            <p style={{
+              fontSize: '1.05rem',
+              color: '#64748b',
+              maxWidth: '640px',
+              margin: '0 auto',
+              lineHeight: 1.6
+            }}>
+              Wähle deine Rolle aus, um maßgeschneiderte Antworten zu Datenschutz, Sicherheit, Kosten und Bedienung zu erhalten.
+            </p>
+          </div>
+
+          {/* Target Group Selector Tabs */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '12px',
+            marginBottom: '40px',
+            flexWrap: 'wrap'
+          }}>
+            <button
+              type="button"
+              onClick={() => { setActiveFaqTab('parents'); setExpandedFaqIndex(0); }}
+              style={{
+                padding: '14px 28px',
+                borderRadius: '9999px',
+                border: activeFaqTab === 'parents' ? '2px solid #34a853' : '1px solid #cbd5e1',
+                background: activeFaqTab === 'parents' ? '#34a853' : '#ffffff',
+                color: activeFaqTab === 'parents' ? '#ffffff' : '#475569',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: activeFaqTab === 'parents' ? '0 4px 14px rgba(52, 168, 83, 0.25)' : '0 2px 6px rgba(0,0,0,0.03)'
+              }}
+            >
+              <span>👨‍👩‍👧</span> Für Eltern &amp; Schüler
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setActiveFaqTab('directors'); setExpandedFaqIndex(0); }}
+              style={{
+                padding: '14px 28px',
+                borderRadius: '9999px',
+                border: activeFaqTab === 'directors' ? '2px solid #ea4335' : '1px solid #cbd5e1',
+                background: activeFaqTab === 'directors' ? '#ea4335' : '#ffffff',
+                color: activeFaqTab === 'directors' ? '#ffffff' : '#475569',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: activeFaqTab === 'directors' ? '0 4px 14px rgba(234, 67, 53, 0.25)' : '0 2px 6px rgba(0,0,0,0.03)'
+              }}
+            >
+              <span>🏛️</span> Für Schulleitung &amp; Admin
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setActiveFaqTab('teachers'); setExpandedFaqIndex(0); }}
+              style={{
+                padding: '14px 28px',
+                borderRadius: '9999px',
+                border: activeFaqTab === 'teachers' ? '2px solid #eab308' : '1px solid #cbd5e1',
+                background: activeFaqTab === 'teachers' ? '#eab308' : '#ffffff',
+                color: activeFaqTab === 'teachers' ? '#ffffff' : '#475569',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: activeFaqTab === 'teachers' ? '0 4px 14px rgba(234, 179, 8, 0.25)' : '0 2px 6px rgba(0,0,0,0.03)'
+              }}
+            >
+              <span>🧑‍🏫</span> Für Lehrkräfte &amp; Pädagogen
+            </button>
+          </div>
+
+          {/* FAQ Accordion List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {faqItems[activeFaqTab].map((item, idx) => {
+              const isOpen = expandedFaqIndex === idx;
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: '20px',
+                    border: isOpen ? '1.5px solid #cbd5e1' : '1px solid #e2e8f0',
+                    boxShadow: isOpen ? '0 10px 25px -5px rgba(0, 0, 0, 0.05)' : '0 2px 8px rgba(0,0,0,0.02)',
+                    overflow: 'hidden',
+                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setExpandedFaqIndex(isOpen ? null : idx)}
+                    style={{
+                      width: '100%',
+                      padding: '24px',
+                      background: 'transparent',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '16px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      outline: 'none'
+                    }}
+                  >
+                    <span style={{
+                      fontSize: '1.08rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      lineHeight: 1.4
+                    }}>
+                      {item.q}
+                    </span>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: isOpen ? '#f1f5f9' : '#f8fafc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#64748b',
+                      flexShrink: 0,
+                      transition: 'transform 0.2s ease',
+                      transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+                    }}>
+                      <ChevronDown size={18} />
+                    </div>
+                  </button>
+
+                  {isOpen && (
+                    <div style={{
+                      padding: '0 24px 24px 24px',
+                      color: '#475569',
+                      fontSize: '0.95rem',
+                      lineHeight: 1.6,
+                      borderTop: '1px solid #f1f5f9',
+                      paddingTop: '16px'
+                    }}>
+                      {item.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -1826,10 +2109,10 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 7 VERTRAGSLAUFZEIT, PREISE &amp; KÜNDIGUNG</h4>
                         <p style={{ margin: 0 }}><strong>1. Schuljahres-Kopplung &amp; Kündigung:</strong> Die Vertragslaufzeit für den Serverbetrieb orientiert sich am Schuljahr (Kündigungsfrist 1 Monat zum 31. August). Ohne Kündigung verlängert sich die Laufzeit automatisch um ein weiteres Schuljahr.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Software-Lizenz:</strong> Die Bereitstellung der Basis-Softwarelizenz von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Zusatzlizenzen und aktive Schüler-Freischaltungen.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ 7,99 € und für das Modul „GrooveLab“ 4,99 €. Werden beide Module gebucht, gilt der Kombi-Vorteil von 9,99 € (Ersparnis von 2,99 €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit 0,49 €/Monat berechnet.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ {pricing.campus.toFixed(2).replace('.', ',')} € und für das Modul „GrooveLab“ {pricing.groovelab.toFixed(2).replace('.', ',')} €. Werden beide Module gebucht, gilt der Kombi-Vorteil von {pricing.kombi.toFixed(2).replace('.', ',')} € (Ersparnis von {pricing.kombiSavings.toFixed(2).replace('.', ',')} €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit {pricing.teacher.toFixed(2).replace('.', ',')} €/Monat berechnet.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
                           <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit 0,49 €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
-                          <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern (0,49 €/Monat bzw. 5,88 € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen 0,40 €/Monat, Schule trägt 0,09 €/Monat). Härtefälle/Geschwisterrabatte können von der Schule manuell befreit werden.
+                          <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern (0,49 €/Monat bzw. 5,88 € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen 0,40 €/Monat, Schule trägt 0,09 €/Monat). <strong>Geschwister-Vorteil:</strong> Bei Verknüpfung von Geschwisterkindern sind alle weiteren Kinder ab dem 3. Kind für die Eltern 100 % kostenlos (0,00 €/Monat; die Schule trägt lediglich den passiven Server-Beitrag von 0,09 €/Monat). Härtefälle können von der Schule manuell befreit werden.
                           <br /><em>Hinweis:</em> GrooveLab-Schülerfreischaltungen werden immer vollumfänglich von der Musikschule getragen (keine Direktabrechnung mit Eltern).
                         </p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>5. Schüler-Deaktivierung:</strong> Bei monatlicher Abrechnung entfällt die Gebühr ab dem Folgemonat der Deaktivierung. Bei jährlicher Vorauszahlung verbleiben das Profil und alle Funktionen bis zum Ende des laufenden Schuljahres aktiv und erlöschen erst zum Schuljahreswechsel.</p>

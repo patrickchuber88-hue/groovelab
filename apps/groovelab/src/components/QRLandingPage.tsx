@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText } from '../utils/nameHelper';
 import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
 
+import { useMasterPricing } from '../context/MasterPricingContext';
+
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
 
@@ -130,6 +132,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [pageState, setPageState] = useState<PageState>('loading');
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const masterPricing = useMasterPricing();
 
   const redirectToCampus = async (userData: { id: string; role: string; roles?: string[]; is_campus_active?: boolean; is_groovelab_active?: boolean; schools?: any }) => {
     const rolesArray = Array.isArray(userData.roles) ? userData.roles : [];
@@ -7413,10 +7416,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       );
                     }
 
-                    // Option 2: Partial direct billing (0,40 € / Mo -> 4,80 € / Jahr)
+                    // Option 2: Partial or Full direct billing
                     const isPartial = opt === 'student_partial';
-                    const monthlyPrice = isPartial ? '0,40 €' : '0,49 €';
-                    const annualPrice = isPartial ? '4,80 €' : '5,88 €';
+                    const baseStudentRate = masterPricing.priceStudent || 0.49;
+                    const monthlyPriceNum = isPartial ? Number((baseStudentRate * 0.8163).toFixed(2)) : baseStudentRate;
+                    const monthlyPrice = `${monthlyPriceNum.toFixed(2).replace('.', ',')} €`;
+                    const annualPrice = `${(monthlyPriceNum * 12).toFixed(2).replace('.', ',')} €`;
 
                     return (
                       <div style={{
@@ -7451,6 +7456,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             ? 'Deine Musikschule bezuschusst deinen Zugang. Der Aktivierungsbeitrag wird als Einmalzahlung für das Schuljahr abgerechnet.' 
                             : 'Direktabrechnung für deinen vollen Campus-Zugang. Der Aktivierungsbeitrag wird als Einmalzahlung für das Schuljahr abgerechnet.'}
                         </span>
+
+                        {/* 🛡️ Treue-Preisgarantie Badge */}
+                        <div style={{
+                          marginTop: '4px',
+                          padding: '8px 12px',
+                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                          border: '1px solid #86efac',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <ShieldCheck size={16} color="#16a34a" style={{ flexShrink: 0 }} />
+                          <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 700, lineHeight: 1.3 }}>
+                            <strong style={{ color: '#166534' }}>🛡️ Treue-Preisgarantie:</strong> Solange dein Profil aktiv bleibt, ist dein Preis von {monthlyPrice} / Mo. dauerhaft geschützt! Bei Kündigung erlischt der Treuepreis.
+                          </span>
+                        </div>
                       </div>
                     );
                   })()}

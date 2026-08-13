@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { useRealNamesVisibility, maskLastName, sanitizeBirthDateToDayOnly } from '../utils/nameHelper';
+import { useMasterPricing } from '../context/MasterPricingContext';
 import { 
   ShieldAlert, CheckCircle, Users, Settings, ShieldCheck, FileText,
   UserCheck, RefreshCw, Key, ChevronRight, UserX, LogOut,
@@ -8,7 +9,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
@@ -1171,6 +1172,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [showDpoIdCardModal, setShowDpoIdCardModal] = useState<boolean>(false);
   const [showDpoPortalModal, setShowDpoPortalModal] = useState<boolean>(false);
 
+  // Master pricing context for live platform-wide price updates
+  const masterPricing = useMasterPricing();
+
   // Operator Billing Info States (Loaded from MasterAdmin Settings)
   const [operatorCompany, setOperatorCompany] = useState('Patrick Huber (Einzelunternehmer)');
   const [operatorContact, setOperatorContact] = useState('Patrick Huber');
@@ -1179,6 +1183,25 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [operatorCity, setOperatorCity] = useState('Rheinfelden');
   const [operatorIban, setOperatorIban] = useState('DE89 3704 0044 0532 9482 11');
   const [operatorBic, setOperatorBic] = useState('WELADED1XYZ');
+  const [currentSchoolProfile, setCurrentSchoolProfile] = useState<any>(null);
+  const effectiveSchoolRates = masterPricing.getSchoolRates(currentSchoolProfile);
+  const [masterRates, setMasterRates] = useState({
+    campus: masterPricing.priceCampus,
+    groovelab: masterPricing.priceGroovelab,
+    kombi: masterPricing.priceKombi,
+    teacher: masterPricing.priceTeacher,
+    student: masterPricing.priceStudent
+  });
+
+  useEffect(() => {
+    setMasterRates({
+      campus: masterPricing.priceCampus,
+      groovelab: masterPricing.priceGroovelab,
+      kombi: masterPricing.priceKombi,
+      teacher: masterPricing.priceTeacher,
+      student: masterPricing.priceStudent
+    });
+  }, [masterPricing.priceCampus, masterPricing.priceGroovelab, masterPricing.priceKombi, masterPricing.priceTeacher, masterPricing.priceStudent]);
 
   useEffect(() => {
     const fetchOperatorBillingSettings = async () => {
@@ -1791,6 +1814,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [customActivationBillingZip, setCustomActivationBillingZip] = useState<string>('');
   const [customActivationBillingCity, setCustomActivationBillingCity] = useState<string>('');
   const [customActivationBillingEmail, setCustomActivationBillingEmail] = useState<string>('');
+  const [selectedStorageAddonGb, setSelectedStorageAddonGb] = useState<number>(0);
+  const [selectedStorageAddonFee, setSelectedStorageAddonFee] = useState<number>(0);
   const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showConfirmExtra, setShowConfirmExtra] = useState<boolean>(false);
@@ -1853,8 +1878,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     };
 
     const monthsRemaining = monthsMap[month] !== undefined ? monthsMap[month] : 12;
-    // Proportional calculation based on standard full-year prices (5.39 standard, 0.49 * 11)
-    const basePrice = 5.39;
+    // Proportional calculation based on standard full-year prices
+    const basePrice = effectiveSchoolRates.priceStudent * (masterPricing.billingMonthsPerYear || 11);
     const fullPrice = (monthsRemaining / 12) * basePrice;
     
     let discountPercent = 0;
@@ -2281,18 +2306,54 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const billedCampus_global = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
   const billedGroovelab_global = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
   const activeModulesCount_global = (billedCampus_global ? 1 : 0) + (billedGroovelab_global ? 1 : 0);
-  const moduleCost_global = (billedCampus_global && billedGroovelab_global) ? 9.99 : ((billedCampus_global ? 7.99 : 0) + (billedGroovelab_global ? 4.99 : 0));
+  const moduleCost_global = (billedCampus_global && billedGroovelab_global) ? effectiveSchoolRates.priceKombi : ((billedCampus_global ? effectiveSchoolRates.priceCampus : 0) + (billedGroovelab_global ? effectiveSchoolRates.priceGroovelab : 0));
   const activeStudentsCount_global = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
-  const studentLevyMonthly_global = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.49 : 0;
-  const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : 0;
-  const billableTeachersCount = allTeachers.filter((t: any) => (t.isActive ?? true) && t.role !== 'admin' && t.role !== 'secretary').length;
   const activeGroovelabStudentsCount_global = students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length;
-  const passiveStudentsCount_global = Math.max(0, students.length - activeGroovelabStudentsCount_global);
-  const baseB2B_global = moduleCost_global + billableTeachersCount * 0.49 + passiveStudentsCount_global * 0.09 + activeGroovelabStudentsCount_global * 0.49;
+  const maxActiveStudentsCount_global = Math.max(activeStudentsCount_global, activeGroovelabStudentsCount_global);
+  const passiveStudentsCount_global = Math.max(0, students.length - maxActiveStudentsCount_global);
+  const allUniqueTeacherProfiles = [...campusTeachers, ...bypassTeachers, ...coaches, ...allTeachers].reduce((acc: any[], t: any) => {
+    if (t && t.id && !acc.some(existing => existing.id === t.id)) {
+      acc.push(t);
+    }
+    return acc;
+  }, []).sort((a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+
+  // Anti-Abuse Rule: Pure Management is unlimited 100% free.
+  // Double-Roles (Management + Teacher): Max 2 profiles are free; 3rd and subsequent double-roles are billed (0,49 € / Mo.).
+  let freeDoubleRoleCount = 0;
+  const billableTeachersCount = allUniqueTeacherProfiles.filter((t: any) => {
+    const isManagement = t.role === 'admin' || t.role === 'secretary' || (Array.isArray(t.roles) && (t.roles.includes('admin') || t.roles.includes('secretary')));
+    const isTeacher = t.role === 'teacher' || (Array.isArray(t.roles) && t.roles.includes('teacher')) || (t.studentCount && t.studentCount > 0);
+    
+    if (isManagement && isTeacher) {
+      if (freeDoubleRoleCount < 2) {
+        freeDoubleRoleCount++;
+        return false; // Free double-role exemption
+      }
+      return true; // Exceeded 2 free double-roles -> Billed at 0,49 € / Mo.
+    }
+    if (isManagement && !isTeacher) {
+      return false; // Pure Management -> Always 100% Free
+    }
+    return true; // Pure Teacher -> Billed
+  }).length;
+
+  const isSammelzahler = billingPayer === 'school' || studentBillingOption === 'option2' || studentBillingOption === 'option1';
+  const campusActivationFeeTotal_global = isSammelzahler ? activeStudentsCount_global * effectiveSchoolRates.priceStudent : 0;
+  const groovelabActivationFeeTotal_global = activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent;
+  const passiveStudentFeeTotal_global = passiveStudentsCount_global * 0.09;
+  const teacherServiceFeeTotal_global = billableTeachersCount * effectiveSchoolRates.priceTeacher;
+  const storageAddonFee_global = selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0);
+
+  const baseB2B_global = subscriptionBypass
+    ? 0
+    : (moduleCost_global + teacherServiceFeeTotal_global + passiveStudentFeeTotal_global + groovelabActivationFeeTotal_global + campusActivationFeeTotal_global + storageAddonFee_global);
+  const studentLevyMonthly_global = campusActivationFeeTotal_global;
+  const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * effectiveSchoolRates.priceTeacher : 0;
   const studentSharePreview_global = 0;
   const schoolShareBookedExtra_global = 0;
   const currentTotalB2B_global = baseB2B_global;
-  const mixedTotal_global = currentTotalB2B_global + studentLevyMonthly_global + extraLevyMonthly_global;
+  const mixedTotal_global = currentTotalB2B_global;
 
   const daysSinceLastBackup = useMemo(() => {
     if (!lastBackupDate) return null;
@@ -3368,7 +3429,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       ] = await Promise.all([
         supabase
           .from('schools')
-          .select('subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass, school_year_start_month, school_year_start_day, auto_delete_expired_users')
+          .select('id, subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass, school_year_start_month, school_year_start_day, auto_delete_expired_users, custom_price_campus, custom_price_groovelab, custom_price_kombi, custom_price_teacher, custom_price_student, grandfathered_campus_price, grandfathered_groovelab_price, grandfathered_kombi_price, grandfathered_teacher_price, grandfathered_student_price, price_grandfathered_at')
           .eq('id', schoolId)
           .single(),
         supabase
@@ -3392,9 +3453,23 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           .eq('school_id', schoolId)
       ]);
 
-      const { data: schoolData, error: schoolErr } = schoolResult;
+      const { data: rawSchoolData, error: schoolErr } = schoolResult;
       if (schoolErr) throw schoolErr;
+      let schoolData: any = rawSchoolData;
       if (schoolData) {
+        try {
+          const overridesStr = localStorage.getItem('groovelab_school_overrides');
+          if (overridesStr) {
+            const overrides = JSON.parse(overridesStr);
+            if (overrides[schoolData.id]) {
+              schoolData = { ...schoolData, ...overrides[schoolData.id] };
+            }
+          }
+        } catch (e) {
+          console.warn('Could not load localStorage school overrides in SecretaryDashboard:', e);
+        }
+
+        setCurrentSchoolProfile(schoolData);
         setSchoolName(schoolData.name);
         setSchoolSubdomain(schoolData.subdomain || '');
         setOpeningHours(schoolData.opening_hours);
@@ -3614,6 +3689,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       const bypassList: BypassTeacher[] = [];
       const employeesList: any[] = [];
       const studentsList: any[] = [];
+      const teacherInstrumentMap: Record<string, string> = {};
+
+      allUsers?.forEach(u => {
+        if (u.role === 'teacher' || (u.roles && u.roles.includes('teacher'))) {
+          if (u.instrument) {
+            teacherInstrumentMap[u.id] = u.instrument;
+          }
+        }
+      });
 
       allUsers?.forEach(u => {
         const fullName = `${u.first_name} ${u.last_name}`;
@@ -3633,8 +3717,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           const resolvedStatus = hasCreatedPin ? 'aktiv' : 'offen';
           const isPending = !hasCreatedPin;
 
+          let resolvedInstrument = u.instrument;
+          if (!u.teacher_id) {
+            resolvedInstrument = 'Musiker';
+          } else if (!resolvedInstrument || resolvedInstrument === 'Musiker' || resolvedInstrument === 'Nicht festgelegt' || resolvedInstrument === 'Instrument') {
+            resolvedInstrument = teacherInstrumentMap[u.teacher_id] || 'Musiker';
+          }
+
           studentsList.push({
             ...u,
+            instrument: resolvedInstrument,
             isPendingOnboarding: isPending,
             day_of_birth: resolvedDay,
             status: resolvedStatus
@@ -3727,15 +3819,23 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             const isCampusAct = userMatch ? !!userMatch.is_campus_active : ((ps as any).is_campus_active ?? true);
             const isGrooveAct = userMatch ? !!userMatch.is_groovelab_active : ((ps as any).is_groovelab_active ?? false);
 
+            const effectiveTeacherId = ps.teacher_id || (userMatch ? userMatch.teacher_id : null);
+            let resolvedInstrument = ps.instrument || (userMatch ? userMatch.instrument : null);
+            if (!effectiveTeacherId) {
+              resolvedInstrument = 'Musiker';
+            } else if (!resolvedInstrument || resolvedInstrument === 'Musiker' || resolvedInstrument === 'Nicht festgelegt' || resolvedInstrument === 'Instrument') {
+              resolvedInstrument = teacherInstrumentMap[effectiveTeacherId] || 'Musiker';
+            }
+
             studentsList.push({
               id: ps.id,
               school_id: ps.school_id,
-              teacher_id: ps.teacher_id,
+              teacher_id: effectiveTeacherId,
               role: 'student',
               first_name: fName,
               last_name: lName,
               email: '',
-              instrument: ps.instrument || 'Nicht festgelegt',
+              instrument: resolvedInstrument,
               is_active: false,
               is_campus_active: isCampusAct,
               is_groovelab_active: isGrooveAct,
@@ -5009,20 +5109,21 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       alert("Dieses Modul ist Teil deiner aktiven Buchung für das Schuljahr 2026/2027 und kann nicht deaktiviert werden.");
       return;
     }
-    try {
-      setHasCampusSub(newValue);
-      const updateData: any = { has_campus_subscription: newValue };
-      if (newValue) {
-        updateData.campus_activated_this_month = true;
-        setCampusActivatedThisMonth(true);
+    setHasCampusSub(newValue);
+    if (newValue) {
+      setCampusActivatedThisMonth(true);
+    }
+    if (isBillingBooked) {
+      try {
+        const updateData: any = { has_campus_subscription: newValue };
+        if (newValue) updateData.campus_activated_this_month = true;
+        await supabase
+          .from('schools')
+          .update(updateData)
+          .eq('id', schoolId);
+      } catch (err: any) {
+        console.warn("Could not update campus sub:", err);
       }
-      const { error } = await supabase
-        .from('schools')
-        .update(updateData)
-        .eq('id', schoolId);
-      if (error) throw error;
-    } catch (err: any) {
-      setHasCampusSub(!newValue);
     }
   };
 
@@ -5031,41 +5132,52 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       alert("Dieses Modul ist Teil deiner aktiven Buchung für das Schuljahr 2026/2027 und kann nicht deaktiviert werden.");
       return;
     }
-    try {
-      setHasGroovelabSub(newValue);
-      const updateData: any = { has_groovelab_subscription: newValue };
-      if (newValue) {
-        updateData.groovelab_activated_this_month = true;
-        setGroovelabActivatedThisMonth(true);
+    setHasGroovelabSub(newValue);
+    if (newValue) {
+      setGroovelabActivatedThisMonth(true);
+    }
+    if (isBillingBooked) {
+      try {
+        const updateData: any = { has_groovelab_subscription: newValue };
+        if (newValue) updateData.groovelab_activated_this_month = true;
+        await supabase
+          .from('schools')
+          .update(updateData)
+          .eq('id', schoolId);
+      } catch (err: any) {
+        console.warn("Could not update groovelab sub:", err);
       }
-      const { error } = await supabase
-        .from('schools')
-        .update(updateData)
-        .eq('id', schoolId);
-      if (error) throw error;
-
-      if (newValue) {
-        // Auto-seed GrooveLab subject if it doesn't exist yet
-        const grooveLabExists = subjects.some(s => s.name.toLowerCase() === 'groovelab');
-        if (!grooveLabExists) {
-          const { error: insertErr } = await supabase
-            .from('subjects')
-            .insert({
-              school_id: schoolId,
-              name: 'GrooveLab',
-              category: 'Allgemein',
-              description: 'Automatisch angelegtes Fach für GrooveLab-Unterricht'
-            });
-          if (insertErr) {
-            console.error('Error seeding GrooveLab subject:', insertErr);
-          }
+    }
+    if (newValue) {
+      // Auto-seed GrooveLab subject if it doesn't exist yet
+      const grooveLabExists = subjects.some(s => s.name.toLowerCase() === 'groovelab');
+      if (!grooveLabExists) {
+        const { error: insertErr } = await supabase
+          .from('subjects')
+          .insert({
+            school_id: schoolId,
+            name: 'GrooveLab',
+            category: 'Allgemein',
+            description: 'Automatisch angelegtes Fach für GrooveLab-Unterricht'
+          });
+        if (insertErr) {
+          console.error('Error seeding GrooveLab subject:', insertErr);
         }
       }
-      fetchDashboardData();
-    } catch (err: any) {
-      setHasGroovelabSub(!newValue);
     }
   };
+
+  useEffect(() => {
+    const handleSchoolUpdated = () => {
+      fetchDashboardData();
+    };
+    window.addEventListener('groovelab_school_updated', handleSchoolUpdated);
+    window.addEventListener('storage', handleSchoolUpdated);
+    return () => {
+      window.removeEventListener('groovelab_school_updated', handleSchoolUpdated);
+      window.removeEventListener('storage', handleSchoolUpdated);
+    };
+  }, [schoolId]);
 
   const handleUpdateStudentBillingOption = async (option: string) => {
     try {
@@ -9237,6 +9349,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     const totalStudents = campusStudentsOnly.length;
     const activeCampusCount = campusStudentsOnly.filter(s => s.is_campus_active).length;
     const activeGroovelabCount = campusStudentsOnly.filter(s => s.is_groovelab_active).length;
+    const hardshipEarnedSlots = Math.floor(activeCampusCount / 20);
+    const hardshipUsedSlots = campusStudentsOnly.filter(s => s.is_campus_active && s.exempt_from_direct_billing).length;
+
+    const campusActiveLoggedIn = campusStudentsOnly.filter(s => s.is_campus_active && !s.isPendingOnboarding).length;
+    const campusPendingCount = campusStudentsOnly.filter(s => s.is_campus_active && s.isPendingOnboarding).length;
+    const groovelabActiveLoggedIn = campusStudentsOnly.filter(s => s.is_groovelab_active && !s.isPendingOnboarding).length;
+    const groovelabPendingCount = campusStudentsOnly.filter(s => s.is_groovelab_active && s.isPendingOnboarding).length;
 
     // Helper for beautiful pastel background based on student name (A-Z alphabetical color)
     const getAvatarGradient = (name: string) => getAlphabeticalColor(name).avatarBg;
@@ -9244,6 +9363,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
     return (
       <>
+        <style>{`
+          @keyframes pulseCircle {
+            0% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.35); opacity: 1; filter: drop-shadow(0 0 2px rgba(217, 119, 6, 0.9)); }
+            100% { transform: scale(1); opacity: 0.6; }
+          }
+          .pulse-open-circle {
+            display: inline-block;
+            animation: pulseCircle 1.8s infinite ease-in-out;
+            font-weight: 900;
+          }
+        `}</style>
         <div className="google-card" style={{ 
           width: '100%',
           display: 'flex', 
@@ -9293,9 +9424,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '3px'
-                  }}>
+                  }} title={`Campus-Nutzer: ${campusActiveLoggedIn} aktiv angemeldet (●), ${campusPendingCount} Einladung ausstehend (○)`}>
                     <UserCheck size={10} />
-                    {activeCampusCount} Campus ({totalStudents > 0 ? Math.round((activeCampusCount / totalStudents) * 100) : 0}%)
+                    {activeCampusCount} Campus ({totalStudents > 0 ? Math.round((activeCampusCount / totalStudents) * 100) : 0}% • {campusActiveLoggedIn}●{campusPendingCount > 0 ? ` ${campusPendingCount}○` : ''})
                   </span>
 
                   <span style={{ 
@@ -9309,9 +9440,25 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '3px'
-                  }}>
+                  }} title={`GrooveLab-Nutzer: ${groovelabActiveLoggedIn} aktiv angemeldet (●), ${groovelabPendingCount} Einladung ausstehend (○)`}>
                     <Music size={10} />
-                    {activeGroovelabCount} GrooveLab ({totalStudents > 0 ? Math.round((activeGroovelabCount / totalStudents) * 100) : 0}%)
+                    {activeGroovelabCount} GrooveLab ({totalStudents > 0 ? Math.round((activeGroovelabCount / totalStudents) * 100) : 0}% • {groovelabActiveLoggedIn}●{groovelabPendingCount > 0 ? ` ${groovelabPendingCount}○` : ''})
+                  </span>
+
+                  <span style={{ 
+                    background: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', 
+                    color: '#6b21a8', 
+                    padding: '2px 8px', 
+                    borderRadius: '100px', 
+                    fontSize: '0.68rem', 
+                    fontWeight: 800, 
+                    fontFamily: 'Urbanist',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }} title={`1 freier Härtefall-Slot pro 20 Campus-Aktivierungen (${hardshipUsedSlots} von ${hardshipEarnedSlots} belegt)`}>
+                    <HeartHandshake size={10} />
+                    Härtefälle: {hardshipUsedSlots}/{hardshipEarnedSlots}
                   </span>
                 </div>
               </div>
@@ -9771,12 +9918,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#ea4335' }}
                 />
               </div>
-              <div style={{ flex: '1.4' }}>Schülername</div>
-              <div style={{ flex: '1.0' }}>Instrument</div>
-              <div style={{ flex: '1.1' }}>Lehrer</div>
+              <div style={{ flex: '1.6' }}>Schülername</div>
+              <div style={{ flex: '1.1' }}>Instrument</div>
+              <div style={{ flex: '1.2' }}>Lehrer</div>
               <div style={{ flex: '0.7' }}>Dauer</div>
-              <div style={{ flex: '1.4' }}>Module & Zugänge</div>
-              <div style={{ flex: '0.9', textAlign: 'center' }}>Status</div>
+              <div style={{ flex: '1.6' }}>Module & Zugänge</div>
               <div style={{ flex: '0 0 76px', textAlign: 'right' }}>Aktionen</div>
             </div>
 
@@ -9841,7 +9987,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       <div 
                         onClick={() => setSelectedStudentForDetail(student)}
                         style={{ 
-                          flex: '1.4', 
+                          flex: '1.6', 
                           display: 'flex', 
                           alignItems: 'center', 
                           gap: '10px', 
@@ -9884,11 +10030,28 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               „{student.nickname}“
                             </span>
                           )}
+                          {student.is_campus_active && student.exempt_from_direct_billing && (
+                            <span style={{ 
+                              fontSize: '0.64rem', 
+                              fontWeight: 800, 
+                              color: '#6b21a8', 
+                              background: '#f3e8ff', 
+                              border: '1px solid #c084fc', 
+                              padding: '1px 6px', 
+                              borderRadius: '100px', 
+                              whiteSpace: 'nowrap',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '2px'
+                            }} title="Beitragsfrei befreit via Härtefall-Slot">
+                              🎁 Härtefall
+                            </span>
+                          )}
                         </div>
                       </div>
 
                       {/* Instrument Badge */}
-                      <div style={{ flex: '1.0', minWidth: 0 }}>
+                      <div style={{ flex: '1.1', minWidth: 0 }}>
                         <span style={{ 
                           display: 'block',
                           padding: '4px 8px', 
@@ -9904,12 +10067,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           boxSizing: 'border-box',
                           border: '1px solid #e2e8f0'
                         }}>
-                          {student.instrument || 'Nicht festgelegt'}
+                          {(() => {
+                            if (!student.teacher_id) {
+                              return 'Musiker';
+                            }
+                            const rawInst = student.instrument;
+                            if (rawInst && rawInst !== 'Musiker' && rawInst !== 'Nicht festgelegt' && rawInst !== 'Instrument') {
+                              return rawInst;
+                            }
+                            const teacherObj = allUniqueTeachers.find((t: any) => t.id === student.teacher_id);
+                            return teacherObj?.instrument || 'Musiker';
+                          })()}
                         </span>
                       </div>
 
                       {/* Teacher Select */}
-                      <div style={{ flex: '1.1', minWidth: 0 }}>
+                      <div style={{ flex: '1.2', minWidth: 0 }}>
                         <select
                           value={student.teacher_id || ''}
                           onChange={(e) => {
@@ -9972,7 +10145,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       </div>
 
                       {/* Integrated Module Chips (Campus & GrooveLab) */}
-                      <div style={{ flex: '1.4', display: 'flex', gap: '6px', minWidth: 0, flexShrink: 0 }}>
+                      <div style={{ flex: '1.6', display: 'flex', gap: '6px', minWidth: 0, flexShrink: 0 }}>
                         {/* Campus Chip */}
                         <button
                           type="button"
@@ -9984,10 +10157,36 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             }
                             const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'diesem Schüler';
                             const actionWord = student.is_campus_active ? 'deaktivieren' : 'aktivieren';
-                            if (!window.confirm(`Campus-Modul für ${sName} ${actionWord}?`)) return;
+                            
+                            let markAsHardship = false;
+                            const isActivating = !student.is_campus_active;
+
+                            if (isActivating) {
+                              const hasFreeHardshipSlot = hardshipEarnedSlots > hardshipUsedSlots;
+                              if (hasFreeHardshipSlot && !student.exempt_from_direct_billing) {
+                                const wantsHardship = window.confirm(
+                                  `🎁 Freier Härtefall-Slot verfügbar (${hardshipUsedSlots} von ${hardshipEarnedSlots} belegt)!\n\nMöchtest du ${sName} als beitragsfreien Härtefall freistellen (0,00 € statt 0,49 € / Mo.)?`
+                                );
+                                if (wantsHardship) {
+                                  markAsHardship = true;
+                                }
+                              } else {
+                                if (!window.confirm(`Campus-Modul für ${sName} ${actionWord}?`)) return;
+                              }
+                            } else {
+                              if (!window.confirm(`Campus-Modul für ${sName} ${actionWord}?`)) return;
+                            }
+
                             try {
                               const newVal = !student.is_campus_active;
-                              await supabase.from('users').update({ is_campus_active: newVal }).eq('id', student.id);
+                              const userUpdates: any = { is_campus_active: newVal };
+                              if (newVal && markAsHardship) {
+                                userUpdates.exempt_from_direct_billing = true;
+                              } else if (!newVal) {
+                                userUpdates.exempt_from_direct_billing = false;
+                              }
+
+                              await supabase.from('users').update(userUpdates).eq('id', student.id);
                               await supabase.from('students').update({ is_campus_active: newVal }).eq('id', student.id);
                               await supabase.from('pending_students').update({ is_campus_active: newVal }).eq('id', student.id);
                               fetchDashboardData();
@@ -10000,15 +10199,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             padding: '4px 6px',
                             height: '32px',
                             borderRadius: '8px',
-                            border: student.is_campus_active ? '1px solid #34a853' : '1px solid #e2e8f0',
+                            border: student.is_campus_active 
+                              ? (student.exempt_from_direct_billing ? '1px solid #c084fc' : (student.isPendingOnboarding ? '1.5px dashed #34a853' : '1px solid #34a853')) 
+                              : '1px solid #e2e8f0',
                             fontSize: '0.78rem',
                             fontWeight: 800,
                             cursor: (!isBillingBooked || hasCampusSub) ? 'pointer' : 'not-allowed',
                             background: student.is_campus_active 
-                              ? (student.isPendingOnboarding ? '#fef3c7' : '#e6f4ea') 
+                              ? (student.exempt_from_direct_billing ? 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)' : (student.isPendingOnboarding ? '#e6f4ea' : '#34a853')) 
                               : '#f8fafc',
                             color: student.is_campus_active 
-                              ? (student.isPendingOnboarding ? '#b45309' : '#16a34a') 
+                              ? (student.exempt_from_direct_billing ? '#6b21a8' : (student.isPendingOnboarding ? '#137333' : '#ffffff')) 
                               : '#94a3b8',
                             opacity: (!isBillingBooked || hasCampusSub) ? 1 : 0.45,
                             whiteSpace: 'nowrap',
@@ -10018,9 +10219,25 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             gap: '4px',
                             transition: 'all 0.15s ease'
                           }}
-                          title={student.is_campus_active ? (student.isPendingOnboarding ? "Campus gebucht (Einladung offen)" : "Campus aktiv") : "Campus nicht gebucht"}
+                          title={
+                            student.is_campus_active 
+                              ? (student.exempt_from_direct_billing 
+                                  ? "Campus aktiv (Härtefall - 100% beitragsfrei: 0,00 €/Mo.)" 
+                                  : (student.isPendingOnboarding 
+                                      ? "Campus gebucht (Einladung offen - PIN noch nicht eingelöst)" 
+                                      : "Campus aktiv (Reguläre Abrechnung: 0,49 €/Mo.)")) 
+                              : "Campus nicht gebucht (Klick zum Aktivieren)"
+                          }
                         >
-                          <span>{student.is_campus_active ? (student.isPendingOnboarding ? '○' : '●') : '+'}</span>
+                          <span>
+                            {student.is_campus_active 
+                              ? (student.exempt_from_direct_billing 
+                                  ? <HeartHandshake size={13} style={{ color: '#6b21a8' }} /> 
+                                  : (student.isPendingOnboarding 
+                                      ? <span className="pulse-open-circle">○</span> 
+                                      : '●')) 
+                              : '+'}
+                          </span>
                           <span>Campus</span>
                         </button>
 
@@ -10051,16 +10268,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             padding: '4px 6px',
                             height: '32px',
                             borderRadius: '8px',
-                            border: student.is_groovelab_active ? '1px solid #eab308' : '1px solid #e2e8f0',
+                            border: student.is_groovelab_active 
+                              ? (student.isPendingOnboarding ? '1.5px dashed #eab308' : '1px solid #eab308') 
+                              : '1px solid #e2e8f0',
                             fontSize: '0.78rem',
                             fontWeight: 800,
                             cursor: (!isBillingBooked || hasGroovelabSub) ? 'pointer' : 'not-allowed',
                             whiteSpace: 'nowrap',
                             background: student.is_groovelab_active 
-                              ? (student.isPendingOnboarding ? '#fef3c7' : '#fef9c3') 
+                              ? (student.isPendingOnboarding ? '#fefce8' : '#eab308') 
                               : '#f8fafc',
                             color: student.is_groovelab_active 
-                              ? (student.isPendingOnboarding ? '#b45309' : '#ca8a04') 
+                              ? (student.isPendingOnboarding ? '#a16207' : '#ffffff') 
                               : '#94a3b8',
                             opacity: (!isBillingBooked || hasGroovelabSub) ? 1 : 0.45,
                             display: 'flex',
@@ -10069,67 +10288,23 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             gap: '4px',
                             transition: 'all 0.15s ease'
                           }}
-                          title={student.is_groovelab_active ? (student.isPendingOnboarding ? "GrooveLab gebucht (Einladung offen)" : "GrooveLab aktiv") : "GrooveLab nicht gebucht"}
+                          title={
+                            student.is_groovelab_active 
+                              ? (student.isPendingOnboarding 
+                                  ? "GrooveLab gebucht (Einladung offen - PIN noch nicht eingelöst)" 
+                                  : "GrooveLab aktiv (Band- & Song-Modul)") 
+                              : "GrooveLab nicht gebucht (Klick zum Aktivieren)"
+                          }
                         >
-                          <span>{student.is_groovelab_active ? (student.isPendingOnboarding ? '○' : '●') : '+'}</span>
+                          <span>
+                            {student.is_groovelab_active 
+                              ? (student.isPendingOnboarding 
+                                  ? <span className="pulse-open-circle">○</span> 
+                                  : '●') 
+                              : '+'}
+                          </span>
                           <span>GrooveLab</span>
                         </button>
-                      </div>
-
-                      {/* Clean Single Status Column */}
-                      <div style={{ flex: '0.9', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
-                        {(() => {
-                          const status = student.isPendingOnboarding ? 'ausstehend' : (student.status || 'aktiv');
-                          if (status === 'aktiv') {
-                            return (
-                              <span style={{
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                background: '#e6f4ea',
-                                color: '#137333',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                whiteSpace: 'nowrap'
-                              }}>🟢 Aktiv</span>
-                            );
-                          } else if (status === 'pausiert') {
-                            return (
-                              <span style={{
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                background: '#fff3e0',
-                                color: '#e65100',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                whiteSpace: 'nowrap'
-                              }}>🟠 Pausiert</span>
-                            );
-                          } else if (status === 'passiv') {
-                            return (
-                              <span style={{
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                background: '#f1f5f9',
-                                color: '#475569',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                whiteSpace: 'nowrap'
-                              }}>⚪ Passiv</span>
-                            );
-                          } else {
-                            return (
-                              <span style={{
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                background: '#fef3c7',
-                                color: '#b45309',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                whiteSpace: 'nowrap'
-                              }} title="Einladung / Onboarding noch nicht durchgeführt (0 € Kosten)">⏳ Offen</span>
-                            );
-                          }
-                        })()}
                       </div>
 
                       {/* Aktionen Column (Direct Delete + 3-Dots Menu) */}
@@ -10633,33 +10808,74 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         }
       }
 
-      const updatePayload: any = { teacher_id: teacherId };
-      if (teacherInstrument) {
-        updatePayload.instrument = teacherInstrument;
+      const updatePayload: any = { 
+        teacher_id: teacherId, 
+        instrument: teacherId ? (teacherInstrument || 'Musiker') : 'Musiker' 
+      };
+
+      // Resolve student first_name & last_name for cross-table matching
+      let sFirstName = '';
+      let sLastName = '';
+      const { data: uStudent } = await supabase
+        .from('users')
+        .select('first_name, last_name')
+        .eq('id', studentId)
+        .maybeSingle();
+
+      if (uStudent) {
+        sFirstName = uStudent.first_name || '';
+        sLastName = uStudent.last_name || '';
+      } else {
+        const { data: pStudent } = await supabase
+          .from('pending_students_decrypted')
+          .select('first_name, last_name')
+          .eq('id', studentId)
+          .maybeSingle();
+        if (pStudent) {
+          sFirstName = pStudent.first_name || '';
+          sLastName = pStudent.last_name || '';
+        }
       }
 
-      // First try to update users table
-      const { data, error } = await supabase
-        .from('users')
-        .update(updatePayload)
-        .eq('id', studentId)
-        .select();
+      // Optimistic local state update for instant UI feedback
+      setStudents((prevStudents: any[]) =>
+        prevStudents.map((s: any) => {
+          const isTarget = s.id === studentId || (sFirstName && sLastName && s.first_name === sFirstName && s.last_name === sLastName);
+          if (isTarget) {
+            return {
+              ...s,
+              teacher_id: teacherId,
+              instrument: teacherId ? (teacherInstrument || s.instrument || 'Musiker') : 'Musiker'
+            };
+          }
+          return s;
+        })
+      );
 
-      if (error) throw error;
+      // If the teacher filter was set to 'none' or a specific teacher, switch to 'All' so student stays visible
+      if (studentFilterTeacher !== 'All') {
+        setStudentFilterTeacher('All');
+      }
 
-      // Update students table as well
-      await supabase
-        .from('students')
-        .update(updatePayload)
-        .eq('id', studentId);
+      // 1. Update users table by ID and by name
+      await supabase.from('users').update(updatePayload).eq('id', studentId);
+      if (sFirstName && sLastName) {
+        await supabase.from('users').update(updatePayload).eq('first_name', sFirstName).eq('last_name', sLastName);
+      }
 
-      // Update pending_students table as well
-      await supabase
-        .from('pending_students')
-        .update(updatePayload)
-        .eq('id', studentId);
+      // 2. Update students table by ID and by name
+      await supabase.from('students').update(updatePayload).eq('id', studentId);
+      if (sFirstName && sLastName) {
+        await supabase.from('students').update(updatePayload).eq('first_name', sFirstName).eq('last_name', sLastName);
+      }
 
-      fetchDashboardData();
+      // 3. Update pending_students table by ID and by name
+      await supabase.from('pending_students').update(updatePayload).eq('id', studentId);
+      if (sFirstName && sLastName) {
+        await supabase.from('pending_students').update(updatePayload).eq('first_name', sFirstName).eq('last_name', sLastName);
+      }
+
+      await fetchDashboardData();
     } catch (err: any) {
       alert("Fehler beim Zuweisen der Lehrkraft: " + err.message);
     }
@@ -14225,6 +14441,27 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           }}>
             <span>🛠️</span>
             <span><strong>Setup-Modus aktiv:</strong> Die {schoolName || 'Musikschule'} befindet sich in der Konfigurationsphase. Aktuell entstehen für Ihre Schule keine Infrastruktur- oder Nutzungsgebühren.</span>
+          </div>
+        )}
+
+        {subscriptionBypass && (
+          <div style={{
+            background: '#f3e8ff',
+            borderBottom: '1px solid #e9d5ff',
+            padding: '10px 40px',
+            fontSize: '0.82rem',
+            color: '#6b21a8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontWeight: 700,
+            fontFamily: 'Inter, sans-serif',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>✦</span>
+              <span><strong>Freistellung aktiv (Abo-Bypass):</strong> Ihre Musikschule nutzt Campus-Groovelab im Rahmen einer kostenfreien Freistellung. Es fallen keine Server-Hosting- oder Nutzungsgebühren an.</span>
+            </div>
           </div>
         )}
 
@@ -24235,16 +24472,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 const billedCampus = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
                 const billedGroovelab = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
                 const activeModulesCount = (billedCampus ? 1 : 0) + (billedGroovelab ? 1 : 0);
-                const moduleCost = (billedCampus && billedGroovelab) ? 9.99 : ((billedCampus ? 7.99 : 0) + (billedGroovelab ? 4.99 : 0));
-                const studentLevyMonthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.49 : 0;
-                const extraLevyMonthly = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : 0;
+                const moduleCost = (billedCampus && billedGroovelab) ? masterRates.kombi : ((billedCampus ? masterRates.campus : 0) + (billedGroovelab ? masterRates.groovelab : 0));
+                const studentLevyMonthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * masterRates.student : 0;
+                const extraLevyMonthly = extraBillingOption === 'option2' ? bookedExtraUsers * masterRates.teacher : 0;
 
-                const baseB2B = moduleCost + allTeachers.filter((t: any) => t.isActive ?? true).length * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
+                const baseB2B = moduleCost + allTeachers.filter((t: any) => t.isActive ?? true).length * masterRates.teacher + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
                 const studentSharePreview = 0;
                 const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial';
                 
                 // Slider prospective change variables (Real-time preview)
-                const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * 0.49 : 0);
+                const extraLevyMonthlyAdditional = (extraBillingOption === 'option2' ? extraUsersSliderVal * masterRates.teacher : 0);
                 const extraLevyYearlyAdditional = (extraBillingOption === 'option1' ? extraUsersSliderVal * getDynamicAnnualPrice(effectiveContractStartDateStr, false) : 0);
                 const isAnnualAdditional = extraBillingOption === 'option1';
                 const schoolShareAdditional = 0;
@@ -24280,8 +24517,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             {[
                               { step: 1, label: 'Module wählen' },
                               { step: 2, label: 'Kostenträger' },
-                              { step: 3, label: 'Abrechnungsmethode' },
-                              { step: 4, label: 'Bestätigen & Buchen' }
+                              { step: 3, label: 'Cloud-Speicher' },
+                              { step: 4, label: 'Rechnungsadresse' },
+                              { step: 5, label: 'Bestätigen & Buchen' }
                             ].map((s, index, arr) => {
                               const isCurrent = checkoutStep === s.step;
                               const isPassed = checkoutStep > s.step;
@@ -24334,7 +24572,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           {checkoutStep === 1 && (
                             <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                               <div>
-                                <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 1 von 4</span>
+                                <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 1 von 5</span>
                                 <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Welche Module möchtest du buchen?</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
                                   Wähle die gewünschten Bereiche für deine Musikschule aus. Server- &amp; Service-Bereitstellungskosten fallen nur für Team-Profile und gebuchte Schüler an.
@@ -24355,9 +24593,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 fontWeight: 700,
                                 boxShadow: '0 4px 15px rgba(234, 179, 8, 0.08)'
                               }}>
-                                <span style={{ fontSize: '1.2rem' }}>🎉</span>
+                                <Sparkles size={18} color="#854d0e" style={{ flexShrink: 0 }} />
                                 <div>
-                                  <span><strong>Kombi-Vorteil sichern:</strong> Campus (7,99 €) &amp; GrooveLab (4,99 €) im Bundle für nur <strong>9,99 € / Mo.</strong> statt 12,98 € / Mo. (du sparst dauerhaft 2,99 € jeden Monat)!</span>
+                                  <span><strong>Kombi-Vorteil sichern:</strong> Campus ({masterRates.campus.toFixed(2).replace('.', ',')} €) &amp; GrooveLab ({masterRates.groovelab.toFixed(2).replace('.', ',')} €) im Bundle für nur <strong>{masterRates.kombi.toFixed(2).replace('.', ',')} € / Mo.</strong> statt {(masterRates.campus + masterRates.groovelab).toFixed(2).replace('.', ',')} € / Mo. (du sparst dauerhaft {(masterRates.campus + masterRates.groovelab - masterRates.kombi).toFixed(2).replace('.', ',')} € jeden Monat)!</span>
                                 </div>
                               </div>
 
@@ -24411,7 +24649,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                      </div>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
-                                    <span style={{ fontWeight: 900, color: '#1e293b' }}>7,99 € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
+                                    <span style={{ fontWeight: 900, color: '#1e293b' }}>{effectiveSchoolRates.priceCampus.toFixed(2).replace('.', ',')} € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
                                     <span style={{ color: hasCampusSub ? '#34a853' : '#94a3b8', fontWeight: 800 }}>{hasCampusSub ? 'Aktiviert' : 'Bereit'}</span>
                                   </div>
                                 </div>
@@ -24465,7 +24703,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                      </div>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
-                                    <span style={{ fontWeight: 900, color: '#1e293b' }}>4,99 € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
+                                    <span style={{ fontWeight: 900, color: '#1e293b' }}>{effectiveSchoolRates.priceGroovelab.toFixed(2).replace('.', ',')} € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
                                     <span style={{ color: hasGroovelabSub ? '#a16207' : '#94a3b8', fontWeight: 800 }}>{hasGroovelabSub ? 'Aktiviert' : 'Bereit'}</span>
                                   </div>
                                 </div>
@@ -24474,13 +24712,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '12px 14px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.74rem', color: '#475569' }}>
                                 <span>💡</span>
                                 <span>
-                                  <strong>Service-Gebühr für Lehrer &amp; Verwaltung:</strong> Aktuell sind <strong>{allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Lehrer</strong> eingetragen (0,49 € / Monat pro Profil, entspricht {((allTeachers.filter((t: any) => t.isActive ?? true).length) * 0.49).toFixed(2).replace('.', ',')} € / Mo. Netto). Die <strong>{employees.filter((e: any) => e.isActive ?? true).length} Verwaltungs- &amp; Sekretariats-Nutzer</strong> sind vollständig kostenlos in den gebuchten Modulen enthalten.
+                                  <strong>Service-Gebühr für Lehrer &amp; Verwaltung:</strong> Aktuell sind <strong>{allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Lehrer</strong> eingetragen ({effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} € / Monat pro Profil, entspricht {((allTeachers.filter((t: any) => t.isActive ?? true).length) * effectiveSchoolRates.priceTeacher).toFixed(2).replace('.', ',')} € / Mo. Netto). Die <strong>{employees.filter((e: any) => e.isActive ?? true).length} Verwaltungs- &amp; Sekretariats-Nutzer</strong> sind vollständig kostenlos in den gebuchten Modulen enthalten.
                                 </span>
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                                 <button 
-                                  onClick={() => setCheckoutStep(2)}
+                                  onClick={() => {
+                                    if (!hasCampusSub && !hasGroovelabSub) {
+                                      setHasCampusSub(true);
+                                      setHasGroovelabSub(true);
+                                    }
+                                    setCheckoutStep(2);
+                                  }}
                                   disabled={!hasCampusSub && !hasGroovelabSub}
                                   style={{
                                     padding: '12px 24px',
@@ -24508,7 +24752,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           {checkoutStep === 2 && (
                             <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                               <div>
-                                <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 2 von 4</span>
+                                <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 2 von 5</span>
                                 <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Wer trägt die Kosten für die Schüleraktivierungen?</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
                                   Die Abrechnung läuft grundsätzlich über die Musikschule. Entscheide hier, wer die Kosten für die Schüleraktivierungen übernimmt.
@@ -24576,7 +24820,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   onClick={() => {
                                     setBillingPayer('student');
                                     setStudentBillingOption('student_full');
-                                    setCustomUmlageAmount(0.49);
+                                    setCustomUmlageAmount(effectiveSchoolRates.priceStudent);
                                   }}
                                   className="selectable-card"
                                   style={{
@@ -24667,7 +24911,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           1. Variable monatliche Abrechnung
                                         </span>
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
-                                          Grundpreis bleibt gleich. Zweite separate Rechnung mit monatlichen Schüler-Aktivierungskosten verändert sich variabel (0,49 € / Schüler / Mo.).
+                                          Grundpreis bleibt gleich. Zweite separate Rechnung mit monatlichen Schüler-Aktivierungskosten verändert sich variabel ({effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} € / Schüler / Mo.).
                                         </span>
                                       </div>
                                     </label>
@@ -24778,16 +25022,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         checked={studentBillingOption === 'student_full'}
                                         onChange={() => {
                                           setStudentBillingOption('student_full');
-                                          setCustomUmlageAmount(0.49);
+                                          setCustomUmlageAmount(effectiveSchoolRates.priceStudent);
                                         }}
                                         style={{ marginTop: '3px', accentColor: '#f59e0b' }}
                                       />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
-                                          1. Vollständige Direktabrechnung (Schüler zahlt 0,49 € / Monat)
+                                          1. Vollständige Direktabrechnung (Schüler zahlt {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} € / Monat)
                                         </span>
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
-                                          Der Schüler/Eltern zahlen den vollen Betrag (Jahresbeitrag: 5,39 €). Die Musikschule wird um die passive Datenbankgebühr von 0,09 €/Monat komplett entlastet (0,00 € Kosten).
+                                          Der Schüler/Eltern zahlen den vollen Betrag (Jahresbeitrag: {(effectiveSchoolRates.priceStudent * (masterPricing.billingMonthsPerYear || 11)).toFixed(2).replace('.', ',')} €). Die Musikschule wird um die passive Datenbankgebühr von 0,09 €/Monat komplett entlastet (0,00 € Kosten).
                                         </span>
                                       </div>
                                     </label>
@@ -24872,16 +25116,122 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     transition: 'all 0.2s'
                                   }}
                                 >
-                                  Weiter zur Abrechnungsmethode <span>➔</span>
+                                  Weiter zum Cloud-Speicher <span>➔</span>
                                 </button>
                               </div>
                             </div>
                           )}
 
+                          {/* DEDICATED STEP 3: AUDIO-TRESOR CLOUD-SPEICHER */}
                           {checkoutStep === 3 && (
                             <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                               <div>
-                                <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 3 von 4</span>
+                                <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 3 von 5</span>
+                                <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>🎙️ Audio-Tresor Cloud-Speicher Kontingent wählen</h4>
+                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
+                                  Der Basis-Audio-Tresor ist in deinen Modulen enthalten. Falls deine Musikschule zusätzliches Speichervolumen für Bandaufnahmen, Playbacks &amp; Audio-Loops benötigt, kannst du hier dein gewünschtes Speicherpaket zubuchen:
+                                </p>
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '14px' }}>
+                                {[
+                                  { gb: 0, fee: 0, label: 'Standard', sublabel: 'Basis-Kontingent', desc: '0,00 € / Mo.', icon: '🎙️' },
+                                  { gb: 5, fee: 1.49, label: '+5 GB', sublabel: 'Kleinere Gruppen', desc: '1,49 € / Mo.', icon: '☁️' },
+                                  { gb: 10, fee: 2.99, label: '+10 GB', sublabel: 'Mittlere Bands', desc: '2,99 € / Mo.', icon: '⚡' },
+                                  { gb: 20, fee: 5.49, label: '+20 GB', sublabel: 'Große Ensembles', desc: '5,49 € / Mo.', icon: '🚀' },
+                                  { gb: 50, fee: 9.99, label: '+50 GB', sublabel: 'Full Cloud Storage', desc: '9,99 € / Mo.', icon: '👑' }
+                                ].map(tier => {
+                                  const isSel = selectedStorageAddonGb === tier.gb;
+                                  return (
+                                    <div
+                                      key={tier.gb}
+                                      onClick={() => {
+                                        setSelectedStorageAddonGb(tier.gb);
+                                        setSelectedStorageAddonFee(tier.fee);
+                                      }}
+                                      style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between',
+                                        padding: '16px 14px',
+                                        borderRadius: '16px',
+                                        border: '2px solid',
+                                        borderColor: isSel ? '#34a853' : '#e2e8f0',
+                                        background: isSel ? '#f0fdf4' : '#ffffff',
+                                        cursor: 'pointer',
+                                        textAlign: 'center',
+                                        transition: 'all 0.2s',
+                                        boxShadow: isSel ? '0 6px 16px rgba(52, 168, 83, 0.12)' : 'none'
+                                      }}
+                                    >
+                                      <div>
+                                        <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>{tier.icon}</div>
+                                        <div style={{ fontWeight: 900, fontSize: '0.92rem', color: isSel ? '#166534' : '#1e293b' }}>{tier.label}</div>
+                                        <div style={{ fontSize: '0.66rem', color: isSel ? '#15803d' : '#64748b', fontWeight: 600, marginTop: '2px' }}>{tier.sublabel}</div>
+                                      </div>
+                                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: '10px', fontSize: '0.78rem', fontWeight: 800, color: isSel ? '#34a853' : '#0f172a' }}>
+                                        {tier.desc}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '12px 14px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.74rem', color: '#475569' }}>
+                                <span>💡</span>
+                                <span>
+                                  <strong>Flexibel anpassbar:</strong> Das Cloud-Speicher-Kontingent wird monatlich abgerechnet und kann jederzeit im laufenden Schuljahr im Sekretariat erweitert oder reduziert werden.
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                                <button 
+                                  onClick={() => setCheckoutStep(2)}
+                                  style={{
+                                    padding: '12px 24px',
+                                    borderRadius: '12px',
+                                    border: '1.5px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    color: '#475569',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  <span>⇠</span> Zurück
+                                </button>
+                                <button 
+                                  onClick={() => setCheckoutStep(4)}
+                                  style={{
+                                    padding: '12px 24px',
+                                    borderRadius: '12px',
+                                    border: 'none',
+                                    background: '#34a853',
+                                    color: '#ffffff',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  Weiter zur Rechnungsadresse <span>➔</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {checkoutStep === 4 && (
+                            <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                              <div>
+                                <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 4 von 5</span>
                                 <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Rechnungsadresse für Schüler-Aktivierungen</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
                                   Gib an, wohin die Rechnungen für die Schüler-Aktivierungen gesendet werden sollen.
@@ -25003,7 +25353,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
                                 <button 
-                                  onClick={() => setCheckoutStep(2)}
+                                  onClick={() => setCheckoutStep(3)}
                                   style={{
                                     padding: '12px 24px',
                                     borderRadius: '12px',
@@ -25022,7 +25372,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   <span>⇠</span> Zurück
                                 </button>
                                 <button 
-                                  onClick={() => setCheckoutStep(4)}
+                                  onClick={() => setCheckoutStep(5)}
                                   style={{
                                     padding: '12px 24px',
                                     borderRadius: '12px',
@@ -25045,7 +25395,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             </div>
                           )}
 
-                          {checkoutStep === 4 && (() => {
+                          {checkoutStep === 5 && (() => {
                             const effectiveContractStartDateStr = isBillingBooked
                               ? contractStartDate
                               : (simulatedToday ? simulatedToday + 'T12:00:00' : new Date().toISOString());
@@ -25059,19 +25409,20 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                             // Calculations for Invoices A & B
                             const selectedModulesCount = (hasCampusSub ? 1 : 0) + (hasGroovelabSub ? 1 : 0);
-                            const baseModuleCost = (hasCampusSub && hasGroovelabSub) ? 9.99 : ((hasCampusSub ? 7.99 : 0) + (hasGroovelabSub ? 4.99 : 0));
+                            const baseModuleCost = (hasCampusSub && hasGroovelabSub) ? masterRates.kombi : ((hasCampusSub ? masterRates.campus : 0) + (hasGroovelabSub ? masterRates.groovelab : 0));
                             
                             // Passive student profiles (total students - active students)
                             const activeStudents = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
                             const passiveStudents = Math.max(0, students.length - activeStudents);
 
                             // Invoice A: Fixkosten
-                            const adminCost = employees.filter((e: any) => e.isActive ?? true).length * 0.49;
-                            const teacherCost = allTeachers.filter((t: any) => t.isActive ?? true).length * 0.49;
+                            const adminCost = employees.filter((e: any) => e.isActive ?? true).length * masterRates.teacher;
+                            const teacherCost = allTeachers.filter((t: any) => t.isActive ?? true).length * masterRates.teacher;
                             const passiveStudentCost = (billingPayer === 'student' && studentBillingOption === 'student_partial')
                               ? (students.length * 0.09)
                               : (passiveStudents * 0.09);
-                            const totalInvoiceA_monthly = baseModuleCost + adminCost + teacherCost + passiveStudentCost;
+                            const storageAddonCost = selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0);
+                            const totalInvoiceA_monthly = baseModuleCost + adminCost + teacherCost + passiveStudentCost + storageAddonCost;
                             const totalInvoiceA_restYear = totalInvoiceA_monthly * remainingMonths;
 
                             // Invoice B: Variable active student profiles (from school's perspective)
@@ -25081,7 +25432,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             const schoolOneTimeSinglePrice = getDynamicAnnualPrice(effectiveContractStartDateStr, schoolOneTimeDiscount);
                             const schoolOneTimeTotal = schoolOneTimeCount * schoolOneTimeSinglePrice;
 
-                            const totalInvoiceB_monthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? (activeStudents * 0.49) : 0;
+                            const totalInvoiceB_monthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? (activeStudents * masterRates.student) : 0;
                             const totalInvoiceB_restYear = isSchoolOneTime ? schoolOneTimeTotal : (totalInvoiceB_monthly * remainingMonths);
 
                             const handleApplyCoupon = () => {
@@ -25099,7 +25450,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             return (
                               <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                 <div>
-                                  <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 4 von 4</span>
+                                  <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 5 von 5</span>
                                   <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Bestätige deine Buchung</h4>
                                   <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
                                     Die Abrechnung wird aus Transparenzgründen in zwei separate Ströme aufgeteilt. Bitte überprüfe die beiden Rechnungsvorschauen.
@@ -25132,12 +25483,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span>Cloud-Datenbank &amp; Support (Verwaltung &amp; Lehrer):</span>
-                                        <strong>{((employees.length + allTeachers.length) * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                        <strong>{((employees.length + allTeachers.length) * masterRates.teacher).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span>Cloud-Datenbank &amp; Support (Schüler-Datenbankprofile):</span>
                                         <strong>{(passiveStudentCost).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
+                                      {storageAddonCost > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534', fontWeight: 700 }}>
+                                          <span>🎙️ Audio-Tresor Cloud-Speicher (+{selectedStorageAddonGb} GB):</span>
+                                          <strong>{storageAddonCost.toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                        </div>
+                                      )}
                                     </div>
                                     <div style={{ borderTop: '1px dotted #34a853', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#34a853' }}>
                                       <span>Monatlicher Betrag (Rechnung A):</span>
@@ -25178,7 +25535,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         ) : (
                                           <>
                                             <span>Aktive Schülerprofile ({activeStudents} aktivierte Aktivierungen):</span>
-                                            <strong>{billingPayer === 'student' ? `${customUmlageAmount.toFixed(2).replace('.', ',')} € / Schüler (Jahresbetrag)` : '0,49 € / Schüler / Mo.'}</strong>
+                                            <strong>{billingPayer === 'student' ? `${customUmlageAmount.toFixed(2).replace('.', ',')} € / Schüler (Jahresbetrag)` : `${effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} € / Schüler / Mo.`}</strong>
                                           </>
                                         )}
                                       </div>
@@ -25318,7 +25675,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
                                   <button 
-                                    onClick={() => setCheckoutStep(3)}
+                                    onClick={() => setCheckoutStep(4)}
                                     style={{
                                       padding: '12px 24px',
                                       borderRadius: '12px',
@@ -25357,6 +25714,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             has_campus_subscription: hasCampusSub,
                                             has_groovelab_subscription: hasGroovelabSub,
                                             student_billing_option: studentBillingOption,
+                                            storage_addon_gb: selectedStorageAddonGb,
+                                            storage_addon_monthly_fee: selectedStorageAddonFee,
+                                            storage_addon_status: selectedStorageAddonGb > 0 ? 'active' : 'none',
                                             contract_start_date: todayStr,
                                             is_trial: false,
                                             status: 'active'
@@ -25446,19 +25806,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               {hasCampusSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                   <span>Server- &amp; Cloud-Infrastruktur Campus:</span>
-                                  <strong>{isStarterFlat ? 'Inklusive' : '7,99 € / Mo.'}</strong>
+                                  <strong>{isStarterFlat ? 'Inklusive' : `${masterRates.campus.toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                                 </div>
                               )}
                               {hasGroovelabSub && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                   <span>Server- &amp; Cloud-Infrastruktur Groovelab:</span>
-                                  <strong>{isStarterFlat ? 'Inklusive' : '4,99 € / Mo.'}</strong>
+                                  <strong>{isStarterFlat ? 'Inklusive' : `${masterRates.groovelab.toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                                 </div>
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Cloud-Datenbank &amp; Support Lehrer (0,49 € x {allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Profile):</span>
-                                <strong>{isStarterFlat ? 'Inklusive' : `${(allTeachers.filter((t: any) => t.isActive ?? true).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                <span>Cloud-Datenbank &amp; Support Lehrer ({masterRates.teacher.toFixed(2).replace('.', ',')} € x {allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Profile):</span>
+                                <strong>{isStarterFlat ? 'Inklusive' : `${(allTeachers.filter((t: any) => t.isActive ?? true).length * masterRates.teacher).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
@@ -25474,7 +25834,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               {checkoutStep >= 2 && (studentBillingOption === 'option2' || studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3') && (
                                 <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
                                   Kostenträger: <strong>Musikschule (Sammelzahler)</strong>. Für Schüler werden die Accounts kostenlos freigeschaltet. Die Schule übernimmt die Kosten. Abrechnung erfolgt: <strong>
-                                    {studentBillingOption === 'option2' && 'Monatlich (0,49 € / Schüler)'}
+                                    {studentBillingOption === 'option2' && `Monatlich (${masterRates.student.toFixed(2).replace('.', ',')} € / Schüler)`}
                                     {studentBillingOption === 'option3_2' && 'Einmalig pro Schuljahr (mit 10% Rabatt bei Aktivierung)'}
                                     {studentBillingOption === 'option3_3' && 'Einmalige Komplett-Aktivierung aller angelegten Schüler (mit 20% Rabatt)'}
                                   </strong>
@@ -25509,7 +25869,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               {checkoutStep >= 2 && billingPayer === 'school' && studentBillingOption === 'option2' && activeStudentsCount_global > 0 && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#4f46e5', marginTop: '2px' }}>
                                   <span>Schüler-Aktivierung ({activeStudentsCount_global} aktiv):</span>
-                                  <strong style={{ fontWeight: 800 }}>{(activeStudentsCount_global * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                  <strong style={{ fontWeight: 800 }}>{(activeStudentsCount_global * masterRates.student).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                 </div>
                               )}
                               <span style={{ fontSize: '0.62rem', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '-4px', fontWeight: 600 }}>
@@ -25761,7 +26121,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   borderRadius: '14px',
                                   padding: '4px',
                                   display: 'inline-flex',
-boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
+                                  boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
                                 }}>
                                   <button
                                     onClick={() => setActiveBillingSubTab('overview')}
@@ -25814,268 +26174,272 @@ boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
                                   {/* Left Column (60%): Plan Status & Student Summary */}
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                     
-                                    {/* Visual Status Badges */}
-                                    <div className="glass-panel" style={{ padding: '24px' }}>
-                                      <h4 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 900, color: '#1e293b' }}>Aktive Module &amp; wer bezahlt</h4>
-                                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
-                                        {hasCampusSub && (
-                                          <span style={{ fontSize: '0.76rem', background: '#e6f4ea', color: '#166534', padding: '6px 14px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                            Campus Aktiv
-                                          </span>
-                                        )}
-                                        {hasGroovelabSub && (
-                                          <span style={{ fontSize: '0.76rem', background: '#fef9c3', color: '#854d0e', padding: '6px 14px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                            GrooveLab Aktiv
-                                          </span>
-                                        )}
-                                        <span style={{ fontSize: '0.76rem', background: '#f3e8ff', color: '#6b21a8', padding: '6px 14px', borderRadius: '100px', fontWeight: 800 }}>
-                                          💳 Bezahlt von: {billingPayer === 'school' ? 'Musikschule (Kostenlos für Schüler & Eltern)' : 'Eltern & Schüler (Direktabrechnung)'}
-                                        </span>
-                                        <span style={{ fontSize: '0.76rem', background: '#e0f2fe', color: '#0369a1', padding: '6px 14px', borderRadius: '100px', fontWeight: 800 }}>
-                                          🎓 Schüler-Beitrag: {
-                                            studentBillingOption === 'option1' ? 'Jahresbeitrag (5,39 € / Jahr pro Schüler)' :
-                                            studentBillingOption === 'option2' ? 'Monatlicher Beitrag (0,40 € / Monat pro Schüler)' :
-                                            studentBillingOption === 'option3_2' ? 'Kofinanzierung (Jährlich)' :
-                                            studentBillingOption === 'option3_3' ? 'Kofinanzierung (Monatlich)' :
-                                            studentBillingOption === 'debit' ? 'Zahlung per Lastschrift' :
-                                            studentBillingOption === 'cash' ? 'Zahlung per Barzahlung' :
-                                            studentBillingOption === 'both' ? 'Zahlung per Lastschrift & Barzahlung' :
-                                            'Standard-Tarif'
-                                          }
-                                        </span>
+                                    {/* Apple HIG Standard: Module & Payment Status Widget */}
+                                    <div className="glass-panel" style={{ padding: '24px', background: '#ffffff', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                                        <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>Aktive Module &amp; Kosten-Übernahme</h4>
+                                        <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '9999px', fontWeight: 600 }}>macOS Sequoia Standard</span>
                                       </div>
-                                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: '1.5' }}>
-                                        Euer Zugang ist für das Schuljahr 2026/2027 vollständig freigeschaltet. Da ihr sowohl <strong>Campus</strong> als auch <strong>GrooveLab</strong> nutzt, spart die Musikschule jeden Monat <strong>2,99 € (Kombi-Rabatt)</strong>.
-                                      </p>
+                                      
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                                        {/* Campus Module */}
+                                        {hasCampusSub && (
+                                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#34a853', boxShadow: '0 0 0 3px rgba(52, 168, 83, 0.15)' }} />
+                                            <div>
+                                              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>Campus Modul</div>
+                                              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>Stundenplan &amp; Protokoll</div>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* GrooveLab Module */}
+                                        {hasGroovelabSub && (
+                                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#eab308', boxShadow: '0 0 0 3px rgba(234, 179, 8, 0.15)' }} />
+                                            <div>
+                                              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>GrooveLab Modul</div>
+                                              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>Live-Lab &amp; Bands</div>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Who pays */}
+                                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#7e22ce', boxShadow: '0 0 0 3px rgba(126, 34, 206, 0.15)' }} />
+                                          <div>
+                                            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                                              {billingPayer === 'school' ? 'Zahlung: Musikschule' : 'Zahlung: Eltern'}
+                                            </div>
+                                            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                                              {billingPayer === 'school' ? 'Sammelabrechnung Träger' : 'Direktabrechnung'}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Student cost */}
+                                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: billingPayer === 'school' ? '#34a853' : '#0284c7', boxShadow: `0 0 0 3px ${billingPayer === 'school' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(2, 132, 199, 0.15)'}` }} />
+                                          <div>
+                                            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                                              Beitrag für Schüler
+                                            </div>
+                                            <div style={{ fontSize: '0.72rem', color: billingPayer === 'school' ? '#15803d' : '#0369a1', fontWeight: 600 }}>
+                                              {billingPayer === 'school' ? '0,00 € (100% Kostenfrei)' : 'Direktbeitrag der Eltern'}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#475569', lineHeight: '1.45', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ color: '#34a853', fontWeight: 800 }}>✓</span>
+                                        <span><strong>Schuljahr 2026/2027 aktiv:</strong> Durch die Kombination von Campus &amp; GrooveLab spart eure Musikschule jeden Monat <strong>2,99 € Kombi-Vorteil</strong>.</span>
+                                      </div>
                                     </div>
 
-                                    {/* Metrics & Student Activations Summary */}
-                                    <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    {/* Apple Segmented Student Progress Bar */}
+                                    <div className="glass-panel" style={{ padding: '24px', background: '#ffffff', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', gap: '18px' }}>
                                       <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
-                                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Schüler-Aktivierungen</h4>
-                                          <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>
-                                            <strong>{activeStudentsCount_global}</strong> aktive Schüler
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+                                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>Schüler-Aktivierungen</h4>
+                                          <span style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: 700 }}>
+                                            <strong>{activeStudentsCount_global}</strong> / {students.length} aktiv
                                           </span>
                                         </div>
                                         
-                                        {/* Progress Bar showing active vs total students */}
-                                        <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden', margin: '8px 0' }}>
-                                          <div className="progress-bar-fill" style={{ width: (students.length > 0 ? Math.min(100, (activeStudentsCount_global / students.length) * 100) : 0) + '%', background: 'linear-gradient(90deg, #34a853 0%, #eab308 100%)', height: '100%' }} />
+                                        {/* Apple-Style Segmented Battery Bar */}
+                                        <div style={{ width: '100%', height: '10px', background: '#f1f5f9', borderRadius: '9999px', overflow: 'hidden', display: 'flex', gap: '2px', padding: '2px' }}>
+                                          <div style={{ width: (students.length > 0 ? Math.min(100, (activeStudentsCount_global / students.length) * 100) : 0) + '%', background: '#34a853', borderRadius: '9999px', transition: 'width 0.4s ease-out' }} />
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>
-                                          <span>0 Aktiv</span>
-                                          <span>Gesamt: {students.length} Schüler</span>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', fontWeight: 500, marginTop: '6px' }}>
+                                          <span>Aktivierte Schüler-Profile ({activeStudentsCount_global})</span>
+                                          <span>Inaktive / Datenbank-Profile ({passiveStudentsCount_global})</span>
                                         </div>
                                       </div>
 
-                                      {/* Savings Display */}
-                                      {(billingPayer === 'student' || studentBillingOption === 'cash') && (
-                                        <div style={{
-                                          background: 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)',
-                                          border: '1px solid #34a853',
-                                          borderRadius: '16px',
-                                          padding: '14px 16px',
-                                          marginTop: '12px',
-                                          marginBottom: '16px',
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          gap: '6px'
-                                        }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <TrendingDown size={18} style={{ color: '#34a853', verticalAlign: 'middle', marginRight: '6px' }} />
-                                            <strong style={{ fontSize: '0.8rem', color: '#34a853' }}>Kostenersparnis durch aktive Profile</strong>
-                                          </div>
-                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
-                                            <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(52,168,83,0.15)' }}>
-                                              <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Monatlich gespart:</span>
-                                              <strong style={{ fontSize: '1rem', color: '#34a853', fontWeight: 800 }}>
-                                                {(((billingPayer === 'student' || studentBillingOption === 'cash') ? 0.49 : 0.09) * activeStudentsCount_global).toFixed(2).replace('.', ',')} €
-                                              </strong>
-                                            </div>
-                                            <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(52,168,83,0.15)' }}>
-                                              <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Jährlich gespart:</span>
-                                              <strong style={{ fontSize: '1rem', color: '#34a853', fontWeight: 800 }}>
-                                                {(((billingPayer === 'student' || studentBillingOption === 'cash') ? 0.49 : 0.09) * activeStudentsCount_global * 12).toFixed(2).replace('.', ',')} €
-                                              </strong>
-                                            </div>
-                                          </div>
-                                          <span style={{ fontSize: '0.62rem', color: '#34a853', display: 'block', marginTop: '2px', lineHeight: '1.3' }}>
-                                            {(billingPayer === 'student' || studentBillingOption === 'cash') 
-                                              ? '* Basierend darauf, dass aktive Schüler-Gebühren (0,49 €/Monat) direkt von den Eltern getragen werden.' 
-                                              : '* Durch Verrechnung der passiven Infrastrukturgebühr (0,09 €) bei aktiven Schülerprofilen.'
-                                            }
-                                          </span>
-                                        </div>
-                                      )}
-
-                                      {/* Info Box: How to add students (replaces slider) */}
+                                      {/* Info Box: How to add students */}
                                       <div style={{ 
                                         display: 'flex',
                                         gap: '12px',
-                                        alignItems: 'flex-start',
-                                        background: '#e6f4ea',
-                                        border: '1.5px dashed #34a853',
+                                        alignItems: 'center',
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
                                         borderRadius: '16px',
-                                        padding: '16px'
+                                        padding: '14px 16px'
                                       }}>
-                                        <Users size={18} style={{ color: '#34a853', verticalAlign: 'middle', marginRight: '6px' }} />
-                                        <div>
-                                          <strong style={{ display: 'block', fontSize: '0.78rem', color: '#1e293b', marginBottom: '4px' }}>Neue Schüler hinzufügen &amp; aktivieren</strong>
-                                          <p style={{ margin: 0, fontSize: '0.72rem', color: '#475569', lineHeight: '1.4' }}>
-                                            Schüleraktivierungen werden nicht manuell vorgebucht. Du kannst neue Schüler einfach über deine Schülerverwaltung anlegen. Sobald diese aktiv geschaltet werden (z. B. durch Freischaltung für Campus oder GrooveLab), wird die Umlage vollautomatisch im Hintergrund angepasst (0,49 € für aktive Profile bzw. 0,09 € für passive Profile).
-                                          </p>
+                                        <Users size={18} style={{ color: '#ea4335', flexShrink: 0 }} />
+                                        <div style={{ fontSize: '0.75rem', color: '#475569', lineHeight: '1.4' }}>
+                                          <strong style={{ color: '#0f172a', fontWeight: 700 }}>Automatische Abrechnung:</strong> Neue Schüler werden einfach in der Schülerverwaltung angelegt. Sobald sie freigeschaltet werden, passt sich die Umlage automatisch an.
                                         </div>
                                       </div>
                                     </div>
 
                                   </div>
 
-                                  {/* Right Column (40%): Sticky Current Rate Card */}
+                                  {/* Right Column (40%): Apple Pay Styled Invoice Card */}
                                   <div style={{ position: 'sticky', top: '20px' }}>
                                     {(() => {
-                                      const activeStudents = activeStudentsCount_global;
-                                      const studentLevyMonthlySim = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudents * 0.49 : 0;
-                                      const totalMonthlySim = baseB2B_global + studentLevyMonthlySim;
-                                      
-                                      const showOneTime = billingPayer === 'school' && (studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3');
-                                      const oneTimeCount = studentBillingOption === 'option3_3' ? students.length : activeStudents;
-                                      const oneTimeDiscount = studentBillingOption === 'option3_3' ? 20 : 10;
-                                      const oneTimeSinglePrice = getDynamicAnnualPrice(contractStartDate, oneTimeDiscount);
-                                      const oneTimeTotalSim = oneTimeCount * oneTimeSinglePrice;
+                                      const totalMonthlySim = subscriptionBypass ? 0 : baseB2B_global;
                                       
                                       return (
                                         <div style={{
-                                          background: 'linear-gradient(135deg, #ffffff 0%, #faf8ff 100%)',
-                                          border: '2px solid #e9d5ff',
+                                          background: '#ffffff',
+                                          border: '1px solid #e2e8f0',
                                           borderRadius: '24px',
                                           padding: '24px',
-                                          boxShadow: '0 8px 30px rgba(107, 33, 168, 0.04)',
+                                          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
                                           display: 'flex',
                                           flexDirection: 'column',
-                                          gap: '16px',
+                                          gap: '18px',
                                           textAlign: 'left'
                                         }}>
-                                          <div style={{ borderBottom: '1px solid #e9d5ff', paddingBottom: '12px' }}>
-                                            <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ABRECHNUNG &amp; TARIFE</span>
-                                            <h4 style={{ margin: '2px 0 0 0', fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Aktuelle Ratenübersicht</h4>
+                                          <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                              <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>ABRECHNUNG &amp; TARIFE</span>
+                                              <h4 style={{ margin: '2px 0 0 0', fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>Aktuelle Ratenübersicht</h4>
+                                            </div>
+                                            {subscriptionBypass && (
+                                              <span style={{ fontSize: '0.68rem', background: '#f3e8ff', color: '#7e22ce', padding: '4px 10px', borderRadius: '9999px', fontWeight: 700 }}>
+                                                Abo-Bypass
+                                              </span>
+                                            )}
                                           </div>
 
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>Software-Infrastruktur:</span>
+                                              <span>Software-Lizenz:</span>
                                               <strong style={{ color: '#34a853' }}>100% kostenlos</strong>
                                             </div>
 
-                                            {hasCampusSub && hasGroovelabSub ? (
-                                              <>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>Server &amp; Service Gebühren Campus:</span>
-                                                  <strong>7,99 € / Mo.</strong>
-                                                </div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>Server &amp; Service Gebühren Groovelab:</span>
-                                                  <strong>4,99 € / Mo.</strong>
-                                                </div>
-                                                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
-                                                  <span>Kombi-Rabatt (Campus + Groovelab):</span>
-                                                  <strong>-2,99 € / Mo.</strong>
-                                                </div>
-                                              </>
+                                            {subscriptionBypass ? (
+                                              <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#faf5ff', border: '1px solid #f3e8ff', color: '#6b21a8', fontSize: '0.75rem', lineHeight: '1.4' }}>
+                                                <div style={{ fontWeight: 800, marginBottom: '2px' }}>⚡ Kostenfreie Freistellung aktiv</div>
+                                                <span>Alle Server-Hosting-Flatrates &amp; Aktivierungsgebühren sind 100% freigestellt (0,00 € / Mo.).</span>
+                                              </div>
                                             ) : (
                                               <>
                                                 {hasCampusSub && (
                                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                    <span>Server &amp; Service Gebühren Campus:</span>
-                                                    <strong>7,99 € / Mo.</strong>
+                                                    <span>Campus Server-Flatrate:</span>
+                                                    <strong>{effectiveSchoolRates.priceCampus.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                                   </div>
                                                 )}
                                                 {hasGroovelabSub && (
                                                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                    <span>Server &amp; Service Gebühren Groovelab:</span>
-                                                    <strong>4,99 € / Mo.</strong>
+                                                    <span>GrooveLab Server-Flatrate:</span>
+                                                    <strong>{effectiveSchoolRates.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                                  </div>
+                                                )}
+                                                {hasCampusSub && hasGroovelabSub && (
+                                                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#15803d', fontWeight: 600 }}>
+                                                    <span>Kombi-Rabatt:</span>
+                                                    <span>-{(effectiveSchoolRates.priceCampus + effectiveSchoolRates.priceGroovelab - effectiveSchoolRates.priceKombi).toFixed(2).replace('.', ',')} € / Mo.</span>
                                                   </div>
                                                 )}
                                               </>
                                             )}
 
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>DB &amp; Service Lehrer (0,49 € x {billableTeachersCount} aktive Profile):</span>
-                                              <strong>{(billableTeachersCount * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                            </div>
+                                            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                              {!subscriptionBypass && billableTeachersCount > 0 && (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                  <span>Lehrer-Profile ({billableTeachersCount} × {effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} €):</span>
+                                                  <strong>{(billableTeachersCount * effectiveSchoolRates.priceTeacher).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                                </div>
+                                              )}
 
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>DB &amp; Service Schüler (0,09 € x {passiveStudentsCount_global} passive Profile):</span>
-                                              <strong>{(passiveStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                            </div>
-                                            
-                                            {activeGroovelabStudentsCount_global > 0 && (
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b45309' }}>
-                                                <span>DB &amp; Service GrooveLab Schüler (0,49 € x {activeGroovelabStudentsCount_global} aktive Profile):</span>
-                                                <strong>{(activeGroovelabStudentsCount_global * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                              </div>
-                                            )}
+                                              {!subscriptionBypass && activeStudentsCount_global > 0 && isSammelzahler && (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                  <span>Campus-Aktivierungen ({activeStudentsCount_global} × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
+                                                  <strong>{(activeStudentsCount_global * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                                </div>
+                                              )}
 
-                                            <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
-                                              <span>Infrastruktur (Schulanteil):</span>
-                                              <strong>{baseB2B_global.toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                              {!subscriptionBypass && activeGroovelabStudentsCount_global > 0 && (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                  <span>GrooveLab-Aktivierungen ({activeGroovelabStudentsCount_global} × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
+                                                  <strong>{(activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                                </div>
+                                              )}
+
+                                              {passiveStudentsCount_global > 0 && (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                  <span>Passive Profile ({passiveStudentsCount_global} × 0,09 €):</span>
+                                                  <strong>{subscriptionBypass ? '0,00 € (Freigestellt)' : `${(passiveStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                                </div>
+                                              )}
+
+                                              {/* Tresor Storage Add-on Line Item & Mini Progress Bar - Hidden when no paid addon is booked */}
+                                              {(() => {
+                                                const addonGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
+                                                if (addonGb <= 0) return null;
+                                                const addonStatus = currentSchoolProfile?.storage_addon_status || 'active';
+                                                const addonPendingGb = Number(currentSchoolProfile?.storage_addon_pending_gb || 0);
+                                                const addonMonthlyFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 2.99 : addonGb === 20 ? 5.49 : 9.99));
+                                                
+                                                const baseGb = 1.0;
+                                                const totalCapGb = baseGb + addonGb;
+                                                const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                                const usedGb = usedBytes / (1024 * 1024 * 1024);
+                                                const freeGb = Math.max(0, totalCapGb - usedGb);
+                                                const usagePct = Math.min(100, Math.round((usedGb / totalCapGb) * 100));
+
+                                                return (
+                                                  <div style={{ borderTop: '1.5px dashed #e2e8f0', paddingTop: '10px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: '0.74rem' }}>
+                                                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                        <span style={{ fontSize: '0.85rem' }}>🎙️</span>
+                                                        <span>Audio-Tresor {addonGb > 0 ? `(+${addonGb} GB)` : '(1 GB Inklusiv)'}:</span>
+                                                      </span>
+                                                      <strong>
+                                                        {addonGb > 0 ? (subscriptionBypass ? '0,00 € (Freigestellt)' : `${addonMonthlyFee.toFixed(2).replace('.', ',')} € / Mo.`) : 'Inklusive'}
+                                                      </strong>
+                                                    </div>
+
+                                                    {/* Mini Battery Progress Bar */}
+                                                    <div style={{ background: '#f1f5f9', borderRadius: '6px', height: '6px', overflow: 'hidden', width: '100%', marginTop: '2px' }}>
+                                                      <div style={{
+                                                        height: '100%',
+                                                        width: `${Math.max(5, usagePct)}%`,
+                                                        background: usagePct > 80 ? '#ef4444' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
+                                                        borderRadius: '6px',
+                                                        transition: 'width 0.3s ease'
+                                                      }} />
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>
+                                                      <span>{usedGb.toFixed(2).replace('.', ',')} GB von {totalCapGb} GB belegt</span>
+                                                      <span style={{ color: usagePct > 80 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>{freeGb.toFixed(2).replace('.', ',')} GB frei ({100 - usagePct}%)</span>
+                                                    </div>
+
+                                                    {addonPendingGb > 0 && addonStatus === 'pending_activation' && (
+                                                      <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '8px', padding: '4px 8px', fontSize: '0.65rem', color: '#92400e', fontWeight: 700, textAlign: 'center', marginTop: '2px' }}>
+                                                        ⏳ +{addonPendingGb} GB Warten auf Hetzner-Aktivierung
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })()}
                                             </div>
                                           </div>
 
-                                          <div style={{ borderTop: '2px solid #e9d5ff', paddingTop: '14px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            {billingPayer === 'school' && studentBillingOption === 'option2' && (
-                                              <>
-                                                {students.filter((s: any) => s.isCampusActive || s.is_campus_active).length > 0 && (
-                                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#34a853' }}>
-                                                    <span>DB &amp; Service Campus Schüler ({students.filter((s: any) => s.isCampusActive || s.is_campus_active).length} aktiv x 0,49 €):</span>
-                                                    <strong style={{ fontWeight: 800 }}>{(students.filter((s: any) => s.isCampusActive || s.is_campus_active).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                                  </div>
-                                                )}
-                                                {students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length > 0 && (
-                                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#b45309' }}>
-                                                    <span>DB &amp; Service GrooveLab Schüler ({students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length} aktiv x 0,49 €):</span>
-                                                    <strong style={{ fontWeight: 800 }}>{(students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                                  </div>
-                                                )}
-                                              </>
-                                            )}
-
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#34a853', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
-                                              <span style={{ fontWeight: 900 }}>Gesamtrate:</span>
-                                              <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>{totalMonthlySim.toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                            </div>
-                                            
-                                            {showOneTime && (
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#6d28d9', borderTop: '1px dashed #cbd5e1', paddingTop: '10px', marginTop: '4px' }}>
-                                                <span style={{ fontWeight: 900 }}>Einmalzahlung (Schuljahr):</span>
-                                                <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>{oneTimeTotalSim.toFixed(2).replace('.', ',')} €</strong>
+                                          {/* Total Rate Display */}
+                                          <div style={{ borderTop: '1.5px solid #e2e8f0', paddingTop: '16px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>Gesamtrate:</span>
+                                            <div style={{ textAlign: 'right' }}>
+                                              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.03em' }}>
+                                                {totalMonthlySim.toFixed(2).replace('.', ',')} € / Mo.
                                               </div>
-                                            )}
-                                            
-                                            <span style={{ fontSize: '0.62rem', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '-4px', fontWeight: 600 }}>
-                                              Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
-                                            </span>
+                                              <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Umsatzsteuerbefreit gemäß § 19 UStG</div>
+                                            </div>
+                                          </div>
+
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.7rem', color: '#64748b', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                                            <Lock size={13} style={{ color: '#64748b' }} />
+                                            <span>Abrechnung erfolgt am Monatsende. Rechnungen jederzeit einsehbar.</span>
                                           </div>
                                         </div>
                                       );
                                     })()}
-                                    
-                                    {/* Visual billing options overview */}
-                                    <div style={{
-                                      marginTop: '12px',
-                                      background: '#ffffff',
-                                      border: '1.5px dashed #cbd5e1',
-                                      borderRadius: '16px',
-                                      padding: '12px 14px',
-                                      fontSize: '0.74rem',
-                                      color: '#475569',
-                                      lineHeight: '1.35',
-                                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                                    }}>
-                                      <span><Lightbulb size={14} style={{ color: '#6b21a8', verticalAlign: 'middle', marginRight: '6px' }} />Abrechnung erfolgt am Monatsende. Rechnungen sind im Rechnungsverlauf einsehbar.</span>
-                                    </div>
                                   </div>
                                 </div>
                               )}
@@ -26434,7 +26798,7 @@ boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
                                   };
                                   const restmonate = monthsMapLocal[m] !== undefined ? monthsMapLocal[m] : 12;
                                   // Dynamic student fee depending on billing options (monthly vs annual packages)
-                                  let studentFee = 0.49;
+                                  let studentFee = effectiveSchoolRates.priceStudent;
                                   if (studentBillingOption === 'option2') {
                                     studentFee = 0.40;
                                   } else if (studentBillingOption === 'option3_2') {
@@ -30101,7 +30465,7 @@ status: status,
                                     ? 'Eltern_Information_Einwilligung_Campus.txt'
                                     : 'Eltern_Information_Einwilligung_Campus_Groovelab.txt';
 
-                                const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR ERPROBUNG DER LERN-APP ${appName.toUpperCase()}\n\nSehr geehrte Eltern, liebe Erziehungsberechtigte,\n\nim Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).\n\nDATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:\n- Die Nutzung der App ist für Sie und Ihr Kind vollständig kostenlos.\n- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.\n- Zur Identifizierung wird lediglich ein Profil mit dem Vornamen sowie dem ersten Buchstaben des Nachnamens (z. B. „Jonas M.“) angelegt.\n- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH) statt.\n- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.\n\nMit der Teilnahme an der Pilotphase willigen Sie ein, dass wir ein anonymisiertes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.\n\nVielen Dank für Ihre Unterstützung!`;
+                                const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR NUTZUNG DER APP ${appName.toUpperCase()}\n\nSehr geehrte Eltern, liebe Erziehungsberechtigte,\n\nim Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).\n\nDATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:\n- Die Nutzung der App ist für Sie und Ihr Kind vollständig kostenlos.\n- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.\n- Zur Identifizierung wird lediglich ein Profil mit dem Vornamen sowie dem ersten Buchstaben des Nachnamens (z. B. „Jonas M.“) angelegt.\n- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH & Supabase EU) statt.\n- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.\n\nMit der Nutzung der App willigen Sie ein, dass wir ein anonymisiertes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.\n\nVielen Dank für Ihre Unterstützung!`;
                                 const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
                                 const url = URL.createObjectURL(blob);
                                 const a = document.createElement('a');
@@ -31799,15 +32163,20 @@ status: status,
             id: selectedInvoice.id,
             date: selectedInvoice.date,
             dueDateStr: selectedInvoice.dueDateStr,
-            amount: selectedInvoice.amount,
+            amount: selectedInvoice.isCurrentMonth ? currentTotalB2B_global : selectedInvoice.amount,
             status: selectedInvoice.status,
             type: selectedInvoice.type,
             isCurrentMonth: selectedInvoice.isCurrentMonth,
             hasCampus: hasCampusSub || campusActivatedThisMonth,
             hasGroovelab: hasGroovelabSub || groovelabActivatedThisMonth,
-            totalTeachersCount: allTeachers.length + employees.length,
-            passiveStudentsCount: students.length,
-            activeStudentFee: 0, // Not needed for client-side view of INF, or matches B2B
+            totalTeachersCount: billableTeachersCount,
+            activeCampusCount: activeStudentsCount_global,
+            activeGroovelabCount: activeGroovelabStudentsCount_global,
+            passiveStudentsCount: passiveStudentsCount_global,
+            isSammelzahler: isSammelzahler,
+            activeStudentFee: (isSammelzahler ? activeStudentsCount_global * effectiveSchoolRates.priceStudent : 0) + (activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent),
+            storageAddonGb: Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0),
+            storageAddonMonthlyFee: selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0),
             activationsCount: selectedInvoice.activationsCount,
             studentFee: selectedInvoice.studentFee,
             restmonate: selectedInvoice.restmonate
@@ -32065,10 +32434,10 @@ status: status,
                     <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 7 VERTRAGSLAUFZEIT, PREISE &amp; KÜNDIGUNG</h4>
                     <p style={{ margin: 0 }}><strong>1. Schuljahres-Kopplung &amp; Kündigung:</strong> Die Vertragslaufzeit für den Serverbetrieb orientiert sich am Schuljahr (Kündigungsfrist 1 Monat zum 31. August). Ohne Kündigung verlängert sich die Laufzeit automatisch um ein weiteres Schuljahr.</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Software-Lizenz:</strong> Die Bereitstellung der Basis-Softwarelizenz von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Zusatzlizenzen und aktive Schüler-Freischaltungen.</p>
-                    <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ 7,99 € und für das Modul „GrooveLab“ 4,99 €. Werden beide Module gebucht, gilt der Kombi-Vorteil von 9,99 € (Ersparnis von 2,99 €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit 0,49 €/Monat berechnet.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ {masterRates.campus.toFixed(2).replace('.', ',')} € und für das Modul „GrooveLab“ {masterRates.groovelab.toFixed(2).replace('.', ',')} €. Werden beide Module gebucht, gilt der Kombi-Vorteil von {masterRates.kombi.toFixed(2).replace('.', ',')} € (Ersparnis von {(masterRates.campus + masterRates.groovelab - masterRates.kombi).toFixed(2).replace('.', ',')} €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit {masterRates.teacher.toFixed(2).replace('.', ',')} €/Monat berechnet.</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
-                      <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit 0,49 €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
-                      <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern (0,49 €/Monat bzw. 5,88 € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen 0,40 €/Monat, Schule trägt 0,09 €/Monat). Härtefälle/Geschwisterrabatte können von der Schule manuell befreit werden.
+                      <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit {masterRates.student.toFixed(2).replace('.', ',')} €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
+                      <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern ({masterRates.student.toFixed(2).replace('.', ',')} €/Monat bzw. {(masterRates.student * 12).toFixed(2).replace('.', ',')} € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen {(masterRates.student - 0.09).toFixed(2).replace('.', ',')} €/Monat, Schule trägt 0,09 €/Monat). Härtefälle/Geschwisterrabatte können von der Schule manuell befreit werden.
                       <br /><em>Hinweis:</em> GrooveLab-Schülerfreischaltungen werden immer vollumfänglich von der Musikschule getragen (keine Direktabrechnung mit Eltern).
                     </p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>5. Schüler-Deaktivierung:</strong> Bei monatlicher Abrechnung entfällt die Gebühr ab dem Folgemonat der Deaktivierung. Bei jährlicher Vorauszahlung verbleiben das Profil und alle Funktionen bis zum Ende des laufenden Schuljahres aktiv und erlöschen erst zum Schuljahreswechsel.</p>

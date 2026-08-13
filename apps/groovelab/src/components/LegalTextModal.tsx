@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, ShieldCheck, FileText, Building, Undo2 } from 'lucide-react';
+import { useMasterPricing } from '../context/MasterPricingContext';
 
 interface LegalTextModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
   onClose,
   initialTab = 'impressum'
 }) => {
+  const masterPricing = useMasterPricing();
   const [activeTab, setActiveTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation'>(initialTab);
 
   if (!isOpen) return null;
@@ -300,11 +302,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               <div>
                 <strong style={{ color: '#0f172a' }}>2. Software-Lizenz & Hosting-Gebühren (§ 19 UStG Kleinunternehmer)</strong><br />
                 - <strong>Software-Lizenz:</strong> Die Überlassung der Anwendungssoftware ist <strong>100% kostenlos</strong>.<br />
-                - <strong>Campus-Modul Hosting:</strong> 7,99 € / Mo. (Server-Hosting & Webspace-Flatrate per Musikschule).<br />
-                - <strong>GrooveLab-Modul Hosting:</strong> 4,99 € / Mo. (Server-Hosting & Webspace-Flatrate per Musikschule).<br />
-                - <strong>Kombi-Vorteil Hosting:</strong> 9,99 € / Mo. (Server-Hosting & Webspace-Flatrate für beide Module).<br />
-                - <strong>Infrastruktur-Service-Fee:</strong> 0,49 € / Mo. je aktivem Lehrer-Profil. Verwaltungs- und Sekretariats-User (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>admin</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>secretary</code>) sind kostenfrei inklusive.<br />
-                - <strong>Schüler-Infrastruktur-Fee:</strong> 0,49 € / Mo. je aktivierter Schülerin/Schüler. Bei mehr als 2 Monaten Inaktivität wird das Profil automatisch passiviert.<br />
+                - <strong>Campus-Modul Hosting:</strong> {masterPricing.priceCampus.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting & Webspace-Flatrate per Musikschule).<br />
+                - <strong>GrooveLab-Modul Hosting:</strong> {masterPricing.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting & Webspace-Flatrate per Musikschule).<br />
+                - <strong>Kombi-Vorteil Hosting:</strong> {masterPricing.priceKombi.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting & Webspace-Flatrate für beide Module).<br />
+                - <strong>Infrastruktur-Service-Fee:</strong> {masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. je aktivem Lehrer-Profil. Verwaltungs- und Sekretariats-User (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>admin</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>secretary</code>) sind kostenfrei inklusive.<br />
+                - <strong>Schüler-Infrastruktur-Fee:</strong> {masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. je aktivierter Schülerin/Schüler. Bei mehr als 2 Monaten Inaktivität wird das Profil automatisch passiviert.<br />
                 - <strong>Steuerlicher Hinweis (§ 19 UStG):</strong> <em>Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</em>
               </div>
 

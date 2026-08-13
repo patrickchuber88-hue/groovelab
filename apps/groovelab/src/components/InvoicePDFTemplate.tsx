@@ -1,5 +1,6 @@
 import React from 'react';
 import QRCode from 'react-qr-code';
+import { useMasterPricing } from '../context/MasterPricingContext';
 
 interface InvoicePDFTemplateProps {
   invoice: {
@@ -25,6 +26,9 @@ interface InvoicePDFTemplateProps {
     totalStudents: number;
     premiumStudents: number;
     activeStudents: number;
+    activeCampusCount?: number;
+    activeGroovelabCount?: number;
+    passiveStudentsCount?: number;
     studentBillingOption: string | null;
     billingPayer: 'school' | 'student';
   };
@@ -46,14 +50,15 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
   operator,
   onClose
 }) => {
+  const masterPricing = useMasterPricing();
   const isInf = invoice.type === 'INF' || !invoice.type;
   const isAkt = invoice.type === 'AKT';
   const isManual = !isInf && !isAkt;
 
   const billedCampus = school.hasCampus;
   const billedGroovelab = school.hasGroovelab;
-  const campusCost = billedCampus ? 7.99 : 0;
-  const groovelabCost = billedGroovelab ? 4.99 : 0;
+  const campusCost = billedCampus ? masterPricing.priceCampus : 0;
+  const groovelabCost = billedGroovelab ? masterPricing.priceGroovelab : 0;
   const hasKombi = billedCampus && billedGroovelab;
   const isPartial = school.studentBillingOption === 'student_partial';
   const activeStudentDiscount = isPartial ? 0 : (Number(school.premiumStudents) || 0) * 0.09;
@@ -305,38 +310,89 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   )}
 
                   {/* Position 3: Team-Members */}
-                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: dynamicTdPadding }}>
-                      <strong style={{ display: 'block', color: '#0f172a' }}>Infrastruktur- &amp; Server-Hosting (Lehrkräfte)</strong>
-                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{school.totalTeachers} Team-Mitglieder (Lehrkräfte) (0,49 € / Mo. pro User)</span>
-                    </td>
-                    <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                      1 Monat
-                    </td>
-                    <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                      {(school.totalTeachers * 0.49).toFixed(2).replace('.', ',')} €
-                    </td>
-                    <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                      {(school.totalTeachers * 0.49).toFixed(2).replace('.', ',')} €
-                    </td>
-                  </tr>
+                  {(school.totalTeachers || 0) > 0 && (
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: dynamicTdPadding }}>
+                        <strong style={{ display: 'block', color: '#0f172a' }}>Infrastruktur- &amp; Server-Hosting (Lehrkräfte)</strong>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{school.totalTeachers} Lehrkräfte ({masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. pro User)</span>
+                      </td>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                        1 Monat
+                      </td>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                        {(school.totalTeachers * masterPricing.priceTeacher).toFixed(2).replace('.', ',')} €
+                      </td>
+                      <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                        {(school.totalTeachers * masterPricing.priceTeacher).toFixed(2).replace('.', ',')} €
+                      </td>
+                    </tr>
+                  )}
 
-                  {/* Position 4: School Base Fee for DB creation */}
-                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: dynamicTdPadding }}>
-                      <strong style={{ display: 'block', color: '#0f172a' }}>Datenbank- &amp; Speicher-Hosting (passive Profile)</strong>
-                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Speicher- &amp; Datenbank-Hosting für {school.totalStudents} Schüler-Accounts (0,09 € / Mo. pro User)</span>
-                    </td>
-                    <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                      1 Monat
-                    </td>
-                    <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                      {(school.totalStudents * 0.09).toFixed(2).replace('.', ',')} €
-                    </td>
-                    <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                      {(school.totalStudents * 0.09).toFixed(2).replace('.', ',')} €
-                    </td>
-                  </tr>
+                  {/* Position 4: Campus Student Activations */}
+                  {(school.activeCampusCount || 0) > 0 && (() => {
+                    const campusCnt = school.activeCampusCount || 0;
+                    return (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Aktivierungen (Schüler-Accounts)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{campusCnt} freigeschaltete Campus-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro User)</span>
+                        </td>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                          1 Monat
+                        </td>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                          {(campusCnt * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                          {(campusCnt * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    );
+                  })()}
+
+                  {/* Position 5: GrooveLab Student Activations */}
+                  {(school.activeGroovelabCount || 0) > 0 && (() => {
+                    const glCnt = school.activeGroovelabCount || 0;
+                    return (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>GrooveLab-Aktivierungen (Schüler-Accounts)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{glCnt} freigeschaltete GrooveLab-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro User)</span>
+                        </td>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                          1 Monat
+                        </td>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                          {(glCnt * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                          {(glCnt * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    );
+                  })()}
+
+                  {/* Position 6: Passive Student Profiles */}
+                  {(school.passiveStudentsCount || 0) > 0 && (() => {
+                    const passCnt = school.passiveStudentsCount || 0;
+                    return (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Datenbank- &amp; Speicher-Hosting (passive Profile)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Speicher- &amp; Datenbank-Hosting für {passCnt} passive Schüler-Accounts (0,09 € / Mo. pro User)</span>
+                        </td>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                          1 Monat
+                        </td>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                          {(passCnt * 0.09).toFixed(2).replace('.', ',')} €
+                        </td>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                          {(passCnt * 0.09).toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    );
+                  })()}
 
                   {/* Kombinations-Rabatt row */}
                   {hasKombi && (
@@ -348,9 +404,9 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>
                         1 Monat
                       </td>
-                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>-2,99 €</td>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>-{masterPricing.kombiSavings.toFixed(2).replace('.', ',')} €</td>
                       <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 700 }}>
-                        -2,99 €
+                        -{masterPricing.kombiSavings.toFixed(2).replace('.', ',')} €
                       </td>
                     </tr>
                   )}
@@ -436,13 +492,13 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                 </div>
               </div>
               {isAkt && school.billingPayer === 'student' && (
-                <div style={{ fontSize: '0.64rem', color: '#34a853', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
-                  💡 <strong>Durchlaufender Posten:</strong> Abdeckung der Gebühren direkt durch die aktivierenden Schüler/Eltern. Keine effektiven Kosten für die Musikschule.
+                <div style={{ fontSize: '0.64rem', color: '#137333', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
+                  <strong>Durchlaufender Posten:</strong> Abdeckung der Gebühren direkt durch die aktivierenden Schüler/Eltern. Keine effektiven Kosten für die Musikschule.
                 </div>
               )}
               {isAkt && school.billingPayer === 'school' && (
                 <div style={{ fontSize: '0.64rem', color: '#ea580c', background: '#ffedd5', border: '1px solid #fed7aa', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
-                  💡 <strong>Sammelabrechnung:</strong> Vertragliche Übernahme der Aktivierungsgebühren durch die Musikschule.
+                  <strong>Sammelabrechnung:</strong> Vertragliche Übernahme der Aktivierungsgebühren durch die Musikschule.
                 </div>
               )}
               <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '12px', textAlign: 'right', fontStyle: 'italic', fontWeight: 600 }}>
@@ -502,12 +558,12 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   borderRadius: '16px', 
                   border: '1px solid #e6f4ea', 
                   fontSize: '0.74rem', 
-                  color: '#34a853', 
+                  color: '#137333', 
                   fontWeight: 700,
                   width: '100%', 
                   textAlign: 'center'
                 }}>
-                  ✅ Rechnung ausgeglichen bzw. Guthaben vorhanden. Keine Zahlung erforderlich.
+                  Rechnung ausgeglichen bzw. Guthaben vorhanden. Keine Zahlung erforderlich.
                 </div>
               )}
             </div>

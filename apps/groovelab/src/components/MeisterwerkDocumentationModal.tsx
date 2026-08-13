@@ -11153,19 +11153,49 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
             if (!hasMastered) {
               return (
-                <div style={{
-                  padding: '80px 24px',
-                  textAlign: 'center',
-                  border: useNotebookLayout ? '2px dashed #32483e' : '2px dashed #cbd5e1',
-                  borderRadius: '24px',
-                  color: useNotebookLayout ? '#8fa399' : '#475569',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : 'white',
-                  maxWidth: '600px',
-                  margin: '40px auto 0 auto'
-                }}>
-                  Noch keine Meisterwerke eingetragen. Auf geht's! 🚀
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', margin: '40px auto 0 auto', maxWidth: '600px' }}>
+                  <div style={{
+                    padding: '60px 24px',
+                    textAlign: 'center',
+                    border: useNotebookLayout ? '2px dashed #32483e' : '2px dashed #cbd5e1',
+                    borderRadius: '24px',
+                    color: useNotebookLayout ? '#8fa399' : '#475569',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : 'white',
+                    width: '100%'
+                  }}>
+                    Noch keine Meisterwerke eingetragen. Auf geht's! 🚀
+                  </div>
+
+                  {/* Audio-Tresor Retro-Kassette Promo Banner */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    borderRadius: '20px',
+                    padding: '18px 22px',
+                    color: 'white',
+                    width: '100%',
+                    boxShadow: '0 8px 22px rgba(16, 185, 129, 0.2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '26px' }}>📼</span>
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: '0.92rem', letterSpacing: '-0.01em' }}>
+                          Meisterwerk Audio-Tresor (Retro-Kassette 📼)
+                        </div>
+                        <div style={{ fontSize: '0.78rem', opacity: 0.95, marginTop: '3px', lineHeight: 1.4 }}>
+                          Sobald deine Musikschule ein Tresor-Paket gebucht hat, wird jede gemeisterte Aufnahme auf einer digitalen <strong>Retro-Kassette mit Spulen-Animation, Datumsstempel &amp; Beschriftung</strong> dauerhaft für dich und deine Eltern archiviert!
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.15)', padding: '8px 14px', borderRadius: '12px', backdropFilter: 'blur(4px)' }}>
+                      <span>🔒 <strong>100 % DSGVO-konform:</strong> Lückenlose Speicherung deiner musikalischen Meilensteine – ohne private Kamerafotos!</span>
+                    </div>
+                  </div>
                 </div>
               );
             }

@@ -18,9 +18,11 @@
   - **Kombi-Vorteil Bundle**: If both Campus and GrooveLab are booked together, the bundle price is 9,99 € / Mo. (fixed server-hosting flat rate per music school, saving 2,99 € / Mo. compared to 12,98 € / Mo.).
   - **Service Fee (Lehrer & Verwaltung)**: 0,49 € / Mo. per active administrator/teacher profile.
 - **Billing Methods for Student Activations (Schüleraktivierungen)**:
-  - Only students who consciously activate their profile/access via the platform are subject to billing (inactive/unregistered profiles in the database are not billed).
+  - Only students who consciously activate their profile/access via the platform are subject to billing (inactive/unregistered profiles in the database are 100% free / 0,00 €).
+  - Jede Modul-Aktivierung löst eine Aktivierungsgebühr aus (0,49 € / Mo.). Ein Schüler, der sowohl Campus als auch GrooveLab aktiv nutzt, wird für beide Modul-Aktivierungen abgerechnet (z. B. 1× Campus + 1× GrooveLab = 2 × 0,49 € / Mo.).
+  - GrooveLab-Aktivierungen werden **immer vollständig von der Musikschule übernommen** (Sammelzahler), auch wenn für das Campus-Modul Direktabrechnung mit den Eltern vereinbart wurde.
   - **Musikschule übernimmt alle Kosten (Sammelzahler)** (Music school covers all fees, making it completely free for students/parents):
-    - *Variable monatliche Abrechnung*: Base price remains same; variable billing of 0,49 € / active student / Mo. Wenn ein Schüler länger als 2 Monate nicht eingeloggt war, wird das Profil automatisch wieder inaktiviert, um Kosten nur bei tatsächlicher Nutzung zu gewährleisten.
+    - *Variable monatliche Abrechnung*: Base price remains same; variable billing of 0,49 € / active student activation / Mo. Wenn ein Schüler länger als 2 Monate nicht eingeloggt war, wird das Profil automatisch wieder inaktiviert, um Kosten nur bei tatsächlicher Nutzung zu gewährleisten.
     - *Jahresbeitrag bei Aktivierung (10% Rabatt)*: Active students billed as an annual fee in a separate monthly bill, offering a 10% discount.
     - *Einmalige Komplett-Aktivierung zum Schuljahresstart (September) (20% Rabatt)*: The school activates all students at the school year start, billed once for the entire school year with a 20% discount.
   - **Direktabrechnung mit Eltern/Schülern (Zahlungsüberwachung)** (Direct billing with parents/students; only available for the Campus module; GrooveLab activations are always covered by the school):
@@ -92,5 +94,11 @@
 - **No Automatic Commits and Deploys**: Do NOT automatically perform git commits, git pushes, or run `./deploy.sh` (or any other deployment script) after making modifications. Changes must only be committed and deployed when explicitly requested by the user, or left for the user to handle manually.
 - **Sandboxed Deployments Bypass**: When compiling the production bundle and running `./deploy.sh` (upon explicit user request), run it with `BypassSandbox: true` so the files are successfully copied to the remote Hetzner Server (`178.105.10.2`).
 - **Kiosk Map Coupling Token Integrity**: Device coupling directly from the interactive map in `LoginScreen.tsx` must always fetch or create a kiosk record in the `kiosks` table and save its unique `secret_token` in `localStorage`, never the school's general onboarding token. To bypass Row-Level Security (RLS) policies on `kiosks` during this unauthenticated insert/select operation, temporarily set `groovelab_kiosk_token` in `localStorage` to the school's general onboarding token (`schoolData.groovelab_kiosk_token`) right before executing the Supabase query, and overwrite it with the kiosk's unique `secret_token` upon success.
+
+## Active Module & User Profile State Protection Rule
+- **Prompt Isolation**: Das Abschicken eines Prompts darf NIEMALS Einfluss auf die Aktivierung/Deaktivierung von Modulen (z. B. Campus, GrooveLab, Abo-Bypass) oder User-Profilen haben.
+- **Live In-App Execution**: Aktivierungen und Deaktivierungen müssen ausschließlich live bei der direkten Verwendung der Web-App durch den Nutzer ausgeführt werden und dürfen niemals durch KI-Prompts oder Agenten-Interaktionen getriggert oder überschrieben werden.
+- **Dynamic User Limits**: Quota- und Speicher-Limits (z. B. für den Audio-Tresor) gelten dynamisch für jeden aktiven User und werden nicht über vorgefertigte, starre Inklusiv-GB-Zahlen gesteuert.
+
 
 

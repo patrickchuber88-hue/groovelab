@@ -19,6 +19,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [signeeName, setSigneeName] = useState('');
   const [agbChecked, setAgbChecked] = useState(false);
   const [liabilityChecked, setLiabilityChecked] = useState(false);
   const [parentChecked, setParentChecked] = useState(false);
@@ -27,6 +28,10 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
   const handleAccept = async () => {
     if (!agbChecked || !liabilityChecked || !parentChecked || !avvChecked) {
       setError('Bitte bestätige alle rechtlichen Bedingungen, um fortzufahren.');
+      return;
+    }
+    if (!signeeName.trim()) {
+      setError('Bitte gib den Namen des/der Vertretungsberechtigten (z. B. Schulleitung / Admin) an.');
       return;
     }
 
@@ -56,28 +61,69 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
       }
 
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown';
+      const signedAtIso = new Date().toISOString();
 
-      // 2. Insert pilot agreement record
-      const { error: insertErr } = await supabase
-        .from('pilot_agreements')
-        .insert({
-          school_id: schoolId,
-          user_id: userId,
-          ip_address: ip,
-          user_agent: userAgent
-        });
+      // 2. Insert or update agreement record (upsert with fallback for duplicate keys)
+      try {
+        const { error: upsertErr } = await supabase
+          .from('pilot_agreements')
+          .upsert(
+            {
+              school_id: schoolId,
+              user_id: userId,
+              signee_name: signeeName.trim(),
+              ip_address: ip,
+              user_agent: userAgent
+            },
+            { onConflict: 'school_id, user_id' }
+          );
 
-      if (insertErr) throw insertErr;
+        if (upsertErr) {
+          // If upsert fails due to unique constraint, update existing record
+          if (upsertErr.code === '23505' || upsertErr.message?.includes('duplicate key') || upsertErr.message?.includes('unique constraint')) {
+            await supabase
+              .from('pilot_agreements')
+              .update({ signee_name: signeeName.trim(), ip_address: ip, user_agent: userAgent })
+              .eq('school_id', schoolId);
+          } else {
+            // Fallback insert attempt
+            const { error: insertErr } = await supabase
+              .from('pilot_agreements')
+              .insert({
+                school_id: schoolId,
+                user_id: userId,
+                signee_name: signeeName.trim(),
+                ip_address: ip,
+                user_agent: userAgent
+              });
+            
+            if (insertErr && (insertErr.code === '23505' || insertErr.message?.includes('duplicate key') || insertErr.message?.includes('unique constraint'))) {
+              // Ignore duplicate key error as agreement already exists
+            } else if (insertErr) {
+              throw insertErr;
+            }
+          }
+        }
+      } catch (dbErr: any) {
+        console.warn('Agreement DB operation warning:', dbErr);
+        if (!dbErr.message?.includes('duplicate key') && dbErr.code !== '23505') {
+          throw dbErr;
+        }
+      }
 
-      // 3. Mark the school as trial/active for safety
+      // 3. Mark school as trial/active AND set AVV digital signature audit trail fields
       await supabase
         .from('schools')
-        .update({ is_trial: true })
+        .update({ 
+          is_trial: true,
+          avv_signed_at: signedAtIso,
+          avv_signee_name: signeeName.trim()
+        })
         .eq('id', schoolId);
 
       onComplete();
     } catch (err: any) {
-      console.error('Error saving pilot agreement:', err);
+      console.error('Error saving agreement:', err);
       setError(err.message || 'Verbindung zum Server fehlgeschlagen.');
     } finally {
       setLoading(false);
@@ -129,10 +175,10 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
             <ShieldCheck size={32} />
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#18181b' }}>
-            Nutzungsvereinbarung & Freischaltung
+            Nutzungsvereinbarung &amp; Freischaltung
           </h2>
           <p style={{ fontSize: '0.88rem', color: '#71717a', margin: 0, lineHeight: 1.4 }}>
-            Bitte bestätige die Nutzungsbedingungen für die Nutzung der Plattform Campus-Groovelab.
+            Bitte bestätige die offiziellen Nutzungs- &amp; Vertragsbedingungen für deine Musikschule auf der Plattform Campus-Groovelab.
           </p>
         </div>
 
@@ -148,8 +194,29 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
         }}>
           <AlertTriangle style={{ color: '#ca8a04', flexShrink: 0 }} size={20} />
           <div style={{ fontSize: '0.8rem', color: '#854d0e', lineHeight: 1.4, fontWeight: 550 }}>
-            <strong>Rechtlicher Hinweis:</strong> Da diese Softwareüberlassung vollständig kostenlos erfolgt, greift das Schenkungshaftungsmodell. Die Software wird ohne Zusicherung von Verfügbarkeit oder Gewährleistung bereitgestellt.
+            <strong>Rechtlicher Hinweis:</strong> Da diese Softwareüberlassung unentgeltlich erfolgt, greift das gesetzliche Haftungsprivileg (§ 599 BGB). Die Software wird ohne Zusicherung von Verfügbarkeit oder Gewährleistung bereitgestellt. Für kostenpflichtig gebuchte Hosting-Infrastruktur gelten die Bestimmungen der B2B-AGB.
           </div>
+        </div>
+
+        {/* Signee Name Field */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: '#f8fafc', padding: '14px 16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
+            Name des/der Vertretungsberechtigten (z. B. Schulleitung / Admin):
+          </label>
+          <input
+            type="text"
+            placeholder="z. B. Dr. Maria Musterfrau (Schulleitung)"
+            value={signeeName}
+            onChange={(e) => setSigneeName(e.target.value)}
+            style={{
+              padding: '10px 14px',
+              borderRadius: '10px',
+              border: '1px solid #cbd5e1',
+              fontSize: '0.84rem',
+              outline: 'none',
+              background: '#ffffff'
+            }}
+          />
         </div>
 
         {/* Requirements checklists */}
@@ -199,7 +266,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
               style={{ accentColor: '#34a853', marginTop: '3px' }}
             />
             <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
-              Ich zeichne hiermit die <strong onClick={(e) => { e.preventDefault(); onShowPrivacy(); }} style={{ color: '#34a853', textDecoration: 'underline', cursor: 'pointer' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong> gemäß Art. 28 DSGVO zur Absicherung des Server-Hostings in Deutschland (Hetzner Online GmbH) mit dem Betreiber.
+              Ich zeichne hiermit die <strong onClick={(e) => { e.preventDefault(); onShowPrivacy(); }} style={{ color: '#34a853', textDecoration: 'underline', cursor: 'pointer' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong> gemäß Art. 28 DSGVO zur Absicherung des Server-Hostings in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH &amp; Supabase EU) mit dem Betreiber.
             </span>
           </label>
 
@@ -214,25 +281,25 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
         {/* Submit Action */}
         <button
           onClick={handleAccept}
-          disabled={loading}
+          disabled={loading || !signeeName.trim()}
           style={{
-            background: loading ? '#a1a1aa' : '#34a853',
+            background: (loading || !signeeName.trim()) ? '#a1a1aa' : '#34a853',
             color: '#ffffff',
             border: 'none',
             borderRadius: '12px',
             padding: '14px',
             fontSize: '0.9rem',
             fontWeight: 800,
-            cursor: loading ? 'not-allowed' : 'pointer',
+            cursor: (loading || !signeeName.trim()) ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            boxShadow: '0 4px 12px rgba(19, 115, 51, 0.15)',
+            boxShadow: (loading || !signeeName.trim()) ? 'none' : '0 4px 12px rgba(19, 115, 51, 0.15)',
             transition: 'all 0.2s ease'
           }}
         >
-          {loading ? 'Speichere Vereinbarung...' : 'Vereinbarung bestätigen & freischalten'}
+          {loading ? 'Speichere Vereinbarung...' : 'Vereinbarung rechtsverbindlich bestätigen & freischalten'}
         </button>
 
       </div>

@@ -2511,9 +2511,20 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
   const handleExportMix = async () => {
     if (!masterLoopDuration) return;
-    const loopNotesCount = homeworkNotesList.filter(note => note.startsWith('LOOP:')).length;
-    if (loopNotesCount >= 10) {
-      alert("Limit erreicht! Du hast bereits 10 gespeicherte Loops. Bitte lösche im Tab 'Gespeicherte Loops' zuerst einen alten Loop, um Platz für diesen neuen Loop-Mix zu machen.");
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const currentMonthSavedLoops = homeworkNotesList.filter(note => {
+      if (!note.startsWith('LOOP:')) return false;
+      const parts = note.replace('LOOP:', '').split('|');
+      const dateStr = parts[2];
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    if (currentMonthSavedLoops.length >= 3) {
+      alert("Monats-Limit erreicht! Du hast in diesem Kalendermonat bereits 3 gespeicherte Loops im Protokoll. Du kannst deinen neuen Song weiterhin unbegrenzt als MP3 herunterladen oder im Tab 'Gespeicherte Loops' einen alten Loop löschen.");
       return;
     }
     setIsExporting(true);
@@ -3062,6 +3073,45 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           <span>Anleitung & Pro-Tipps</span>
         </button>
       </div>
+
+      {(() => {
+        const now = new Date();
+        const currentMonthName = now.toLocaleString("de-DE", { month: "long" });
+        const currentMonthSavedLoops = (homeworkNotesList || []).filter(note => {
+          if (!note.startsWith("LOOP:")) return false;
+          const parts = note.replace("LOOP:", "").split("|");
+          const dateStr = parts[2];
+          if (!dateStr) return false;
+          const d = new Date(dateStr);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+        const usedCount = currentMonthSavedLoops.length;
+        const isFull = usedCount >= 3;
+
+        return (
+          <div style={{
+            width: "100%",
+            padding: "8px 14px",
+            borderRadius: "12px",
+            background: isFull ? "rgba(239, 68, 68, 0.08)" : "rgba(52, 168, 83, 0.08)",
+            border: `1px solid ${isFull ? "rgba(239, 68, 68, 0.25)" : "rgba(52, 168, 83, 0.25)"}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            fontSize: "0.74rem",
+            boxSizing: "border-box",
+            marginBottom: "12px"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: isFull ? "#b91c1c" : "#15803d", fontWeight: 800 }}>
+              <span>🎛️ Monats-Kontingent ({currentMonthName}):</span>
+              <span style={{ fontWeight: 900 }}>{usedCount} / 3 Loops im Protokoll gespeichert</span>
+            </div>
+            <span style={{ fontSize: '0.70rem', color: '#64748b' }}>
+              {isFull ? "⚠️ Monats-Limit erreicht (Download & Live-Studio frei)" : "✨ Live-Studio & MP3-Download unbegrenzt"}
+            </span>
+          </div>
+        );
+      })()}
 
       {activeSubTab === 'guide' ? (
         <div style={{

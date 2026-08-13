@@ -134,32 +134,52 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             borderRadius: '12px',
             marginBottom: '16px',
             fontSize: '0.78rem',
-            fontWeight: 600
+            fontWeight: 600,
+            lineHeight: 1.5
           }}>
-            Vertragspartner: <strong>{school?.name || 'Musikschule'}</strong> (Auftraggeber) und <strong>Campus-Groovelab SaaS Operator</strong> (Auftragnehmer).
+            Vertragspartner: <strong>{school?.name || 'Musikschule'}</strong> {school?.address ? `(${school.address}) ` : ''}(Auftraggeber) und <strong>Campus-Groovelab SaaS Operator</strong> (Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden) (Auftragnehmer).
           </div>
 
           <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginTop: '12px', color: '#0f172a' }}>
-            1. Gegenstand & Dauer der Vereinbarung
+            1. Gegenstand, Art &amp; Zweck der Verarbeitung
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            Der Auftragnehmer verarbeitet personenbezogene Daten im Auftrag des Auftraggebers im Rahmen der Nutzung der SaaS-Software Campus-Groovelab (Hausaufgabenheft, Schüler-Protokolle, Band-Verwaltung & Audio-Loopstation).
+            Der Auftragnehmer erbringt für den Auftraggeber die Bereitstellung der SaaS-Schulmanagement- und Übungsplattform <strong>Campus-Groovelab</strong>. Die Verarbeitung erfolgt ausschließlich auf dokumentierte Weisung des Auftraggebers (Art. 28 Abs. 3 lit. a DSGVO).
           </p>
 
           <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginTop: '12px', color: '#0f172a' }}>
-            2. Pflichten des Auftragnehmers
-          </h4>
-          <ul style={{ margin: '4px 0 12px 0', paddingLeft: '20px' }}>
-            <li>Verarbeitung ausschließlich auf dokumentierte Weisung des Auftraggebers.</li>
-            <li>Gewährleistung technischer und organisatorischer Maßnahmen (TOM) nach Art. 32 DSGVO (Verschlüsselung, Mandantentrennung).</li>
-            <li>Vollständige Löschung aller personenbezogenen Schülerspuren und Audiodateien nach Vertragsende oder Aufhebung der Freischaltung.</li>
-          </ul>
-
-          <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginTop: '12px', color: '#0f172a' }}>
-            3. Unterauftragsverhältnisse & Drittländer
+            2. Vertraulichkeit &amp; Serverstandort (Art. 28 Abs. 3 lit. b DSGVO)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            Daten werden ausschließlich in Rechenzentren innerhalb der Europäischen Union bzw. der Schweiz verarbeitet (Host: Hetzner / Supabase EU-West Frankfurt).
+            Sämtliche personenbezogenen Daten werden zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren der <strong>Hetzner Online GmbH (Falkenstein/DE) &amp; Supabase EU (Frankfurt/DE)</strong> verarbeitet. Das eingesetzte Personal ist zur Verschwiegenheit verpflichtet.
+          </p>
+
+          <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginTop: '12px', color: '#0f172a' }}>
+            3. Technisch-Organisatorische Maßnahmen / TOMs (Art. 32 DSGVO)
+          </h4>
+          <p style={{ margin: '4px 0 12px 0' }}>
+            Gewährleistung von TLS 1.3 &amp; AES-256 Verschlüsselung, clientseitiger Datenminimierung (Pseudonymisierung von Vornamen), strikter Row-Level Security (RLS) Mandantentrennung sowie schreibgeschützten WORM Audit-Logs in deutscher Ortszeit.
+          </p>
+
+          <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginTop: '12px', color: '#0f172a' }}>
+            4. Unterauftragsverhältnisse (Art. 28 Abs. 2 DSGVO)
+          </h4>
+          <p style={{ margin: '4px 0 12px 0' }}>
+            Der Auftraggeber stimmt der Einbindung der Unterauftragsverarbeiter Hetzner Online GmbH (Hosting Infrastruktur DE) und Supabase EU (Datenbank DE) zu.
+          </p>
+
+          <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginTop: '12px', color: '#0f172a' }}>
+            5. Unterstützungspflichten &amp; Meldung von Datenschutzverletzungen
+          </h4>
+          <p style={{ margin: '4px 0 12px 0' }}>
+            Der Auftragnehmer unterstützt den Auftraggeber bei Betroffenenrechten (Art. 15–22 DSGVO) sowie bei der Meldung von Datenschutzverletzungen (Art. 33 DSGVO).
+          </p>
+
+          <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginTop: '12px', color: '#0f172a' }}>
+            6. Beendigung, Datenlöschung &amp; Kontrollrechte (Art. 17 &amp; 28 DSGVO)
+          </h4>
+          <p style={{ margin: '4px 0 12px 0' }}>
+            Vollständige Löschung aller verarbeiteten Daten nach Vertragsende oder Aufhebung der Freischaltung. Der Auftraggeber erhält alle erforderlichen Nachweise und Audit-Rechte.
           </p>
         </div>
 

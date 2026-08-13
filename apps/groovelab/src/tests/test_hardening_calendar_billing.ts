@@ -64,9 +64,9 @@ function calculateBilling({
   const baseModuleCost = (hasCampusSub && hasGroovelabSub) ? 9.99 : ((hasCampusSub ? 7.99 : 0) + (hasGroovelabSub ? 4.99 : 0));
   const passiveStudents = Math.max(0, totalStudents - activeStudents);
 
-  const adminCost = employeeCount * 0.49;
+  const adminCost = 0; // Admin & Secretary free of charge
   const teacherCost = teacherCount * 0.49;
-  const passiveStudentCost = passiveStudents * 0.09;
+  const passiveStudentCost = 0; // Passive DB profiles 0,00 €
 
   const totalInvoiceA_monthly = baseModuleCost + adminCost + teacherCost + passiveStudentCost;
   const finalInvoiceA_monthly = couponApplied ? (totalInvoiceA_monthly * (1 - couponDiscount / 100)) : totalInvoiceA_monthly;
@@ -243,21 +243,21 @@ async function main() {
 
       // Expected math:
       // baseModuleCost = 7.99
-      // adminCost = 1 * 0.49 = 0.49
+      // adminCost = 0.00 (free)
       // teacherCost = 3 * 0.49 = 1.47
       // passiveStudents = 50 - 20 = 30
-      // passiveStudentCost = 30 * 0.09 = 2.70
-      // Invoice A total = 7.99 + 0.49 + 1.47 + 2.70 = 12.65
+      // passiveStudentCost = 0.00 (free)
+      // Invoice A total = 7.99 + 0.00 + 1.47 + 0.00 = 9.46
       // Invoice B total = 20 * 0.49 = 9.80
-      // Mixed total = 22.45
-      if (billing.finalInvoiceA_monthly.toFixed(2) !== '12.65') {
-        throw new Error(`Expected Invoice A total to be 12.65, got ${billing.finalInvoiceA_monthly}`);
+      // Mixed total = 19.26
+      if (billing.finalInvoiceA_monthly.toFixed(2) !== '9.46') {
+        throw new Error(`Expected Invoice A total to be 9.46, got ${billing.finalInvoiceA_monthly}`);
       }
       if (billing.totalInvoiceB_monthly.toFixed(2) !== '9.80') {
         throw new Error(`Expected Invoice B total to be 9.80, got ${billing.totalInvoiceB_monthly}`);
       }
-      if (billing.mixedTotal.toFixed(2) !== '22.45') {
-        throw new Error(`Expected Mixed total to be 22.45, got ${billing.mixedTotal}`);
+      if (billing.mixedTotal.toFixed(2) !== '19.26') {
+        throw new Error(`Expected Mixed total to be 19.26, got ${billing.mixedTotal}`);
       }
     });
 
@@ -279,16 +279,16 @@ async function main() {
 
       // Expected math:
       // baseModuleCost = 9.99
-      // adminCost = 0.49
+      // adminCost = 0.00
       // teacherCost = 2.45
       // passiveStudents = 90
-      // passiveStudentCost = 90 * 0.09 = 8.10
-      // Invoice A pre-discount = 9.99 + 0.49 + 2.45 + 8.10 = 21.03
-      // Invoice A post-discount (20% off) = 21.03 * 0.8 = 16.824 (16.82)
+      // passiveStudentCost = 0.00
+      // Invoice A pre-discount = 9.99 + 2.45 = 12.44
+      // Invoice A post-discount (20% off) = 12.44 * 0.8 = 9.952 (~9.95)
       // Invoice B = 0 (self-payer)
-      const diff = Math.abs(billing.finalInvoiceA_monthly - 16.824);
+      const diff = Math.abs(billing.finalInvoiceA_monthly - 9.952);
       if (diff > 0.001) {
-        throw new Error(`Expected discounted Invoice A to be ~16.82, got ${billing.finalInvoiceA_monthly}`);
+        throw new Error(`Expected discounted Invoice A to be ~9.95, got ${billing.finalInvoiceA_monthly}`);
       }
       if (billing.totalInvoiceB_monthly !== 0) {
         throw new Error(`Expected Invoice B to be 0, got ${billing.totalInvoiceB_monthly}`);

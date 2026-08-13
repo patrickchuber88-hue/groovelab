@@ -518,7 +518,7 @@ export function CampusSetupScreen({
                   color: '#ffffff',
                   whiteSpace: 'nowrap'
                 }}>
-                  100% ISO 27001 (Hetzner DE)
+                  ISO 27001 Rechenzentrum (DE)
                 </span>
               </div>
 
@@ -578,7 +578,7 @@ export function CampusSetupScreen({
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Server &amp; Offsite-Backups</strong>
-                      <span style={{ fontSize: '0.7rem', background: '#d1fae5', color: '#065f46', padding: '2px 8px', borderRadius: '12px', fontWeight: 800 }}>ISO 27001</span>
+                      <span style={{ fontSize: '0.7rem', background: '#d1fae5', color: '#065f46', padding: '2px 8px', borderRadius: '12px', fontWeight: 800 }}>ISO 27001 RZ</span>
                     </div>
                     <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', lineHeight: '1.4' }}>
                       100% deutsches Hosting in Hetzner-Rechenzentren inkl. täglicher automatisierter Backups.

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import { useMasterPricing } from '../context/MasterPricingContext';
+import { calculateSchoolEffectiveRates } from '../domain/pricingEngine';
 import { 
   CreditCard, 
   Search, 
@@ -51,6 +53,7 @@ interface Invoice {
   userQuota: number;
   pendingUserQuota: number | null;
   studentBillingOption: string;
+  isGrandfathered?: boolean;
 
   // Custom Breakdown Fields
   activeStudentFee: number;
@@ -59,6 +62,9 @@ interface Invoice {
   passiveStudentsCount: number;
   teachersHostingFee: number;
   passiveStudentsHostingFee: number;
+  storageAddonGb: number;
+  storageUsedBytes: number;
+  storageAddonMonthlyFee: number;
 }
 
 interface PlatformSummary {
@@ -88,6 +94,7 @@ const formatDateDisplay = (dateString: string) => {
 };
 
 export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?: string }) {
+  const masterPricing = useMasterPricing();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [dbInvoices, setDbInvoices] = useState<any[]>([]);
 
@@ -216,6 +223,15 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
   useEffect(() => {
     fetchBillingData();
+
+    const handleSchoolUpdate = () => {
+      fetchBillingData();
+    };
+
+    window.addEventListener('groovelab_school_updated', handleSchoolUpdate);
+    return () => {
+      window.removeEventListener('groovelab_school_updated', handleSchoolUpdate);
+    };
   }, []);
 
   // Load user details lazily when a school is expanded (Performance & Privacy Optimization)
@@ -363,24 +379,43 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         if (billingSettings.bic) setOperatorBic(billingSettings.bic);
       }
       
-      const rateCampus = billingSettings?.price_module_campus ?? 7.99;
-      const rateGroovelab = billingSettings?.price_module_groovelab ?? 4.99;
-      const rateTeacher = billingSettings?.price_user_teacher ?? 0.49;
-      const rateStudent = billingSettings?.price_user_student ?? 0.49;
+      const rateCampus = billingSettings?.price_module_campus ?? masterPricing.priceCampus;
+      const rateGroovelab = billingSettings?.price_module_groovelab ?? masterPricing.priceGroovelab;
+      const rateKombi = billingSettings?.price_module_kombi ?? masterPricing.priceKombi;
+      const rateTeacher = billingSettings?.price_user_teacher ?? masterPricing.priceTeacher;
+      const rateStudent = billingSettings?.price_user_student ?? masterPricing.priceStudent;
 
-      // 2. Fetch schools
-      const { data: schools, error: schoolsErr } = await supabase
+      // 2. Fetch schools with resilient fallback
+      let { data: schools, error: schoolsErr } = await supabase
         .from('schools')
-        .select('id, name, street, house_number, zip_code, city, subscription_type, has_campus_subscription, has_groovelab_subscription, has_kombi_discount, subscription_bypass, status, is_trial, user_quota, pending_user_quota, student_billing_option');
+        .select('*');
 
-      if (schoolsErr) throw schoolsErr;
+      if (schoolsErr) {
+        console.error('⚠️ Primary schools fetch error:', schoolsErr);
+        throw schoolsErr;
+      }
 
-      // 3. Fetch active license metrics
+      // Merge local overrides from localStorage to ensure instant reflection when edited in Master Admin
+      if (typeof window !== 'undefined' && schools) {
+        try {
+          const overridesStr = localStorage.getItem('groovelab_school_overrides');
+          if (overridesStr) {
+            const overrides = JSON.parse(overridesStr);
+            schools = schools.map(s => (overrides[s.id] ? { ...s, ...overrides[s.id] } : s));
+          }
+        } catch (e) {
+          console.warn('Could not merge groovelab_school_overrides:', e);
+        }
+      }
+
+      // 3. Fetch active license metrics (Graceful fallback if view/table unavailable)
       const { data: metrics, error: metricsErr } = await supabase
         .from('active_licence_metrics')
         .select('school_id, active_campus_users');
 
-      if (metricsErr) throw metricsErr;
+      if (metricsErr) {
+        console.warn('⚠️ active_licence_metrics fetch warning (non-fatal):', metricsErr.message);
+      }
 
       const metricsMap: Record<string, number> = {};
       metrics?.forEach(m => {
@@ -392,13 +427,19 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         .from('users')
         .select('school_id, role, roles, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing');
 
-      if (usersErr) throw usersErr;
+      if (usersErr) {
+        console.warn('⚠️ users fetch warning:', usersErr.message);
+      }
       setAllUsers([]);
 
-      // 4b. Fetch pending students
+      // 4b. Fetch pending students (Graceful fallback)
       const { data: pendingStudentsDb, error: pendingErr } = await supabase
         .from('pending_students_decrypted')
         .select('id, school_id');
+      
+      if (pendingErr) {
+        console.warn('⚠️ pending_students_decrypted fetch warning:', pendingErr.message);
+      }
       
       const pendingCountMap: Record<string, number> = {};
       pendingStudentsDb?.forEach(p => {
@@ -453,13 +494,38 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           }
         }
         
-        // Count teachers (exclude those who are also employees/admins)
-        const isTeacher = (u.role === 'teacher' || (u.roles && u.roles.includes('teacher'))) && !isEmployee;
-        if (isTeacher) {
-          userStatsMap[u.school_id].totalTeachers++;
-          if (u.is_active) {
-            userStatsMap[u.school_id].activeTeachers++;
+      });
+
+      // Recalculate billable teachers applying Anti-Abuse 2 Cap (Max 2 free double-roles per school)
+      const schoolUsersMap: { [schoolId: string]: any[] } = {};
+      users?.forEach(u => {
+        if (!schoolUsersMap[u.school_id]) schoolUsersMap[u.school_id] = [];
+        schoolUsersMap[u.school_id].push(u);
+      });
+
+      Object.keys(schoolUsersMap).forEach(schId => {
+        const schUsers = schoolUsersMap[schId];
+        let freeDoubleRoleCount = 0;
+        let billableTeacherCount = 0;
+
+        schUsers.forEach(u => {
+          const isMgmt = u.role === 'admin' || u.role === 'secretary' || (Array.isArray(u.roles) && (u.roles.includes('admin') || u.roles.includes('secretary')));
+          const isTch = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
+
+          if (isMgmt && isTch) {
+            if (freeDoubleRoleCount < 2) {
+              freeDoubleRoleCount++;
+            } else {
+              billableTeacherCount++;
+            }
+          } else if (!isMgmt && isTch) {
+            billableTeacherCount++;
           }
+        });
+
+        if (userStatsMap[schId]) {
+          userStatsMap[schId].activeTeachers = billableTeacherCount;
+          userStatsMap[schId].totalTeachers = billableTeacherCount;
         }
       });
 
@@ -488,17 +554,22 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         const teachersCount = stats.activeTeachers; // Fix: use active count
         const employeesCount = stats.activeEmployees; // Fix: use active count
 
-        // MODULE BASE FEE CALCULATION
-        let baseFee = 0;
-        if (school.has_campus_subscription) baseFee += rateCampus;
-        if (school.has_groovelab_subscription) baseFee += rateGroovelab;
+        // MODULE BASE FEE & EFFECTIVE RATES CALCULATION
+        const effectiveRates = calculateSchoolEffectiveRates(school, masterPricing);
+        const hasCampus = school.has_campus_subscription;
+        const hasGroovelab = school.has_groovelab_subscription;
+        const hasKombi = school.has_kombi_discount || (hasCampus && hasGroovelab);
 
-        // COMBINATION DISCOUNT
-        const hasKombi = school.has_kombi_discount || (school.has_campus_subscription && school.has_groovelab_subscription);
-        const kombiDiscountAmount = hasKombi ? 2.99 : 0.00;
+        let moduleBaseFee = 0;
+        if (hasKombi) {
+          moduleBaseFee = effectiveRates.priceKombi;
+        } else {
+          if (hasCampus) moduleBaseFee += effectiveRates.priceCampus;
+          if (hasGroovelab) moduleBaseFee += effectiveRates.priceGroovelab;
+        }
 
         // STAFF FEE (teachers & employees)
-        const staffFee = teachersCount * 0.49;
+        const staffFee = teachersCount * effectiveRates.priceTeacher;
         
         // PASSIVE STUDENTS FEE (0.09 € per passive student profile)
         const isPartial = school.student_billing_option === 'student_partial';
@@ -511,13 +582,16 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
         // ACTIVE STUDENTS FEE (only if billing option is option2 / school pays monthly per active student)
         const isSchoolPayer = school.student_billing_option === 'option2' || school.student_billing_option === 'option3_2' || school.student_billing_option === 'option3_3';
-        const activeStudentFee = (isSchoolPayer && school.student_billing_option === 'option2') ? activeStudents * 0.49 : 0.00;
+        const activeStudentFee = (isSchoolPayer && school.student_billing_option === 'option2') ? activeStudents * effectiveRates.priceStudent : 0.00;
         
         // B2C REVENUE (e.g. from student upgrades)
         const b2cRevenue = premiumStudents * 9.99;
 
         // Subtotal B2B
-        const subtotal = Math.max(0, (baseFee - kombiDiscountAmount) + userFee + activeStudentFee);
+        const baseFee = moduleBaseFee;
+        const kombiDiscountAmount = hasKombi ? Math.max(0, (effectiveRates.priceCampus + effectiveRates.priceGroovelab) - effectiveRates.priceKombi) : 0;
+        const storageAddonFee = Number(school.storage_addon_gb || 0) > 0 ? Number(school.storage_addon_monthly_fee || 1.49) : 0;
+        const subtotal = Math.max(0, moduleBaseFee + userFee + activeStudentFee + storageAddonFee);
         const isBypass = school.subscription_bypass || false;
         let status: 'trial' | 'active' | 'bypass' | 'suspended' = 'active';
         if (school.status === 'suspended') {
@@ -559,6 +633,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           userQuota: school.user_quota || 150,
           pendingUserQuota: school.pending_user_quota,
           studentBillingOption: school.student_billing_option || 'option1',
+          isGrandfathered: effectiveRates.isGrandfatheredRateActive,
           
           // Custom Breakdown Fields
           activeStudentFee: parseFloat(activeStudentFee.toFixed(2)),
@@ -566,7 +641,10 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           totalEmployeesCount: employeesCount,
           passiveStudentsCount,
           teachersHostingFee: parseFloat(staffFee.toFixed(2)),
-          passiveStudentsHostingFee: parseFloat(passiveStudentsFee.toFixed(2))
+          passiveStudentsHostingFee: parseFloat(passiveStudentsFee.toFixed(2)),
+          storageAddonGb: Number(school.storage_addon_gb || 0),
+          storageUsedBytes: Number(school.storage_used_bytes || 0),
+          storageAddonMonthlyFee: storageAddonFee
         };
       });
 
@@ -658,7 +736,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
     } catch (err: any) {
       console.error('Error fetching billing data:', err);
-      setError('Verbindungsfehler beim Laden der Abrechnungsmetriken.');
+      setError('Verbindungsfehler beim Laden der Abrechnungsmetriken: ' + (err.message || String(err)));
     } finally {
       setLoading(false);
     }
@@ -1135,6 +1213,20 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                           }}>
                             {inv.status === 'trial' ? 'Probe' : inv.status === 'bypass' ? 'Bypass' : inv.status === 'suspended' ? 'Gesperrt' : 'Aktiv'}
                           </span>
+                          {inv.isGrandfathered && (
+                            <span style={{
+                              fontSize: '0.6rem',
+                              fontWeight: 800,
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              background: '#fef3c7',
+                              color: '#b45309',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.03em'
+                            }}>
+                              Bestandsschutz
+                            </span>
+                          )}
                           <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
                             {inv.totalStudents} Schüler | {inv.totalTeachers} Lehrer
                           </span>
@@ -1216,10 +1308,10 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                     fontSize: '0.68rem',
                     fontWeight: 800,
                     padding: '4px 10px',
-                    borderRadius: '8px',
-                    background: inv.status === 'trial' ? '#fff8e1' : inv.status === 'bypass' ? '#fee2e2' : inv.status === 'suspended' ? '#fee2e2' : '#e6f4ea',
-                    color: inv.status === 'trial' ? '#b06000' : inv.status === 'bypass' ? '#dc2626' : inv.status === 'suspended' ? '#7f1d1d' : '#34a853',
-                    textTransform: 'uppercase',
+                    borderRadius: '20px',
+                    background: inv.status === 'trial' ? '#fef3c7' : inv.status === 'bypass' ? '#f3e8ff' : inv.status === 'suspended' ? '#fee2e2' : '#e6f4ea',
+                    color: inv.status === 'trial' ? '#b45309' : inv.status === 'bypass' ? '#7e22ce' : inv.status === 'suspended' ? '#dc2626' : '#137333',
+                    border: `1px solid ${inv.status === 'trial' ? '#fde68a' : inv.status === 'bypass' ? '#e9d5ff' : inv.status === 'suspended' ? '#fca5a5' : '#ceead6'}`,
                     letterSpacing: '0.04em'
                   }}>
                     Abonnement: {inv.status === 'trial' ? 'Probezeit' : inv.status === 'bypass' ? 'Gebühren-Bypass' : inv.status === 'suspended' ? 'Gesperrt' : 'Aktiv'}
@@ -1271,28 +1363,37 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                         {inv.hasKombiDiscount && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#34a853' }}>
                             <span style={{ fontWeight: 600 }}>Kombi-Vorteilsrabatt</span>
-                            <span style={{ fontWeight: 600 }}>-{(2.99).toFixed(2).replace('.', ',')} €</span>
+                            <span style={{ fontWeight: 600 }}>-{masterPricing.kombiSavings.toFixed(2).replace('.', ',')} €</span>
                           </div>
                         )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Infrastruktur- & Server-Hosting</span>
-                            <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.totalTeachersCount} Lehrkräfte aktiv × 0,49 €</span>
+                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Infrastruktur- &amp; Server-Hosting</span>
+                            <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.totalTeachersCount} Lehrkräfte aktiv × {masterPricing.priceTeacher.toFixed(2).replace('.', ',')} €</span>
                           </div>
                           <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.teachersHostingFee.toFixed(2).replace('.', ',')} €</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Datenbank- & Speicher-Hosting</span>
+                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Datenbank- &amp; Speicher-Hosting</span>
                             <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.passiveStudentsCount} Schüler passiv × 0,09 €</span>
                           </div>
                           <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.passiveStudentsHostingFee.toFixed(2).replace('.', ',')} €</span>
                         </div>
+                        {inv.storageAddonGb > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                              <span style={{ color: '#0f172a', fontWeight: 600 }}>🎙️ Audio-Tresor &amp; Speicher (+{inv.storageAddonGb} GB)</span>
+                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>Zusatz-Speichervolumen</span>
+                            </div>
+                            <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.storageAddonMonthlyFee.toFixed(2).replace('.', ',')} €</span>
+                          </div>
+                        )}
                         {inv.activeStudentFee > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                               <span style={{ color: '#0f172a', fontWeight: 600 }}>Infrastruktur-Bereitstellung</span>
-                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{Math.round(inv.activeStudentFee / 0.49)} Schüler aktiv × 0,49 €</span>
+                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{Math.round(inv.activeStudentFee / (masterPricing.priceStudent || 0.49))} Schüler aktiv × {(masterPricing.priceStudent || 0.49).toFixed(2).replace('.', ',')} €</span>
                             </div>
                             <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.activeStudentFee.toFixed(2).replace('.', ',')} €</span>
                           </div>
@@ -1326,6 +1427,116 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                     </div>
                   </div>
                 </div>
+
+                {/* Audio-Tresor Storage Addon & Quota Card */}
+                {(() => {
+                  const storageGb = Number(inv.storageAddonGb || 0);
+                  const storageUsedBytes = Number(inv.storageUsedBytes || 0);
+                  const baseGb = 5; // Standard 5 GB base volume
+                  const totalGb = baseGb + storageGb;
+                  const totalBytes = totalGb * 1024 * 1024 * 1024;
+                  const usedGb = storageUsedBytes / (1024 * 1024 * 1024);
+                  const freeGb = Math.max(0, totalGb - usedGb);
+                  const usagePct = Math.min(100, Math.round((storageUsedBytes / (totalBytes || 1)) * 100));
+
+                  const isHighUsage = usagePct >= 80;
+                  const isFull = usagePct >= 100;
+                  const schoolStudentCount = inv.totalStudents || 0;
+
+                  // Define packages with price & recommendation logic
+                  const storagePackages = [
+                    { gb: 5, price: 1.99, label: '5 GB Tresor-Paket', recMax: 100, desc: 'Empfehlung: Bis zu 100 Schüler' },
+                    { gb: 10, price: 2.99, label: '10 GB Tresor-Paket', recMax: 250, desc: 'Empfehlung: Bis zu 250 Schüler' },
+                    { gb: 20, price: 4.99, label: '20 GB Tresor-Paket', recMax: 500, desc: 'Empfehlung: Bis zu 500 Schüler' },
+                    { gb: 40, price: 7.99, label: '40 GB Tresor-Paket', recMax: 1000, desc: 'Empfehlung: Bis zu 1.000 Schüler' }
+                  ];
+
+                  return (
+                    <div style={{
+                      marginTop: '16px',
+                      background: isFull ? '#fef2f2' : isHighUsage ? '#fffbeb' : '#f8fafc',
+                      borderRadius: '16px',
+                      padding: '20px',
+                      border: `1px solid ${isFull ? '#fca5a5' : isHighUsage ? '#fde68a' : 'rgba(15, 23, 42, 0.05)'}`,
+                      boxShadow: isHighUsage ? '0 4px 14px rgba(234, 179, 8, 0.08)' : 'none'
+                    }}>
+                      {/* Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '22px' }}>🎙️</span>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>Audio-Tresor &amp; Cloud-Speicher Kontingent</h4>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
+                              Inklusiv-Speicher ({baseGb} GB) {storageGb > 0 ? `+ ${storageGb} GB gebuchtes Zusatz-Volumen` : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 800, color: isFull ? '#dc2626' : isHighUsage ? '#b45309' : '#1e293b' }}>
+                            {usedGb.toFixed(2).replace('.', ',')} GB / {totalGb} GB
+                          </span>
+                          <span style={{ display: 'block', fontSize: '0.7rem', color: '#34a853', fontWeight: 800 }}>
+                            {freeGb.toFixed(2).replace('.', ',')} GB frei ({100 - usagePct} %)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Dynamic Progress Bar */}
+                      <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: '6px', overflow: 'hidden', marginBottom: '16px' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${usagePct}%`,
+                          background: isFull ? '#ef4444' : isHighUsage ? '#f59e0b' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
+                          borderRadius: '6px',
+                          transition: 'width 0.4s ease-in-out'
+                        }} />
+                      </div>
+
+                      {/* Toast / Warning Banner at 80% */}
+                      {isHighUsage && (
+                        <div style={{
+                          marginBottom: '16px',
+                          padding: '10px 14px',
+                          background: '#ffffff',
+                          borderRadius: '12px',
+                          border: `1px solid ${isFull ? '#f87171' : '#fcd34d'}`,
+                          fontSize: '0.76rem',
+                          color: isFull ? '#991b1b' : '#92400e',
+                          lineHeight: 1.4
+                        }}>
+                          ⚠️ <strong>{isFull ? 'Speicher voll!' : 'Speicher zu 80 % belegt!'}</strong> {isFull ? 'Der Audio-Tresor deiner Schule ist voll.' : 'Der Audio-Tresor deiner Schule ist zu 80 % belegt.'}
+                        </div>
+                      )}
+
+                      {/* Read-Only Status Info for Master Admin */}
+                      <div style={{
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        fontSize: '0.78rem',
+                        color: '#475569'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.1rem' }}>ℹ️</span>
+                          <span>
+                            <strong>Speicherverwaltung:</strong> Zusatz-Speicherpakete (+5 GB bis +40 GB) werden eigenständig von der Musikschule im eigenen Sekretariat gebucht und hier im Financial Control als Übersicht verwaltet.
+                          </span>
+                        </div>
+                        {storageGb > 0 && (
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34a853', background: '#e6f4ea', padding: '4px 10px', borderRadius: '999px', whiteSpace: 'nowrap' }}>
+                            + {storageGb} GB Zusatz-Speicher aktiv
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Direct payment students list if self-paying enabled */}
                 {isSelbstzahler && (

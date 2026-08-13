@@ -278,7 +278,7 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
   doc.text(`Offizielles DSB-Freigabepaket für Kommunen & Träger • Schulpartner: ${schoolName}`, 20, 26);
-  doc.text(`Dokumenten-ID: CG-TRUST-2026-DSB | Stand: August 2026 | ISO 27001 & DSGVO Konform`, 20, 31);
+  doc.text(`Dokumenten-ID: CG-TRUST-2026-DSB | Stand: August 2026 | ISO 27001 RZ & DSGVO Konform`, 20, 31);
   
   doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
   doc.line(20, 35, 190, 35);

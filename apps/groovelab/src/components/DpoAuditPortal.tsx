@@ -4,6 +4,9 @@ import { ShieldCheck, Download, Search, FileText, Lock, CheckCircle2, ChevronDow
 interface DpoAuditPortalProps {
   onClose?: () => void;
   schoolName?: string;
+  schoolAddress?: string;
+  schoolSigneeName?: string;
+  school?: any;
 }
 
 interface WormLogEntry {
@@ -18,7 +21,7 @@ interface WormLogEntry {
   hash: string;
 }
 
-export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule' }: DpoAuditPortalProps) {
+export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoolAddress, schoolSigneeName, school }: DpoAuditPortalProps) {
   const [activeTab, setActiveTab] = useState<'LOGS' | 'AVV_TOM' | 'RIGHTS'>('LOGS');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
@@ -325,42 +328,46 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule' }: Dpo
             boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)'
           }}>
             {[
-              { id: 'LOGS', label: '📜 WORM Audit-Logs', badge: `${logs.length} Einträge` },
-              { id: 'AVV_TOM', label: '📄 AVV & TOM-Nachweis', badge: 'Geprüft 2026' },
-              { id: 'RIGHTS', label: '⚖️ Betroffenenrechte & Löschen', badge: 'Automatisert' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                style={{
-                  background: activeTab === tab.id ? '#ffffff' : 'transparent',
-                  border: 'none',
-                  borderRadius: '14px',
-                  padding: '10px 22px',
-                  fontWeight: activeTab === tab.id ? 800 : 650,
-                  fontSize: '0.84rem',
-                  color: activeTab === tab.id ? '#0f172a' : '#475569',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  boxShadow: activeTab === tab.id ? '0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)' : 'none',
-                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
-              >
-                <span>{tab.label}</span>
-                <span style={{
-                  background: activeTab === tab.id ? '#e6f4ea' : 'rgba(255, 255, 255, 0.6)',
-                  color: activeTab === tab.id ? '#047857' : '#64748b',
-                  padding: '2px 8px',
-                  borderRadius: '100px',
-                  fontSize: '0.68rem',
-                  fontWeight: 800
-                }}>
-                  {tab.badge}
-                </span>
-              </button>
-            ))}
+              { id: 'LOGS', label: 'WORM Audit-Logs', icon: FileText, badge: `${logs.length} Einträge` },
+              { id: 'AVV_TOM', label: 'AVV & TOM-Nachweis', icon: ShieldCheck, badge: 'Geprüft 2026' },
+              { id: 'RIGHTS', label: 'Betroffenenrechte & Löschen', icon: Lock, badge: 'Automatisiert' }
+            ].map(tab => {
+              const TabIcon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  style={{
+                    background: activeTab === tab.id ? '#ffffff' : 'transparent',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '10px 22px',
+                    fontWeight: activeTab === tab.id ? 800 : 650,
+                    fontSize: '0.84rem',
+                    color: activeTab === tab.id ? '#0f172a' : '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: activeTab === tab.id ? '0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)' : 'none',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
+                  <TabIcon size={16} color={activeTab === tab.id ? '#34a853' : '#64748b'} />
+                  <span>{tab.label}</span>
+                  <span style={{
+                    background: activeTab === tab.id ? '#e6f4ea' : 'rgba(255, 255, 255, 0.6)',
+                    color: activeTab === tab.id ? '#047857' : '#64748b',
+                    padding: '2px 8px',
+                    borderRadius: '100px',
+                    fontSize: '0.68rem',
+                    fontWeight: 800
+                  }}>
+                    {tab.badge}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* TAB 1: WORM AUDIT LOGS */}
@@ -652,8 +659,8 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule' }: Dpo
                 gap: '24px',
                 boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)'
               }}>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
-                  📄 Technisch-Organisatorische Maßnahmen (TOMs nach Art. 32 Abs. 1 lit. a–d DSGVO)
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileText size={20} color="#0f172a" /> Technisch-Organisatorische Maßnahmen (TOMs nach Art. 32 Abs. 1 lit. a–d DSGVO)
                 </h3>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -834,7 +841,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule' }: Dpo
                     Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO
                   </h3>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                    Campus-Groovelab Enterprise Contract Engine • ISO 27001 Zertifiziert
+                    Campus-Groovelab Enterprise Contract Engine • Hosting in ISO 27001 zertifizierten Rechenzentren
                   </span>
                 </div>
               </div>
@@ -879,7 +886,12 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule' }: Dpo
                 <div>
                   <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>VERANTWORTLICHER (AUFTRAGGEBER)</span>
                   <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', marginTop: '4px' }}>{cleanSchoolName}</div>
-                  <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '2px' }}>Vertreten durch die Schulleitung / Verwaltung</div>
+                  <div style={{ fontSize: '0.78rem', color: '#334155', marginTop: '2px', fontWeight: 600 }}>
+                    {schoolAddress || school?.address || 'Offizielle Schuladresse laut Mandantenstamm'}
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '2px' }}>
+                    Vertreten durch: {schoolSigneeName || school?.avv_signee_name || 'die Schulleitung / Verwaltung'}
+                  </div>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>AUFTRAGSVERARBEITER (AUFTRAGNEHMER)</span>
@@ -888,26 +900,36 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule' }: Dpo
                 </div>
               </div>
 
-              {/* Legal Sections */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontSize: '0.84rem', color: '#334155', lineHeight: 1.6 }}>
+              {/* Legal Sections (Art. 28 Abs. 3 lit. a-h DSGVO Volltext) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', fontSize: '0.82rem', color: '#334155', lineHeight: 1.55 }}>
                 <div>
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: '0.92rem', fontWeight: 900, color: '#0f172a' }}>§ 1 Gegenstand und Dauer der Verarbeitung</h4>
-                  <p style={{ margin: 0 }}>Der Auftragnehmer erbringt für den Auftraggeber die Bereitstellung der SaaS-Schulmanagement- und Übungsplattform <strong>Campus-Groovelab</strong>. Die Verarbeitung erfolgt ausschließlich im Rahmen der Weisungen des Auftraggebers.</p>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 1 Gegenstand, Art und Zweck der Verarbeitung</h4>
+                  <p style={{ margin: 0 }}>Der Auftragnehmer erbringt für den Auftraggeber die Bereitstellung der SaaS-Schulmanagement- und Übungsplattform <strong>Campus-Groovelab</strong> (Hausaufgabenheft, Raumplaner, Schüler-Protokolle, Band-Verwaltung). Die Verarbeitung erfolgt ausschließlich auf dokumentierte Weisung des Auftraggebers (Art. 28 Abs. 3 lit. a DSGVO).</p>
                 </div>
 
                 <div>
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: '0.92rem', fontWeight: 900, color: '#0f172a' }}>§ 2 Pflichten des Auftragnehmers & Serverstandort</h4>
-                  <p style={{ margin: 0 }}>Sämtliche personenbezogenen Daten werden zu 100% in ISO-27001 zertifizierten Rechenzentren der <strong>Hetzner Online GmbH am Standort Falkenstein (Deutschland)</strong> gehostet. Ein Datentransfer in Drittstaaten außerhalb der EU findet nicht statt.</p>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 2 Vertraulichkeit &amp; Serverstandort (Art. 28 Abs. 3 lit. b DSGVO)</h4>
+                  <p style={{ margin: 0 }}>Sämtliche personenbezogenen Daten werden zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren der <strong>Hetzner Online GmbH (Falkenstein/DE) &amp; Supabase EU (Frankfurt/DE)</strong> verarbeitet. Ein Datentransfer in Drittstaaten außerhalb der EU/EWR findet nicht statt. Der Auftragnehmer gewährleistet, dass das zur Verarbeitung eingesetzte Personal zur Verschwiegenheit verpflichtet wurde.</p>
                 </div>
 
                 <div>
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: '0.92rem', fontWeight: 900, color: '#0f172a' }}>§ 3 Technisch-Organisatorische Maßnahmen (TOMs)</h4>
-                  <p style={{ margin: 0 }}>Der Auftragnehmer garantiert die Einhaltung der Maßnahmen nach Art. 32 DSGVO: TLS 1.3 & AES-256 Verschlüsselung, clientseitige Datenminimierung (Pseudonymisierung von Vornamen und Filterung des Geburtsmonats/-jahres) sowie schreibgeschützte WORM Audit-Logs in deutscher Ortszeit (Europe/Berlin).</p>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 3 Technisch-Organisatorische Maßnahmen / TOMs (Art. 32 DSGVO)</h4>
+                  <p style={{ margin: 0 }}>Der Auftragnehmer garantiert die Einhaltung der TOMs nach Art. 32 DSGVO: TLS 1.3 HSTS &amp; AES-256 Verschlüsselung, clientseitige Datenminimierung (Pseudonymisierung von Vornamen, Filterung von Geburtsdaten), strikte Row-Level Security (RLS) Mandantentrennung sowie schreibgeschützte WORM Audit-Logs in deutscher Ortszeit (Europe/Berlin).</p>
                 </div>
 
                 <div>
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: '0.92rem', fontWeight: 900, color: '#0f172a' }}>§ 4 Beendigung & Datenlöschung (Art. 17 DSGVO)</h4>
-                  <p style={{ margin: 0 }}>Nach Beendigung der Leistung oder nach Aufforderung löscht der Auftragnehmer sämtliche im Auftrag verarbeiteten Daten vollständig und datenschutzkonform.</p>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 4 Unterauftragsverhältnisse (Art. 28 Abs. 2 &amp; Abs. 3 lit. d DSGVO)</h4>
+                  <p style={{ margin: 0 }}>Der Auftraggeber stimmt der Einbindung der Unterauftragsverarbeiter Hetzner Online GmbH (Hosting Infrastruktur DE) und Supabase EU (Datenbank &amp; Auth DE) zu. Der Auftragnehmer informiert den Auftraggeber vor jeder vorgesehenen Änderung bezüglich der Hinzuziehung anderer Unterauftragnehmer.</p>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 5 Unterstützungspflichten &amp; Meldung von Datenschutzverletzungen</h4>
+                  <p style={{ margin: 0 }}>Der Auftragnehmer unterstützt den Auftraggeber bei der Erfüllung von Betroffenenrechten (Art. 15–22 DSGVO) sowie bei der Einhaltung der Pflichten nach Art. 32 bis 36 DSGVO. Verletzungen des Schutzes personenbezogener Daten werden dem Auftraggeber unverzüglich gemeldet (Art. 33 DSGVO).</p>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 6 Beendigung, Datenlöschung &amp; Kontrollrechte (Art. 17 &amp; Art. 28 Abs. 3 lit. g, h DSGVO)</h4>
+                  <p style={{ margin: 0 }}>Nach Beendigung der Leistung oder nach Aufforderung löscht oder ruft der Auftragnehmer alle im Auftrag verarbeiteten Daten vollständig und datenschutzkonform ab. Dem Auftraggeber werden die erforderlichen Informationen zum Nachweis der Einhaltung dieser Vereinbarung sowie für Überprüfungen (Audits) bereitgestellt.</p>
                 </div>
               </div>
 

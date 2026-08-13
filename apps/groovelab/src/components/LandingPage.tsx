@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { LegalTextModal } from './LegalTextModal';
 import { supabase } from '../lib/supabase';
+import { useMasterPricing } from '../context/MasterPricingContext';
 
 interface LandingPageProps {
   onLogin: () => void;
@@ -12,6 +13,7 @@ interface LandingPageProps {
 }
 
 export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
+  const masterPricing = useMasterPricing();
   const [activeTab, setActiveTab] = useState<number>(0);
   const [email, setEmail] = useState<string>('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -25,48 +27,17 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const [showPrivacyAudits, setShowPrivacyAudits] = useState<boolean>(false);
   const [showFullTomCatalog, setShowFullTomCatalog] = useState<boolean>(false);
 
-  // Dynamic pricing state (loaded from master_billing_settings in MasterAdminDashboard)
-  const [pricing, setPricing] = useState({
-    campus: 7.99,
-    groovelab: 4.99,
-    kombi: 9.99,
-    teacher: 0.49,
-    student: 0.49
-  });
-
-  useEffect(() => {
-    const fetchGlobalPricing = async () => {
-      try {
-        const { data } = await supabase
-          .from('master_billing_settings')
-          .select('*')
-          .eq('id', 1)
-          .maybeSingle();
-
-        if (data) {
-          const c = Number(data.price_module_campus) || 7.99;
-          const g = Number(data.price_module_groovelab) || 4.99;
-          // Dynamic 20% discount formula for Kombi-Vorteil
-          const calculatedKombi = Math.round((c + g) * 0.8 * 100) / 100;
-          const k = data.price_module_kombi ? Number(data.price_module_kombi) : calculatedKombi;
-          const t = Number(data.price_user_teacher) || 0.49;
-          const s = Number(data.price_user_student) || 0.49;
-
-          setPricing({
-            campus: c,
-            groovelab: g,
-            kombi: k,
-            teacher: t,
-            student: s
-          });
-        }
-      } catch (e) {
-        console.warn('Could not fetch dynamic pricing:', e);
-      }
-    };
-
-    fetchGlobalPricing();
-  }, []);
+  const pricing = {
+    campus: masterPricing.priceCampus,
+    groovelab: masterPricing.priceGroovelab,
+    kombi: masterPricing.priceKombi,
+    teacher: masterPricing.priceTeacher,
+    student: masterPricing.priceStudent,
+    freeMonthsPerYear: masterPricing.freeMonthsPerYear,
+    billingMonthsPerYear: masterPricing.billingMonthsPerYear,
+    kombiSavings: masterPricing.kombiSavings,
+    kombiSavingsPercent: masterPricing.kombiSavingsPercent
+  };
 
   const getPaidMonthsUntilAugust = () => {
     const now = new Date();
@@ -1511,6 +1482,45 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 </div>
 
               </div>
+
+              {/* 🛡️ Das Campus-Groovelab Preisversprechen Banner */}
+              <div style={{
+                marginTop: '32px',
+                padding: '24px 28px',
+                borderRadius: '20px',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                border: '1.5px solid #86efac',
+                boxShadow: '0 4px 16px rgba(34, 197, 94, 0.08)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '16px',
+                textAlign: 'left'
+              }}>
+                <div style={{
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 900,
+                  fontSize: '20px',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 8px rgba(22, 165, 74, 0.3)'
+                }}>
+                  🛡️
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 900, color: '#14532d', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Das Campus-Groovelab Preisversprechen: 100 % Bestandsschutz & Garantie
+                  </div>
+                  <div style={{ fontSize: '13.5px', color: '#166534', lineHeight: 1.5, fontWeight: 500 }}>
+                    <strong>Sichern Sie sich den Tarif von heute – inklusive aller Innovationen von morgen!</strong> Der gebuchte Grundtarif Ihrer Musikschule (Server-Flatrate) sowie bestehende Lehrer- und Schüler-Profile sind dauerhaft vor Preiserhöhungen geschützt. Auch bei neuen KI-Funktionen, Raumplanern oder Modul-Updates steigt Ihr Sockelpreis um keinen Cent. Für neu angemeldete Schüler im neuen Schuljahr gilt transparent der jeweils aktuell gültige Schüler-Tarif.
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Split Details Section: Service Fees & Flex billing options */}
@@ -1536,14 +1546,14 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Lehrkräfte</div>
                     <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                      <strong>0,49 € / Monat</strong> je aktives Lehrer-Profil. Verwaltungs- und Sekretariats-Accounts (Rollen admin &amp; secretary) sind vollständig kostenfrei inklusive.
+                      <strong>{pricing.teacher.toFixed(2).replace('.', ',')} € / Monat</strong> je aktives Lehrer-Profil. Verwaltungs- und Sekretariats-Accounts (Rollen admin &amp; secretary) sind vollständig kostenfrei inklusive.
                     </div>
                   </div>
 
                   <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Schüler-Aktivierungen &amp; Deaktivierung</div>
                     <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                      <strong>0,49 € / Monat</strong> je aktiver Schüler-Zugang. Bei Deaktivierung (monatlich) entfällt die Gebühr zum Monatsende. Bereits bezahlte Jahresbeiträge bleiben bis zum Schuljahresende aktiv und werden dann inaktiviert.
+                      <strong>{pricing.student.toFixed(2).replace('.', ',')} € / Monat</strong> je aktiver Schüler-Zugang. Bei Deaktivierung (monatlich) entfällt die Gebühr zum Monatsende. Bereits bezahlte Jahresbeiträge bleiben bis zum Schuljahresende aktiv und werden dann inaktiviert.
                     </div>
                   </div>
                 </div>
@@ -1565,7 +1575,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                       Entlaste das Schulbudget auf <strong>0,00 € Schülergebühren</strong>. Die Eltern übernehmen den Kleinstbetrag direkt über die Plattform.
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span>• <strong>Vollständig:</strong> Eltern zahlen 0,49 €/Mo. Schule zahlt 0,00 € Schülergebühr.</span>
+                      <span>• <strong>Vollständig:</strong> Eltern zahlen {pricing.student.toFixed(2).replace('.', ',')} €/Mo. Schule zahlt 0,00 € Schülergebühr.</span>
                       <span>• <strong>Teilweise:</strong> Eltern zahlen 0,40 €/Mo, Schule stützt mit 0,09 €/Mo.</span>
                     </div>
 
@@ -1586,7 +1596,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                       Die Musikschule zahlt gesammelt für alle Schüler. Hier profitierst du von exzellenten Skalierungsrabatten:
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl (0,49 €/Schüler). Konten ohne Login für mehr als 2 Monate werden automatisch inaktiviert – Kosten fallen somit nur bei tatsächlicher Nutzung an.</span>
+                      <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl ({pricing.student.toFixed(2).replace('.', ',')} €/Schüler). Konten ohne Login für mehr als 2 Monate werden automatisch inaktiviert – Kosten fallen somit nur bei tatsächlicher Nutzung an.</span>
                       <span>• <strong>Jahresbeitrag (10% Rabatt):</strong> Die Aktivierung eines Schülerprofils löst den Jahresbeitrag aus. Unterjährige Neuanmeldungen lassen sich jederzeit flexibel hinzufügen – der Beitrag wird dabei automatisiert auf die verbleibende Restlaufzeit berechnet.</span>
                       <span>• <strong>Aktivierung aller Schüler zum Schuljahresstart (September) (20% Rabatt):</strong> Einmalige, gesammelte Aktivierung aller Schüler im September für das gesamte Schuljahr.</span>
                     </div>

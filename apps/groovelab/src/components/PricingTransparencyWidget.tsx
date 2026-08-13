@@ -1,15 +1,15 @@
 import React from 'react';
-import { ShieldCheck, Info, CheckCircle2, Zap, DollarSign } from 'lucide-react';
+import { ShieldCheck, Info } from 'lucide-react';
+import { useMasterPricing } from '../context/MasterPricingContext';
 
 interface PricingTransparencyWidgetProps {
   school?: any;
   activePlatform?: 'campus' | 'groovelab' | 'kombi';
 }
 
-export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps> = ({
-  school,
-  activePlatform = 'kombi'
-}) => {
+export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps> = () => {
+  const pricing = useMasterPricing();
+
   return (
     <div style={{
       background: '#ffffff',
@@ -28,8 +28,8 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
             width: '36px',
             height: '36px',
             borderRadius: '10px',
-            background: '#e6f4ea',
-            color: '#34a853',
+            background: '#fce8e6',
+            color: '#ea4335',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -39,7 +39,7 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
           </div>
           <div>
             <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
-              Transparente Lizenz- & Preiskonditionen
+              Transparente Lizenz- &amp; Preiskonditionen
             </h4>
             <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b' }}>
               Campus-Groovelab Fair-Use Tarifübersicht für Musikschulen
@@ -47,8 +47,8 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
           </div>
         </div>
         <span style={{
-          background: '#d1fae5',
-          color: '#065f46',
+          background: '#fce8e6',
+          color: '#c5221f',
           fontSize: '0.72rem',
           fontWeight: 800,
           padding: '4px 10px',
@@ -66,23 +66,23 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
             Server-Hosting Flatrate
           </div>
           <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>
-            9,99 € <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ Mo. Kombi</span>
+            {pricing.priceKombi.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ Mo. Kombi</span>
           </div>
           <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.4 }}>
-            Campus (7,99 €) + GrooveLab (4,99 €) im Kombi-Vorteil. Sparen Sie 2,99 € / Mo.
+            Campus ({pricing.priceCampus.toFixed(2).replace('.', ',')} €) + GrooveLab ({pricing.priceGroovelab.toFixed(2).replace('.', ',')} €) im Kombi-Vorteil. Sparen Sie {pricing.kombiSavings.toFixed(2).replace('.', ',')} € / Mo.
           </div>
         </div>
 
         {/* Teachers & Admin */}
         <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #cbd5e1' }}>
           <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-            Lehrer & Verwaltung
+            Lehrer &amp; Verwaltung
           </div>
           <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>
-            0,49 € <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ Lehrer / Mo.</span>
+            {pricing.priceTeacher.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ Lehrer / Mo.</span>
           </div>
           <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.4 }}>
-            Verwaltungs- & Sekretariatskonten sind zu 100% inklusive (0,00 € Gebühr).
+            Verwaltungs- &amp; Sekretariatskonten sind zu 100% inklusive (0,00 € Gebühr).
           </div>
         </div>
 
@@ -92,7 +92,7 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
             Schüler-Aktivierungen
           </div>
           <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>
-            0,49 € <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ aktiv. Schüler / Mo.</span>
+            {pricing.priceStudent.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ aktiv. Schüler / Mo.</span>
           </div>
           <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.4 }}>
             Nur tatsächlich eingeloggte Schüler werden berechnet. Auto-Passivierung nach 2 Monaten Inaktivität.
@@ -103,17 +103,17 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
       {/* Protection & Legal Note */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{
-          background: '#eff6ff',
-          border: '1px solid #bfdbfe',
+          background: '#fce8e6',
+          border: '1px solid #f87171',
           borderRadius: '12px',
           padding: '10px 14px',
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
           fontSize: '0.75rem',
-          color: '#1e40af'
+          color: '#991b1b'
         }}>
-          <Info size={16} color="#2563eb" style={{ flexShrink: 0 }} />
+          <Info size={16} color="#ea4335" style={{ flexShrink: 0 }} />
           <span>
             Volle Kostenkontrolle: Schülerinaktivierungen verursachen keine unerwarteten Kosten für schlafende Konten in der Datenbank.
           </span>
