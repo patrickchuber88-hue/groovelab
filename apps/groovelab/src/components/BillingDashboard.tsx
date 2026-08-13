@@ -1742,113 +1742,140 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                       const renderInvoiceCard = (invoice: any) => {
                         const isPreview = invoice.status === 'preview' || invoice.status === 'Vorschau';
                         return (
-                          <div key={invoice.id} className="receipt-card" style={{ opacity: invoice.status === 'cancelled' ? 0.6 : 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+                          <div 
+                            key={invoice.id} 
+                            className="receipt-card" 
+                            style={{ 
+                              opacity: invoice.status === 'cancelled' ? 0.6 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: '12px',
+                              padding: '12px 16px',
+                              boxSizing: 'border-box',
+                              width: '100%'
+                            }}
+                          >
+                            {/* Left Group: Invoice ID, Date & Status tag */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', minWidth: '180px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontWeight: 700, color: isPreview ? '#0284c7' : '#0f172a', fontSize: '0.8rem' }}>
-                                  {isPreview ? invoice.id : (invoice.amount < 0 ? invoice.id.replace('INV-', 'GS-') : invoice.id.replace('INV-', 'RE-'))}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontWeight: 700, color: isPreview ? '#0284c7' : '#0f172a', fontSize: '0.82rem' }}>
+                                    {isPreview ? invoice.id : (invoice.amount < 0 ? invoice.id.replace('INV-', 'GS-') : invoice.id.replace('INV-', 'RE-'))}
+                                  </span>
+                                  {isPreview && (
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '2px 7px', borderRadius: '4px', border: '1px solid #bae6fd', letterSpacing: '0.03em' }}>
+                                      Vorschau
+                                    </span>
+                                  )}
+                                </div>
                                 <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>{invoice.billing_date}</span>
                               </div>
-                              <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.82rem' }}>
-                                {Number(invoice.amount || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                              </span>
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setViewingInvoice({
-                                    invoiceId: invoice.id,
-                                    schoolId: inv.schoolId,
-                                    schoolName: inv.schoolName,
-                                    schoolStreet: inv.schoolStreet,
-                                    schoolZipCode: inv.schoolZipCode,
-                                    schoolCity: inv.schoolCity,
-                                    date: invoice.billing_date,
-                                    amount: invoice.amount,
-                                    status: isPreview ? 'Vorschau' : invoice.status,
-                                    type: invoice.type,
-                                    isCurrentMonth: invoice.isCurrentMonth,
-                                    hasCampus: inv.hasCampus,
-                                    hasGroovelab: inv.hasGroovelab,
-                                    baseFee: inv.baseFee,
-                                    kombiDiscountAmount: inv.kombiDiscountAmount,
-                                    userFee: inv.userFee,
-                                    activeStudentFee: inv.activeStudentFee,
-                                    totalTeachersCount: inv.totalTeachersCount,
-                                    totalEmployeesCount: inv.totalEmployeesCount,
-                                    passiveStudentsCount: inv.passiveStudentsCount,
-                                    activeStudents: inv.activeStudents,
-                                    subscriptionBypass: inv.subscriptionBypass,
-                                    subtotal: inv.subtotal,
-                                    studentBillingOption: inv.studentBillingOption,
-                                    isTrialMonth: invoice.isTrialMonth
-                                  });
-                                }}
-                                style={{
-                                  background: isPreview ? '#e0f2fe' : 'transparent',
-                                  border: isPreview ? '1px solid #bae6fd' : '1px solid rgba(0, 0, 0, 0.08)',
-                                  borderRadius: '6px',
-                                  padding: '4px 10px',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 700,
-                                  color: isPreview ? '#0369a1' : '#1e293b',
-                                  cursor: 'pointer'
-                                }}
-                                onMouseOver={(e: any) => { e.currentTarget.style.background = isPreview ? '#bae6fd' : '#f1f5f9'; }}
-                                onMouseOut={(e: any) => { e.currentTarget.style.background = isPreview ? '#e0f2fe' : 'transparent'; }}
-                              >
-                                {isPreview ? 'Vorschau ansehen' : 'Beleg ansehen'}
-                              </button>
-                              
-                              {isPreview ? (
-                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '4px 10px', borderRadius: '6px', border: '1px solid #bae6fd' }}>
-                                  Vorschau
-                                </span>
-                              ) : invoice.isDb ? (
-                                <select
-                                  value={invoice.status}
-                                  onChange={(e) => updateInvoiceStatus(invoice.id, e.target.value)}
-                                  style={{
-                                    padding: '4px 6px',
-                                    borderRadius: '6px',
-                                    border: '1px solid rgba(0, 0, 0, 0.08)',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 600,
-                                    background: '#ffffff',
-                                    cursor: 'pointer',
-                                    color: '#334155',
-                                    outline: 'none'
+                            {/* Right Group: Amount & Action Button */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', marginLeft: 'auto' }}>
+                              <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>
+                                {Number(invoice.amount || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                              </span>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewingInvoice({
+                                      invoiceId: invoice.id,
+                                      schoolId: inv.schoolId,
+                                      schoolName: inv.schoolName,
+                                      schoolStreet: inv.schoolStreet,
+                                      schoolZipCode: inv.schoolZipCode,
+                                      schoolCity: inv.schoolCity,
+                                      date: invoice.billing_date,
+                                      amount: invoice.amount,
+                                      status: isPreview ? 'Vorschau' : invoice.status,
+                                      type: invoice.type,
+                                      isCurrentMonth: invoice.isCurrentMonth,
+                                      hasCampus: inv.hasCampus,
+                                      hasGroovelab: inv.hasGroovelab,
+                                      baseFee: inv.baseFee,
+                                      kombiDiscountAmount: inv.kombiDiscountAmount,
+                                      userFee: inv.userFee,
+                                      activeStudentFee: inv.activeStudentFee,
+                                      totalTeachersCount: inv.totalTeachersCount,
+                                      totalEmployeesCount: inv.totalEmployeesCount,
+                                      passiveStudentsCount: inv.passiveStudentsCount,
+                                      activeStudents: inv.activeStudents,
+                                      subscriptionBypass: inv.subscriptionBypass,
+                                      subtotal: inv.subtotal,
+                                      studentBillingOption: inv.studentBillingOption,
+                                      isTrialMonth: invoice.isTrialMonth
+                                    });
                                   }}
-                                >
-                                  <option value="open">Offen</option>
-                                  <option value="paid">Bezahlt</option>
-                                  <option value="overdue">Überfällig</option>
-                                  <option value="cancelled">Storniert</option>
-                                </select>
-                              ) : (
-                                <select
-                                  value={invoice.status}
-                                  onChange={() => toggleInvoicePaid(inv.schoolId, invoice.id)}
                                   style={{
-                                    padding: '4px 6px',
-                                    borderRadius: '6px',
-                                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                                    background: isPreview ? '#0284c7' : '#ffffff',
+                                    border: isPreview ? 'none' : '1px solid rgba(0, 0, 0, 0.12)',
+                                    borderRadius: '8px',
+                                    padding: '5px 12px',
                                     fontSize: '0.74rem',
-                                    fontWeight: 600,
-                                    background: '#ffffff',
+                                    fontWeight: 700,
+                                    color: isPreview ? '#ffffff' : '#1e293b',
                                     cursor: 'pointer',
-                                    color: '#334155',
-                                    outline: 'none'
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: isPreview ? '0 2px 6px rgba(2, 132, 199, 0.25)' : 'none',
+                                    transition: 'all 0.15s ease-in-out'
                                   }}
+                                  onMouseOver={(e: any) => { e.currentTarget.style.background = isPreview ? '#0369a1' : '#f8fafc'; }}
+                                  onMouseOut={(e: any) => { e.currentTarget.style.background = isPreview ? '#0284c7' : '#ffffff'; }}
                                 >
-                                  <option value="open">Offen</option>
-                                  <option value="paid">Bezahlt</option>
-                                </select>
-                              )}
+                                  {isPreview ? 'Vorschau ansehen' : 'Vorschau'}
+                                </button>
+                                
+                                {!isPreview && (
+                                  invoice.isDb ? (
+                                    <select
+                                      value={invoice.status}
+                                      onChange={(e) => updateInvoiceStatus(invoice.id, e.target.value)}
+                                      style={{
+                                        padding: '5px 8px',
+                                        borderRadius: '8px',
+                                        border: '1px solid rgba(0, 0, 0, 0.12)',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 600,
+                                        background: '#ffffff',
+                                        cursor: 'pointer',
+                                        color: '#334155',
+                                        outline: 'none'
+                                      }}
+                                    >
+                                      <option value="open">Offen</option>
+                                      <option value="paid">Bezahlt</option>
+                                      <option value="overdue">Überfällig</option>
+                                      <option value="cancelled">Storniert</option>
+                                    </select>
+                                  ) : (
+                                    <select
+                                      value={invoice.status}
+                                      onChange={() => toggleInvoicePaid(inv.schoolId, invoice.id)}
+                                      style={{
+                                        padding: '5px 8px',
+                                        borderRadius: '8px',
+                                        border: '1px solid rgba(0, 0, 0, 0.12)',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 600,
+                                        background: '#ffffff',
+                                        cursor: 'pointer',
+                                        color: '#334155',
+                                        outline: 'none'
+                                      }}
+                                    >
+                                      <option value="open">Offen</option>
+                                      <option value="paid">Bezahlt</option>
+                                    </select>
+                                  )
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
