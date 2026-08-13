@@ -10,7 +10,7 @@ import {
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
   School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake,
-  HardDrive, Cloud, Crown, Rocket
+  HardDrive, Cloud, Crown, Rocket, Cpu
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
@@ -21477,62 +21477,143 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     </div>
                   </div>
 
-                  {/* Datenschutz-Compliance-Ampel */}
+                  {/* Apple HIG Datenschutz-Cockpit */}
                   <div className="google-card" style={{
                     padding: '24px',
                     borderRadius: '24px',
-                    border: '1.5px solid #cbd5e1',
+                    border: '1.5px solid #e2e8f0',
                     background: '#ffffff',
-                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+                    boxShadow: '0 10px 30px -5px rgba(0,0,0,0.03)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '16px'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <ShieldCheck size={20} style={{ color: '#34a853' }} />
-                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                        Datenschutz-Cockpit
-                      </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '10px',
+                          background: '#e6f4ea',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <ShieldCheck size={18} style={{ color: '#34a853' }} />
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                          Datenschutz-Cockpit
+                        </h3>
+                      </div>
+                      <span style={{
+                        fontSize: '0.66rem',
+                        fontWeight: 800,
+                        color: '#15803d',
+                        background: '#ecfdf5',
+                        border: '1px solid #a7f3d0',
+                        padding: '3px 8px',
+                        borderRadius: '20px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }}></span>
+                        100% DSGVO-KONFORM
+                      </span>
                     </div>
+
                     <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.45, fontFamily: 'Inter' }}>
-                      Übersicht der aktiven DSGVO-Sicherheitsstufen für Campus-Groovelab an dieser Musikschule.
+                      Aktive Sicherheitsstufen & TOMs nach Art. 32 DSGVO für Campus-Groovelab an dieser Musikschule.
                     </p>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {[
-                        { title: 'PGP-Datenverschlüsselung', value: '100% Aktiv', desc: 'Schülervornamen verschlüsselt in Datenbank.' },
-                        { title: 'Schüler-Datenminimierung', value: '0 Kinder-E-Mails', desc: 'Keine E-Mails/Adressen erfasst.' },
-                        { title: 'Schulterblick-Schutz', value: 'Maskierung aktiv', desc: 'Standardmäßige Nachnamen-Sperre.' },
-                        { title: 'Serverstandort', value: 'Falkenstein (DE)', desc: 'ISO 27001 zertifiziertes RZ.' },
-                        { title: 'Zero-Cloud Biometrie', value: '100% Lokal', desc: 'Keine Videoübertragung an Server.' }
+                        { 
+                          icon: <Lock size={15} style={{ color: '#0f172a' }} />,
+                          title: 'PGP-Datenverschlüsselung', 
+                          value: '100% Aktiv', 
+                          desc: 'Verschlüsselung im Ruhezustand (Art. 32 DSGVO).',
+                          legalNote: 'Schülervornamen und E-Mail-Fragmente werden kryptographisch mit PGP/AES im Ruhezustand (Encryption-at-Rest) in PostgreSQL isoliert.'
+                        },
+                        { 
+                          icon: <ShieldCheck size={15} style={{ color: '#0f172a' }} />,
+                          title: 'Schüler-Datenminimierung', 
+                          value: '0 Kinder-E-Mails', 
+                          desc: 'Keine E-Mails/Adressen erfasst (Art. 5 DSGVO).',
+                          legalNote: 'Vollständige Einhaltung des Grundsatzes der Datenminimierung (Art. 5 Abs. 1 lit. c DSGVO) zum Schutz Minderjähriger (ErwGr. 38).'
+                        },
+                        { 
+                          icon: <EyeOff size={15} style={{ color: '#0f172a' }} />,
+                          title: 'Schulterblick-Schutz', 
+                          value: 'Maskierung aktiv', 
+                          desc: 'Pseudonymisierte Namensmaskierung (TOM Art. 32).',
+                          legalNote: 'Standardmäßige Namens-Anonymisierung im Schulsekretariat zum Schutz vor unbefugter Einsichtnahme durch Dritte.'
+                        },
+                        { 
+                          icon: <HardDrive size={15} style={{ color: '#0f172a' }} />,
+                          title: 'Serverstandort Falkenstein', 
+                          value: 'ISO 27001 (DE)', 
+                          desc: 'Deutsches RZ ohne Drittlandtransfer (Art. 44).',
+                          legalNote: 'Betrieb im DIN EN ISO/IEC 27001 zertifizierten deutschen Rechenzentrum (Hetzner Falkenstein). 100% EU-Datensouveränität.'
+                        },
+                        { 
+                          icon: <Cpu size={15} style={{ color: '#0f172a' }} />,
+                          title: 'Zero-Cloud Biometrie', 
+                          value: '100% Lokal', 
+                          desc: 'Reine Client-Side Bild-/QR-Verarbeitung (Art. 9).',
+                          legalNote: 'QR- und Bildanalysen laufen ausschließlich lokal im Browser-Arbeitsspeicher (WASM/RAM). Keine biometrischen Daten nach Art. 9 DSGVO.'
+                        }
                       ].map((item, idx) => (
                         <div key={idx} style={{
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: '2px',
+                          alignItems: 'flex-start',
+                          gap: '10px',
                           background: '#f8fafc',
-                          padding: '10px 14px',
-                          borderRadius: '12px',
-                          border: '1px solid #f1f5f9'
+                          padding: '10px 12px',
+                          borderRadius: '14px',
+                          border: '1px solid #f1f5f9',
+                          transition: 'all 0.15s ease'
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b', fontFamily: 'Urbanist' }}>{item.title}</span>
-                            <span style={{
-                              fontSize: '0.68rem',
-                              fontWeight: 900,
-                              color: '#34a853',
-                              background: '#e6f4ea',
-                              padding: '2px 8px',
-                              borderRadius: '20px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }}></span>
-                              {item.value}
+                          <div style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '8px',
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            marginTop: '2px'
+                          }}>
+                            {item.icon}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {item.title}
+                              </span>
+                              <span style={{
+                                fontSize: '0.66rem',
+                                fontWeight: 800,
+                                color: '#15803d',
+                                background: '#ecfdf5',
+                                border: '1px solid #d1fae5',
+                                padding: '2px 7px',
+                                borderRadius: '12px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                flexShrink: 0
+                              }}>
+                                <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
+                                {item.value}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.67rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35 }} title={item.legalNote}>
+                              {item.desc}
                             </span>
                           </div>
-                          <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 500 }}>{item.desc}</span>
                         </div>
                       ))}
                     </div>
