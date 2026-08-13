@@ -2580,19 +2580,27 @@ function App() {
       (window as any).stopAllCameras();
     }
 
-    setActivePlatformRaw(targetVal);
+    React.startTransition(() => {
+      setActivePlatformRaw(targetVal);
+    });
     localStorage.setItem('groovelab_active_platform', targetVal);
     
     // Auto-switch the active tab to the saved tab of the target platform to load flawlessly
     if (targetVal === 'campus') {
       const savedTab = localStorage.getItem('campus_active_tab') || 'briefing';
-      setActiveStudentTabRaw(savedTab);
+      React.startTransition(() => {
+        setActiveStudentTabRaw(savedTab);
+      });
     } else if (targetVal === 'ensembles') {
       const savedTab = localStorage.getItem('ensembles_active_tab') || 'overview';
-      setActiveStudentTabRaw(savedTab);
+      React.startTransition(() => {
+        setActiveStudentTabRaw(savedTab);
+      });
     } else {
       const savedTab = localStorage.getItem('groovelab_active_tab') || 'live';
-      setActiveStudentTabRaw(savedTab);
+      React.startTransition(() => {
+        setActiveStudentTabRaw(savedTab);
+      });
     }
   }, [locationMode, user?.role, user?.schools]);
 
@@ -2610,7 +2618,9 @@ function App() {
     if (val === 'messages') {
       setSelectedCampusRecipient(null);
     }
-    setActiveStudentTabRaw(val);
+    React.startTransition(() => {
+      setActiveStudentTabRaw(val);
+    });
     // Persist the tab to the correct localStorage key based on the current active platform
     const platform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
     if (platform === 'campus') {

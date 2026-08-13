@@ -13955,7 +13955,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             return (
               <button
                 key={item.id}
-                onClick={() => setSecretarySubTab(item.id as any)}
+                onClick={() => {
+                  React.startTransition(() => {
+                    setSecretarySubTab(item.id as any);
+                  });
+                }}
                 className={`google-sidebar-item briefing ${isSelected ? 'active briefing' : ''}`}
               >
                 <div className="sidebar-icon-circle briefing">
