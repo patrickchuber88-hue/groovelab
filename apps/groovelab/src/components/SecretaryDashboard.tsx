@@ -25731,21 +25731,36 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         const simulated = typeof window !== 'undefined' ? localStorage.getItem(`simulatedContractStartDate_${schoolId}`) : null;
                                         const todayStr = simulated || new Date().toISOString().split('T')[0];
 
-                                        const { error } = await supabase
+                                        let updatePayload: any = {
+                                          is_billing_booked: true,
+                                          has_campus_subscription: hasCampusSub,
+                                          has_groovelab_subscription: hasGroovelabSub,
+                                          student_billing_option: studentBillingOption,
+                                          contract_start_date: todayStr,
+                                          is_trial: false,
+                                          status: 'active'
+                                        };
+                                        if (selectedStorageAddonGb > 0) {
+                                          updatePayload.storage_addon_gb = selectedStorageAddonGb;
+                                          updatePayload.storage_addon_monthly_fee = selectedStorageAddonFee;
+                                          updatePayload.storage_addon_status = 'active';
+                                        }
+
+                                        let { error } = await supabase
                                           .from('schools')
-                                          .update({
-                                            is_billing_booked: true,
-                                            has_campus_subscription: hasCampusSub,
-                                            has_groovelab_subscription: hasGroovelabSub,
-                                            student_billing_option: studentBillingOption,
-                                            storage_addon_gb: selectedStorageAddonGb,
-                                            storage_addon_monthly_fee: selectedStorageAddonFee,
-                                            storage_addon_status: selectedStorageAddonGb > 0 ? 'active' : 'none',
-                                            contract_start_date: todayStr,
-                                            is_trial: false,
-                                            status: 'active'
-                                          })
+                                          .update(updatePayload)
                                           .eq('id', schoolId);
+
+                                        if (error && error.message && (error.message.includes('storage_addon') || error.message.includes('schema cache'))) {
+                                          console.warn("Retrying booking without storage columns:", error.message);
+                                          const { storage_addon_gb, storage_addon_monthly_fee, storage_addon_status, ...corePayload } = updatePayload;
+                                          const retryRes = await supabase
+                                            .from('schools')
+                                            .update(corePayload)
+                                            .eq('id', schoolId);
+                                          error = retryRes.error;
+                                        }
+
                                         if (error) throw error;
 
                                         setIsBillingBooked(true);
