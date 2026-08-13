@@ -4,6 +4,7 @@ import QRCode from 'react-qr-code';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { calculateSchoolEffectiveRates } from '../domain/pricingEngine';
+import { calculateCampusGroovelabBilling } from '../domain/billingCalculator';
 import { 
   CreditCard, 
   Search, 
@@ -571,46 +572,38 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         const teachersCount = stats.activeTeachers;
         const employeesCount = stats.activeEmployees;
 
-        // MODULE BASE FEE & EFFECTIVE RATES CALCULATION
         const effectiveRates = calculateSchoolEffectiveRates(school, masterPricing);
-        const hasCampus = school.has_campus_subscription;
-        const hasGroovelab = school.has_groovelab_subscription;
+        const hasCampus = Boolean(school.has_campus_subscription);
+        const hasGroovelab = Boolean(school.has_groovelab_subscription);
         const hasKombi = school.has_kombi_discount || (hasCampus && hasGroovelab);
 
-        let moduleBaseFee = 0;
-        if (hasKombi) {
-          moduleBaseFee = effectiveRates.priceKombi;
-        } else {
-          if (hasCampus) moduleBaseFee += effectiveRates.priceCampus;
-          if (hasGroovelab) moduleBaseFee += effectiveRates.priceGroovelab;
-        }
-
-        // STAFF FEE (teachers & employees)
-        const staffFee = teachersCount * effectiveRates.priceTeacher;
-        
-        // PASSIVE STUDENTS FEE (0.09 € per passive student profile)
         const isPartial = school.student_billing_option === 'student_partial';
         const isFullDirect = school.student_billing_option === 'student_full';
         const passiveStudentsCount = isPartial ? totalStudents : (isFullDirect ? 0 : Math.max(0, totalStudents - maxActiveStudents));
-        const passiveStudentsFee = passiveStudentsCount * 0.09;
 
-        // Profile-Levy (B2B User Fee)
-        const userFee = staffFee + passiveStudentsFee;
+        const calcResult = calculateCampusGroovelabBilling({
+          hasCampusModule: hasCampus,
+          hasGroovelabModule: hasGroovelab,
+          activeTeacherCount: teachersCount,
+          activeStudentCount: maxActiveStudents,
+          campusStudentCount: activeCampusStudents,
+          groovelabStudentCount: activeGroovelabStudents,
+          passiveStudentCount: passiveStudentsCount,
+          billingDiscountType: (school.billing_discount_type as any) || 'monthly',
+          exemptStudentCount: stats.exemptActiveStudents || 0,
+          directBillingMode: isFullDirect ? 'full' : (isPartial ? 'partial' : 'none'),
+          rates: {
+            priceCampus: effectiveRates.priceCampus,
+            priceGroovelab: effectiveRates.priceGroovelab,
+            priceKombi: effectiveRates.priceKombi,
+            priceTeacher: effectiveRates.priceTeacher,
+            priceStudent: effectiveRates.priceStudent,
+            pricePassiveStudent: effectiveRates.pricePassiveStudent
+          }
+        });
 
-        // ACTIVE STUDENTS FEE (Campus + GrooveLab activations covered by school / Sammelzahler)
-        const isSchoolPayer = school.student_billing_option === 'option2' || school.student_billing_option === 'option3_2' || school.student_billing_option === 'option3_3' || !school.student_billing_option || school.student_billing_option === 'option1';
-        const campusActiveStudentFee = isSchoolPayer ? activeCampusStudents * effectiveRates.priceStudent : 0.00;
-        const groovelabActiveStudentFee = activeGroovelabStudents * effectiveRates.priceStudent;
-        const activeStudentFee = campusActiveStudentFee + groovelabActiveStudentFee;
-        
-        // B2C REVENUE (e.g. from student upgrades)
-        const b2cRevenue = premiumStudents * 9.99;
-
-        // Subtotal B2B
-        const baseFee = moduleBaseFee;
-        const kombiDiscountAmount = hasKombi ? Math.max(0, (effectiveRates.priceCampus + effectiveRates.priceGroovelab) - effectiveRates.priceKombi) : 0;
         const storageAddonFee = Number(school.storage_addon_gb || 0) > 0 ? Number(school.storage_addon_monthly_fee || 1.49) : 0;
-        const subtotal = Math.max(0, moduleBaseFee + userFee + activeStudentFee + storageAddonFee);
+        const subtotal = calcResult.totalMonthlySchoolInvoice + storageAddonFee;
         const isBypass = school.subscription_bypass || false;
         let status: 'trial' | 'active' | 'bypass' | 'suspended' = 'active';
         if (school.status === 'suspended') {
@@ -622,6 +615,8 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         }
 
         const total = (isBypass || status === 'trial' || status === 'suspended') ? 0.00 : subtotal;
+
+        const b2cRevenue = premiumStudents * 9.99;
 
         return {
           schoolId: school.id,
@@ -635,9 +630,9 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           hasKombiDiscount: hasKombi,
           subscriptionBypass: isBypass,
           activeCampusUsers,
-          baseFee,
-          userFee: parseFloat(userFee.toFixed(2)),
-          kombiDiscountAmount,
+          baseFee: calcResult.baseServerFlatRate,
+          userFee: parseFloat((calcResult.teacherServiceFeeTotal + calcResult.passiveStudentFeeTotal).toFixed(2)),
+          kombiDiscountAmount: calcResult.bundleSavings,
           subtotal: parseFloat(subtotal.toFixed(2)),
           total: parseFloat(total.toFixed(2)),
           status,
@@ -655,12 +650,12 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           isGrandfathered: effectiveRates.isGrandfatheredRateActive,
           
           // Custom Breakdown Fields
-          activeStudentFee: parseFloat(activeStudentFee.toFixed(2)),
+          activeStudentFee: parseFloat(calcResult.studentActivationFeeTotal.toFixed(2)),
           totalTeachersCount: teachersCount,
           totalEmployeesCount: employeesCount,
           passiveStudentsCount,
-          teachersHostingFee: parseFloat(staffFee.toFixed(2)),
-          passiveStudentsHostingFee: parseFloat(passiveStudentsFee.toFixed(2)),
+          teachersHostingFee: parseFloat(calcResult.teacherServiceFeeTotal.toFixed(2)),
+          passiveStudentsHostingFee: parseFloat(calcResult.passiveStudentFeeTotal.toFixed(2)),
           storageAddonGb: Number(school.storage_addon_gb || 0),
           storageUsedBytes: Number(school.storage_used_bytes || 0),
           storageAddonMonthlyFee: storageAddonFee
