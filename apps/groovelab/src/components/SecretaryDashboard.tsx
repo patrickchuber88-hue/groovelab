@@ -25151,19 +25151,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                               <div>
                                 <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 3 von 5</span>
-                                <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>🎙️ Audio-Tresor Cloud-Speicher Kontingent wählen</h4>
-                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-                                  Der Basis-Audio-Tresor ist in deinen Modulen enthalten. Falls deine Musikschule zusätzliches Speichervolumen für Bandaufnahmen, Playbacks &amp; Audio-Loops benötigt, kannst du hier dein gewünschtes Speicherpaket zubuchen:
+                                <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>🎙️ Audio-Tresor &amp; Cloud-Speicher für Audio-Aufnahmen &amp; Loops</h4>
+                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.45' }}>
+                                  Der Basis-Audio-Tresor ist in deinen Modulen bereits standardmäßig enthalten. Um Speicherbegrenzungen aufzuheben und sämtliche Audio-Aufnahmen, Loopstation-Sessions und musikalischen Momente deiner Schüler &amp; Lehrkräfte in hoher Menge verlustfrei festzuhalten, kannst du das gewünschte Speichervolumen passend zu deiner Musikschul-Größe wählen:
                                 </p>
                               </div>
 
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '14px' }}>
                                 {[
                                   { gb: 0, fee: 0, label: 'Standard', sublabel: 'Basis-Kontingent', desc: '0,00 € / Mo.', icon: '🎙️' },
-                                  { gb: 5, fee: 1.49, label: '+5 GB', sublabel: 'Kleinere Gruppen', desc: '1,49 € / Mo.', icon: '☁️' },
-                                  { gb: 10, fee: 2.99, label: '+10 GB', sublabel: 'Mittlere Bands', desc: '2,99 € / Mo.', icon: '⚡' },
-                                  { gb: 20, fee: 5.49, label: '+20 GB', sublabel: 'Große Ensembles', desc: '5,49 € / Mo.', icon: '🚀' },
-                                  { gb: 50, fee: 9.99, label: '+50 GB', sublabel: 'Full Cloud Storage', desc: '9,99 € / Mo.', icon: '👑' }
+                                  { gb: 5, fee: 1.49, label: '+5 GB', sublabel: 'Bis 100 Schüler', desc: '1,49 € / Mo.', icon: '☁️' },
+                                  { gb: 10, fee: 2.99, label: '+10 GB', sublabel: 'Bis 250 Schüler', desc: '2,99 € / Mo.', icon: '⚡' },
+                                  { gb: 20, fee: 5.49, label: '+20 GB', sublabel: 'Bis 500 Schüler', desc: '5,49 € / Mo.', icon: '🚀' },
+                                  { gb: 50, fee: 9.99, label: '+50 GB', sublabel: 'Große Musikschulen', desc: '9,99 € / Mo.', icon: '👑' }
                                 ].map(tier => {
                                   const isSel = selectedStorageAddonGb === tier.gb;
                                   return (
