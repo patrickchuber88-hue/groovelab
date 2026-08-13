@@ -451,6 +451,8 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
       const userStatsMap: Record<string, { 
         totalStudents: number; 
         activeStudents: number; 
+        activeCampusStudents: number;
+        activeGroovelabStudents: number;
         premiumStudents: number;
         exemptActiveStudents: number;
         totalTeachers: number;
@@ -464,6 +466,8 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           userStatsMap[u.school_id] = { 
             totalStudents: 0, 
             activeStudents: 0, 
+            activeCampusStudents: 0,
+            activeGroovelabStudents: 0,
             premiumStudents: 0,
             exemptActiveStudents: 0,
             totalTeachers: 0,
@@ -472,10 +476,19 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
             activeEmployees: 0
           };
         }
-        if (u.role === 'student') {
+        const isStudent = u.role === 'student' || (Array.isArray(u.roles) && u.roles.includes('student'));
+        if (isStudent) {
           userStatsMap[u.school_id].totalStudents++;
-          // Active student definition (premium/campus active)
-          if (u.is_campus_active) {
+          const isCampusAct = Boolean(u.is_campus_active || (u as any).isCampusActive);
+          const isGroovelabAct = Boolean(u.is_groovelab_active || (u as any).isGroovelabActive);
+
+          if (isCampusAct) {
+            userStatsMap[u.school_id].activeCampusStudents++;
+          }
+          if (isGroovelabAct) {
+            userStatsMap[u.school_id].activeGroovelabStudents++;
+          }
+          if (isCampusAct || isGroovelabAct) {
             userStatsMap[u.school_id].activeStudents++;
             userStatsMap[u.school_id].premiumStudents++;
             if (u.exempt_from_direct_billing) {
@@ -537,6 +550,8 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         const stats = userStatsMap[school.id] || { 
           totalStudents: 0, 
           activeStudents: 0, 
+          activeCampusStudents: 0,
+          activeGroovelabStudents: 0,
           premiumStudents: 0, 
           exemptActiveStudents: 0,
           totalTeachers: 0, 
@@ -545,14 +560,16 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           activeEmployees: 0
         };
 
-        const pendingStudentsCount = pendingCountMap[school.id] || 0;
-        const totalStudents = stats.totalStudents + pendingStudentsCount;
-        const activeStudents = stats.activeStudents;
+        const totalStudents = stats.totalStudents;
+        const activeCampusStudents = stats.activeCampusStudents;
+        const activeGroovelabStudents = stats.activeGroovelabStudents;
+        const maxActiveStudents = Math.max(activeCampusStudents, activeGroovelabStudents);
+        const activeStudents = maxActiveStudents;
         const premiumStudents = stats.premiumStudents;
         const exemptActiveStudents = stats.exemptActiveStudents || 0;
         
-        const teachersCount = stats.activeTeachers; // Fix: use active count
-        const employeesCount = stats.activeEmployees; // Fix: use active count
+        const teachersCount = stats.activeTeachers;
+        const employeesCount = stats.activeEmployees;
 
         // MODULE BASE FEE & EFFECTIVE RATES CALCULATION
         const effectiveRates = calculateSchoolEffectiveRates(school, masterPricing);
@@ -574,15 +591,17 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         // PASSIVE STUDENTS FEE (0.09 € per passive student profile)
         const isPartial = school.student_billing_option === 'student_partial';
         const isFullDirect = school.student_billing_option === 'student_full';
-        const passiveStudentsCount = isPartial ? totalStudents : (isFullDirect ? 0 : Math.max(0, totalStudents - activeStudents));
+        const passiveStudentsCount = isPartial ? totalStudents : (isFullDirect ? 0 : Math.max(0, totalStudents - maxActiveStudents));
         const passiveStudentsFee = passiveStudentsCount * 0.09;
 
         // Profile-Levy (B2B User Fee)
         const userFee = staffFee + passiveStudentsFee;
 
-        // ACTIVE STUDENTS FEE (only if billing option is option2 / school pays monthly per active student)
-        const isSchoolPayer = school.student_billing_option === 'option2' || school.student_billing_option === 'option3_2' || school.student_billing_option === 'option3_3';
-        const activeStudentFee = (isSchoolPayer && school.student_billing_option === 'option2') ? activeStudents * effectiveRates.priceStudent : 0.00;
+        // ACTIVE STUDENTS FEE (Campus + GrooveLab activations covered by school / Sammelzahler)
+        const isSchoolPayer = school.student_billing_option === 'option2' || school.student_billing_option === 'option3_2' || school.student_billing_option === 'option3_3' || !school.student_billing_option || school.student_billing_option === 'option1';
+        const campusActiveStudentFee = isSchoolPayer ? activeCampusStudents * effectiveRates.priceStudent : 0.00;
+        const groovelabActiveStudentFee = activeGroovelabStudents * effectiveRates.priceStudent;
+        const activeStudentFee = campusActiveStudentFee + groovelabActiveStudentFee;
         
         // B2C REVENUE (e.g. from student upgrades)
         const b2cRevenue = premiumStudents * 9.99;
