@@ -361,38 +361,40 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
       })()}
 
       {/* Revenue Financial Counters (MRR / ARR / Abo-Bypass Card) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
         {/* MRR Card */}
         <div style={{
           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
           borderRadius: '20px',
-          padding: '20px',
+          padding: '22px 20px',
           color: '#ffffff',
-          boxShadow: '0 10px 25px rgba(16, 185, 129, 0.25)',
+          boxShadow: '0 12px 28px rgba(16, 185, 129, 0.28)',
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.9 }}>
-            Monatlicher Umsatz (MRR)
-          </span>
-          <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
-            {totalMrr.toFixed(2)} €
-          </h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', fontSize: '0.72rem', opacity: 0.95, fontWeight: 650 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Building2 size={12} /> {committedBaseMrr.toFixed(2)} €
+          <div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.92)' }}>
+              Monatlicher Umsatz (MRR)
             </span>
-            <span style={{ opacity: 0.6 }}>•</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Users size={12} /> {seatUsageMrr.toFixed(2)} €
+            <h3 style={{ fontSize: '2.1rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif', color: '#ffffff' }}>
+              {totalMrr.toFixed(2).replace('.', ',')} €
+            </h3>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '0.70rem', color: '#ffffff', fontWeight: 700, flexWrap: 'wrap' }}>
+            <span title="🏢 Modul-Hosting Flatrates" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.18)', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+              <Building2 size={11} color="#ffffff" /> {committedBaseMrr.toFixed(2).replace('.', ',')} €
+            </span>
+            <span title="👥 Schüler- &amp; Lehrer-Bereitstellung" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.18)', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+              <Users size={11} color="#ffffff" /> {seatUsageMrr.toFixed(2).replace('.', ',')} €
             </span>
             {storageAddonMrr > 0 && (
-              <>
-                <span style={{ opacity: 0.6 }}>•</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <HardDrive size={12} /> {storageAddonMrr.toFixed(2)} €
-                </span>
-              </>
+              <span title="💽 Audio-Tresor Speicher-Addons" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.18)', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+                <HardDrive size={11} color="#ffffff" /> {storageAddonMrr.toFixed(2).replace('.', ',')} €
+              </span>
             )}
           </div>
         </div>
@@ -401,31 +403,33 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
         <div style={{
           background: '#ffffff',
           borderRadius: '20px',
-          padding: '20px',
-          border: '1px solid rgba(15, 23, 42, 0.06)',
-          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)'
+          padding: '22px 20px',
+          border: '1px solid rgba(15, 23, 42, 0.08)',
+          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.025)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            Jährliche Run-Rate (ARR)
-          </span>
-          <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
-            {totalArr.toFixed(2)} €
-          </h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', fontSize: '0.72rem', color: '#64748b', fontWeight: 650 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Building2 size={12} color="#64748b" /> {committedBaseArr.toFixed(2)} €
+          <div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Jährliche Run-Rate (ARR)
             </span>
-            <span style={{ opacity: 0.4 }}>•</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Users size={12} color="#64748b" /> {seatUsageArr.toFixed(2)} €
+            <h3 style={{ fontSize: '2.1rem', fontWeight: 900, margin: '6px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+              {totalArr.toFixed(2).replace('.', ',')} €
+            </h3>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '0.70rem', color: '#475569', fontWeight: 700, flexWrap: 'wrap' }}>
+            <span title="🏢 Jährliche Modul-Flatrates" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+              <Building2 size={11} color="#64748b" /> {committedBaseArr.toFixed(2).replace('.', ',')} €
+            </span>
+            <span title="👥 Jährliche Schüler- &amp; Lehrereinnahmen" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+              <Users size={11} color="#64748b" /> {seatUsageArr.toFixed(2).replace('.', ',')} €
             </span>
             {storageAddonArr > 0 && (
-              <>
-                <span style={{ opacity: 0.4 }}>•</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <HardDrive size={12} color="#64748b" /> {storageAddonArr.toFixed(2)} €
-                </span>
-              </>
+              <span title="💽 Jährliche Audio-Tresor Addons" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+                <HardDrive size={11} color="#64748b" /> {storageAddonArr.toFixed(2).replace('.', ',')} €
+              </span>
             )}
           </div>
         </div>
@@ -434,17 +438,23 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
         <div style={{
           background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
           borderRadius: '20px',
-          padding: '20px',
+          padding: '22px 20px',
           border: '1px solid #e9d5ff',
-          boxShadow: '0 10px 30px rgba(126, 34, 206, 0.04)'
+          boxShadow: '0 8px 24px rgba(126, 34, 206, 0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#7e22ce', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            Abo-Bypass (Freigestellt)
-          </span>
-          <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', color: '#6b21a8', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
-            {bypassedCount} <span style={{ fontSize: '0.9rem', color: '#7e22ce', fontWeight: 700 }}>Schulen</span>
-          </h3>
-          <span style={{ fontSize: '0.72rem', color: expiringBypassSchools.length > 0 ? '#b45309' : '#7e22ce', fontWeight: 700, marginTop: '4px', display: 'block' }}>
+          <div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#7e22ce', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Abo-Bypass (Freigestellt)
+            </span>
+            <h3 style={{ fontSize: '2.1rem', fontWeight: 900, margin: '6px 0 0 0', color: '#6b21a8', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+              {bypassedCount} <span style={{ fontSize: '0.9rem', color: '#7e22ce', fontWeight: 700 }}>Schulen</span>
+            </h3>
+          </div>
+          <span style={{ fontSize: '0.72rem', color: expiringBypassSchools.length > 0 ? '#b45309' : '#7e22ce', fontWeight: 700, marginTop: '10px', display: 'block' }}>
             {expiringBypassSchools.length > 0
               ? `⚠️ ${expiringBypassSchools.length} läuft bald ab`
               : '0,00 € Sponsoring / Kulanz'}
@@ -455,17 +465,23 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
         <div style={{
           background: '#ffffff',
           borderRadius: '20px',
-          padding: '20px',
-          border: '1px solid rgba(15, 23, 42, 0.06)',
-          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)'
+          padding: '22px 20px',
+          border: '1px solid rgba(15, 23, 42, 0.08)',
+          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.025)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            Aktive Musikschulen
-          </span>
-          <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
-            {validSchools.length}
-          </h3>
-          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '4px', display: 'block' }}>
+          <div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Aktive Musikschulen
+            </span>
+            <h3 style={{ fontSize: '2.1rem', fontWeight: 900, margin: '6px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+              {validSchools.length}
+            </h3>
+          </div>
+          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '10px', display: 'block' }}>
             {validSchools.length - bypassedCount} zahlend • {bypassedCount} Bypass
           </span>
         </div>
@@ -474,19 +490,25 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
         <div style={{
           background: '#ffffff',
           borderRadius: '20px',
-          padding: '20px',
-          border: '1px solid rgba(15, 23, 42, 0.06)',
-          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)'
+          padding: '22px 20px',
+          border: '1px solid rgba(15, 23, 42, 0.08)',
+          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.025)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            Offene Freischaltungen
-          </span>
-          <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', color: pendingUsers.length > 0 ? '#ef4444' : '#10b981', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
-            {pendingUsers.length}
-          </h3>
+          <div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Offene Freischaltungen
+            </span>
+            <h3 style={{ fontSize: '2.1rem', fontWeight: 900, margin: '6px 0 0 0', color: pendingUsers.length > 0 ? '#ef4444' : '#10b981', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+              {pendingUsers.length}
+            </h3>
+          </div>
           <button
             onClick={() => onNavigateTab('briefing')}
-            style={{ fontSize: '0.72rem', color: '#0284c7', background: 'transparent', border: 'none', padding: 0, fontWeight: 800, cursor: 'pointer', marginTop: '4px', textDecoration: 'underline' }}
+            style={{ fontSize: '0.72rem', color: '#0284c7', background: 'transparent', border: 'none', padding: 0, fontWeight: 800, cursor: 'pointer', marginTop: '10px', textDecoration: 'underline', textAlign: 'left' }}
           >
             Prüfen →
           </button>

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3 } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
 import * as lamejs from '@breezystack/lamejs';
 import { GrooveLoopstation } from './groovelab/GrooveLoopstation';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
+import { AudioBiographyView } from './campus/AudioBiographyView';
 
 
 export const ALL_STICKERS = [
@@ -75,7 +76,7 @@ interface MeisterwerkDocumentationModalProps {
   teacherId?: string;
   initialLehrwerkId?: string;
   initialViewMode?: 'document' | 'recordings' | 'loopstation' | 'practice';
-  initialModalTab?: 'document' | 'logbook' | 'stickeralbum';
+  initialModalTab?: 'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography';
   onProfileClick?: (student: Student) => void;
   readOnly?: boolean;
   isEmbed?: boolean;
@@ -721,7 +722,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [shareCardLayout, setShareCardLayout] = useState<'dark' | 'light'>('dark');
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [lessonDay, setLessonDay] = useState<number>(1);
-  const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar'>(initialModalTab || 'document');
+  const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>(initialModalTab || 'document');
 
   useEffect(() => {
     if (initialModalTab) {
@@ -971,6 +972,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             
           const uploadedUrl = publicUrlData.publicUrl;
           await saveAudioMetadata(uploadedUrl);
+
+          // 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
+          let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+          if (!targetSchoolId && student?.id) {
+            try {
+              const { data: stRec } = await supabase
+                .from('students')
+                .select('school_id')
+                .eq('id', student.id)
+                .maybeSingle();
+              if (stRec?.school_id) targetSchoolId = stRec.school_id;
+            } catch (stErr) {
+              console.warn('[Meisterwerk] School lookup note:', stErr);
+            }
+          }
+          if (targetSchoolId && blob?.size) {
+            try {
+              const { data: schoolData } = await supabase
+                .from('schools')
+                .select('storage_used_bytes')
+                .eq('id', targetSchoolId)
+                .maybeSingle();
+              if (schoolData) {
+                const currentBytes = Number(schoolData.storage_used_bytes || 0);
+                await supabase
+                  .from('schools')
+                  .update({ storage_used_bytes: currentBytes + blob.size })
+                  .eq('id', targetSchoolId);
+              }
+            } catch (quotaErr) {
+              console.warn('[Meisterwerk] Storage quota update note:', quotaErr);
+            }
+          }
         } catch (err: any) {
           console.error("Storage upload failed:", err);
           alert(`Fehler beim Hochladen der Audio-Datei: ${err.message || err}. Bitte überprüfe deine Internetverbindung.`);
@@ -4659,6 +4693,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             const currentTabValue = 
               activeModalTab === 'skillradar' ? 'radar' :
               activeModalTab === 'stickeralbum' ? 'stickers' :
+              activeModalTab === 'audiobiography' ? 'audiobiography' :
               activeModalTab === 'logbook' ? 'meisterwerke' :
               (activeModalTab === 'document' && activeSubView === 'history') ? 'history' :
               activeViewMode;
@@ -4668,6 +4703,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 setActiveModalTab('skillradar');
               } else if (val === 'stickers') {
                 setActiveModalTab('stickeralbum');
+                setActiveSubView('hub');
+              } else if (val === 'audiobiography') {
+                setActiveModalTab('audiobiography');
                 setActiveSubView('hub');
               } else if (val === 'meisterwerke') {
                 setActiveModalTab('logbook');
@@ -7406,37 +7444,52 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
                 </div>{/* close inner scrollable div */}
 
-                {/* Meisterwerke & Sticker-Album Buttons - pinned at bottom */}
-                <div style={{ padding: '12px 24px 24px 24px', display: 'flex', gap: '12px' }}>
+                {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom */}
+                <div style={{ padding: '12px 20px 24px 20px', display: 'flex', gap: '10px' }}>
                   <button
                     type="button"
                     onClick={() => setActiveModalTab('logbook')}
                     style={{
-                      flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                      flex: 1, padding: '13px 8px', borderRadius: '14px', border: 'none',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer',
                       boxShadow: '0 4px 10px rgba(99, 102, 241, 0.2)',
                       transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                     }}
                     className="hover-scale"
                   >
                     <Award size={15} />
-                    Deine Meisterwerke
+                    <span style={{ whiteSpace: 'nowrap' }}>Deine Meisterwerke</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
                     style={{
-                      flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
-                      background: '#d97706', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                      flex: 1, padding: '13px 8px', borderRadius: '14px', border: 'none',
+                      background: '#d97706', color: 'white', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer',
                       boxShadow: '0 4px 10px rgba(217, 119, 6, 0.2)',
                       transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                     }}
                     className="hover-scale"
                   >
                     <Star size={15} fill="#fff" />
-                    Sticker-Album
+                    <span style={{ whiteSpace: 'nowrap' }}>Sticker-Album</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setActiveModalTab('audiobiography'); setActiveSubView('hub'); }}
+                    style={{
+                      flex: 1, padding: '13px 8px', borderRadius: '14px', border: 'none',
+                      background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: 'white', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer',
+                      boxShadow: '0 4px 10px rgba(16, 185, 129, 0.25)',
+                      transition: 'all 0.15s ease',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Disc size={15} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Audio-Biografie</span>
                   </button>
                 </div>
               </>
@@ -11040,6 +11093,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
 
         </div>
+      ) : activeModalTab === 'audiobiography' ? (
+        /* AUDIO-BIOGRAFIE VIEW (AKUSTISCHES STAMMBAUCH & MEILENSTEINE) */
+        <AudioBiographyView
+          student={student}
+          teacherId={teacherId}
+          isTeacher={isTeacherTools}
+          onBackToHub={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}
+          isMobileOrSim={isMobileOrSim}
+        />
       ) : (
         /* COLUMN 4: 🏆 MEISTERWERKE & LOGBUCH (Full Width in Swiss Modernist Style) */
         <div style={{

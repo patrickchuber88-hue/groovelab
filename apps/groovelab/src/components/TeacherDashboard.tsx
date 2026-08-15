@@ -890,7 +890,34 @@ export function TeacherDashboard({
   activePlatform: propsActivePlatform
 }: TeacherDashboardProps) {
   const activePlatform = propsActivePlatform || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_active_platform') || 'campus') : 'campus');
-  const [teacher, setTeacher] = useState<any>(null);
+  const [teacher, setTeacher] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      const isGhost = userId === 'master-support-id' || sessionStorage.getItem('groovelab_support_ghost') === 'true';
+      if (isGhost) {
+        const ghostSchoolId = sessionStorage.getItem('groovelab_ghost_school_id') || '';
+        const ghostSchoolName = sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule';
+        return {
+          id: 'master-support-id',
+          school_id: ghostSchoolId,
+          role: 'teacher',
+          first_name: `${ghostSchoolName} Support`,
+          last_name: '',
+          photo_url: '/campus_login_hero.png',
+          avatar_url: '/campus_login_hero.png',
+          instrument: 'Support-Lehrkraft',
+          is_campus_active: true,
+          is_groovelab_active: true,
+          is_ghost_mode: true,
+          schools: {
+            id: ghostSchoolId,
+            name: ghostSchoolName,
+            status: 'active'
+          }
+        };
+      }
+    }
+    return null;
+  });
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
 
   useEffect(() => {
@@ -4630,6 +4657,39 @@ export function TeacherDashboard({
   const fetchData = async () => {
     if (!userId) return;
     setFetchError(null);
+
+    if (userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true')) {
+      const ghostSchoolId = sessionStorage.getItem('groovelab_ghost_school_id') || '';
+      const ghostSchoolName = sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule';
+      const ghostTeacher = {
+        id: 'master-support-id',
+        school_id: ghostSchoolId,
+        role: 'teacher',
+        first_name: `${ghostSchoolName} Support`,
+        last_name: '',
+        photo_url: '/campus_login_hero.png',
+        avatar_url: '/campus_login_hero.png',
+        instrument: 'Support-Lehrkraft',
+        is_campus_active: true,
+        is_groovelab_active: true,
+        is_ghost_mode: true,
+        schools: {
+          id: ghostSchoolId,
+          name: ghostSchoolName,
+          status: 'active'
+        }
+      };
+      setTeacher(ghostTeacher);
+      if (ghostSchoolId) {
+        supabase.from('schools').select('*').eq('id', ghostSchoolId).single().then(({ data: sd }) => {
+          if (sd) {
+            setSchoolData(sd);
+            setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
+          }
+        });
+      }
+      return;
+    }
 
     // Update coach presence in DB
     supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});

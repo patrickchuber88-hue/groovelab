@@ -29,6 +29,8 @@ import { DpoAuditPortal } from './DpoAuditPortal';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
+import { BulkImportModal } from './common/BulkImportModal';
+import { generateTeacherQuickstartPDF, generateParentQuickstartPDF } from '../utils/pdfGenerator';
 function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
   let prefix = 'C';
   if (role === 'admin' || role === 'secretary') {
@@ -1240,6 +1242,28 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     if (saved && valid.includes(saved)) return saved as any;
     return 'briefing';
   });
+
+  // 🎙️ Live Audio-Tresor Storage & Quota Auto-Refresh on Licenses tab view
+  useEffect(() => {
+    if (secretarySubTab === 'licenses' && currentSchoolProfile?.id) {
+      const refreshStorageQuota = async () => {
+        try {
+          const { data } = await supabase
+            .from('schools')
+            .select('storage_used_bytes, storage_addon_gb, storage_addon_status, storage_addon_monthly_fee')
+            .eq('id', currentSchoolProfile.id)
+            .maybeSingle();
+
+          if (data && typeof data.storage_used_bytes === 'number') {
+            setCurrentSchoolProfile((prev: any) => prev ? ({ ...prev, ...data }) : prev);
+          }
+        } catch (err) {
+          console.warn('[Storage] Auto-refresh quota note:', err);
+        }
+      };
+      refreshStorageQuota();
+    }
+  }, [secretarySubTab, currentSchoolProfile?.id]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [auditLoading, setAuditLoading] = useState<boolean>(false);
   const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
@@ -1312,7 +1336,23 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [realtimeToast, setRealtimeToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [liveSearchQuery, setLiveSearchQuery] = useState<string>('');
-  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      const isGhost = userId === 'master-support-id' || sessionStorage.getItem('groovelab_support_ghost') === 'true';
+      if (isGhost) {
+        const ghostSchoolName = sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule';
+        return {
+          id: 'master-support-id',
+          first_name: `${ghostSchoolName} Support`,
+          last_name: '',
+          role: 'admin',
+          photo_url: '/campus_login_hero.png',
+          is_ghost_mode: true
+        };
+      }
+    }
+    return null;
+  });
   const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<any>(null);
   const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
@@ -1387,6 +1427,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   useEffect(() => {
     if (!userId) return;
     const loadOwnProfile = async () => {
+      if (userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true')) {
+        const ghostSchoolName = sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule';
+        setCurrentUserProfile({
+          id: 'master-support-id',
+          first_name: `${ghostSchoolName} Support`,
+          last_name: '',
+          role: 'admin',
+          photo_url: '/campus_login_hero.png',
+          is_ghost_mode: true
+        });
+        return;
+      }
       const { data } = await supabase
         .from('users')
         .select('id, first_name, last_name, nickname, photo_url, role, roles, email, instrument, qr_token, teacher_qr_token')
@@ -1745,6 +1797,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   // Manual Student Creation Form States
   const [showAddStudentModal, setShowAddStudentModal] = useState<boolean>(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState<boolean>(false);
   const [newStudentFirstName, setNewStudentFirstName] = useState<string>('');
   const [newStudentLastName, setNewStudentLastName] = useState<string>('');
   const [newStudentBirthDate, setNewStudentBirthDate] = useState<string>('');
@@ -9543,7 +9596,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 </button>
 
                 <button
-                  onClick={() => setIsStudentCsvExpanded(!isStudentCsvExpanded)}
+                  onClick={() => setShowBulkImportModal(true)}
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
@@ -9552,14 +9605,67 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     padding: '4px 10px', 
                     fontSize: '0.72rem', 
                     fontWeight: 800,
-                    background: isStudentCsvExpanded ? '#f1f5f9' : '#ffffff',
+                    background: '#ffffff',
+                    border: '1.5px solid #a7f3d0',
+                    color: '#065f46',
+                    cursor: 'pointer',
+                    fontFamily: 'Urbanist',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-scale-mini"
+                  title="Smarter 1-Klick Schüler- &amp; Lehrer-Import aus Excel/CSV mit automatischer DSGVO-Maskierung"
+                >
+                  <Upload size={12} color="#059669" />
+                  <span>📥 Smarter CSV/Excel Import</span>
+                </button>
+
+                <button
+                  onClick={() => generateTeacherQuickstartPDF(currentSchoolProfile?.name || 'Stadtmusikschule')}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    borderRadius: '8px', 
+                    padding: '4px 10px', 
+                    fontSize: '0.72rem', 
+                    fontWeight: 800,
+                    background: '#f8fafc',
                     border: '1px solid #cbd5e1',
+                    color: '#334155',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist',
                     transition: 'all 0.2s'
                   }}
+                  className="hover-scale-mini"
+                  title="1-Seiter A4 Spickzettel für das Lehrerzimmer herunterladen"
                 >
-                  📄 CSV Import {isStudentCsvExpanded ? '▲' : '▼'}
+                  <FileText size={12} color="#3b82f6" />
+                  <span>Lehrer-Spickzettel (PDF)</span>
+                </button>
+
+                <button
+                  onClick={() => generateParentQuickstartPDF(currentSchoolProfile?.name || 'Stadtmusikschule', (activePlatform as any) || 'both')}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    borderRadius: '8px', 
+                    padding: '4px 10px', 
+                    fontSize: '0.72rem', 
+                    fontWeight: 800,
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    color: '#334155',
+                    cursor: 'pointer',
+                    fontFamily: 'Urbanist',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-scale-mini"
+                  title="1-Seiter A4 Informationsblatt für Eltern zum digitalen Hausaufgabenheft"
+                >
+                  <FileText size={12} color="#10b981" />
+                  <span>Eltern-Info (PDF)</span>
                 </button>
 
                 <button
@@ -15318,7 +15424,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             alignItems: 'center'
                           }}>{currentUserProfile?.first_name || 'Zentrale'}</span>! 
                           <span className="inline-block animate-bounce" style={{ marginLeft: '4px' }}>
-                            👋
+                            {currentUserProfile?.is_ghost_mode ? '🎧' : '👋'}
                           </span>
                         </h3>
                         <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.25 }}>
@@ -26863,7 +26969,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                     </div>
 
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>
-                                                      <span>{usedGb.toFixed(2).replace('.', ',')} GB von {totalCapGb} GB belegt</span>
+                                                      <span>{usedBytes > 0 && usedGb < 0.01 ? `${(usedBytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB` : `${usedGb.toFixed(2).replace('.', ',')} GB`} von {totalCapGb} GB belegt</span>
                                                       <span style={{ color: usagePct > 80 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>{freeGb.toFixed(2).replace('.', ',')} GB frei ({100 - usagePct}%)</span>
                                                     </div>
 
@@ -33694,6 +33800,18 @@ status: status,
           />
         </div>
       )}
+
+      {/* Smarter CSV/Excel Bulk-Import Modal */}
+      <BulkImportModal
+        isOpen={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        schoolId={schoolId}
+        schoolName={schoolName || currentSchoolProfile?.name || 'Stadtmusikschule'}
+        teachers={allUniqueTeacherProfiles.map((t: any) => ({ id: t.id, name: t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() }))}
+        onImportComplete={() => {
+          fetchDashboardData();
+        }}
+      />
     </div>
   </div>
 );

@@ -1540,7 +1540,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
                         <div style={{ textAlign: 'right' }}>
                           <span style={{ fontSize: '0.95rem', fontWeight: 800, color: isFull ? '#dc2626' : isHighUsage ? '#b45309' : '#1e293b' }}>
-                            {usedGb.toFixed(2).replace('.', ',')} GB / {totalGb} GB
+                            {storageUsedBytes > 0 && usedGb < 0.01 ? `${(storageUsedBytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB` : `${usedGb.toFixed(2).replace('.', ',')} GB`} / {totalGb} GB
                           </span>
                           <span style={{ display: 'block', fontSize: '0.7rem', color: '#34a853', fontWeight: 800 }}>
                             {freeGb.toFixed(2).replace('.', ',')} GB frei ({100 - usagePct} %)

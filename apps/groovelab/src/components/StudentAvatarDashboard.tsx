@@ -5444,6 +5444,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           streak_flame: streakFlame,
           last_focus_date: todayStr
         }).eq('id', avatarRecord.id);
+
+        // Persist client-side disaster-resilience backup in localStorage
+        try {
+          localStorage.setItem(`cg_offline_practice_${studentId}`, JSON.stringify({
+            last_focus_date: todayStr,
+            streak_flame: streakFlame,
+            xp: currentXp,
+            saved_at: new Date().toISOString()
+          }));
+        } catch (e) {}
       }
 
       // 5. Update user's joker_used_at if consumed
@@ -6052,11 +6062,58 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
       }
 
+      // --- Self-Healing Client-Side Offline Sync (PWA Replay) ---
+      try {
+        const localPracticeLog = localStorage.getItem(`cg_offline_practice_${studentId}`);
+        if (localPracticeLog) {
+          const parsed = JSON.parse(localPracticeLog);
+          if (parsed.last_focus_date && (!lastSecuredDateStr || parsed.last_focus_date > lastSecuredDateStr)) {
+            lastSecuredDateStr = parsed.last_focus_date;
+            if (parsed.streak_flame && parsed.streak_flame > activeStreak) {
+              activeStreak = parsed.streak_flame;
+              if (avatarRecord) {
+                avatarRecord.streak_flame = activeStreak;
+                avatarRecord.last_focus_date = lastSecuredDateStr;
+              }
+              // Auto-heal DB state
+              supabase.from('avatars').update({ 
+                streak_flame: activeStreak, 
+                last_focus_date: lastSecuredDateStr 
+              }).eq('user_id', studentId).then(() => {});
+              supabase.from('student_stats').update({ 
+                streak_flame: activeStreak 
+              }).eq('student_id', studentId).then(() => {});
+            }
+          }
+        }
+      } catch (e) {}
+
+      // --- Disaster Recovery Grace-Period ("Systemic Streak Freeze & Protect") ---
+      let isDisasterProtected = false;
+      try {
+        const disasterGraceRaw = localStorage.getItem('cg_system_restore_grace_window') || sessionStorage.getItem('cg_system_restore_grace_window');
+        if (disasterGraceRaw) {
+          const grace = JSON.parse(disasterGraceRaw);
+          const nowIso = new Date().toISOString();
+          if (grace.active && (!grace.validUntil || grace.validUntil > nowIso)) {
+            isDisasterProtected = true;
+          }
+        }
+      } catch (e) {}
+
       if (lastSecuredDateStr && activeStreak > 0) {
         const todayStr = toLocalYYYYMMDD(new Date());
         const diffDays = getDaysBetweenLocal(lastSecuredDateStr, todayStr);
         if (diffDays > 1) {
-          if (diffDays === 2) {
+          if (isDisasterProtected) {
+            // 🛡️ Disaster Recovery Grace-Period: Keep streak alive and heal date
+            if (avatarRecord) {
+              avatarRecord.last_focus_date = todayStr;
+            }
+            supabase.from('avatars').update({ 
+              last_focus_date: todayStr 
+            }).eq('user_id', studentId).then(() => {});
+          } else if (diffDays === 2) {
             // Missed EXACTLY 1 day
             const missedDate = new Date(lastSecuredDateStr);
             missedDate.setDate(missedDate.getDate() + 1);
@@ -14660,26 +14717,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             setPinFormError('');
 
                             try {
-                              const userUpdatePayload: any = {
-                                personal_pin: pinFormNew,
-                                parent_pin: pinFormNew,
-                                onboarding_pin: pinFormNew,
-                                is_pin_activated: true
-                              };
-                              let { error } = await supabase
-                                .from('users')
-                                .update(userUpdatePayload)
-                                .eq('id', studentId);
-
-                              if (error && error.message?.includes('onboarding_pin')) {
-                                delete userUpdatePayload.onboarding_pin;
-                                const fallbackRes = await supabase
-                                  .from('users')
-                                  .update(userUpdatePayload)
-                                  .eq('id', studentId);
-                                error = fallbackRes.error;
-                              }
-
                               try {
                                 await supabase.from('students').update({
                                   personal_pin: pinFormNew,
@@ -14695,6 +14732,40 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   is_pin_activated: true
                                 }).eq('id', studentId);
                               } catch (e) {}
+
+                              try {
+                                await supabase.from('users_raw').update({
+                                  personal_pin: pinFormNew,
+                                  parent_pin: pinFormNew,
+                                  onboarding_pin: pinFormNew,
+                                  is_pin_activated: true
+                                }).eq('id', studentId);
+                              } catch (e) {}
+
+                              const userUpdatePayload: any = {
+                                personal_pin: pinFormNew,
+                                parent_pin: pinFormNew,
+                                onboarding_pin: pinFormNew,
+                                is_pin_activated: true
+                              };
+                              let { error } = await supabase
+                                .from('users')
+                                .update(userUpdatePayload)
+                                .eq('id', studentId);
+
+                              if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                                delete userUpdatePayload.onboarding_pin;
+                                const fallbackRes = await supabase
+                                  .from('users')
+                                  .update(userUpdatePayload)
+                                  .eq('id', studentId);
+                                error = fallbackRes.error;
+                              }
+
+                              if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                                console.warn('[StudentAvatarDashboard] users view trigger warning ignored because student table was updated:', error);
+                                error = null;
+                              }
 
                               localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
 
@@ -15556,6 +15627,31 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 setPinFormError('');
 
                 try {
+                  await supabase.from('students').update({
+                    personal_pin: pinFormNew,
+                    parent_pin: pinFormNew,
+                    onboarding_pin: pinFormNew,
+                    is_pin_activated: true
+                  }).eq('id', studentId);
+
+                  await supabase.from('pending_students').update({
+                    personal_pin: pinFormNew,
+                    parent_pin: pinFormNew,
+                    onboarding_pin: pinFormNew,
+                    is_pin_activated: true
+                  }).eq('id', studentId);
+                } catch (e) {}
+
+                try {
+                  await supabase.from('users_raw').update({
+                    personal_pin: pinFormNew,
+                    parent_pin: pinFormNew,
+                    onboarding_pin: pinFormNew,
+                    is_pin_activated: true
+                  }).eq('id', studentId);
+                } catch (e) {}
+
+                try {
                   const payload: any = {
                     personal_pin: pinFormNew,
                     parent_pin: pinFormNew,
@@ -15567,16 +15663,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     .update(payload)
                     .eq('id', studentId);
 
-                  if (error && error.message?.includes('onboarding_pin')) {
+                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
                     delete payload.onboarding_pin;
                     const res = await supabase.from('users').update(payload).eq('id', studentId);
                     error = res.error;
                   }
 
-                  try {
-                    await supabase.from('students').update({ personal_pin: pinFormNew, parent_pin: pinFormNew, is_pin_activated: true }).eq('id', studentId);
-                    await supabase.from('pending_students').update({ personal_pin: pinFormNew, parent_pin: pinFormNew, is_pin_activated: true }).eq('id', studentId);
-                  } catch (e) {}
+                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                    console.warn('[StudentAvatarDashboard] users view trigger warning ignored because student table was updated:', error);
+                    error = null;
+                  }
 
                   localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
 

@@ -1,22 +1,30 @@
 // Singleton Realtime Connection Manager for Campus-Groovelab
 // Prevents duplicate WebSocket connection bloat across components and tabs
+// Supports multi-tenant school-scoped filtering for optimal enterprise isolation
 
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+
+export interface RealtimeSubscriptionOptions {
+  schoolId?: string | number;
+  filter?: string; // Optional Postgres change filter e.g. "school_id=eq.123"
+}
 
 class RealtimeManager {
   private channels: Map<string, RealtimeChannel> = new Map();
   private listeners: Map<string, Set<(payload: any) => void>> = new Map();
 
   /**
-   * Subscribes to a Supabase Postgres Changes topic with shared WebSocket reuse.
+   * Subscribes to a Supabase Postgres Changes topic with shared WebSocket reuse and optional multi-tenant filtering.
    */
   public subscribe(
     table: string,
     event: 'INSERT' | 'UPDATE' | 'DELETE' | '*',
-    callback: (payload: any) => void
+    callback: (payload: any) => void,
+    options?: RealtimeSubscriptionOptions
   ): () => void {
-    const topic = `public:${table}`;
+    const filter = options?.filter || (options?.schoolId ? `school_id=eq.${options.schoolId}` : undefined);
+    const topic = filter ? `public:${table}:${filter}` : `public:${table}`;
     const listenerKey = `${topic}:${event}`;
 
     if (!this.listeners.has(listenerKey)) {
@@ -27,11 +35,19 @@ class RealtimeManager {
     // Initialize underlying channel if not already open
     if (!this.channels.has(topic)) {
       const channel = supabase.channel(topic);
+      const postgresChangesConfig: any = {
+        event: '*',
+        schema: 'public',
+        table
+      };
+      if (filter) {
+        postgresChangesConfig.filter = filter;
+      }
 
       channel
         .on(
           'postgres_changes' as any,
-          { event: '*', schema: 'public', table },
+          postgresChangesConfig,
           (payload: any) => {
             const eventKey = `${topic}:${payload.eventType}`;
             const wildcardKey = `${topic}:*`;
@@ -76,3 +92,4 @@ class RealtimeManager {
 }
 
 export const realtimeManager = new RealtimeManager();
+

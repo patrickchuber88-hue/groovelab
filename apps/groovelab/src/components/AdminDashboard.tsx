@@ -256,7 +256,34 @@ export function AdminDashboard({
   hideHeader = false,
   onSwitchPlatform
 }: AdminDashboardProps) {
-  const [admin, setAdmin] = useState<any>(null);
+  const [admin, setAdmin] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      const isGhost = userId === 'master-support-id' || sessionStorage.getItem('groovelab_support_ghost') === 'true';
+      if (isGhost) {
+        const ghostSchoolId = sessionStorage.getItem('groovelab_ghost_school_id') || '';
+        const ghostSchoolName = sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule';
+        const ghostRole = sessionStorage.getItem('groovelab_ghost_active_role') || 'admin';
+        return {
+          id: 'master-support-id',
+          school_id: ghostSchoolId,
+          role: ghostRole,
+          first_name: `${ghostSchoolName} Support`,
+          last_name: '',
+          photo_url: '/campus_login_hero.png',
+          avatar_url: '/campus_login_hero.png',
+          is_campus_active: true,
+          is_groovelab_active: true,
+          is_ghost_mode: true,
+          schools: {
+            id: ghostSchoolId,
+            name: ghostSchoolName,
+            status: 'active'
+          }
+        };
+      }
+    }
+    return null;
+  });
   const schoolObj = Array.isArray((admin as any)?.schools) ? (admin as any)?.schools[0] : (admin as any)?.schools;
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [students, setStudents] = useState<any[]>([]);
@@ -2226,21 +2253,45 @@ export function AdminDashboard({
     let adminData = null;
     let fetchError = null;
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*, schools(*)')
-        .eq('id', userId)
-        .maybeSingle();
-      if (error) {
-        fetchError = error;
-      } else {
-        adminData = data;
-      }
-      if (!adminData && currentAdmin) {
-        adminData = currentAdmin;
-      }
-      if (adminData) {
+      if (userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true')) {
+        const ghostSchoolId = sessionStorage.getItem('groovelab_ghost_school_id') || '';
+        const ghostSchoolName = sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule';
+        const ghostRole = sessionStorage.getItem('groovelab_ghost_active_role') || 'admin';
+        adminData = {
+          id: 'master-support-id',
+          school_id: ghostSchoolId,
+          role: ghostRole,
+          first_name: `${ghostSchoolName} Support`,
+          last_name: '',
+          photo_url: '/campus_login_hero.png',
+          avatar_url: '/campus_login_hero.png',
+          is_campus_active: true,
+          is_groovelab_active: true,
+          is_ghost_mode: true,
+          schools: {
+            id: ghostSchoolId,
+            name: ghostSchoolName,
+            status: 'active'
+          }
+        };
         setAdmin(adminData);
+      } else {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*, schools(*)')
+          .eq('id', userId)
+          .maybeSingle();
+        if (error) {
+          fetchError = error;
+        } else {
+          adminData = data;
+        }
+        if (!adminData && currentAdmin) {
+          adminData = currentAdmin;
+        }
+        if (adminData) {
+          setAdmin(adminData);
+        }
       }
 
       if (!adminData) return;

@@ -1,5 +1,6 @@
-import React from 'react';
-import { GraduationCap, Music, Bell } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { GraduationCap, Music, Bell, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { subscribePendingOfflineCount, flushOfflineSyncQueue } from '../../services/offlineSyncService';
 
 interface MobileTopHeaderProps {
   user: any;
@@ -14,6 +15,44 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
   setActivePlatform,
   unreadCount = 0
 }) => {
+  const [pendingCount, setPendingCount] = useState<number>(0);
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = subscribePendingOfflineCount(setPendingCount);
+
+    const handleOnline = async () => {
+      setIsOnline(true);
+      setIsSyncing(true);
+      try {
+        await flushOfflineSyncQueue();
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      unsub();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const handleManualSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await flushOfflineSyncQueue();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const getAvatarSrc = () => {
     if (user?.role === 'admin' || user?.role === 'secretary') {
       return '/campus_login_hero.png';
@@ -119,8 +158,52 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
         </button>
       </div>
 
-      {/* Right: Notifications & Profile Avatar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* Right: Offline Indicator, Notifications & Profile Avatar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Offline Sync State Badge (shown when offline, syncing, or pending changes) */}
+        {(!isOnline || pendingCount > 0 || isSyncing) && (
+          <button
+            onClick={handleManualSync}
+            title={
+              !isOnline
+                ? 'Offline-Modus aktiv: Änderungen werden lokal gepuffert'
+                : isSyncing
+                ? 'Synchronisiere lokale Änderungen...'
+                : `${pendingCount} Änderung(en) lokal gespeichert (Klick zum Sync)`
+            }
+            style={{
+              padding: '4px 8px',
+              borderRadius: '100px',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              background: '#f8fafc',
+              color: '#64748b',
+              fontSize: '11px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            {!isOnline ? (
+              <>
+                <CloudOff size={13} color="#94a3b8" />
+                <span style={{ fontSize: '10px' }}>Offline</span>
+              </>
+            ) : isSyncing ? (
+              <>
+                <RefreshCw size={13} color="#3b82f6" style={{ animation: 'spin 1s linear infinite' }} />
+                <span style={{ fontSize: '10px' }}>Sync...</span>
+              </>
+            ) : (
+              <>
+                <Cloud size={13} color="#64748b" />
+                <span style={{ fontSize: '10px' }}>{pendingCount}</span>
+              </>
+            )}
+          </button>
+        )}
+
         {/* Unread Notifications Bell */}
         <div style={{ position: 'relative' }}>
           <button
@@ -162,3 +245,4 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
     </header>
   );
 };
+

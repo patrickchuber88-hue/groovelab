@@ -526,3 +526,249 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   doc.save(`DSB_Freigabepaket_TOM_AVV_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
 };
 
+/**
+ * Generates a 1-page A4 Quickstart Cheat Sheet for Teachers
+ */
+export const generateTeacherQuickstartPDF = async (schoolName: string) => {
+  const { default: jsPDF } = await import('jspdf');
+  const doc = new jsPDF();
+
+  doc.setProperties({
+    title: 'Lehrkräfte-Schnellstart - Campus-Groovelab',
+    subject: '1-Seiter Quickstart Leitfaden für Musikschullehrkräfte',
+    author: 'Campus-Groovelab',
+    creator: 'Campus-Groovelab Platform'
+  });
+
+  const primaryGreen = [52, 168, 83];
+  const darkSlate = [15, 23, 42];
+  const mutedText = [100, 116, 139];
+  const borderGray = [226, 232, 240];
+
+  // Top Accent Bar
+  doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  doc.rect(0, 0, 210, 6, 'F');
+
+  let y = 18;
+
+  // Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+  doc.text((schoolName || 'Meine Musikschule').toUpperCase(), 20, y);
+  y += 7;
+
+  doc.setFontSize(18);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text('Lehrer-Schnellstart: Campus-Groovelab', 20, y);
+  y += 6;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+  doc.text('In 3 einfachen Schritten zu digitalem Hausaufgabenheft, Loopstation & Stundenplan', 20, y);
+  y += 10;
+
+  // 3-Step Cards
+  const steps = [
+    {
+      nr: '1',
+      title: 'Schritt 1: Einloggen & Schülerprofil öffnen',
+      desc: 'Melden Sie sich mit Ihrem PIN im Lehrer-Dashboard an. Ihre Schülerliste und der tagesaktuelle Stundenplan sind bereits hinterlegt. Klicken Sie auf den Namen Ihres Schülers, um das digitale Protokoll aufzurufen.'
+    },
+    {
+      nr: '2',
+      title: 'Schritt 2: Hausaufgabe eintragen & Audio-Loop aufnehmen',
+      desc: 'Tippen Sie Notizen oder Übestücke ein. Optional: Nehmen Sie mit der integrierten 4-Takte-Loopstation ein kurzes Begleitmuster (Playalong) auf, zu dem der Schüler zuhause im Takt üben kann.'
+    },
+    {
+      nr: '3',
+      title: 'Schritt 3: Übe-Timer & Streaks aktivieren',
+      desc: 'Der Schüler sieht den Eintrag sofort in seiner App. Mit dem Fokus-Timer sammelt der Schüler XP-Punkte für regelmäßiges Üben – spielerische Motivation ohne zusätzlichen Lehreraufwand!'
+    }
+  ];
+
+  steps.forEach(st => {
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+    doc.roundedRect(20, y, 170, 36, 3, 3, 'FD');
+
+    // Number circle badge
+    doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.roundedRect(25, y + 6, 7, 7, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.text(st.nr, 27.5, y + 11);
+
+    // Title
+    doc.setFontSize(10.5);
+    doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+    doc.text(st.title, 36, y + 11);
+
+    // Desc
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.2);
+    doc.setTextColor(71, 85, 105);
+    const splitText = doc.splitTextToSize(st.desc, 150);
+    doc.text(splitText, 25, y + 19);
+
+    y += 42;
+  });
+
+  y += 2;
+
+  // DSGVO & Zero-PII Box
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(187, 247, 208);
+  doc.roundedRect(20, y, 170, 42, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(22, 101, 52);
+  doc.text('100% DATENSCHUTZ & ZERO-PII FÜR LEHRKRÄFTE', 25, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  const dsgvoText = [
+    '• Keine privaten Telefonnummern/E-Mails nötig: Die gesamte Kommunikation läuft geschützt über die Plattform.',
+    '• Schülernamen sind automatisch maskiert (z. B. Max M.), um Schulterblick-Spionage zu verhindern.',
+    '• Automatischer Hardware-Schutz: Mikrofone werden beim Schließen von Audio-Modulen sofort abgeschaltet.',
+    '• Gehostet nach deutschem Schulrecht auf nach ISO 27001 zertifizierten Servern in Deutschland.'
+  ];
+  let textY = y + 14;
+  dsgvoText.forEach(line => {
+    doc.text(line, 25, textY);
+    textY += 6;
+  });
+
+  // Footer
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+  doc.text(`Bereitgestellt für: ${schoolName} • Campus-Groovelab Lehrkräfte-Onboarding`, 20, 282);
+
+  doc.save(`Lehrer_Schnellstart_Campus_Groovelab_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+};
+
+/**
+ * Generates a 1-page A4 Quickstart Info Sheet for Parents
+ */
+export const generateParentQuickstartPDF = async (
+  schoolName: string, 
+  activePlatform: 'campus' | 'groovelab' | 'both' = 'both'
+) => {
+  const { default: jsPDF } = await import('jspdf');
+  const doc = new jsPDF();
+
+  doc.setProperties({
+    title: 'Eltern-Information - Campus-Groovelab',
+    subject: '1-Seiter Informationsblatt für Eltern zum digitalen Hausaufgabenheft',
+    author: 'Campus-Groovelab',
+    creator: 'Campus-Groovelab Platform'
+  });
+
+  const primaryGreen = [52, 168, 83];
+  const darkSlate = [15, 23, 42];
+  const mutedText = [100, 116, 139];
+  const borderGray = [226, 232, 240];
+
+  // Top Accent Bar
+  doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  doc.rect(0, 0, 210, 6, 'F');
+
+  let y = 18;
+
+  // Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+  doc.text((schoolName || 'Meine Musikschule').toUpperCase(), 20, y);
+  y += 7;
+
+  doc.setFontSize(18);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text('Eltern-Info: Das digitale Hausaufgabenheft', 20, y);
+  y += 6;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+  doc.text('So unterstützt Campus-Groovelab Ihr Kind beim Instrumental- und Ensemble-Unterricht', 20, y);
+  y += 10;
+
+  // 3 Advantage Cards
+  const features = [
+    {
+      title: 'Hausaufgaben & Notizen immer griffbereit',
+      desc: 'Vergessene Zettel gehören der Vergangenheit an: Hausaufgaben, Tonleitern und Notizen der Lehrkraft sind direkt auf dem Smartphone oder Tablet abrufbar – übersichtlich und jederzeit synchronisiert.'
+    },
+    {
+      title: 'Spielerischer Übe-Timer & Audio-Begleitung',
+      desc: 'Mit dem interaktiven Übe-Timer und Playalongs der Lehrkraft macht das tägliche Üben zuhause Spaß. Regelmäßigkeit wird durch motivierende Übe-Streaks und XP-Punkte belohnt.'
+    },
+    {
+      title: '100% Datenschutz: Keine E-Mail, keine Bankdaten',
+      desc: 'Wir schützen die Privatsphäre Ihres Kindes: Es werden weder E-Mail-Adressen, private Telefonnummern noch Zahlungsdaten gespeichert. Schülernamen werden auf Vorname und Initiale maskiert.'
+    }
+  ];
+
+  features.forEach(feat => {
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+    doc.roundedRect(20, y, 170, 36, 3, 3, 'FD');
+
+    // Green check badge
+    doc.setFillColor(230, 244, 234);
+    doc.setDrawColor(187, 247, 208);
+    doc.roundedRect(25, y + 6, 7, 7, 2, 2, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(22, 101, 52);
+    doc.text('OK', 26.5, y + 11);
+
+    // Title
+    doc.setFontSize(10.5);
+    doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+    doc.text(feat.title, 36, y + 11);
+
+    // Desc
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.2);
+    doc.setTextColor(71, 85, 105);
+    const splitText = doc.splitTextToSize(feat.desc, 150);
+    doc.text(splitText, 25, y + 19);
+
+    y += 42;
+  });
+
+  y += 4;
+
+  // Login Guide Card
+  doc.setFillColor(239, 246, 255);
+  doc.setDrawColor(191, 219, 254);
+  doc.roundedRect(20, y, 170, 36, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(29, 78, 216);
+  doc.text('WIE MELDET SICH MEIN KIND AN?', 25, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.2);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text('1. Öffnen Sie die Website oder Web-App der Musikschule auf dem Smartphone oder Tablet.', 25, y + 16);
+  doc.text('2. Scannen Sie den persönlichen QR-Code des Schülers oder wählen Sie den Namen in der Liste.', 25, y + 23);
+  doc.text('3. Geben Sie die 4-stellige Schüler-PIN ein – und schon kann die Übe-Session starten!', 25, y + 30);
+
+  // Footer
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+  doc.text(`Information für Eltern • ${schoolName} • Campus-Groovelab`, 20, 282);
+
+  doc.save(`Eltern_Information_Campus_Groovelab_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+};
+
+

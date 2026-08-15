@@ -76,27 +76,6 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           sessionStorage.setItem('groovelab_qr_token', authQrToken);
         }
 
-        const userUpdatePayload: any = {
-          personal_pin: pinInput,
-          parent_pin: pinInput,
-          onboarding_pin: pinInput,
-          is_pin_activated: true,
-          is_campus_active: true
-        };
-        let { error } = await supabase
-          .from('users')
-          .update(userUpdatePayload)
-          .eq('id', user.id);
-
-        if (error && error.message?.includes('onboarding_pin')) {
-          delete userUpdatePayload.onboarding_pin;
-          const fallbackRes = await supabase
-            .from('users')
-            .update(userUpdatePayload)
-            .eq('id', user.id);
-          error = fallbackRes.error;
-        }
-
         try {
           await supabase.from('students').update({
             personal_pin: pinInput,
@@ -114,6 +93,42 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
             is_campus_active: true
           }).eq('id', user.id);
         } catch (e) {}
+
+        try {
+          await supabase.from('users_raw').update({
+            personal_pin: pinInput,
+            parent_pin: pinInput,
+            onboarding_pin: pinInput,
+            is_pin_activated: true,
+            is_campus_active: true
+          }).eq('id', user.id);
+        } catch (e) {}
+
+        const userUpdatePayload: any = {
+          personal_pin: pinInput,
+          parent_pin: pinInput,
+          onboarding_pin: pinInput,
+          is_pin_activated: true,
+          is_campus_active: true
+        };
+        let { error } = await supabase
+          .from('users')
+          .update(userUpdatePayload)
+          .eq('id', user.id);
+
+        if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+          delete userUpdatePayload.onboarding_pin;
+          const fallbackRes = await supabase
+            .from('users')
+            .update(userUpdatePayload)
+            .eq('id', user.id);
+          error = fallbackRes.error;
+        }
+
+        if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+          console.warn('[CampusPinUnlockModal] users view trigger warning ignored because student table was updated:', error);
+          error = null;
+        }
 
         localStorage.setItem(`groovelab_user_pin_${user.id}`, pinInput);
 

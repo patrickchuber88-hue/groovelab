@@ -1,6 +1,8 @@
 import React from 'react';
 import QRCode from 'react-qr-code';
+import { FileCode, Download } from 'lucide-react';
 import { useMasterPricing } from '../context/MasterPricingContext';
+import { downloadXRechnungXML, EInvoiceLineItem } from '../utils/eInvoiceGenerator';
 
 export interface InvoiceData {
   id: string;
@@ -109,6 +111,113 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const schoolShareTotal = isInf ? invoice.amount : 0;
   const studentShareTotal = isAkt ? invoice.amount : 0;
 
+  const handleDownloadXRechnung = () => {
+    const lineItems: EInvoiceLineItem[] = [];
+
+    // Canonical Item 1: Software License (Free)
+    lineItems.push({
+      id: 1,
+      name: 'Campus-Groovelab Software-Nutzungslizenz',
+      description: '100% kostenlose Basislizenz für Musikschulen',
+      quantity: 1,
+      unitPrice: 0,
+      totalPrice: 0,
+      vatPercent: 0
+    });
+
+    if (isInf) {
+      if (invoice.hasCampus) {
+        lineItems.push({
+          id: 2,
+          name: 'Cloud- & Datenbank-Hosting: Modul Campus',
+          description: 'Hosting, Schüler-Protokolle, Stundenplan, Raumplaner',
+          quantity: 1,
+          unitPrice: isFree ? 0 : masterPricing.priceCampus,
+          totalPrice: isFree ? 0 : masterPricing.priceCampus,
+          vatPercent: 0
+        });
+      }
+      if (invoice.hasGroovelab) {
+        lineItems.push({
+          id: 3,
+          name: 'Cloud- & Datenbank-Hosting: Modul GrooveLab',
+          description: 'Echtzeit-Bandmodul, Server-Infrastruktur & Audio-Routing',
+          quantity: 1,
+          unitPrice: isFree ? 0 : masterPricing.priceGroovelab,
+          totalPrice: isFree ? 0 : masterPricing.priceGroovelab,
+          vatPercent: 0
+        });
+      }
+      if (invoice.hasCampus && invoice.hasGroovelab && !isFree) {
+        lineItems.push({
+          id: 4,
+          name: 'Kombi-Vorteilsrabatt (Infrastruktur-Bündel)',
+          description: 'Preisvorteil bei paralleler Bereitstellung von Campus + GrooveLab',
+          quantity: 1,
+          unitPrice: -2.99,
+          totalPrice: -2.99,
+          vatPercent: 0
+        });
+      }
+      if (invoice.totalTeachersCount > 0) {
+        lineItems.push({
+          id: 5,
+          name: 'Service- & Administrationspauschale',
+          description: `${invoice.totalTeachersCount} aktive Profile (Lehrkräfte & Verwaltung)`,
+          quantity: invoice.totalTeachersCount,
+          unitPrice: isFree ? 0 : masterPricing.priceTeacher,
+          totalPrice: isFree ? 0 : (invoice.totalTeachersCount * masterPricing.priceTeacher),
+          vatPercent: 0
+        });
+      }
+      if ((invoice.passiveStudentsCount ?? 0) > 0) {
+        lineItems.push({
+          id: 6,
+          name: 'Basis-Bereitstellung',
+          description: `${invoice.passiveStudentsCount} Schülerdatenbank-Datensätze & DSGVO-Hosting`,
+          quantity: invoice.passiveStudentsCount,
+          unitPrice: isFree ? 0 : masterPricing.pricePassiveStudent,
+          totalPrice: isFree ? 0 : (invoice.passiveStudentsCount * masterPricing.pricePassiveStudent),
+          vatPercent: 0
+        });
+      }
+    } else {
+      // AKT Invoice
+      lineItems.push({
+        id: 7,
+        name: 'Cloud- & Modul-Bereitstellung: Schüleraktivierungen',
+        description: `${invoice.activationsCount || 1} freigeschaltete Schüler-Zugänge`,
+        quantity: invoice.activationsCount || 1,
+        unitPrice: isFree ? 0 : (invoice.studentFee || 0.49),
+        totalPrice: isFree ? 0 : invoice.amount,
+        vatPercent: 0
+      });
+    }
+
+    downloadXRechnungXML({
+      invoiceNumber: displayInvoiceId,
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      seller: {
+        name: operatorCompany,
+        street: operatorStreet,
+        zipCode: operatorZip,
+        city: operatorCity,
+        iban: operatorIban,
+        bic: operatorBic
+      },
+      buyer: {
+        name: schoolName,
+        street: schoolStreet,
+        zipCode: schoolZipCode,
+        city: schoolCity
+      },
+      lineItems,
+      paymentReference: displayInvoiceId,
+      notes: 'Campus-Groovelab Cloud- und Schul-Infrastruktur. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.'
+    });
+  };
+
   return (
     <div style={{
       position: 'fixed',
@@ -184,6 +293,27 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
           <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Rechnungs-Vorschau</span>
           <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={handleDownloadXRechnung}
+              style={{
+                background: '#0f172a',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '6px 14px',
+                fontSize: '0.72rem',
+                fontWeight: 750,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 4px rgba(15, 23, 42, 0.15)'
+              }}
+              title="ZUGFeRD 2.2 / XRechnung (EN16931) für ERP & Kämmereien"
+            >
+              <FileCode size={13} color="#38bdf8" />
+              <span>XRechnung XML</span>
+            </button>
             <button
               onClick={() => {
                 window.print();

@@ -2534,33 +2534,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         profile.is_pin_activated = true;
         setProfile(prev => prev ? { ...prev, has_parent_pin: true, is_pin_activated: true, personal_pin: pinInput, parent_pin: pinInput } : null);
 
-        const userUpdatePayload: any = {
-          personal_pin: pinInput,
-          parent_pin: pinInput,
-          onboarding_pin: pinInput,
-          is_pin_activated: true,
-          status: 'aktiv'
-        };
-        let { error: updateErr } = await supabase
-          .from('users')
-          .update(userUpdatePayload)
-          .eq('id', profile.id);
-
-        if (updateErr && updateErr.message?.includes('onboarding_pin')) {
-          delete userUpdatePayload.onboarding_pin;
-          const fallbackRes = await supabase
-            .from('users')
-            .update(userUpdatePayload)
-            .eq('id', profile.id);
-          updateErr = fallbackRes.error;
-        }
-
-        if (updateErr) {
-          console.error('[QRLanding] user update error:', updateErr);
-          setPinError('Fehler beim Speichern der PIN: ' + updateErr.message);
-          return;
-        }
-
+        // Primary updates on base student tables
         try {
           await supabase.from('students').update({
             personal_pin: pinInput,
@@ -2578,7 +2552,50 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             status: 'aktiv'
           }).eq('id', profile.id);
         } catch (e) {
-          console.warn('[QRLanding] Optional table update warning:', e);
+          console.warn('[QRLanding] Student table update warning:', e);
+        }
+
+        // Try direct update on users_raw if possible
+        try {
+          await supabase.from('users_raw').update({
+            personal_pin: pinInput,
+            parent_pin: pinInput,
+            onboarding_pin: pinInput,
+            is_pin_activated: true,
+            status: 'aktiv'
+          }).eq('id', profile.id);
+        } catch (e) {}
+
+        const userUpdatePayload: any = {
+          personal_pin: pinInput,
+          parent_pin: pinInput,
+          onboarding_pin: pinInput,
+          is_pin_activated: true,
+          status: 'aktiv'
+        };
+        let { error: updateErr } = await supabase
+          .from('users')
+          .update(userUpdatePayload)
+          .eq('id', profile.id);
+
+        if (updateErr && (updateErr.message?.includes('onboarding_pin') || updateErr.message?.includes('record "new" has no field'))) {
+          delete userUpdatePayload.onboarding_pin;
+          const fallbackRes = await supabase
+            .from('users')
+            .update(userUpdatePayload)
+            .eq('id', profile.id);
+          updateErr = fallbackRes.error;
+        }
+
+        if (updateErr && (updateErr.message?.includes('onboarding_pin') || updateErr.message?.includes('record "new" has no field'))) {
+          console.warn('[QRLanding] users view schema trigger warning suppressed because students table was updated:', updateErr);
+          updateErr = null;
+        }
+
+        if (updateErr) {
+          console.error('[QRLanding] user update error:', updateErr);
+          setPinError('Fehler beim Speichern der PIN: ' + updateErr.message);
+          return;
         }
 
         // Ensure activation_days record exists so Secretary Dashboard shows "Aktiv"

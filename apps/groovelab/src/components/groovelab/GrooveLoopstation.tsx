@@ -2615,6 +2615,39 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       const creatorRole = readOnly ? 'student' : 'teacher';
       const audioMetaStr = `LOOP:${publicUrl}|${Math.round(masterLoopDuration / 1000)}|${new Date().toISOString()}|${sanitizedLabel}|${creatorRole}`;
 
+      // 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
+      let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+      if (!targetSchoolId && student?.id) {
+        try {
+          const { data: stRec } = await supabase
+            .from('students')
+            .select('school_id')
+            .eq('id', student.id)
+            .maybeSingle();
+          if (stRec?.school_id) targetSchoolId = stRec.school_id;
+        } catch (stErr) {
+          console.warn('[Loopstation] School lookup note:', stErr);
+        }
+      }
+      if (targetSchoolId && mixBlob?.size) {
+        try {
+          const { data: schoolData } = await supabase
+            .from('schools')
+            .select('storage_used_bytes')
+            .eq('id', targetSchoolId)
+            .maybeSingle();
+          if (schoolData) {
+            const currentBytes = Number(schoolData.storage_used_bytes || 0);
+            await supabase
+              .from('schools')
+              .update({ storage_used_bytes: currentBytes + mixBlob.size })
+              .eq('id', targetSchoolId);
+          }
+        } catch (quotaErr) {
+          console.warn('[Loopstation] Storage quota update note:', quotaErr);
+        }
+      }
+
       setHomeworkNotesList(prev => [...prev, audioMetaStr]);
       const updatedList = [...homeworkNotesList, audioMetaStr];
       await syncHomeworkNotes(updatedList);

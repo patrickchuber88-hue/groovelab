@@ -3,13 +3,14 @@ import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldChec
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
-import { LoginScreen, CustomQRScanner } from './components/LoginScreen';
 import { subscribeUserToPush } from './utils/webPush';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar } from './components/StudioAvatar';
-import { CampusPinUnlockModal } from './components/CampusPinUnlockModal';
-import { PilotOnboardingModal } from './components/PilotOnboardingModal';
+import { reportClientError, initGlobalErrorListeners } from './lib/errorTelemetry';
 
-// Dynamic lazy imports for top-level dashboards to enable code-splitting & reduce initial bundle size by ~75%
+// Initialize global error interception
+initGlobalErrorListeners();
+
+// Dynamic lazy imports for top-level dashboards & heavy screens to enable code-splitting & reduce initial bundle size by ~70%
 const Startseite2 = lazy(() => import('./components/Startseite2').then(m => ({ default: m.Startseite2 })));
 const Startseite = lazy(() => import('./components/Startseite').then(m => ({ default: m.Startseite })));
 const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
@@ -20,29 +21,36 @@ const StudentAvatarDashboard = lazy(() => import('./components/StudentAvatarDash
 const EnsembleDashboard = lazy(() => import('./components/EnsembleDashboard').then(m => ({ default: m.EnsembleDashboard })));
 const BandProfileContent = lazy(() => import('./components/BandProfileContent'));
 const ArtistGateway = lazy(() => import('./components/ArtistGateway').then(m => ({ default: m.ArtistGateway })));
-
-import { QRCodeModal } from './components/QRCodeModal';
 const QRLandingPage = lazy(() => import('./components/QRLandingPage').then(m => ({ default: m.QRLandingPage })));
-import { DeviceSetupScreen } from './components/DeviceSetupScreen';
+const LoginScreen = lazy(() => import('./components/LoginScreen').then(m => ({ default: m.LoginScreen })));
+const QRCodeModal = lazy(() => import('./components/QRCodeModal').then(m => ({ default: m.QRCodeModal })));
+const DeviceSetupScreen = lazy(() => import('./components/DeviceSetupScreen').then(m => ({ default: m.DeviceSetupScreen })));
+const TeacherDetailModal = lazy(() => import('./components/TeacherDetailModal').then(m => ({ default: m.TeacherDetailModal })));
+const StudentDetailModal = lazy(() => import('./components/StudentDetailModal').then(m => ({ default: m.StudentDetailModal })));
+const ContractEndPrompt = lazy(() => import('./components/ContractEndPrompt').then(m => ({ default: m.ContractEndPrompt })));
+const SignupWizard = lazy(() => import('./components/SignupWizard').then(m => ({ default: m.SignupWizard })));
+const StudentRadarChart = lazy(() => import('./components/StudentRadarChart'));
+const CampusDirectMessages = lazy(() => import('./components/CampusDirectMessages'));
+const GrooveLabMessagesBoard = lazy(() => import('./components/GrooveLabMessagesBoard'));
+const StudentOnboardingPage = lazy(() => import('./components/StudentOnboardingPage').then(m => ({ default: m.StudentOnboardingPage })));
+const DeviceOnboardingPage = lazy(() => import('./components/DeviceOnboardingPage').then(m => ({ default: m.DeviceOnboardingPage })));
+const SchoolSelfOnboardingModal = lazy(() => import('./components/SchoolSelfOnboardingModal').then(m => ({ default: m.SchoolSelfOnboardingModal })));
+const CampusPinUnlockModal = lazy(() => import('./components/CampusPinUnlockModal').then(m => ({ default: m.CampusPinUnlockModal })));
+const PilotOnboardingModal = lazy(() => import('./components/PilotOnboardingModal').then(m => ({ default: m.PilotOnboardingModal })));
+const GhostSupportCapsule = lazy(() => import('./components/masterAdmin/GhostSupportCapsule').then(m => ({ default: m.GhostSupportCapsule })));
+const SharedAudioBiographyPage = lazy(() => import('./components/campus/SharedAudioBiographyPage').then(m => ({ default: m.SharedAudioBiographyPage })));
+
 import { MobileBottomNav } from './components/ui/MobileBottomNav';
-import { TeacherDetailModal } from './components/TeacherDetailModal';
-import { StudentDetailModal } from './components/StudentDetailModal';
-import { ContractEndPrompt } from './components/ContractEndPrompt';
-import { SignupWizard } from './components/SignupWizard';
-import StudentRadarChart from './components/StudentRadarChart';
 import ConfettiModal from './components/ConfettiModal';
-import CampusDirectMessages from './components/CampusDirectMessages';
-import GrooveLabMessagesBoard from './components/GrooveLabMessagesBoard';
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
-import { StudentOnboardingPage } from './components/StudentOnboardingPage';
-import { DeviceOnboardingPage } from './components/DeviceOnboardingPage';
 import { ProfileSelector } from './components/ProfileSelector';
 import { flushOfflineSyncQueue } from './services/offlineSyncService';
-import { SchoolSelfOnboardingModal } from './components/SchoolSelfOnboardingModal';
 import { DeviceSimulator } from './components/ui/DeviceSimulator';
 import { MobileTopHeader } from './components/ui/MobileTopHeader';
 import { useMasterPricing } from './context/MasterPricingContext';
+import { MaintenanceLockoutOverlay } from './components/MaintenanceLockoutOverlay';
+import { GlobalBroadcastBanner } from './components/GlobalBroadcastBanner';
 import { runStorageJanitor } from './services/storageJanitorService';
 import './App.css';
 
@@ -326,6 +334,13 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
 
   componentDidCatch(error: any, errorInfo: any) {
     console.error("Dashboard ErrorBoundary caught an error:", error, errorInfo);
+    
+    // Report silently to centralized telemetry
+    reportClientError(error, {
+      componentStack: errorInfo?.componentStack,
+      severity: 'CRITICAL',
+      context: 'ErrorBoundary.componentDidCatch'
+    });
     
     // Auto-recover from dynamic module script/chunk loading errors
     const errorMessage = String(error?.message || error || "");
@@ -1510,6 +1525,41 @@ async function safeSupabaseQuery<T>(
 function App() {
   const masterPricing = useMasterPricing();
 
+  const [maintenanceBypass, setMaintenanceBypass] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && (
+      sessionStorage.getItem('cg_maintenance_bypass') === 'true' || 
+      localStorage.getItem('cg_maintenance_bypass') === 'true'
+    );
+  });
+
+  const maintenanceState = useMemo(() => {
+    if (masterPricing?.specialOffers) {
+      const entry = masterPricing.specialOffers.find((o: any) => o?.id === '__cg_master_maintenance_state__');
+      if (entry?.state) return entry.state;
+    }
+    if (typeof window !== 'undefined') {
+      const local = localStorage.getItem('cg_master_maintenance_state');
+      if (local) {
+        try { return JSON.parse(local); } catch (e) {}
+      }
+    }
+    return null;
+  }, [masterPricing?.specialOffers]);
+
+  const broadcastAnnouncement = useMemo(() => {
+    if (masterPricing?.specialOffers) {
+      const entry = masterPricing.specialOffers.find((o: any) => o?.id === '__cg_master_broadcast_announcement__');
+      if (entry?.state) return entry.state;
+    }
+    if (typeof window !== 'undefined') {
+      const local = localStorage.getItem('cg_master_broadcast_announcement');
+      if (local) {
+        try { return JSON.parse(local); } catch (e) {}
+      }
+    }
+    return null;
+  }, [masterPricing?.specialOffers]);
+
   // Declarative definition of renderLegalModals to ensure availability across all routes/landing pages
   const renderLegalModals = () => {
     return (
@@ -2073,6 +2123,16 @@ function App() {
 
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
+    const urlParams = new URLSearchParams(window.location.search);
+    const isGhost = urlParams.get('support_ghost') === 'true' || 
+                    urlParams.get('ghost_session') === 'true' || 
+                    sessionStorage.getItem('groovelab_support_ghost') === 'true';
+    const ghostSchoolId = urlParams.get('school_id') || 
+                          urlParams.get('ghost_school_id') || 
+                          sessionStorage.getItem('groovelab_ghost_school_id');
+    if (isGhost && ghostSchoolId) {
+      return 'master-support-id';
+    }
     return sessionStorage.getItem('groovelab_user_id');
   });
   const [locationMode, setLocationMode] = useState<'lab' | 'home'>(() => (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home' : null) || 'home');
@@ -2467,6 +2527,33 @@ function App() {
   const [user, setUserRaw] = useState<any>(() => {
     if (typeof window === 'undefined') return null;
     try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isGhost = urlParams.get('support_ghost') === 'true' || 
+                      urlParams.get('ghost_session') === 'true' || 
+                      sessionStorage.getItem('groovelab_support_ghost') === 'true';
+      const ghostSchoolId = urlParams.get('school_id') || 
+                            urlParams.get('ghost_school_id') || 
+                            sessionStorage.getItem('groovelab_ghost_school_id');
+      const ghostRole = urlParams.get('role') || 
+                        sessionStorage.getItem('groovelab_ghost_active_role') || 
+                        'admin';
+
+      if (isGhost && ghostSchoolId) {
+        return {
+          id: 'master-support-id',
+          school_id: ghostSchoolId,
+          role: ghostRole,
+          first_name: 'Master',
+          last_name: 'Support',
+          is_master_admin: false,
+          is_ghost_mode: true,
+          schools: {
+            id: ghostSchoolId,
+            name: sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule'
+          }
+        };
+      }
+
       const cached = localStorage.getItem('groovelab_cached_user');
       return cached ? JSON.parse(cached) : null;
     } catch (e) {
@@ -2490,6 +2577,12 @@ function App() {
 
   useEffect(() => {
     if (loading) return; // wait until supabase auth/session loading is complete
+
+    const isGhostSessionActive = typeof window !== 'undefined' && (
+      new URLSearchParams(window.location.search).get('support_ghost') === 'true' ||
+      sessionStorage.getItem('groovelab_support_ghost') === 'true'
+    );
+    if (isGhostSessionActive) return; // Don't redirect during support ghost sessions
     
     const isPublicRoute = 
       location.pathname === '/' || 
@@ -2502,7 +2595,10 @@ function App() {
       location.pathname === '/signup' || 
       location.pathname.startsWith('/qr/') ||
       location.pathname.startsWith('/onboarding/') ||
-      location.pathname.startsWith('/device-onboarding/');
+      location.pathname.startsWith('/device-onboarding/') ||
+      location.pathname.startsWith('/shared-biography/') ||
+      location.pathname.startsWith('/shared/');
+
       
     const isAuth = !!loggedInUserId;
     if (isAuth) {
@@ -2521,17 +2617,28 @@ function App() {
   // Auto-switch context when support_ghost is active in URL (Placed before any early returns)
   useEffect(() => {
     const ghostUrlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-    const isGhostParam = ghostUrlParams.get('support_ghost') === 'true' || sessionStorage.getItem('groovelab_support_ghost') === 'true';
-    const ghostSchoolId = ghostUrlParams.get('school_id') || sessionStorage.getItem('groovelab_ghost_school_id');
+    const isGhostParam = ghostUrlParams.get('support_ghost') === 'true' || 
+                         ghostUrlParams.get('ghost_session') === 'true' || 
+                         sessionStorage.getItem('groovelab_support_ghost') === 'true';
+    const ghostSchoolId = ghostUrlParams.get('school_id') || 
+                          ghostUrlParams.get('ghost_school_id') || 
+                          sessionStorage.getItem('groovelab_ghost_school_id');
+    const ghostRole = ghostUrlParams.get('role') || 
+                      sessionStorage.getItem('groovelab_ghost_active_role') || 
+                      'admin';
+
     if (isGhostParam && ghostSchoolId) {
       sessionStorage.setItem('groovelab_support_ghost', 'true');
       sessionStorage.setItem('groovelab_ghost_school_id', ghostSchoolId);
+      sessionStorage.setItem('groovelab_ghost_active_role', ghostRole);
+
       supabase.from('schools').select('*').eq('id', ghostSchoolId).single().then(({ data: ghostSchool }) => {
         if (ghostSchool) {
+          sessionStorage.setItem('groovelab_ghost_school_name', ghostSchool.name);
           const ghostUser = {
             id: 'master-support-id',
             school_id: ghostSchool.id,
-            role: 'secretary',
+            role: ghostRole,
             first_name: 'Master',
             last_name: 'Support',
             is_master_admin: false,
@@ -2543,7 +2650,7 @@ function App() {
           setActivePlatform('campus');
           setActiveStudentTab('briefing');
           try {
-            localStorage.setItem('groovelab_active_workspace', 'secretary');
+            localStorage.setItem('groovelab_active_workspace', ghostRole);
             localStorage.setItem('campus_active_tab', 'briefing');
           } catch (e) {}
         }
@@ -7059,6 +7166,31 @@ function App() {
     setActiveStudentsCount(count);
   };
 
+  // Pre-calculate session and lockout hooks unconditionally BEFORE any early returns
+  const ghostUrlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const isGhostParam = ghostUrlParams.get('support_ghost') === 'true' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
+  const ghostSchoolId = ghostUrlParams.get('school_id') || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_ghost_school_id') : null);
+
+  const isMasterAdminSession = (user?.is_master_admin === true || 
+                               sessionStorage.getItem('groovelab_is_master_admin') === 'true') && !(isGhostParam && ghostSchoolId);
+
+  const currentSchoolObj = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
+  const currentSchoolId = user?.school_id || currentSchoolObj?.id;
+
+  const isMaintenanceLockoutActive = useMemo(() => {
+    if (!maintenanceState || !maintenanceState.isActive) return false;
+    if (maintenanceBypass) return false;
+    if (isMasterAdminSession) return false;
+
+    // Check scope
+    if (maintenanceState.scope === 'all') return true;
+    if (maintenanceState.scope === 'campus_only' && activePlatform === 'campus') return true;
+    if (maintenanceState.scope === 'groovelab_only' && activePlatform === 'groovelab') return true;
+    if (maintenanceState.scope === 'schools_only' && currentSchoolId && (maintenanceState.targetSchoolIds || []).includes(currentSchoolId)) return true;
+
+    return false;
+  }, [maintenanceState, maintenanceBypass, isMasterAdminSession, activePlatform, currentSchoolId]);
+
   const urlBandId = searchParams.get('band');
 
   // 1. PUBLIC BAND VIEW (Prioritized for sharing)
@@ -7181,13 +7313,21 @@ function App() {
   // 0. ONBOARDING PAGE
   const onboardingPathMatch = location.pathname.match(/^\/onboarding\/([^/?#]+)/);
   if (onboardingPathMatch) {
-    return <StudentOnboardingPage token={onboardingPathMatch[1]} />;
+    return (
+      <Suspense fallback={<DashboardLoader />}>
+        <StudentOnboardingPage token={onboardingPathMatch[1]} />
+      </Suspense>
+    );
   }
 
   // 0.0 DEVICE ONBOARDING PAGE
   const deviceOnboardingPathMatch = location.pathname.match(/^\/device-onboarding\/([^/?#]+)/);
   if (deviceOnboardingPathMatch) {
-    return <DeviceOnboardingPage token={deviceOnboardingPathMatch[1]} />;
+    return (
+      <Suspense fallback={<DashboardLoader />}>
+        <DeviceOnboardingPage token={deviceOnboardingPathMatch[1]} />
+      </Suspense>
+    );
   }
 
   // 0.1 QR LANDING PAGE — Weg 2: Nativer Kamera-Scan oder fixer QR-Token-Link (Sofort abfangen vor allen States!)
@@ -7229,6 +7369,16 @@ function App() {
         </Suspense>
       );
     }
+  }
+
+  // 0.9 PUBLIC SHARED AUDIO-BIOGRAPHY LANDING PAGE
+  if (location.pathname.startsWith('/shared-biography/') || location.pathname.startsWith('/shared/')) {
+    const studentIdParam = location.pathname.split('/').filter(Boolean).pop();
+    return (
+      <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#090d16', color: '#64748b' }}>Lade Audio-Biografie...</div>}>
+        <SharedAudioBiographyPage studentId={studentIdParam} />
+      </Suspense>
+    );
   }
 
   // 1. SIGNUP WIZARD
@@ -7275,21 +7425,23 @@ function App() {
     if (showSchoolOnboardingModal) {
       return (
         <div style={{ position: 'relative', minHeight: '100vh', background: '#0f172a' }}>
-          <SchoolSelfOnboardingModal
-            onClose={() => {
-              setShowSchoolOnboardingModal(false);
-              navigate('/', { replace: true });
-            }}
-            onSuccess={(schoolData, userData) => {
-              setShowSchoolOnboardingModal(false);
-              if (userData?.id) {
-                handleLogin(userData.id, false);
-              } else {
-                navigate('/login', { replace: true });
-                window.location.reload();
-              }
-            }}
-          />
+          <Suspense fallback={<DashboardLoader />}>
+            <SchoolSelfOnboardingModal
+              onClose={() => {
+                setShowSchoolOnboardingModal(false);
+                navigate('/', { replace: true });
+              }}
+              onSuccess={(schoolData, userData) => {
+                setShowSchoolOnboardingModal(false);
+                if (userData?.id) {
+                  handleLogin(userData.id, false);
+                } else {
+                  navigate('/login', { replace: true });
+                  window.location.reload();
+                }
+              }}
+            />
+          </Suspense>
         </div>
       );
     }
@@ -7331,7 +7483,11 @@ function App() {
                                  hasSubdomain || 
                                  isKioskMode;
       if (isParentOnboarding) {
-        return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
+        return (
+          <Suspense fallback={<DashboardLoader />}>
+            <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
+          </Suspense>
+        );
       }
 
       return (
@@ -7347,9 +7503,17 @@ function App() {
       );
     }
     if (location.pathname === '/login') {
-      return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
+      return (
+        <Suspense fallback={<DashboardLoader />}>
+          <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
+        </Suspense>
+      );
     }
-    return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
+    return (
+      <Suspense fallback={<DashboardLoader />}>
+        <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
+      </Suspense>
+    );
   }
 
   if (showDeletionPrompt && deletionPromptUserId) {
@@ -7480,13 +7644,6 @@ function App() {
 
   // 2.5 MASTER ADMIN PORTAL — nur via is_master_admin DB-Flag
   // SECURITY: Niemals per Vorname oder Rolle erkennen — ausschließlich das is_master_admin-Flag aus der DB ist maßgeblich.
-  const ghostUrlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-  const isGhostParam = ghostUrlParams.get('support_ghost') === 'true' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
-  const ghostSchoolId = ghostUrlParams.get('school_id') || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_ghost_school_id') : null);
-
-  const isMasterAdminSession = (user?.is_master_admin === true || 
-                               sessionStorage.getItem('groovelab_is_master_admin') === 'true') && !(isGhostParam && ghostSchoolId);
-
   if (isMasterAdminSession) {
     return (
       <>
@@ -7514,12 +7671,21 @@ function App() {
       // 1. Synchronously update local React state & cached user
       setUser((prevUser: any) => {
         if (!prevUser) return prevUser;
-        const updated = { ...prevUser, role: newRole };
+        const updated = { 
+          ...prevUser, 
+          role: newRole,
+          is_ghost_mode: prevUser.is_ghost_mode ?? isGhostParam
+        };
         try {
           localStorage.setItem('groovelab_cached_user', JSON.stringify(updated));
         } catch (e) {}
         return updated;
       });
+
+      if (isGhostParam) {
+        sessionStorage.setItem('groovelab_ghost_active_role', newRole);
+        sessionStorage.setItem('groovelab_support_ghost', 'true');
+      }
 
       // 2. Await database role update FIRST before triggering platform/tab refetches
       const { error } = await supabase
@@ -7562,6 +7728,13 @@ function App() {
   if (user.role?.toLowerCase() === 'secretary' || user.role?.toLowerCase() === 'admin') {
     return (
       <ErrorBoundary>
+        {isGhostParam && (
+          <GhostSupportCapsule 
+            schoolName={user?.schools?.name || (Array.isArray(user?.schools) ? user.schools[0]?.name : undefined)} 
+            currentRole={user?.role}
+            onRoleChange={handleSwitchActiveRole}
+          />
+        )}
         <Suspense fallback={<DashboardLoader />}>
           <SecretaryDashboard 
             schoolId={user.school_id} 
@@ -7994,6 +8167,22 @@ function App() {
 
   return (
     <DeviceSimulator>
+      {isGhostParam && (
+        <GhostSupportCapsule 
+          schoolName={user?.schools?.name || (Array.isArray(user?.schools) ? user.schools[0]?.name : undefined)} 
+          currentRole={user?.role}
+          onRoleChange={handleSwitchActiveRole}
+        />
+      )}
+      {isMaintenanceLockoutActive && maintenanceState && (
+        <MaintenanceLockoutOverlay 
+          maintenanceState={maintenanceState} 
+          onBypassUnlocked={() => setMaintenanceBypass(true)} 
+          currentRole={user?.role}
+          currentSchoolId={school?.id}
+        />
+      )}
+      <GlobalBroadcastBanner announcement={broadcastAnnouncement} currentRole={user?.role} />
       <div className="app-layout">
       {toastMessage && (
         <div 
@@ -8489,51 +8678,6 @@ function App() {
           to { transform: scale(1) translateY(0); opacity: 1; }
         }
       `}</style>
-      {/* 🛡️ Support Ghost-Mode Sticky Top Banner */}
-      {user?.is_ghost_mode && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 999999,
-          background: '#0f172a',
-          color: '#ffffff',
-          padding: '10px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255,255,255,0.15)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-          fontFamily: '"Outfit", sans-serif'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', fontWeight: 700 }}>
-            <Shield size={16} color="#ffffff" />
-            <span>Support-Sitzung aktiv für <strong>{user?.schools?.name || 'Musikschule'}</strong> (SOC 2 protokolliert)</span>
-          </div>
-          <button
-            onClick={() => {
-              sessionStorage.removeItem('groovelab_support_ghost');
-              sessionStorage.removeItem('groovelab_ghost_school_id');
-              window.location.href = window.location.origin;
-            }}
-            style={{
-              background: '#ffffff',
-              color: '#0f172a',
-              padding: '6px 14px',
-              borderRadius: '8px',
-              border: 'none',
-              fontWeight: 800,
-              fontSize: '0.80rem',
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-            }}
-          >
-            Zurück zum Master Leitstand
-          </button>
-        </div>
-      )}
-
       {/* Sidebar Navigation (iPad/Desktop) */}
       <aside className="sidebar-nav" style={{ display: windowWidth > 1024 ? 'flex' : 'none' }}>
         <div className="sidebar-logo" style={{ padding: '8px 0px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -11507,21 +11651,23 @@ function App() {
             </ErrorBoundary>
           ) : (
             <ErrorBoundary>
-              <GrooveLabMessagesBoard
-                user={user}
-                schoolUsers={schoolUsers}
-                announcements={announcements}
-                studentMessages={studentMessages}
-                onPostAnnouncement={async (title, message, targetType, targetUserIds) => {
-                  setAnnouncementTitle(title);
-                  setAnnouncementMessage(message);
-                  setAnnouncementTarget(targetType as any);
-                  setSelectedTargetUserIds(targetUserIds);
-                  await handlePostAnnouncement({ preventDefault: () => {} } as any);
-                }}
-                onDeleteAnnouncement={handleDeleteAnnouncement}
-                onAcknowledgeMessage={handleAcknowledgeStudentMessage}
-              />
+              <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontWeight: 600 }}>Lade Pinnwand...</div>}>
+                <GrooveLabMessagesBoard
+                  user={user}
+                  schoolUsers={schoolUsers}
+                  announcements={announcements}
+                  studentMessages={studentMessages}
+                  onPostAnnouncement={async (title, message, targetType, targetUserIds) => {
+                    setAnnouncementTitle(title);
+                    setAnnouncementMessage(message);
+                    setAnnouncementTarget(targetType as any);
+                    setSelectedTargetUserIds(targetUserIds);
+                    await handlePostAnnouncement({ preventDefault: () => {} } as any);
+                  }}
+                  onDeleteAnnouncement={handleDeleteAnnouncement}
+                  onAcknowledgeMessage={handleAcknowledgeStudentMessage}
+                />
+              </Suspense>
             </ErrorBoundary>
           )
         )}
@@ -13611,34 +13757,38 @@ function App() {
       )}
 
       {showCampusPinPrompt && (
-        <CampusPinUnlockModal 
-          user={user}
-          supabase={supabase}
-          schoolData={school}
-          onUnlock={() => {
-            setIsCampusUnlocked(true);
-            setShowCampusPinPrompt(false);
-            setActivePlatform('campus');
-            const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
-            const startTab = isStaff ? 'live' : 'briefing';
-            setActiveStudentTab(startTab);
-            localStorage.setItem('campus_active_tab', startTab);
-          }}
-          onClose={() => {
-            setShowCampusPinPrompt(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <CampusPinUnlockModal 
+            user={user}
+            supabase={supabase}
+            schoolData={school}
+            onUnlock={() => {
+              setIsCampusUnlocked(true);
+              setShowCampusPinPrompt(false);
+              setActivePlatform('campus');
+              const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
+              const startTab = isStaff ? 'live' : 'briefing';
+              setActiveStudentTab(startTab);
+              localStorage.setItem('campus_active_tab', startTab);
+            }}
+            onClose={() => {
+              setShowCampusPinPrompt(false);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Pilot Phase Onboarding Agreement Modal */}
       {showPilotAgreementModal && user?.school_id && user?.id && (
-        <PilotOnboardingModal
-          schoolId={user.school_id}
-          userId={user.id}
-          onComplete={() => setShowPilotAgreementModal(false)}
-          onShowPrivacy={() => setShowPrivacy(true)}
-          onShowAgb={() => setShowAgb(true)}
-        />
+        <Suspense fallback={null}>
+          <PilotOnboardingModal
+            schoolId={user.school_id}
+            userId={user.id}
+            onComplete={() => setShowPilotAgreementModal(false)}
+            onShowPrivacy={() => setShowPrivacy(true)}
+            onShowAgb={() => setShowAgb(true)}
+          />
+        </Suspense>
       )}
 
       {/* Render Legal Modals Helper Call */}

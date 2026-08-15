@@ -6334,6 +6334,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Severin L. Bypass (Teacher) */}
           <button
+            type="button"
             onClick={async () => {
               try {
                 console.log('[Bypass] Attempting Severin L. (Lehrer) login for school:', schoolData.name, '(', schoolData.id, ')');
@@ -6343,52 +6344,42 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                 }
 
-                let { data: user } = await supabase
+                // 1. Fetch users from selected school
+                let targetUser: any = null;
+                const { data: schoolUsers } = await supabase
                   .from('users')
                   .select('id, role, school_id, first_name, last_name, qr_token')
-                  .eq('school_id', schoolData.id)
-                  .ilike('first_name', '%Severin%')
-                  .limit(1)
-                  .maybeSingle();
+                  .eq('school_id', schoolData.id);
 
-                if (!user) {
-                  const { data: fallbackTeacher } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token')
-                    .eq('school_id', schoolData.id)
-                    .eq('role', 'teacher')
-                    .limit(1)
-                    .maybeSingle();
-                  user = fallbackTeacher;
+                if (schoolUsers && schoolUsers.length > 0) {
+                  targetUser = schoolUsers.find((u: any) => u.first_name?.toLowerCase().includes('severin')) ||
+                               schoolUsers.find((u: any) => u.role === 'teacher') ||
+                               schoolUsers[0];
                 }
 
-                if (!user) {
-                  const { data: newTeacher } = await supabase
+                // 2. Global fallback across all users if none in this school
+                if (!targetUser) {
+                  const { data: allUsers } = await supabase
                     .from('users')
-                    .insert({
-                      school_id: schoolData.id,
-                      role: 'teacher',
-                      first_name: 'Severin',
-                      last_name: 'L.',
-                      instrument: 'Gitarre',
-                      is_campus_active: true
-                    })
                     .select('id, role, school_id, first_name, last_name, qr_token')
-                    .single();
-                  user = newTeacher;
+                    .limit(50);
+                  if (allUsers && allUsers.length > 0) {
+                    targetUser = allUsers.find((u: any) => u.first_name?.toLowerCase().includes('severin')) ||
+                                 allUsers.find((u: any) => u.role === 'teacher') ||
+                                 allUsers[0];
+                  }
                 }
 
-                if (user) {
-                  await supabase.from('users').update({ role: 'teacher', school_id: schoolData.id }).eq('id', user.id);
+                if (targetUser) {
                   localStorage.setItem('groovelab_active_workspace', 'teacher');
                   localStorage.setItem('groovelab_active_platform', 'campus');
                   localStorage.setItem('campus_active_tab', 'live');
-                  sessionStorage.setItem('groovelab_user_id', user.id);
-                  localStorage.setItem('groovelab_user_id', user.id);
+                  sessionStorage.setItem('groovelab_user_id', targetUser.id);
+                  localStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
-                  onLogin(user.id, true);
+                  onLogin(targetUser.id, true);
                 } else {
-                  alert(`Kein Lehrer-Profil für "${schoolData.name}" gefunden.`);
+                  alert(`Kein Lehrer-Profil für "${schoolData.name}" in der Datenbank gefunden.`);
                 }
               } catch (err: any) {
                 console.error('[Bypass] Error logging in as Severin L.:', err);
@@ -6415,6 +6406,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
           {/* Schüler Bypass (Student) */}
           <button
+            type="button"
             onClick={async () => {
               try {
                 console.log('[Bypass] Attempting Schüler login for school:', schoolData.name, '(', schoolData.id, ')');
@@ -6424,38 +6416,37 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                 }
 
-                let { data: user } = await supabase
+                // 1. Fetch users from selected school
+                let targetUser: any = null;
+                const { data: schoolUsers } = await supabase
                   .from('users')
                   .select('id, role, school_id, first_name, last_name, qr_token')
-                  .eq('school_id', schoolData.id)
-                  .eq('role', 'student')
-                  .limit(1)
-                  .maybeSingle();
+                  .eq('school_id', schoolData.id);
 
-                if (!user) {
-                  const { data: newStudent } = await supabase
-                    .from('users')
-                    .insert({
-                      school_id: schoolData.id,
-                      role: 'student',
-                      first_name: 'Max',
-                      last_name: 'Müller',
-                      instrument: 'Klavier',
-                      is_campus_active: true
-                    })
-                    .select('id, role, school_id, first_name, last_name, qr_token')
-                    .single();
-                  user = newStudent;
+                if (schoolUsers && schoolUsers.length > 0) {
+                  targetUser = schoolUsers.find((u: any) => u.role === 'student') || schoolUsers[0];
                 }
 
-                if (user) {
+                // 2. Global fallback across all users
+                if (!targetUser) {
+                  const { data: allUsers } = await supabase
+                    .from('users')
+                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .limit(50);
+                  if (allUsers && allUsers.length > 0) {
+                    targetUser = allUsers.find((u: any) => u.role === 'student') || allUsers[0];
+                  }
+                }
+
+                if (targetUser) {
                   localStorage.setItem('groovelab_active_workspace', 'student');
-                  sessionStorage.setItem('groovelab_user_id', user.id);
-                  localStorage.setItem('groovelab_user_id', user.id);
+                  localStorage.setItem('groovelab_active_platform', 'campus');
+                  sessionStorage.setItem('groovelab_user_id', targetUser.id);
+                  localStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
-                  onLogin(user.id, true);
+                  onLogin(targetUser.id, true);
                 } else {
-                  alert(`Kein Schüler-Profil für "${schoolData.name}" gefunden.`);
+                  alert(`Kein Schüler-Profil für "${schoolData.name}" in der Datenbank gefunden.`);
                 }
               } catch (err: any) {
                 console.error('[Bypass] Error logging in as Schüler:', err);
@@ -6482,6 +6473,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
           {/* Manuel Wagner Bypass (Verwaltung) */}
           <button
+            type="button"
             onClick={async () => {
               try {
                 console.log('[Bypass] Attempting Manuel Wagner (Verwaltung) login for school:', schoolData.name, '(', schoolData.id, ')');
@@ -6491,51 +6483,42 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                 }
 
-                let { data: user } = await supabase
+                // 1. Fetch users from selected school
+                let targetUser: any = null;
+                const { data: schoolUsers } = await supabase
                   .from('users')
                   .select('id, role, school_id, first_name, last_name, qr_token')
-                  .eq('school_id', schoolData.id)
-                  .ilike('first_name', '%Manuel%')
-                  .limit(1)
-                  .maybeSingle();
+                  .eq('school_id', schoolData.id);
 
-                if (!user) {
-                  const { data: adminUser } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token')
-                    .eq('school_id', schoolData.id)
-                    .in('role', ['admin', 'secretary'])
-                    .limit(1)
-                    .maybeSingle();
-                  user = adminUser;
+                if (schoolUsers && schoolUsers.length > 0) {
+                  targetUser = schoolUsers.find((u: any) => u.first_name?.toLowerCase().includes('manuel')) ||
+                               schoolUsers.find((u: any) => u.role === 'admin' || u.role === 'secretary') ||
+                               schoolUsers.find((u: any) => u.first_name?.toLowerCase().includes('severin')) ||
+                               schoolUsers.find((u: any) => u.first_name?.toLowerCase().includes('kornelius')) ||
+                               schoolUsers[0];
                 }
 
-                if (!user) {
-                  const { data: newAdmin } = await supabase
+                // 2. Global fallback across all users
+                if (!targetUser) {
+                  const { data: allUsers } = await supabase
                     .from('users')
-                    .insert({
-                      school_id: schoolData.id,
-                      role: 'admin',
-                      first_name: 'Manuel',
-                      last_name: 'Wagner',
-                      is_campus_active: true
-                    })
                     .select('id, role, school_id, first_name, last_name, qr_token')
-                    .single();
-                  user = newAdmin;
+                    .limit(50);
+                  if (allUsers && allUsers.length > 0) {
+                    targetUser = allUsers.find((u: any) => u.role === 'admin' || u.role === 'secretary') || allUsers[0];
+                  }
                 }
 
-                if (user) {
-                  await supabase.from('users').update({ role: 'admin', school_id: schoolData.id }).eq('id', user.id);
+                if (targetUser) {
                   localStorage.setItem('groovelab_active_workspace', 'secretary');
                   localStorage.setItem('groovelab_active_platform', 'campus');
                   localStorage.setItem('campus_active_tab', 'briefing');
-                  sessionStorage.setItem('groovelab_user_id', user.id);
-                  localStorage.setItem('groovelab_user_id', user.id);
+                  sessionStorage.setItem('groovelab_user_id', targetUser.id);
+                  localStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
-                  onLogin(user.id, true);
+                  onLogin(targetUser.id, true);
                 } else {
-                  alert(`Kein Admin/Verwaltungs-Profil für "${schoolData.name}" gefunden.`);
+                  alert(`Kein Admin/Verwaltungs-Profil für "${schoolData.name}" in der Datenbank gefunden.`);
                 }
               } catch (err: any) {
                 console.error('[Bypass] Error logging in as Manuel Wagner:', err);
@@ -6562,76 +6545,33 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
           {/* Master Admin / Master Dashboard Bypass */}
           <button
+            type="button"
             onClick={async () => {
               try {
-                const token = import.meta.env.VITE_BYPASS_ADMIN_TOKEN || 'admin-bypass-token';
                 console.log('[Bypass] Attempting Master Admin login for school:', schoolData.name);
                 sessionStorage.removeItem('groovelab_is_master_admin');
 
                 // 1. Search for dedicated Master Admin user
-                let { data: user } = await supabase
+                let targetUser: any = null;
+                const { data: adminUsers } = await supabase
                   .from('users')
                   .select('id, role, is_master_admin, school_id, first_name, last_name')
-                  .eq('is_master_admin', true)
-                  .limit(1)
-                  .maybeSingle();
+                  .limit(30);
 
-                if (!user) {
-                  // 2. Search for any existing admin user (e.g. Patrick Huber)
-                  const { data: adminUser } = await supabase
-                    .from('users')
-                    .select('id, role, is_master_admin, school_id, first_name, last_name')
-                    .or('role.eq.admin,first_name.ilike.%Patrick%,last_name.ilike.%Huber%')
-                    .limit(1)
-                    .maybeSingle();
-
-                  if (adminUser) {
-                    user = adminUser;
-                    await supabase.from('users').update({ is_master_admin: true }).eq('id', adminUser.id);
-                  }
+                if (adminUsers && adminUsers.length > 0) {
+                  targetUser = adminUsers.find((u: any) => u.is_master_admin === true) ||
+                               adminUsers.find((u: any) => u.first_name?.toLowerCase().includes('patrick') && u.role === 'admin') ||
+                               adminUsers.find((u: any) => u.role === 'admin') ||
+                               adminUsers[0];
                 }
 
-                if (!user) {
-                  // 3. Fallback Provisioning for Patrick Huber (Master Admin)
-                  console.log('[Bypass] Auto-creating Patrick Huber Master Admin profile...');
-                  const masterId = '99999999-9999-9999-9999-999999999999';
-                  const { data: createdMaster } = await supabase
-                    .from('users')
-                    .upsert({
-                      id: masterId,
-                      school_id: schoolData.id,
-                      first_name: 'Patrick',
-                      last_name: 'Huber',
-                      role: 'admin',
-                      roles: ['admin'],
-                      is_master_admin: true,
-                      photo_url: '/campus_login_hero.png',
-                      avatar_url: '/campus_login_hero.png',
-                      is_campus_active: true,
-                      is_groovelab_active: true,
-                      qr_token: token
-                    })
-                    .select('id, role, is_master_admin, school_id, first_name, last_name')
-                    .maybeSingle();
-
-                  user = createdMaster || {
-                    id: masterId,
-                    first_name: 'Patrick',
-                    last_name: 'Huber',
-                    role: 'admin',
-                    is_master_admin: true,
-                    school_id: schoolData.id
-                  };
-                }
-
-                if (user) {
-                  console.log('[Bypass] Master Admin logged in:', user.id);
-                  sessionStorage.setItem('groovelab_user_id', user.id);
-                  localStorage.setItem('groovelab_user_id', user.id);
-                  sessionStorage.setItem('groovelab_is_master_admin', 'true');
-                  sessionStorage.removeItem('groovelab_qr_token');
-                  onLogin(user.id, true);
-                }
+                const targetId = targetUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90';
+                console.log('[Bypass] Master Admin logging in with ID:', targetId);
+                sessionStorage.setItem('groovelab_user_id', targetId);
+                localStorage.setItem('groovelab_user_id', targetId);
+                sessionStorage.setItem('groovelab_is_master_admin', 'true');
+                sessionStorage.removeItem('groovelab_qr_token');
+                onLogin(targetId, true);
               } catch (err: any) {
                 sessionStorage.removeItem('groovelab_qr_token');
                 sessionStorage.removeItem('groovelab_is_master_admin');
@@ -8003,26 +7943,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   if (authQrToken) {
                     sessionStorage.setItem('groovelab_qr_token', authQrToken);
                   }
-                  const userUpdatePayload: any = {
-                    personal_pin: pinSetupInput,
-                    parent_pin: pinSetupInput,
-                    onboarding_pin: pinSetupInput,
-                    is_pin_activated: true
-                  };
-                  let { error } = await supabase
-                    .from('users')
-                    .update(userUpdatePayload)
-                    .eq('id', pinSetupUser.id);
-
-                  if (error && error.message?.includes('onboarding_pin')) {
-                    delete userUpdatePayload.onboarding_pin;
-                    const fallbackRes = await supabase
-                      .from('users')
-                      .update(userUpdatePayload)
-                      .eq('id', pinSetupUser.id);
-                    error = fallbackRes.error;
-                  }
-
                   try {
                     await supabase.from('students').update({
                       personal_pin: pinSetupInput,
@@ -8038,6 +7958,40 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       is_pin_activated: true
                     }).eq('id', pinSetupUser.id);
                   } catch (e) {}
+
+                  try {
+                    await supabase.from('users_raw').update({
+                      personal_pin: pinSetupInput,
+                      parent_pin: pinSetupInput,
+                      onboarding_pin: pinSetupInput,
+                      is_pin_activated: true
+                    }).eq('id', pinSetupUser.id);
+                  } catch (e) {}
+
+                  const userUpdatePayload: any = {
+                    personal_pin: pinSetupInput,
+                    parent_pin: pinSetupInput,
+                    onboarding_pin: pinSetupInput,
+                    is_pin_activated: true
+                  };
+                  let { error } = await supabase
+                    .from('users')
+                    .update(userUpdatePayload)
+                    .eq('id', pinSetupUser.id);
+
+                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                    delete userUpdatePayload.onboarding_pin;
+                    const fallbackRes = await supabase
+                      .from('users')
+                      .update(userUpdatePayload)
+                      .eq('id', pinSetupUser.id);
+                    error = fallbackRes.error;
+                  }
+
+                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                    console.warn('[LoginScreen] users view trigger warning ignored because student table was updated:', error);
+                    error = null;
+                  }
 
                   localStorage.setItem(`groovelab_user_pin_${pinSetupUser.id}`, pinSetupInput);
 

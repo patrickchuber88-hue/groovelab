@@ -47,6 +47,8 @@ export interface School {
   pricing_tier_name?: string | null;
   active_students_count?: number;
   teachers_count?: number;
+  is_approved?: boolean;
+  [key: string]: any;
 }
 
 export interface SchoolStat {
