@@ -103,15 +103,7 @@ const getISOWeekRaw = (dateInput?: string | Date, lessonDay: number = 1): string
   } else if (dateInput instanceof Date) {
     date = dateInput;
   } else {
-    const match = String(dateInput).match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) {
-      const year = parseInt(match[1], 10);
-      const month = parseInt(match[2], 10) - 1; // 0-indexed
-      const day = parseInt(match[3], 10);
-      date = new Date(year, month, day);
-    } else {
-      date = new Date(dateInput);
-    }
+    date = new Date(dateInput);
   }
   
   if (isNaN(date.getTime())) {
@@ -423,9 +415,42 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [topicName, setTopicName] = useState('');
   const [status, setStatus] = useState<'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED'>('IN_PROGRESS');
   const [isCurrentHomework, setIsCurrentHomework] = useState(false);
-  const [teacherNotes, setTeacherNotes] = useState('');
-  const [homeworkNotes, setHomeworkNotes] = useState('');
-  const [homeworkNotesList, setHomeworkNotesList] = useState<string[]>([]);
+  const [teacherNotes, setTeacherNotes] = useState<string>(() => {
+    try {
+      return localStorage.getItem(`campus_teacher_notes_${student.id}`) || '';
+    } catch {
+      return '';
+    }
+  });
+  const [homeworkNotes, setHomeworkNotes] = useState<string>(() => {
+    try {
+      const cached = localStorage.getItem(`campus_homework_notes_${student.id}`);
+      if (cached && cached.startsWith('[') && cached.endsWith(']')) {
+        const parsed = JSON.parse(cached);
+        return parsed.filter((n: string) => 
+          typeof n === 'string' && 
+          !n.startsWith('AUDIO:') && 
+          !n.startsWith('STICKER:') && 
+          !n.startsWith('FEEDBACK:') && 
+          !n.startsWith('STUDENT_NOTE_')
+        ).join('\n\n') || '';
+      }
+      return cached || '';
+    } catch {
+      return '';
+    }
+  });
+  const [homeworkNotesList, setHomeworkNotesList] = useState<string[]>(() => {
+    try {
+      const cached = localStorage.getItem(`campus_homework_notes_${student.id}`);
+      if (cached && cached.startsWith('[') && cached.endsWith(']')) {
+        return JSON.parse(cached);
+      }
+      return cached ? [cached] : [];
+    } catch {
+      return [];
+    }
+  });
   const [studentNotes, setStudentNotes] = useState('');
   const [isStudentNotePrivate, setIsStudentNotePrivate] = useState(false);
   const [studentNotesSavedToast, setStudentNotesSavedToast] = useState(false);
@@ -446,6 +471,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Lehrwerke assigned to student states
   const [globalLehrwerke, setGlobalLehrwerke] = useState<any[]>([]);
   const [assignedLehrwerke, setAssignedLehrwerke] = useState<any[]>([]);
+  const sortedAssignedLehrwerke = useMemo(() => {
+    return [...assignedLehrwerke].sort((a, b) => {
+      const timeA = a.assignedAt ? new Date(a.assignedAt).getTime() : 0;
+      const timeB = b.assignedAt ? new Date(b.assignedAt).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [assignedLehrwerke]);
   const [activeLehrwerkId, setActiveLehrwerkId] = useState<string | null>(null);
   const [activePageNumber, setActivePageNumber] = useState<number | null>(null);
   const [activeSubView, setActiveSubView] = useState<'hub' | 'lehrwerk' | 'song' | 'history'>('hub');
@@ -614,12 +646,178 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const clampedCode = Math.max(65, Math.min(90, charCode));
     const hue = Math.round(((clampedCode - 65) / 25) * 360);
     return {
-      from: `hsl(${hue}, 85%, 94%)`,
-      to: `hsl(${hue}, 80%, 84%)`,
+      from: `hsl(${hue}, 85%, 92%)`,
+      to: `hsl(${hue}, 80%, 82%)`,
       text: `hsl(${hue}, 90%, 25%)`,
       shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
       shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
     };
+  };
+
+  const renderSongVinylCover = (songColor: { from: string; to: string; text?: string }, size: 'sm' | 'md' | 'lg' = 'md') => {
+    const isSm = size === 'sm';
+    const isLg = size === 'lg';
+    const sleeveSize = isSm ? 54 : isLg ? 102 : 94;
+    const vinylSize = isSm ? 48 : isLg ? 92 : 84;
+    const borderRadius = isSm ? 14 : isLg ? 25 : 23;
+    const noteWidth = isSm ? 30 : isLg ? 52 : 46;
+    const noteHeight = isSm ? 30 : isLg ? 52 : 46;
+    const vinylRight = isSm ? -7 : isLg ? -13 : -11;
+
+    const gradId = `fineVinylGrad_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+    const highId = `fineVinylHigh_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+    const headHigh1 = `fineHead1_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+    const headHigh2 = `fineHead2_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+
+    return (
+      <div style={{
+        position: 'relative',
+        width: `${sleeveSize + (isSm ? 8 : 12)}px`,
+        height: `${sleeveSize}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        marginLeft: isSm ? '-3px' : '-5px',
+        flexShrink: 0
+      }}>
+        {/* 1. Sleek Black Vinyl Disc with Ultra-Fine Grooves */}
+        <div style={{
+          position: 'absolute',
+          right: `${vinylRight}px`,
+          width: `${vinylSize}px`,
+          height: `${vinylSize}px`,
+          borderRadius: '50%',
+          boxShadow: '3px 5px 15px rgba(0, 0, 0, 0.32)',
+          zIndex: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <svg width={vinylSize} height={vinylSize} viewBox="0 0 100 100" fill="none">
+            <defs>
+              <radialGradient id={`discBase_${gradId}`} cx="50" cy="50" r="50" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#2c2c30" />
+                <stop offset="25%" stopColor="#141416" />
+                <stop offset="60%" stopColor="#08080a" />
+                <stop offset="90%" stopColor="#18181b" />
+                <stop offset="100%" stopColor="#050506" />
+              </radialGradient>
+              {/* Anisotropic Light Reflection Beams */}
+              <linearGradient id={`discSheen1_${gradId}`} x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.22)" />
+                <stop offset="35%" stopColor="rgba(255, 255, 255, 0)" />
+                <stop offset="65%" stopColor="rgba(255, 255, 255, 0)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0.18)" />
+              </linearGradient>
+              <linearGradient id={`discSheen2_${gradId}`} x1="100" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.15)" />
+                <stop offset="40%" stopColor="rgba(255, 255, 255, 0)" />
+                <stop offset="60%" stopColor="rgba(255, 255, 255, 0)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0.12)" />
+              </linearGradient>
+            </defs>
+            {/* Disc Body */}
+            <circle cx="50" cy="50" r="49.5" fill={`url(#discBase_${gradId})`} />
+            <circle cx="50" cy="50" r="49.5" fill={`url(#discSheen1_${gradId})`} />
+            <circle cx="50" cy="50" r="49.5" fill={`url(#discSheen2_${gradId})`} />
+            
+            {/* Distinct, Crisp Concentric Vinyl Grooves */}
+            <circle cx="50" cy="50" r="46.5" stroke="rgba(255,255,255,0.32)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="44" stroke="rgba(0,0,0,0.65)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="41.5" stroke="rgba(255,255,255,0.26)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="39" stroke="rgba(0,0,0,0.6)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="36.5" stroke="rgba(255,255,255,0.28)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="34" stroke="rgba(0,0,0,0.6)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="31.5" stroke="rgba(255,255,255,0.22)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="29" stroke="rgba(0,0,0,0.6)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="26.5" stroke="rgba(255,255,255,0.18)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="24" stroke="rgba(0,0,0,0.5)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="21.5" stroke="rgba(255,255,255,0.16)" strokeWidth="0.85" />
+            
+            {/* Outer Rim Light Edge */}
+            <circle cx="50" cy="50" r="49" stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
+          </svg>
+        </div>
+
+        {/* 2. Soft Pastel Rounded Square Sleeve */}
+        <div style={{
+          width: `${sleeveSize}px`,
+          height: `${sleeveSize}px`,
+          background: `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`,
+          borderRadius: `${borderRadius}px`,
+          boxShadow: '0 11px 24px -4px rgba(0, 0, 0, 0.1), 0 3px 7px -2px rgba(0, 0, 0, 0.05), inset 0 1.5px 2px rgba(255, 255, 255, 0.9)',
+          border: '1.5px solid rgba(255, 255, 255, 0.8)',
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2,
+          boxSizing: 'border-box'
+        }}>
+          {/* 3. 10% Feiner 3D Double Music Note (Sleek, Glossy, Precision Engineered) */}
+          <svg 
+            width={noteWidth} 
+            height={noteHeight} 
+            viewBox="0 0 100 100" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ filter: 'drop-shadow(0 4.5px 7px rgba(0, 0, 0, 0.25)) drop-shadow(0 1.5px 2.5px rgba(0, 0, 0, 0.14))' }}
+          >
+            <defs>
+              {/* Main 3D Dark Graphite Body */}
+              <linearGradient id={gradId} x1="25" y1="15" x2="75" y2="85" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#2c2c30" />
+                <stop offset="35%" stopColor="#18181b" />
+                <stop offset="75%" stopColor="#0f0f12" />
+                <stop offset="100%" stopColor="#08080a" />
+              </linearGradient>
+              
+              {/* Head 1 Specular Glow */}
+              <radialGradient id={headHigh1} cx="34" cy="67" r="12" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.45)" />
+                <stop offset="45%" stopColor="rgba(255, 255, 255, 0.08)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
+              </radialGradient>
+
+              {/* Head 2 Specular Glow */}
+              <radialGradient id={headHigh2} cx="67" cy="58" r="12" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.45)" />
+                <stop offset="45%" stopColor="rgba(255, 255, 255, 0.08)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
+              </radialGradient>
+
+              {/* Top Beam Highlight Line */}
+              <linearGradient id={highId} x1="39" y1="21" x2="78" y2="13" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.72)" />
+                <stop offset="60%" stopColor="rgba(255, 255, 255, 0.26)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0.05)" />
+              </linearGradient>
+            </defs>
+
+            {/* Left Note Head (10% feineres 3D-Oval) */}
+            <ellipse cx="36" cy="68.5" rx="11.8" ry="8.8" transform="rotate(-19 36 68.5)" fill={`url(#${gradId})`} />
+            <ellipse cx="36" cy="68.5" rx="11.8" ry="8.8" transform="rotate(-19 36 68.5)" fill={`url(#${headHigh1})`} />
+
+            {/* Right Note Head (10% feineres 3D-Oval) */}
+            <ellipse cx="68" cy="59.5" rx="11.8" ry="8.8" transform="rotate(-19 68 59.5)" fill={`url(#${gradId})`} />
+            <ellipse cx="68" cy="59.5" rx="11.8" ry="8.8" transform="rotate(-19 68 59.5)" fill={`url(#${headHigh2})`} />
+
+            {/* Left Stem (5.8px Schlanker Stab) */}
+            <rect x="42" y="25" width="5.8" height="44" rx="2.9" fill={`url(#${gradId})`} />
+
+            {/* Right Stem (5.8px Schlanker Stab) */}
+            <rect x="74.2" y="16" width="5.8" height="44" rx="2.9" fill={`url(#${gradId})`} />
+
+            {/* Top Beam (10% feinerer Verbindungsbalken) */}
+            <path d="M 42 26 C 42 22 45 21 48.5 20.2 L 75.5 13.5 C 78.5 12.8 81.5 14.2 81.5 17.5 L 81.5 24.5 C 81.5 27.5 78.5 28.5 75.5 29.2 L 48.5 35.8 C 45 36.5 42 35.2 42 32 Z" fill={`url(#${gradId})`} />
+
+            {/* Top Beam Specular Light Edge */}
+            <path d="M 44.5 23 L 78.5 14.8" stroke={`url(#${highId})`} strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
+    );
   };
 
   const [pageGroupIndex, setPageGroupIndex] = useState(0);
@@ -842,13 +1040,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       });
       if (invokeErr) throw invokeErr;
       if (data?.summary) {
-        setHomeworkNotes(prev => prev ? `${prev}\n• ${data.summary}` : `• ${data.summary}`);
+        setHomeworkNotes((prev: string) => prev ? `${prev}\n• ${data.summary}` : `• ${data.summary}`);
         setHasChanges(true);
+        triggerDebouncedAutoSave(300);
       }
     } catch (e) {
       console.error("Error summarizing voice notes:", e);
-      setHomeworkNotes(prev => prev ? `${prev}\n• ${textStr}` : `• ${textStr}`);
+      setHomeworkNotes((prev: string) => prev ? `${prev}\n• ${textStr}` : `• ${textStr}`);
       setHasChanges(true);
+      triggerDebouncedAutoSave(300);
     } finally {
       setSaving(false);
     }
@@ -1161,14 +1361,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  const handleClose = () => {
-    if (hasChanges) {
-      if (confirm('Du hast ungespeicherte Änderungen. Möchtest du das Protokoll wirklich schließen, ohne zu speichern?')) {
-        onClose();
-      }
-    } else {
-      onClose();
+  const handleClose = async () => {
+    if (autoSaveDebounceTimerRef.current) {
+      clearTimeout(autoSaveDebounceTimerRef.current);
     }
+    if (hasChanges && !readOnly) {
+      try {
+        await handleSave(true);
+      } catch (e) {
+        console.warn('Auto-save on close error:', e);
+      }
+    }
+    onClose();
   };
 
   const getISOWeek = (dateInput?: string | Date): string => {
@@ -1441,6 +1645,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // Always backup to localStorage
     try {
       localStorage.setItem(`campus_homework_notes_${student.id}`, allNotesJson);
+      localStorage.setItem(`campus_teacher_notes_${student.id}`, teacherNotes.trim());
     } catch (lsErr) {
       console.warn('[Meisterwerk] localStorage cache notice:', lsErr);
     }
@@ -1454,7 +1659,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (dummyWeeklyItem) {
         const { error } = await supabase
           .from('progress_matrix')
-          .update({ homework_notes: allNotesJson, updated_at: new Date().toISOString() })
+          .update({ homework_notes: allNotesJson, teacher_notes: teacherNotes.trim(), updated_at: new Date().toISOString() })
           .eq('id', dummyWeeklyItem.id);
         if (error) console.warn('[syncHomeworkNotes] Supabase update warning:', error);
       } else {
@@ -1467,7 +1672,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
             status: 'IN_PROGRESS',
             is_current_homework: true,
-            teacher_notes: '',
+            teacher_notes: teacherNotes.trim(),
             homework_notes: allNotesJson,
             updated_at: new Date().toISOString()
           });
@@ -1676,49 +1881,103 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       });
       setCustomTags(customFound);
 
-      // Pre-populate homeworkNotes with the current week's active homework notes if found
+      // Pre-populate homeworkNotes with the active homework notes
       const currentWeek = getISOWeek();
       const currentWeekHomework = (data || []).find(item => 
-        item.topic_name.startsWith('Hausaufgabe KW ') &&
-        item.homework_notes && 
-        item.homework_notes.trim() !== '' && 
-        item.updated_at && 
-        getISOWeek(item.updated_at) === currentWeek
+        item.topic_name.startsWith('Hausaufgabe KW ') && 
+        (getItemWeek(item) === currentWeek || (item.updated_at && getISOWeek(item.updated_at) === currentWeek))
       ) || (data || []).find(item => 
-        item.homework_notes && 
-        item.homework_notes.trim() !== '' && 
-        item.updated_at && 
-        getISOWeek(item.updated_at) === currentWeek
+        item.topic_name.startsWith('Hausaufgabe KW ')
       ) || (data || []).find(item => 
-        item.is_current_homework && 
-        item.homework_notes && 
-        item.homework_notes.trim() !== ''
-      );
+        item.is_current_homework && (item.homework_notes || item.teacher_notes)
+      ) || (data && data.length > 0 ? data[0] : null);
+
+      let loadedHomeworkNotes = '';
+      let loadedHomeworkNotesList: string[] = [];
+      let loadedTeacherNotes = '';
+
       if (currentWeekHomework) {
-        const rawNotes = currentWeekHomework.homework_notes;
-        try {
-          if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
-            setHomeworkNotesList(JSON.parse(rawNotes));
-          } else {
-            // Backward compatibility: filter out old bullet logs
-            const cleanNotes = rawNotes
-              .split('\n')
-              .filter((line: string) => !line.trim().startsWith('• 📖') && !line.trim().startsWith('• 🎵') && !line.trim().startsWith('• 🗑️'))
-              .join('\n')
-              .trim();
-            if (cleanNotes) {
-              setHomeworkNotesList(cleanNotes.split('\n\n').filter(Boolean));
+        if (currentWeekHomework.homework_notes) {
+          const rawNotes = currentWeekHomework.homework_notes;
+          try {
+            if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
+              const parsed = JSON.parse(rawNotes);
+              loadedHomeworkNotesList = parsed;
+              loadedHomeworkNotes = parsed.filter((n: string) => 
+                typeof n === 'string' && 
+                !n.startsWith('AUDIO:') && 
+                !n.startsWith('STICKER:') && 
+                !n.startsWith('FEEDBACK:') && 
+                !n.startsWith('STUDENT_NOTE_')
+              ).join('\n\n');
             } else {
-              setHomeworkNotesList([]);
+              const cleanNotes = rawNotes
+                .split('\n')
+                .filter((line: string) => !line.trim().startsWith('• 📖') && !line.trim().startsWith('• 🎵') && !line.trim().startsWith('• 🗑️'))
+                .join('\n')
+                .trim();
+              if (cleanNotes) {
+                loadedHomeworkNotesList = cleanNotes.split('\n\n').filter(Boolean);
+                loadedHomeworkNotes = cleanNotes;
+              }
+            }
+          } catch (e) {
+            loadedHomeworkNotesList = [rawNotes];
+            loadedHomeworkNotes = rawNotes;
+          }
+        }
+        if (currentWeekHomework.teacher_notes) {
+          loadedTeacherNotes = currentWeekHomework.teacher_notes;
+        }
+      }
+
+      // Also scan other recent items for teacher_notes if not yet found
+      if (!loadedTeacherNotes && data && data.length > 0) {
+        const itemWithTeacherNotes = data.find(item => item.teacher_notes && item.teacher_notes.trim() !== '');
+        if (itemWithTeacherNotes?.teacher_notes) {
+          loadedTeacherNotes = itemWithTeacherNotes.teacher_notes;
+        }
+      }
+
+      // LocalStorage fallback for instantaneous 100% data preservation
+      if (!loadedHomeworkNotes || loadedHomeworkNotesList.length === 0) {
+        try {
+          const cachedHW = localStorage.getItem(`campus_homework_notes_${student.id}`);
+          if (cachedHW) {
+            if (cachedHW.startsWith('[') && cachedHW.endsWith(']')) {
+              const parsed = JSON.parse(cachedHW);
+              if (loadedHomeworkNotesList.length === 0) loadedHomeworkNotesList = parsed;
+              if (!loadedHomeworkNotes) {
+                loadedHomeworkNotes = parsed.filter((n: string) => 
+                  typeof n === 'string' && 
+                  !n.startsWith('AUDIO:') && 
+                  !n.startsWith('STICKER:') && 
+                  !n.startsWith('FEEDBACK:') && 
+                  !n.startsWith('STUDENT_NOTE_')
+                ).join('\n\n');
+              }
+            } else if (!loadedHomeworkNotes) {
+              loadedHomeworkNotes = cachedHW;
+              if (loadedHomeworkNotesList.length === 0) loadedHomeworkNotesList = [cachedHW];
             }
           }
-        } catch (e) {
-          setHomeworkNotesList([rawNotes]);
-        }
-      } else {
-        setHomeworkNotesList([]);
+        } catch (lsErr) {}
       }
-      setHomeworkNotes(''); // Keep input textarea completely clean!
+
+      if (!loadedTeacherNotes) {
+        try {
+          const cachedTN = localStorage.getItem(`campus_teacher_notes_${student.id}`);
+          if (cachedTN) {
+            loadedTeacherNotes = cachedTN;
+          }
+        } catch (lsErr) {}
+      }
+
+      setHomeworkNotesList(loadedHomeworkNotesList);
+      if (!hasChanges) {
+        setHomeworkNotes(loadedHomeworkNotes);
+        setTeacherNotes(loadedTeacherNotes);
+      }
     } catch (err: any) {
       console.error('Error fetching progress:', err);
       setError('Fehler beim Laden des Lernfortschritts.');
@@ -3153,6 +3412,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
+  const autoSaveDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerDebouncedAutoSave = (delayMs: number = 350) => {
+    if (readOnly) return;
+    setHasChanges(true);
+    if (autoSaveDebounceTimerRef.current) {
+      clearTimeout(autoSaveDebounceTimerRef.current);
+    }
+    autoSaveDebounceTimerRef.current = setTimeout(() => {
+      handleSave(true);
+    }, delayMs);
+  };
+
+  const triggerImmediateAutoSave = () => {
+    if (readOnly) return;
+    if (autoSaveDebounceTimerRef.current) {
+      clearTimeout(autoSaveDebounceTimerRef.current);
+    }
+    handleSave(true);
+  };
+
   const handleSave = async (e?: React.FormEvent | boolean, keepOpenParam?: boolean) => {
     let keepOpen = false;
     if (typeof e === 'boolean') {
@@ -3258,7 +3538,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const isLehrwerkPage = (activeInputTab === 'lehrwerk_page');
     const isSong = (activeInputTab === 'active_song');
 
-    const finalNotesList = [...homeworkNotesList];
+    const specialNotes = homeworkNotesList.filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
+    const finalNotesList = [...specialNotes];
     if (!isLehrwerkPage && !isSong && homeworkNotes.trim().length > 0) {
       finalNotesList.push(homeworkNotes.trim());
     }
@@ -3302,54 +3583,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }
       }
 
-      // 1. Post to API endpoint (if available)
-      let apiSaved = false;
-      try {
-        const response = await fetch('/api/teacher/save-progress', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${sessionStorage.getItem('sb-access-token') || ''}`
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (response.ok) {
-          apiSaved = true;
-          if (!isLehrwerkPage && !isSong) {
-            const parsedNotes = JSON.parse(combinedHomeworkNotes || '[]');
-            await syncHomeworkNotes(parsedNotes);
-          }
-
-          if (targetHomework && !isCurrentHomework) {
-            setIsCurrentHomework(true);
-          }
-
-          await fetchProgress();
-          notifyHomeworkChange();
-          setStudentNotesSavedToast(true);
-          setTimeout(() => setStudentNotesSavedToast(false), 2500);
-
-          setHomeworkNotesList(finalNotesList);
-          setHomeworkNotes('');
-          setHasChanges(false);
-          setSaving(false);
-          return;
-        }
-      } catch (apiErr) {
-        console.warn('API save-progress fallback to Supabase:', apiErr);
-      }
-
-      // 2. Direct Supabase update/insert fallback
+      // Direct reliable Supabase persistence
       const activeTId = await getCurrentTeacherId();
       const currentWeek = getISOWeek();
 
-      const parsedNotes = JSON.parse(combinedHomeworkNotes || '[]');
       const rowHomeworkNotes = (isLehrwerkPage || isSong)
         ? homeworkNotes.trim()
         : (finalTopicName.startsWith('Hausaufgabe KW ')
             ? combinedHomeworkNotes
-            : JSON.stringify(parsedNotes.filter((n: string) => !n.startsWith('AUDIO:'))));
+            : JSON.stringify(finalNotesList.filter((n: string) => !n.startsWith('AUDIO:'))));
 
       const row = {
         student_id: student.id,
@@ -3361,6 +3603,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         homework_notes: rowHomeworkNotes,
         updated_at: new Date().toISOString()
       };
+
+      // Immediate local backup
+      try {
+        localStorage.setItem(`campus_homework_notes_${student.id}`, combinedHomeworkNotes);
+        localStorage.setItem(`campus_teacher_notes_${student.id}`, teacherNotes.trim());
+      } catch (lsErr) {
+        console.warn('[Meisterwerk] localStorage backup notice:', lsErr);
+      }
 
       let dbError;
       if (activeItem?.id) {
@@ -3394,7 +3644,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (dbError) throw dbError;
 
       if (!isLehrwerkPage && !isSong) {
-        await syncHomeworkNotes(parsedNotes);
+        await syncHomeworkNotes(finalNotesList);
+      }
+
+      if (targetHomework && !isCurrentHomework) {
+        setIsCurrentHomework(true);
       }
 
       await fetchProgress();
@@ -3403,7 +3657,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       setTimeout(() => setStudentNotesSavedToast(false), 2500);
 
       setHomeworkNotesList(finalNotesList);
-      setHomeworkNotes('');
       setHasChanges(false);
     } catch (err: any) {
       console.error('Error saving progress:', err);
@@ -4951,6 +5204,74 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
             {/* Actions (Always visible on all screen sizes, including Fullscreen + Close) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="header-right-actions">
+              {/* Live Auto-Save Status Badge */}
+              {/* Live Auto-Save Interactive Button & Cloud Sync Pill (Apple & Enterprise+ Standard) */}
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hasChanges && !saving) {
+                      handleSave(true);
+                    } else if (!saving) {
+                      setStudentNotesSavedToast(true);
+                      setTimeout(() => setStudentNotesSavedToast(false), 2000);
+                    }
+                  }}
+                  disabled={saving}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: hasChanges 
+                      ? 'linear-gradient(135deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.2) 100%)'
+                      : 'rgba(255, 255, 255, 0.16)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    border: hasChanges 
+                      ? '1px solid rgba(255, 255, 255, 0.65)' 
+                      : '1px solid rgba(255, 255, 255, 0.25)',
+                    padding: '5px 12px',
+                    borderRadius: '20px',
+                    color: '#ffffff',
+                    fontSize: '0.73rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.01em',
+                    boxShadow: hasChanges 
+                      ? '0 0 10px rgba(255, 255, 255, 0.3), 0 2px 6px rgba(0,0,0,0.12)' 
+                      : '0 2px 5px rgba(0,0,0,0.08)',
+                    cursor: saving ? 'wait' : 'pointer',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    outline: 'none'
+                  }}
+                  className="hover-scale"
+                  title={hasChanges ? "Jetzt manuell in der Cloud sichern" : "Alle Änderungen sind live in der Cloud gesichert"}
+                >
+                  {saving ? (
+                    <>
+                      <span style={{ fontSize: '0.75rem', animation: 'spin 1.2s linear infinite', display: 'inline-block' }}>⏳</span>
+                      <span style={{ color: '#ffffff' }}>Speichert...</span>
+                    </>
+                  ) : hasChanges ? (
+                    <>
+                      <span style={{ 
+                        width: '7px', 
+                        height: '7px', 
+                        borderRadius: '50%', 
+                        background: '#facc15',
+                        display: 'inline-block',
+                        boxShadow: '0 0 6px #facc15'
+                      }} />
+                      <span style={{ color: '#ffffff', fontWeight: 900 }}>Jetzt speichern</span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ color: '#86efac', fontWeight: 900 }}>✓</span>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.95)' }}>Gespeichert</span>
+                    </>
+                  )}
+                </button>
+              )}
+
               <div className="header-desktop-archiv" style={{ display: isMobileOrSim ? 'none' : 'flex', alignItems: 'center', gap: '4px' }}>
                 {renderSkillRadarButton()}
                 {renderArchivButton()}
@@ -6944,45 +7265,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       alignItems: 'center',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
                     }}>
-                      <div style={{ position: 'relative', width: '70px', height: '60px', flexShrink: 0 }}>
-                        {/* Vinyl peeking out */}
-                        <div style={{
-                          position: 'absolute',
-                          right: '2px',
-                          top: '4px',
-                          width: '52px',
-                          height: '52px',
-                          borderRadius: '50%',
-                          background: 'radial-gradient(circle, #27272a 35%, #09090b 36%, #18181b 45%, #09090b 60%)',
-                          border: '1px solid #000',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          zIndex: 1
-                        }}>
-                          <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: songColor.to, border: '1px solid rgba(0,0,0,0.2)' }} />
-                        </div>
-                        {/* Album Sleeve */}
-                        <div style={{
-                          position: 'absolute',
-                          left: 0,
-                          top: 0,
-                          width: '60px',
-                          height: '60px',
-                          background: `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`,
-                          borderRadius: '6px',
-                          border: '1px solid rgba(0,0,0,0.1)',
-                          boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '1.6rem',
-                          zIndex: 2
-                        }}>
-                          🎵
-                        </div>
-                      </div>
+                      {renderSongVinylCover(songColor, 'sm')}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {skill.songs?.title}
@@ -7365,11 +7648,151 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               <>
                 {/* Hub-view inner scrollable area */}
                 <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px', paddingBottom: '12px' }}>
-                {/* Clean Apple-style Header Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
-                    Lehrwerke & Übungen
-                  </h3>
+                {/* Clean Apple-style Header Row with Quick-Add Action */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', position: 'relative' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BookOpen size={18} style={{ color: '#34a853' }} />
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
+                      Lehrwerke & Übungen
+                    </h3>
+                  </div>
+
+                  {/* Kompakter Apple-Style Header Action Button */}
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#f0fdf4',
+                        border: '1.5px solid #bbf7d0',
+                        color: '#15803d',
+                        padding: '5px 12px',
+                        borderRadius: '100px',
+                        fontSize: '0.76rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Plus size={13} strokeWidth={3} />
+                      <span>Lehrwerk hinzufügen</span>
+                    </button>
+
+                    {showAssignDropdown && (
+                      <div style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: '36px',
+                        background: 'white',
+                        border: '1px solid #e8e8ed',
+                        borderRadius: '18px',
+                        boxShadow: '0 16px 36px rgba(0,0,0,0.16)',
+                        zIndex: 100,
+                        minWidth: '240px',
+                        padding: '8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Aus Mediathek wählen</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setShowAssignDropdown(false); }}
+                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                        {globalLehrwerke
+                          .filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id))
+                          .map(g => (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => {
+                                handleAssignLehrwerk(g.id);
+                                setShowAssignDropdown(false);
+                              }}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                padding: '8px 10px',
+                                borderRadius: '10px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                color: '#000',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                transition: 'background 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#f3f3f6'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                              {(() => {
+                                const bookColor = getLehrwerkColor(g.title);
+                                return (
+                                  <div style={{
+                                    width: '20px',
+                                    height: '28px',
+                                    background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                                    borderRadius: '3px',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0
+                                  }}>
+                                    <BookOpen size={10} color={bookColor.text} />
+                                  </div>
+                                );
+                              })()}
+                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</span>
+                            </button>
+                          ))
+                        }
+                        {globalLehrwerke.filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id)).length === 0 && (
+                          <span style={{ fontSize: '0.72rem', color: '#7d7d82', padding: '6px 8px', textAlign: 'center', fontStyle: 'italic' }}>
+                            Alle Mediathek-Bücher zugewiesen
+                          </span>
+                        )}
+                        <div style={{ borderTop: '1px solid #e8e8ed', margin: '4px 0' }} />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCreateLehrwerkModal(true);
+                            setShowAssignDropdown(false);
+                          }}
+                          style={{
+                            border: 'none',
+                            background: '#34a853',
+                            color: 'white',
+                            padding: '8px 12px',
+                            borderRadius: '10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          <Plus size={14} /> Eigenes Lehrwerk neu anlegen
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {showCreateLehrwerkModal && (
@@ -7456,8 +7879,66 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </form>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '14px' }}>
-                  {assignedLehrwerke.map(assigned => {
+                {/* Horizontal Scroll-Container mit sichtbarer Scrollbar und Quick-Add ganz vorne (links) */}
+                <div 
+                  className="custom-horizontal-scrollbar"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: '14px',
+                    overflowX: 'auto',
+                    paddingBottom: '14px',
+                    scrollSnapType: 'x mandatory',
+                    WebkitOverflowScrolling: 'touch',
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#cbd5e1 #f8fafc'
+                  }}
+                >
+                  {/* 1. Kompakte Quick-Add Card GANZ VORNE (LINKS) */}
+                  <div
+                    onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+                    style={{
+                      flex: '0 0 auto',
+                      width: sortedAssignedLehrwerke.length === 0 ? '160px' : '140px',
+                      scrollSnapAlign: 'start',
+                      background: 'rgba(248, 250, 252, 0.7)',
+                      borderRadius: '20px',
+                      border: '2px dashed #cbd5e1',
+                      padding: '14px 10px',
+                      minHeight: '210px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      textAlign: 'center',
+                      transition: 'all 0.2s',
+                      boxSizing: 'border-box'
+                    }}
+                    className="hover-scale"
+                  >
+                    <div style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      border: '1.5px solid #e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#34a853',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                    }}>
+                      <Plus size={20} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>Lehrwerk</div>
+                      <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Hinzufügen</div>
+                    </div>
+                  </div>
+
+                  {sortedAssignedLehrwerke.map(assigned => {
                     const book = globalLehrwerke.find(g => g.id === assigned.lehrwerkId) || {
                       title: 'Unbekanntes Buch',
                       emoji: '📚',
@@ -7474,6 +7955,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         key={assigned.lehrwerkId}
                         onClick={() => selectTextbookPage(assigned.lehrwerkId, activePageNumber || 1)}
                         style={{
+                          flex: '0 0 auto',
+                          width: '160px',
+                          scrollSnapAlign: 'start',
                           background: '#ffffff',
                           borderRadius: '20px',
                           border: isSelected ? '2px solid #34a853' : '1.5px solid #e8e8ed',
@@ -7485,7 +7969,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           justifyContent: 'space-between',
                           gap: '10px',
                           position: 'relative',
-                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          boxSizing: 'border-box'
                         }}
                         className="hover-scale"
                       >
@@ -7651,170 +8136,41 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </div>
                     );
                   })}
-
-                  {/* + Lehrwerk hinzufügen Placeholder Card */}
-                  <div style={{ position: 'relative' }}>
-                    <div
-                      onClick={() => setShowAssignDropdown(!showAssignDropdown)}
-                      style={{
-                        background: 'rgba(248, 250, 252, 0.7)',
-                        borderRadius: '20px',
-                        border: '2px dashed #cbd5e1',
-                        padding: '16px 12px',
-                        minHeight: '205px',
-                        height: '100%',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '12px',
-                        textAlign: 'center',
-                        transition: 'all 0.2s',
-                        boxSizing: 'border-box'
-                      }}
-                      className="hover-scale"
-                    >
-                      <div style={{
-                        width: '46px',
-                        height: '46px',
-                        borderRadius: '50%',
-                        background: '#ffffff',
-                        border: '1.5px solid #e2e8f0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#34a853',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-                      }}>
-                        <Plus size={22} strokeWidth={2.5} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a' }}>Lehrwerk</div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Hinzufügen</div>
-                      </div>
-                    </div>
-
-                    {showAssignDropdown && (
-                      <div style={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        top: '10px',
-                        background: 'white',
-                        border: '1px solid #e8e8ed',
-                        borderRadius: '18px',
-                        boxShadow: '0 16px 36px rgba(0,0,0,0.16)',
-                        zIndex: 40,
-                        minWidth: '220px',
-                        padding: '8px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Aus Mediathek wählen</span>
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setShowAssignDropdown(false); }}
-                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
-                          >
-                            <X size={13} />
-                          </button>
-                        </div>
-                        {globalLehrwerke
-                          .filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id))
-                          .map(g => (
-                            <button
-                              key={g.id}
-                              type="button"
-                              onClick={() => {
-                                handleAssignLehrwerk(g.id);
-                                setShowAssignDropdown(false);
-                              }}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                padding: '8px 10px',
-                                borderRadius: '10px',
-                                fontSize: '0.78rem',
-                                fontWeight: 700,
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                color: '#000',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                transition: 'background 0.2s'
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = '#f3f3f6'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                            >
-                              {(() => {
-                                const bookColor = getLehrwerkColor(g.title);
-                                return (
-                                  <div style={{
-                                    width: '20px',
-                                    height: '28px',
-                                    background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                    borderRadius: '3px',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0
-                                  }}>
-                                    <BookOpen size={10} color={bookColor.text} />
-                                  </div>
-                                );
-                              })()}
-                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</span>
-                            </button>
-                          ))
-                        }
-                        {globalLehrwerke.filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id)).length === 0 && (
-                          <span style={{ fontSize: '0.72rem', color: '#7d7d82', padding: '6px 8px', textAlign: 'center', fontStyle: 'italic' }}>
-                            Alle Mediathek-Bücher zugewiesen
-                          </span>
-                        )}
-                        <div style={{ borderTop: '1px solid #e8e8ed', margin: '4px 0' }} />
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowCreateLehrwerkModal(true);
-                            setShowAssignDropdown(false);
-                          }}
-                          style={{
-                            border: 'none',
-                            background: '#34a853',
-                            color: 'white',
-                            padding: '8px 12px',
-                            borderRadius: '10px',
-                            fontSize: '0.75rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)'
-                          }}
-                          className="hover-scale-mini"
-                        >
-                          <Plus size={14} /> Eigenes Lehrwerk neu anlegen
-                        </button>
-                      </div>
-                    )}
-                  </div>
                 </div>
 
                 <div style={{ borderTop: '1px solid #e8e8ed', margin: '20px 0 10px 0' }} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <Music size={18} style={{ color: '#000' }} />
-                  <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#000', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    🎵 Aktive Song-Projekte
-                  </span>
+                
+                {/* Header Row mit Quick-Add Button */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', position: 'relative' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Music size={18} style={{ color: '#000' }} />
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
+                      Aktive Song-Projekte
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateSongModal(!showCreateSongModal)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#f0fdf4',
+                      border: '1.5px solid #bbf7d0',
+                      color: '#15803d',
+                      padding: '5px 12px',
+                      borderRadius: '100px',
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Plus size={13} strokeWidth={3} />
+                    <span>Song anlegen</span>
+                  </button>
                 </div>
 
                 {(() => {
@@ -7834,7 +8190,64 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     const activeSongs = Array.from(uniqueActiveMap.values());
 
                     return (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '14px' }}>
+                      <div 
+                        className="custom-horizontal-scrollbar"
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'row',
+                          gap: '14px',
+                          overflowX: 'auto',
+                          paddingBottom: '14px',
+                          scrollSnapType: 'x mandatory',
+                          WebkitOverflowScrolling: 'touch',
+                          scrollbarWidth: 'thin',
+                          scrollbarColor: '#cbd5e1 #f8fafc'
+                        }}
+                      >
+                        {/* 1. Kompakte Quick-Add Card GANZ VORNE (LINKS) */}
+                        <div
+                          onClick={() => setShowCreateSongModal(!showCreateSongModal)}
+                          style={{
+                            flex: '0 0 auto',
+                            width: activeSongs.length === 0 ? '160px' : '140px',
+                            scrollSnapAlign: 'start',
+                            background: 'rgba(248, 250, 252, 0.7)',
+                            borderRadius: '20px',
+                            border: '2px dashed #cbd5e1',
+                            padding: '14px 10px',
+                            minHeight: '210px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '10px',
+                            textAlign: 'center',
+                            transition: 'all 0.2s',
+                            boxSizing: 'border-box'
+                          }}
+                          className="hover-scale"
+                        >
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            background: '#ffffff',
+                            border: '1.5px solid #e2e8f0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#34a853',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                          }}>
+                            <Plus size={20} strokeWidth={2.5} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>Song</div>
+                            <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Neu anlegen</div>
+                          </div>
+                        </div>
+
                         {activeSongs.map(skill => {
                           const progress = skill.is_stage_ready ? 100 : (skill.progress_percent || 0);
                           const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Unbenannter Song';
@@ -7847,6 +8260,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               key={skill.id}
                               onClick={() => selectActiveSong(skill)}
                               style={{
+                                flex: '0 0 auto',
+                                width: '160px',
+                                scrollSnapAlign: 'start',
                                 background: '#ffffff',
                                 borderRadius: '20px',
                                 border: isSelected ? '2px solid #34a853' : '1.5px solid #e8e8ed',
@@ -7858,77 +8274,45 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 justifyContent: 'space-between',
                                 gap: '10px',
                                 position: 'relative',
-                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                boxSizing: 'border-box'
                               }}
                               className="hover-scale"
                             >
-                              {/* Vinyl + Album Cover Art 1:1 */}
+                              {/* Song Showcase Area: Pastel Sleeve + Peeking Black Vinyl */}
                               <div style={{
                                 width: '100%',
-                                height: '112px',
-                                background: `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`,
-                                borderRadius: '14px',
-                                boxShadow: '0 6px 14px rgba(0,0,0,0.12)',
+                                height: '148px',
+                                background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+                                borderRadius: '16px',
                                 position: 'relative',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 overflow: 'hidden'
                               }}>
-                                {/* Peeking Vinyl Disc */}
+                                {renderSongVinylCover(songColor, 'md')}
+
+                                {/* Top-Right Pill: % gemeistert */}
                                 <div style={{
                                   position: 'absolute',
-                                  right: '-14px',
-                                  top: '12px',
-                                  width: '84px',
-                                  height: '84px',
-                                  borderRadius: '50%',
-                                  background: 'radial-gradient(circle, #27272a 35%, #09090b 36%, #18181b 45%, #09090b 60%)',
-                                  border: '1px solid #000',
-                                  boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  opacity: 0.85
-                                }}>
-                                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: songColor.to, border: '2px solid rgba(255,255,255,0.4)' }} />
-                                </div>
-
-                                {/* Music Note Icon Badge */}
-                                <div style={{
-                                  width: '42px',
-                                  height: '42px',
-                                  borderRadius: '12px',
-                                  background: 'rgba(255, 255, 255, 0.25)',
+                                  top: '6px',
+                                  right: '6px',
+                                  background: progress >= 100 ? '#34a853' : 'rgba(15, 23, 42, 0.72)',
                                   backdropFilter: 'blur(8px)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  zIndex: 2,
-                                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                                }}>
-                                  <Music size={22} color="#ffffff" />
-                                </div>
-
-                                {/* Top-Left Progress Pill */}
-                                <div style={{
-                                  position: 'absolute',
-                                  top: '8px',
-                                  left: '8px',
-                                  background: progress >= 100 ? '#34a853' : 'rgba(0,0,0,0.45)',
-                                  backdropFilter: 'blur(6px)',
                                   color: '#ffffff',
                                   fontSize: '0.62rem',
                                   fontWeight: 900,
-                                  padding: '2px 7px',
+                                  padding: '2.5px 7.5px',
                                   borderRadius: '100px',
-                                  boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
-                                  zIndex: 3
+                                  border: '1px solid rgba(255,255,255,0.18)',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+                                  zIndex: 10
                                 }}>
                                   {progress}%
                                 </div>
 
-                                {/* Delete Button if removable */}
+                                {/* Delete Button top left if removable */}
                                 {!readOnly && (skill.songs?.teacher_id || skill.created_by_teacher) && (
                                   <button
                                     type="button"
@@ -7939,8 +8323,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     style={{
                                       position: 'absolute',
                                       top: '6px',
-                                      right: '6px',
-                                      background: 'rgba(255, 255, 255, 0.85)',
+                                      left: '6px',
+                                      background: 'rgba(255, 255, 255, 0.9)',
                                       border: 'none',
                                       color: '#ef4444',
                                       cursor: 'pointer',
@@ -7977,7 +8361,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 </h4>
 
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
-                                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px' }}>{songArtist}</span>
+                                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90px' }}>{songArtist}</span>
                                   <span style={{ color: skill.songs?.teacher_id || skill.created_by_teacher ? '#16a34a' : '#d97706', fontWeight: 800 }}>
                                     {skill.songs?.teacher_id || skill.created_by_teacher ? '🎓 Lehrer' : '⭐ Wunsch'}
                                   </span>
@@ -7996,46 +8380,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             </div>
                           );
                         })}
-
-                        {/* + Song hinzufügen Card */}
-                        <div
-                          onClick={() => setShowCreateSongModal(!showCreateSongModal)}
-                          style={{
-                            background: 'rgba(248, 250, 252, 0.7)',
-                            borderRadius: '20px',
-                            border: '2px dashed #cbd5e1',
-                            padding: '16px 12px',
-                            minHeight: '175px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '10px',
-                            textAlign: 'center',
-                            transition: 'all 0.2s'
-                          }}
-                          className="hover-scale"
-                        >
-                          <div style={{
-                            width: '42px',
-                            height: '42px',
-                            borderRadius: '50%',
-                            background: '#ffffff',
-                            border: '1.5px solid #e2e8f0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#34a853',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                          }}>
-                            <Plus size={20} strokeWidth={2.5} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#0f172a' }}>Song</div>
-                            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Neu anlegen</div>
-                          </div>
-                        </div>
                       </div>
                     );
                   })()}
@@ -8849,7 +9193,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         value={homeworkNotes}
                         onChange={(e) => {
                           setHomeworkNotes(e.target.value);
-                          setHasChanges(true);
+                          triggerDebouncedAutoSave();
                         }}
                         style={{
                           width: '100%',
@@ -8896,7 +9240,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   const bpmText = bpm ? `${bpm} BPM` : "X BPM";
                                   text = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
                                 }
-                                setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
+                                setHomeworkNotes((prev: string) => prev ? `${prev}\n\n${text}` : text);
                                 setIsCurrentHomework(true);
                                 setHasChanges(true);
                               }}
@@ -9251,7 +9595,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       value={teacherNotes}
                       onChange={(e) => {
                         setTeacherNotes(e.target.value);
-                        setHasChanges(true);
+                        triggerDebouncedAutoSave();
                       }}
                       style={{
                         width: '100%', height: '50px', padding: '8px 12px', borderRadius: '12px',
@@ -9265,26 +9609,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     <button
                       type="button"
                       onClick={() => {
+                        triggerImmediateAutoSave();
                         setActiveSubView('hub');
                         setActiveLehrwerkId(null);
                         setActivePageNumber(null);
                       }}
                       style={{
-                        flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #34a853',
-                        background: 'white', color: '#34a853', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
+                        flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1',
+                        background: 'white', color: '#1e293b', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
                       }}
+                      className="hover-scale"
                     >
-                      Zurück
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      style={{
-                        flex: 2, padding: '12px', borderRadius: '12px', border: 'none',
-                        background: '#34a853', color: 'white', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
-                      }}
-                    >
-                      {saving ? 'Speichert...' : 'Seite speichern'}
+                      <span>← Zurück zur Übersicht</span>
                     </button>
                   </div>
                 </form>
@@ -9398,8 +9736,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               key={i}
                               type="button"
                               onClick={() => {
-                                setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
-                                setHasChanges(true);
+                                setHomeworkNotes((prev: string) => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
+                                triggerDebouncedAutoSave();
                               }}
                               style={{
                                 background: '#f8fafc',
@@ -9429,51 +9767,50 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </div>
 
                       {!readOnly && (
-<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          🔒 Interne Notiz (nur für Lehrer):
-                        </label>
-                        <textarea
-                          placeholder="Interne Bemerkungen..."
-                          value={teacherNotes}
-                          onChange={(e) => {
-                            setTeacherNotes(e.target.value);
-                            setHasChanges(true);
-                          }}
-                          style={{
-                            width: '100%',
-                            height: '100px',
-                            padding: '16px',
-                            borderRadius: '20px',
-                            border: '1.5px solid #cbd5e1',
-                            fontSize: '0.88rem',
-                            fontWeight: 650,
-                            lineHeight: '1.5',
-                            outline: 'none',
-                            resize: 'none',
-                            background: '#fefdf8',
-                            color: '#1e293b',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onFocus={e => {
-                            e.currentTarget.style.borderColor = 'var(--primary-color, #34a853)';
-                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.15)';
-                          }}
-                          onBlur={e => {
-                            e.currentTarget.style.borderColor = '#cbd5e1';
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
-                          }}
-                        />
-                      </div>
-)}
-
-
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            🔒 Interne Notiz (nur für Lehrer):
+                          </label>
+                          <textarea
+                            placeholder="Interne Bemerkungen..."
+                            value={teacherNotes}
+                            onChange={(e) => {
+                              setTeacherNotes(e.target.value);
+                              triggerDebouncedAutoSave();
+                            }}
+                            style={{
+                              width: '100%',
+                              height: '100px',
+                              padding: '16px',
+                              borderRadius: '20px',
+                              border: '1.5px solid #cbd5e1',
+                              fontSize: '0.88rem',
+                              fontWeight: 650,
+                              lineHeight: '1.5',
+                              outline: 'none',
+                              resize: 'none',
+                              background: '#fefdf8',
+                              color: '#1e293b',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onFocus={e => {
+                              e.currentTarget.style.borderColor = 'var(--primary-color, #34a853)';
+                              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.15)';
+                            }}
+                            onBlur={e => {
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
+                            }}
+                          />
+                        </div>
+                      )}
 
                       <div style={{ display: 'flex', gap: '12px', marginTop: '8px', paddingBottom: (isMobileView || isInsideSim || isFullscreen || isMobileOrSim) ? '180px' : '48px' }}>
                         <button
                           type="button"
                           onClick={() => {
+                            triggerImmediateAutoSave();
                             setActiveSubView('hub');
                             setSelectedActiveSongId('');
                           }}
@@ -9483,36 +9820,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             borderRadius: '14px',
                             border: '1px solid #cbd5e1',
                             background: 'white',
-                            color: '#475569',
+                            color: '#1e293b',
                             fontWeight: 800,
                             fontSize: '0.82rem',
                             cursor: 'pointer',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-                            transition: 'all 0.15s ease'
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
                           }}
                           className="hover-scale"
                         >
-                          Zurück
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={saving}
-                          style={{
-                            flex: 2,
-                            padding: '14px',
-                            borderRadius: '14px',
-                            border: 'none',
-                            background: '#34a853',
-                            color: 'white',
-                            fontWeight: 800,
-                            fontSize: '0.82rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)',
-                            transition: 'all 0.15s ease'
-                          }}
-                          className="hover-scale"
-                        >
-                          {saving ? 'Speichert...' : 'Song speichern'}
+                          <span>← Zurück zur Übersicht</span>
                         </button>
                       </div>
                     </form>
@@ -9695,7 +10016,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             });
 
                             const hasActive = lehrwerkeList.length > 0 || otherHWs.length > 0;
-                            const hasNotes = homeworkNotesList.length > 0;
+                            const hasNotes = homeworkNotesList.some(n => typeof n === 'string' && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:')) || homeworkNotes.trim().length > 0;
                             
                             if (!hasActive && !hasNotes) {
                               return (
@@ -9946,12 +10267,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 )}
 
                                 {(() => {
-                                  const visibleNotes = homeworkNotesList.filter(note => !note.startsWith("STICKER:") && !note.startsWith("LATENCY:"));
-                                  if (visibleNotes.length === 0) return null;
-
+                                  const rawTextNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => !item.note.startsWith("AUDIO:") && !item.note.startsWith("STICKER:") && !item.note.startsWith("LATENCY:") && !item.note.startsWith("RHYTHM_SCORE:"));
                                   const audioNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => item.note.startsWith("AUDIO:"));
                                   const rhythmNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => item.note.startsWith("RHYTHM_SCORE:"));
-                                  const textNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => !item.note.startsWith("AUDIO:") && !item.note.startsWith("STICKER:") && !item.note.startsWith("LATENCY:") && !item.note.startsWith("RHYTHM_SCORE:"));
+                                  
+                                  // Filter out notes from array that are already identical to the live editable homeworkNotes
+                                  const textNotes = rawTextNotes.filter(item => item.note.trim() !== homeworkNotes.trim());
+                                  const hasLiveHomeworkNote = homeworkNotes.trim().length > 0;
+                                  
+                                  const hasAnyVisibleNotes = audioNotes.length > 0 || rhythmNotes.length > 0 || textNotes.length > 0 || hasLiveHomeworkNote;
+                                  if (!hasAnyVisibleNotes) return null;
 
                                   return (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px', marginTop: '4px' }}>
@@ -9961,7 +10286,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       
                                       {/* Audio Notes (Cassettes) side-by-side */}
                                       {audioNotes.length > 0 && (
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px', marginBottom: textNotes.length > 0 || rhythmNotes.length > 0 ? '6px' : '2px' }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px', marginBottom: textNotes.length > 0 || rhythmNotes.length > 0 || hasLiveHomeworkNote ? '6px' : '2px' }}>
                                           {audioNotes.map((item, index) => {
                                             const parts = item.note.substring(6).split('|');
                                             return (
@@ -10022,7 +10347,64 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         </div>
                                       )}
 
-                                      {/* Text Notes stacked vertically */}
+                                      {/* Live Zusätzliche Hausaufgaben-Bemerkungen */}
+                                      {hasLiveHomeworkNote && (
+                                        <div style={{
+                                          display: 'flex',
+                                          alignItems: 'flex-start',
+                                          justifyContent: 'space-between',
+                                          background: '#ffffff',
+                                          border: '1px solid rgba(251, 191, 36, 0.25)',
+                                          padding: '8px 12px',
+                                          borderRadius: '12px',
+                                          fontSize: '0.78rem',
+                                          fontWeight: 650,
+                                          color: '#1e293b',
+                                          lineHeight: '1.45',
+                                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                                          marginTop: '2px'
+                                        }}>
+                                          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', flex: 1 }}>
+                                            <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>📝</span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                                              <span style={{ fontWeight: 800, color: '#b45309', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                                Zusätzliche Bemerkungen:
+                                              </span>
+                                              <span style={{ whiteSpace: 'pre-wrap', color: '#0f172a' }}>
+                                                {homeworkNotes.trim()}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          {!readOnly && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setHomeworkNotes('');
+                                                triggerDebouncedAutoSave(50);
+                                              }}
+                                              style={{
+                                                border: 'none',
+                                                background: 'none',
+                                                color: '#ef4444',
+                                                cursor: 'pointer',
+                                                fontSize: '0.74rem',
+                                                fontWeight: 800,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                padding: '2px',
+                                                marginLeft: '8px',
+                                                flexShrink: 0
+                                              }}
+                                              title="Bemerkung entfernen"
+                                            >
+                                              ✕
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {/* Other Text Notes stacked vertically */}
                                       {textNotes.length > 0 && (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                           {textNotes.map((item) => {
@@ -10200,11 +10582,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           value={homeworkNotes}
                           readOnly={readOnly}
                           onChange={readOnly ? undefined : (e) => {
-                            setHomeworkNotes(e.target.value);
-                            setHasChanges(true);
+                            const val = e.target.value;
+                            setHomeworkNotes(val);
+                            try {
+                              localStorage.setItem(`campus_homework_notes_${student.id}`, val);
+                            } catch {}
+                            triggerDebouncedAutoSave(350);
                           }}
                           onFocus={readOnly ? undefined : () => setIsNotesFocused(true)}
                           onBlur={readOnly ? undefined : () => {
+                            triggerImmediateAutoSave();
                             setTimeout(() => {
                               const activeEl = document.activeElement;
                               if (activeEl && (
@@ -10317,6 +10704,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   }
                                 }
                                 setHasChanges(true);
+                                triggerDebouncedAutoSave(300);
                               };
 
                               const allPresets = [
@@ -10732,62 +11120,137 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                       {/* Internal teacher notes */}
                       {!readOnly && (
-<div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                          🔒 Interne Notiz (nur für Lehrer)
-                        </label>
-                        <textarea
-                          placeholder="Welche Aspekte liefen heute gut? Wo gab es Herausforderungen? Nur für Lehrer sichtbar..."
-                          value={teacherNotes}
-                          onChange={(e) => {
-                            setTeacherNotes(e.target.value);
-                            setHasChanges(true);
-                          }}
-                          style={{
-                            width: '100%', height: '70px', padding: '12px 14px', borderRadius: '16px',
-                            border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, outline: 'none', resize: 'none', background: 'white'
-                          }}
-                        />
-                      </div>
-)}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                          <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
+                            🔒 Interne Notiz (nur für Lehrer)
+                          </label>
+                          <textarea
+                            placeholder="Welche Aspekte liefen heute gut? Wo gab es Herausforderungen? Nur für Lehrer sichtbar..."
+                            value={teacherNotes}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setTeacherNotes(val);
+                              try {
+                                localStorage.setItem(`campus_teacher_notes_${student.id}`, val);
+                              } catch {}
+                              triggerDebouncedAutoSave(350);
+                            }}
+                            onBlur={() => {
+                              triggerImmediateAutoSave();
+                            }}
+                            style={{
+                              width: '100%', height: '70px', padding: '12px 14px', borderRadius: '16px',
+                              border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, outline: 'none', resize: 'none', background: 'white'
+                            }}
+                          />
+                        </div>
+                      )}
+
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '4px', paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '24px' : '48px' }}>
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      style={{
-                        flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
-                        background: saving
-                          ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
-                          : (hasChanges
-                              ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                              : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'),
-                        color: 'white',
-                        fontWeight: 900,
-                        fontSize: '0.84rem',
-                        cursor: saving ? 'wait' : 'pointer',
-                        boxShadow: hasChanges
-                          ? '0 4px 16px rgba(239, 68, 68, 0.4)'
-                          : '0 4px 10px rgba(34, 197, 94, 0.25)',
-                        transition: 'all 0.2s ease',
+                  {/* Apple / Enterprise+ Floating Dynamic Island Action & Reassurance Bar */}
+                  {!readOnly && (
+                    <div style={{
+                      position: 'sticky',
+                      bottom: '8px',
+                      zIndex: 40,
+                      paddingTop: '6px',
+                      paddingBottom: '6px',
+                      marginTop: 'auto'
+                    }}>
+                      <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px'
-                      }}
-                      className="hover-scale"
-                    >
-                      {saving ? (
-                        <span>⏳ Speichert Eintrag...</span>
-                      ) : hasChanges ? (
-                        <span>⚠️ Ungespeicherte Änderungen — Eintrag jetzt speichern!</span>
-                      ) : (
-                        <span>✓ Eintrag gespeichert</span>
-                      )}
-                    </button>
-                  </div>
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        padding: '12px 18px',
+                        background: 'rgba(255, 255, 255, 0.92)',
+                        backdropFilter: 'blur(24px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                        borderRadius: '20px',
+                        border: '1px solid rgba(226, 232, 240, 0.95)',
+                        boxShadow: '0 8px 32px -4px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04)',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: saving ? '#3b82f6' : (hasChanges ? '#f59e0b' : '#22c55e'),
+                            boxShadow: saving ? '0 0 8px #3b82f6' : (hasChanges ? '0 0 8px #f59e0b' : '0 0 8px #22c55e'),
+                            animation: saving ? 'pulse 1s infinite' : 'none'
+                          }} />
+                          <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#334155' }}>
+                            {saving ? 'Änderungen werden synchronisiert...' : (hasChanges ? 'Ungespeicherte Eingaben (Auto-Save aktiv)' : 'Alle Einträge in der Cloud gesichert')}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {hasChanges && (
+                            <button
+                              type="button"
+                              onClick={() => handleSave(true)}
+                              disabled={saving}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid #cbd5e1',
+                                color: '#1e293b',
+                                padding: '8px 14px',
+                                borderRadius: '12px',
+                                fontSize: '0.76rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className="hover-scale"
+                            >
+                              <span>💾</span>
+                              <span>Jetzt sichern</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (hasChanges && !saving) {
+                                await handleSave(true);
+                              }
+                              handleClose();
+                            }}
+                            disabled={saving}
+                            style={{
+                              background: '#34a853',
+                              border: 'none',
+                              color: '#ffffff',
+                              padding: '8px 20px',
+                              borderRadius: '12px',
+                              fontSize: '0.80rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              boxShadow: '0 2px 8px rgba(52, 168, 83, 0.25)',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="hover-scale"
+                          >
+                            <span>✓</span>
+                            <span>Fertig & Schließen</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Clean Bottom Spacing */}
+                  <div style={{ paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '24px' : '16px' }} />
                 </form>
               </>
             )}
@@ -12282,43 +12745,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                         }}>
                           {/* Cover + Vinyl */}
-                          <div style={{ position: 'relative', width: '52px', height: '44px', flexShrink: 0 }}>
-                            <div style={{
-                              position: 'absolute',
-                              right: '1px',
-                              top: '3px',
-                              width: '38px',
-                              height: '38px',
-                              borderRadius: '50%',
-                              background: 'radial-gradient(circle, #27272a 35%, #09090b 36%, #18181b 45%, #09090b 60%)',
-                              border: '1px solid #000',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              zIndex: 1
-                            }}>
-                              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: songColor.to, border: '1px solid rgba(0,0,0,0.2)' }} />
-                            </div>
-                            <div style={{
-                              position: 'absolute',
-                              left: 0,
-                              top: 0,
-                              width: '44px',
-                              height: '44px',
-                              background: `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`,
-                              borderRadius: '5px',
-                              border: '1px solid rgba(0,0,0,0.1)',
-                              boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '1.2rem',
-                              zIndex: 2
-                            }}>
-                              🎵
-                            </div>
-                          </div>
+                          {renderSongVinylCover(songColor, 'sm')}
 
                           {/* Content in a single line */}
                           <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
