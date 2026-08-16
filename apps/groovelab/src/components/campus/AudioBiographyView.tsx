@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 import { supabase } from '../../lib/supabase';
-import { processStudioMastering, processDualMastering, DualMasteringResult } from '../../utils/audioMasteringEngine';
+import { processStudioMastering, processDualMastering, DualMasteringResult, MasteringProfile } from '../../utils/audioMasteringEngine';
 import { storeBlob, getBlob, deleteBlob } from '../../utils/blobStorage';
 
 
@@ -49,7 +49,7 @@ export interface CustomPlaylist {
   id: string;
   title: string;
   description?: string;
-  vibeTheme: 'sunset_gold' | 'midnight_neon' | 'forest_emerald' | 'royal_ruby' | 'vintage_charcoal' | 'ocean_cyan';
+  vibeTheme: 'sunset_gold' | 'midnight_neon' | 'forest_emerald' | 'royal_ruby' | 'vintage_charcoal' | 'ocean_cyan' | 'vintage_tape' | 'ocean_breeze' | 'cyber_neon' | 'royal_velvet' | 'emerald_studio' | 'christmas_gold';
   iconName: string;
   tracks: CustomPlaylistTrack[];
   createdAt: string;
@@ -82,7 +82,12 @@ const VIBE_THEMES = [
   { id: 'forest_emerald', name: 'Forest Emerald', color: '#10b981', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', desc: 'Klassik & Natur' },
   { id: 'royal_ruby', name: 'Royal Ruby', color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', desc: 'Konzertsaal & Gala' },
   { id: 'vintage_charcoal', name: 'Vintage Vinyl', color: '#64748b', gradient: 'linear-gradient(135deg, #475569 0%, #1e293b 100%)', desc: 'Analoges Tonstudio' },
-  { id: 'ocean_cyan', name: 'Ocean Cyan', color: '#06b6d4', gradient: 'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)', desc: 'Frisch & Melodisch' }
+  { id: 'ocean_cyan', name: 'Ocean Cyan', color: '#06b6d4', gradient: 'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)', desc: 'Frisch & Melodisch' },
+  { id: 'vintage_tape', name: 'Vintage Tape', color: '#e11d48', gradient: 'linear-gradient(135deg, #e11d48 0%, #be123c 50%, #881337 100%)', desc: 'Festlich & Bandwärme' },
+  { id: 'ocean_breeze', name: 'Ocean Breeze', color: '#0284c7', gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%)', desc: 'Sommer & Urlaubs-Vibes' },
+  { id: 'cyber_neon', name: 'Cyber Neon', color: '#ec4899', gradient: 'linear-gradient(135deg, #ec4899 0%, #d946ef 50%, #a855f7 100%)', desc: 'Pop-Star & Charts' },
+  { id: 'royal_velvet', name: 'Royal Velvet', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 50%, #4c1d95 100%)', desc: 'Bühnenreif & Festlich' },
+  { id: 'emerald_studio', name: 'Emerald Studio', color: '#10b981', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)', desc: 'Campus-Grün & Erfolg' }
 ];
 
 
@@ -95,9 +100,76 @@ const ACCENT_GRADIENTS = [
   'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)'
 ];
 
+export interface PlaylistTemplate {
+  id: string;
+  title: string;
+  description: string;
+  vibeTheme: CustomPlaylist['vibeTheme'];
+  iconName: string;
+  emoji: string;
+  tag: string;
+}
+
+export const PEDAGOGICAL_PLAYLIST_TEMPLATES: PlaylistTemplate[] = [
+  {
+    id: 'tpl_weihnachten',
+    title: '🎄 Meine Weihnachts-Playlist',
+    description: 'Festliche Klänge für Heiligabend, Familie & Freunde',
+    vibeTheme: 'vintage_tape',
+    iconName: 'gift',
+    emoji: '🎄',
+    tag: 'Saisonal (Winter)'
+  },
+  {
+    id: 'tpl_sommerhits',
+    title: '☀️ Meine Sommerhits & Sommerkonzert',
+    description: 'Highlights zum Schuljahresabschluss & Urlaubsvibes',
+    vibeTheme: 'ocean_breeze',
+    iconName: 'sun',
+    emoji: '☀️',
+    tag: 'Saisonal (Sommer)'
+  },
+  {
+    id: 'tpl_lieblingssongs',
+    title: '⭐ Meine absoluten Lieblingssongs',
+    description: 'Tracks, die ich einfach immer wieder gerne spiele',
+    vibeTheme: 'cyber_neon',
+    iconName: 'heart',
+    emoji: '⭐',
+    tag: 'Lieblingsstücke'
+  },
+  {
+    id: 'tpl_konzert',
+    title: '🏆 Mein Konzert- & Vorspiel-Repertoire',
+    description: 'Auf den Punkt vorbereitet für den großen Auftritt & Prüfungen',
+    vibeTheme: 'royal_velvet',
+    iconName: 'trophy',
+    emoji: '🏆',
+    tag: 'Bühne & Prüfung'
+  },
+  {
+    id: 'tpl_vorher_nachher',
+    title: '🌱 Mein Start: Vorher & Nachher',
+    description: 'Vom allerersten Ton bis zu meinen heutigen Fortschritten',
+    vibeTheme: 'emerald_studio',
+    iconName: 'sparkles',
+    emoji: '🌱',
+    tag: 'Entwicklung'
+  },
+  {
+    id: 'tpl_band',
+    title: '🥁 Groove & Band-Session',
+    description: 'Gemeinsam grooven – Songs aus Bandprobe & Ensemble',
+    vibeTheme: 'sunset_gold',
+    iconName: 'disc',
+    emoji: '🥁',
+    tag: 'Band & Ensemble'
+  }
+];
+
 /**
  * Dynamically computes active music school years starting from student registration date (created_at).
- * Music school years in DACH run from Sept 1st to August 31st.
+ * Includes the timeless golden Milestone-LP and active school year albums.
  */
 export function computeActiveSchoolYears(createdAt?: string): SchoolYearLP[] {
   let regStartYear = 2026;
@@ -115,6 +187,20 @@ export function computeActiveSchoolYears(createdAt?: string): SchoolYearLP[] {
   const minYear = Math.min(regStartYear, maxYear);
 
   const yearsList: SchoolYearLP[] = [];
+
+  // 🌟 Goldene Meilenstein-LP (Zeitlos • Lebenswerk über alle Jahre)
+  yearsList.push({
+    id: 'lp_timeless_master',
+    year: '🌟 Meilenstein-LP',
+    title: '🌟 Meine Meilenstein-LP (Zeitlos)',
+    subtitle: 'Mein musikalisches Lebenswerk – Alle Meilensteine',
+    accentColor: '#f59e0b',
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+    isCurrent: false,
+    tracksCount: 0,
+    totalDurationMin: 0
+  });
+
   const totalYears = maxYear - minYear + 1;
 
   for (let y = maxYear; y >= minYear; y--) {
@@ -135,19 +221,7 @@ export function computeActiveSchoolYears(createdAt?: string): SchoolYearLP[] {
     });
   }
 
-  return yearsList.length > 0 ? yearsList : [
-    {
-      id: 'lp_2026_2027',
-      year: '2026/2027',
-      title: 'Vol. 1 – Aktuelle Meisterreise',
-      subtitle: 'Meisterstücke, Soli & Lieblingssongs',
-      accentColor: '#10b981',
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-      isCurrent: true,
-      tracksCount: 0,
-      totalDurationMin: 0
-    }
-  ];
+  return yearsList;
 }
 
 
@@ -302,7 +376,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [isProcessingMastering, setIsProcessingMastering] = useState<boolean>(false);
   const [activeUploadModalMilestone, setActiveUploadModalMilestone] = useState<MilestoneData | null>(null);
   const [uploadMode, setUploadMode] = useState<'mic' | 'file'>('mic');
-  const [isDrumPadMode, setIsDrumPadMode] = useState<boolean>(false);
+  const [selectedProfile, setSelectedProfile] = useState<MasteringProfile>('acoustic_audiophile');
+  const isDrumPadMode = selectedProfile === 'drums_percussion';
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [tempSongTitle, setTempSongTitle] = useState<string>('');
   const [tempArtist, setTempArtist] = useState<string>('');
@@ -343,9 +418,16 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   // Share Modal States
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
-  const [sharePin, setSharePin] = useState<string>('');
+  const [sharePin, setSharePin] = useState<string>(() => {
+    try {
+      const stored = localStorage.getItem(`campus_share_pin_${student?.id || studentId}`);
+      if (stored && /^\d{4}$/.test(stored)) return stored;
+    } catch {}
+    return Math.floor(1000 + Math.random() * 9000).toString();
+  });
   const [shareAnonymously, setShareAnonymously] = useState<boolean>(false);
   const [shareAllowDownload, setShareAllowDownload] = useState<boolean>(true);
+  const [shareAllowApplause, setShareAllowApplause] = useState<boolean>(true);
   const [shareTargetPlaylistId, setShareTargetPlaylistId] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
 
@@ -356,6 +438,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const timerIntervalRef = useRef<any>(null);
   const countInIntervalRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // 🛡️ Audio-Tresor Storage Add-on Access Gate
+  const [tresorAccessLoading, setTresorAccessLoading] = useState<boolean>(true);
+  const [hasAudioTresorStorage, setHasAudioTresorStorage] = useState<boolean>(true);
 
   // Initialize theme from storage (default to 'light')
   useEffect(() => {
@@ -371,6 +457,165 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       setTheme('light');
     }
   }, []);
+
+  // Check School Audio-Tresor Storage Add-on Status
+  useEffect(() => {
+    let isCancelled = false;
+    const checkStorageAddon = async () => {
+      // 0. Direct Props & Joined School Inspection (Zero-Latency)
+      if (student?.schools) {
+        const activeGb = Number(student.schools.storage_addon_gb || 0);
+        const isStatusValid = student.schools.storage_addon_status !== 'cancelled';
+        if (activeGb > 0 && isStatusValid) {
+          if (!isCancelled) {
+            setHasAudioTresorStorage(true);
+            setTresorAccessLoading(false);
+          }
+          return;
+        }
+      }
+
+      if (student?.storage_addon_gb !== undefined && student?.storage_addon_gb !== null) {
+        const activeGb = Number(student.storage_addon_gb || 0);
+        if (activeGb > 0) {
+          if (!isCancelled) {
+            setHasAudioTresorStorage(true);
+            setTresorAccessLoading(false);
+          }
+          return;
+        }
+      }
+
+      let targetSchoolId = 
+        student?.school_id || 
+        (student as any)?.schoolId || 
+        (student as any)?.schools?.id ||
+        (window as any).__groovelab_school_id || 
+        localStorage.getItem('groovelab_school_id') || 
+        localStorage.getItem('campus_school_id') || 
+        localStorage.getItem('school_id') ||
+        sessionStorage.getItem('groovelab_school_id') ||
+        sessionStorage.getItem('groovelab_ghost_school_id');
+
+      let schoolData: any = null;
+
+      // 1. Lookup by targetSchoolId
+      if (targetSchoolId) {
+        try {
+          const { data } = await supabase
+            .from('schools')
+            .select('*')
+            .eq('id', targetSchoolId)
+            .maybeSingle();
+          if (data) schoolData = data;
+        } catch (e) {
+          console.warn('[Storage Check] ID lookup note:', e);
+        }
+      }
+
+      // 2. Lookup by student.school_name if ID was missing or not found
+      if (!schoolData && (student?.school_name || localStorage.getItem('campus_school_name'))) {
+        const sName = student?.school_name || localStorage.getItem('campus_school_name');
+        if (sName) {
+          try {
+            const { data } = await supabase
+              .from('schools')
+              .select('*')
+              .ilike('name', `%${sName}%`)
+              .maybeSingle();
+            if (data) schoolData = data;
+          } catch (e) {
+            console.warn('[Storage Check] Name lookup note:', e);
+          }
+        }
+      }
+
+      // 3. Lookup by student database record
+      if (!schoolData && studentId && studentId !== 'anonymous_student') {
+        try {
+          const { data: stRec } = await supabase
+            .from('students')
+            .select('school_id')
+            .eq('id', studentId)
+            .maybeSingle();
+          if (stRec?.school_id) {
+            const { data } = await supabase
+              .from('schools')
+              .select('*')
+              .eq('id', stRec.school_id)
+              .maybeSingle();
+            if (data) schoolData = data;
+          }
+        } catch (e) {
+          console.warn('[Storage Check] Student record lookup note:', e);
+        }
+      }
+
+      // 4. Session Fallback: Query primary active school
+      if (!schoolData) {
+        try {
+          const { data } = await supabase
+            .from('schools')
+            .select('*')
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (data) schoolData = data;
+        } catch (e) {
+          console.warn('[Storage Check] Primary school fallback lookup note:', e);
+        }
+      }
+
+      // 5. Merge localStorage Overrides (from Secretary/Admin live bookings)
+      try {
+        const overridesStr = localStorage.getItem('groovelab_school_overrides') || localStorage.getItem('campus_school_overrides');
+        if (overridesStr) {
+          const overrides = JSON.parse(overridesStr);
+          const sId = targetSchoolId || schoolData?.id;
+          if (sId && overrides[sId]) {
+            schoolData = { ...(schoolData || {}), ...overrides[sId] };
+          } else {
+            const allEntries = Object.values(overrides) as any[];
+            const activeEntry = allEntries.find(e => Number(e.storage_addon_gb || 0) > 0 && e.storage_addon_status !== 'cancelled');
+            if (activeEntry) {
+              schoolData = { ...(schoolData || {}), ...activeEntry };
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[Storage Check] Overrides check error:', e);
+      }
+
+      // 7. Check if any billing booking is active across localStorage
+      let isAnyBillingBooked = false;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('isBillingBooked_') && localStorage.getItem(k) === 'true') {
+            isAnyBillingBooked = true;
+            break;
+          }
+        }
+      } catch (e) {}
+
+      if (!isCancelled) {
+        let activeGb = Number(schoolData?.storage_addon_gb || schoolData?.storage_addon_pending_gb || 0);
+        if (activeGb === 0 && (isAnyBillingBooked || schoolData?.status === 'active' || schoolData?.is_trial === true)) {
+          const fallbackBooked = Number(localStorage.getItem('selectedStorageAddonGb') || 20);
+          activeGb = fallbackBooked;
+        }
+
+        const isStatusValid = schoolData?.storage_addon_status !== 'cancelled';
+        const isAddonActive = activeGb > 0 && isStatusValid;
+
+        setHasAudioTresorStorage(Boolean(isAddonActive));
+        setTresorAccessLoading(false);
+      }
+    };
+
+    checkStorageAddon();
+    return () => { isCancelled = true; };
+  }, [student, studentId]);
 
   const toggleTheme = (newTheme: 'dark' | 'light') => {
     setTheme(newTheme);
@@ -464,17 +709,46 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         if (savedPlaylists) {
           loadedPlaylists = JSON.parse(savedPlaylists);
         } else {
-          const defaultPl: CustomPlaylist = {
-            id: 'pl_sommer_2026',
-            title: 'Mein Sommerkonzert 2026',
-            description: 'Akustische Highlights & Vorbereitungen',
-            vibeTheme: 'sunset_gold',
-            iconName: 'music',
-            createdAt: '15. Aug 2026',
-            tracks: []
-          };
-          loadedPlaylists = [defaultPl];
-          localStorage.setItem(PLAYLISTS_KEY, JSON.stringify([defaultPl]));
+          const starterPlaylists: CustomPlaylist[] = [
+            {
+              id: 'pl_meilenstein_lp',
+              title: '🌟 Meine Meilenstein-LP',
+              description: 'Mein musikalisches Lebenswerk – Die wichtigsten Meilensteine',
+              vibeTheme: 'sunset_gold',
+              iconName: 'star',
+              createdAt: 'Schuljahr 2026/2027',
+              tracks: []
+            },
+            {
+              id: 'pl_sommer_2026',
+              title: '☀️ Mein Sommerkonzert 2026',
+              description: 'Akustische Highlights & Vorbereitungen zum Schuljahresabschluss',
+              vibeTheme: 'sunset_gold',
+              iconName: 'sun',
+              createdAt: '15. Aug 2026',
+              tracks: []
+            },
+            {
+              id: 'pl_weihnachten',
+              title: '🎄 Meine Weihnachts-Playlist',
+              description: 'Festliche Klänge für Heiligabend, Familie & Freunde',
+              vibeTheme: 'vintage_tape',
+              iconName: 'gift',
+              createdAt: 'Schuljahr 2026/2027',
+              tracks: []
+            },
+            {
+              id: 'pl_lieblingssongs',
+              title: '⭐ Meine absoluten Lieblingssongs',
+              description: 'Tracks, die ich einfach immer wieder gerne spiele',
+              vibeTheme: 'cyber_neon',
+              iconName: 'heart',
+              createdAt: 'Schuljahr 2026/2027',
+              tracks: []
+            }
+          ];
+          loadedPlaylists = starterPlaylists;
+          localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(starterPlaylists));
         }
 
         // Hydrate Playlists Audio Blobs from IndexedDB
@@ -836,7 +1110,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     setActiveUploadModalMilestone(ms);
     setRecordingPlaylistId(null);
     setUploadMode('mic');
-    setIsDrumPadMode(false);
+    setSelectedProfile('acoustic_audiophile');
     setUploadFile(null);
     setTempSongTitle(ms.title || '');
     setTempArtist(student?.first_name || 'Eigenes Spiel');
@@ -849,30 +1123,62 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   // 🌟 MIKROFON-FREIGABE ZUERST ANFORDERN -> DANN 3-SEKUNDEN COUNT-IN
   const triggerRecordingCountIn = async () => {
     try {
-      // 1. Mikrofon-Berechtigung ZUERST anfordern, damit kein System-Dialog den Countdown unterbricht
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // 1. Mikrofon-Berechtigung ZUERST anfordern mit audiophilen Settings
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          sampleRate: 48000
+        }
+      });
       activeMicStreamRef.current = stream;
 
-      const recorder = new MediaRecorder(stream);
+      // 2. Browser MIME-Type Ermittlung (Safari, Chrome, Firefox, iOS Kompatibilität)
+      let mimeType = 'audio/webm;codecs=opus';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          if (MediaRecorder.isTypeSupported('audio/webm')) {
+            mimeType = 'audio/webm';
+          } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            mimeType = 'audio/mp4';
+          } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+            mimeType = 'audio/aac';
+          } else {
+            mimeType = '';
+          }
+        }
+      }
+
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const actualMime = recorder.mimeType || (audioChunksRef.current[0]?.type) || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
+
+        // WICHTIG: Tracks erst beenden, wenn alle Audiodaten vollständig geflusht wurden!
         if (activeMicStreamRef.current) {
           activeMicStreamRef.current.getTracks().forEach(track => track.stop());
           activeMicStreamRef.current = null;
         }
-        await processDualMasteringForModal(audioBlob, recordSeconds);
+
+        if (audioBlob.size > 0) {
+          await processDualMasteringForModal(audioBlob, recordSeconds);
+        } else {
+          alert('Keine Audiodaten aufgezeichnet. Bitte versuche es erneut.');
+          setIsProcessingMastering(false);
+        }
       };
 
-      // 2. Mikrofon ist aktiv & bereit -> Jetzt 3-Sekunden Count-In („Hände ans Instrument“) starten
+      // 3. 3-Sekunden Count-In („Hände ans Instrument“)
       setCountDown(3);
       let currentCount = 3;
 
@@ -884,8 +1190,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           clearInterval(countInIntervalRef.current);
           setCountDown(null);
 
-          // 3. Sofortiger, latenzfreier Aufnahmestart auf dem bereits aktiven Stream
-          recorder.start();
+          // 4. Lückenloser Aufnahmestart mit 250ms Puffer-Timeslices
+          recorder.start(250);
           setRecordingMilestoneId(activeUploadModalMilestone?.id || 'new_track');
           setRecordSeconds(0);
 
@@ -910,17 +1216,17 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     if (countInIntervalRef.current) {
       clearInterval(countInIntervalRef.current);
     }
-
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (activeMicStreamRef.current) {
-      activeMicStreamRef.current.getTracks().forEach(track => track.stop());
-      activeMicStreamRef.current = null;
-    }
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
     }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.requestData();
+      } catch (e) {}
+      mediaRecorderRef.current.stop();
+    }
+    // HINWEIS: activeMicStreamRef.current wird sicher in recorder.onstop gestoppt!
   };
 
   // File Upload Handling
@@ -937,7 +1243,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   const commitFileUpload = async () => {
     if (!uploadFile) return;
-    await processDualMasteringForModal(uploadFile, 0, isDrumPadMode);
+    await processDualMasteringForModal(uploadFile, 0, selectedProfile);
   };
 
   /**
@@ -946,32 +1252,36 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
    * 1. Studio Audio-Processing (-13.0 LUFS, natürliche analoge Klangpolitur)
    * 2. Pure RAW (-13.0 LUFS Lautheits-Match, 100% unverfälschter Originalklang)
    */
-  const processDualMasteringForModal = async (fileOrBlob: Blob | File, durationSec: number, drumPadOverride?: boolean) => {
+  const processDualMasteringForModal = async (fileOrBlob: Blob | File, durationSec: number, profileOverride?: MasteringProfile) => {
     setIsProcessingMastering(true);
     setPendingDualResult(null);
 
-    const useDrumPad = drumPadOverride ?? isDrumPadMode;
+    const effectiveProfile: MasteringProfile = profileOverride || selectedProfile;
+    const isDrum = effectiveProfile === 'drums_percussion';
 
     try {
       const dualRes = await processDualMastering(fileOrBlob, {
-        profile: 'acoustic_audiophile',
+        profile: effectiveProfile,
         targetLufs: -13.0,
         targetPeakDb: -1.0,
-        isDrumPadMode: useDrumPad,
+        isDrumPadMode: isDrum,
         applyAutoGainStage: true,
         applyAdaptiveHpf: true,
         applyTransientSoftener: true,
         applyLowEndResonance: true,
         applyMidResonance: true,
+        applyTiltEq: true,
+        tiltPivotHz: 1000,
+        applyDeHarsh: true,
         applyPultecAir: true,
         applyParallelConsoleBus: true,
         applyStereoDimension: true,
         applyConvolutionReverb: true,
-        reverbWetMix: useDrumPad ? 0.060 : 0.075,
-        reverbPreDelayMs: 20
+        reverbWetMix: isDrum ? 0.075 : (effectiveProfile === 'grand_piano' ? 0.160 : 0.145),
+        reverbPreDelayMs: effectiveProfile === 'grand_piano' ? 25 : 30
       });
       setPendingDualResult(dualRes);
-      setPendingDurationSec(durationSec);
+      setPendingDurationSec(dualRes.durationSec || durationSec);
     } catch (e) {
       console.warn('Dual mastering processing fallback:', e);
       const fallbackUrl = URL.createObjectURL(fileOrBlob);
@@ -1409,15 +1719,41 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const effectiveShareUrl = useMemo(() => {
     const params = new URLSearchParams();
     if (shareTargetPlaylistId) params.set('pl', shareTargetPlaylistId);
-    if (sharePin) params.set('pin', sharePin);
     if (shareAnonymously) params.set('anon', '1');
     if (!shareAllowDownload) params.set('dl', '0');
+    if (!shareAllowApplause) params.set('appl', '0');
     const qs = params.toString();
-    return `${window.location.origin}/shared-biography/${studentId}${qs ? `?${qs}` : ''}`;
-  }, [studentId, shareTargetPlaylistId, sharePin, shareAnonymously, shareAllowDownload]);
+    return `${window.location.origin}/bio/${studentId || 'talent'}${qs ? `?${qs}` : ''}`;
+  }, [studentId, shareTargetPlaylistId, shareAnonymously, shareAllowDownload, shareAllowApplause]);
 
-  const handleShareLink = () => {
-    copyToClipboard(effectiveShareUrl);
+  const fullShareText = useMemo(() => {
+    return `🎵 Höre dir meine neuesten Songs aus der Musikschule an!\n\n1. Link öffnen: ${effectiveShareUrl}\n2. Familien-PIN eingeben: ${sharePin || '4829'}\n\n(Hinweis: Aus Urheberrechtsgründen nur für den privaten Familienkreis bestimmt.)`;
+  }, [effectiveShareUrl, sharePin]);
+
+  const handleShareLink = async () => {
+    // Save current PIN for this student/playlist
+    try {
+      if (studentId && sharePin) {
+        localStorage.setItem(`campus_share_pin_${studentId}`, sharePin);
+        if (shareTargetPlaylistId) {
+          localStorage.setItem(`campus_share_pin_${studentId}_${shareTargetPlaylistId}`, sharePin);
+        }
+      }
+    } catch {}
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: `🎵 Audio-Biografie & Songs`,
+          text: fullShareText,
+          url: effectiveShareUrl
+        });
+        return;
+      } catch (err) {
+        // Fallback to clipboard if share cancelled or unsupported
+      }
+    }
+    copyToClipboard(fullShareText);
   };
 
   const isLight = theme === 'light';
@@ -2131,6 +2467,113 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       </button>
     </div>
   );
+
+  // 🛡️ Audio-Tresor Gate Screen (If School has not purchased storage add-on)
+  if (!tresorAccessLoading && !hasAudioTresorStorage) {
+    return (
+      <div style={{
+        flex: 1,
+        width: '100%',
+        padding: isMobileOrSim ? '24px 16px 100px 16px' : '40px 32px 80px 32px',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: colors.bg,
+        color: colors.textPrimary,
+        fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+        boxSizing: 'border-box'
+      }}>
+        <div style={{
+          maxWidth: '540px',
+          width: '100%',
+          background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.04)',
+          border: `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
+          borderRadius: '24px',
+          padding: '36px 28px',
+          textAlign: 'center',
+          boxShadow: isLight ? '0 10px 30px rgba(0,0,0,0.06)' : '0 10px 30px rgba(0,0,0,0.4)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '18px'
+        }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '20px',
+            background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 20px rgba(217, 119, 6, 0.3)'
+          }}>
+            <Shield size={32} color="#ffffff" />
+          </div>
+
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 6px 0', color: colors.textPrimary }}>
+              Audio-Biografie & Audio-Tresor
+            </h2>
+            <p style={{ fontSize: '0.85rem', color: colors.textSecondary, margin: 0, lineHeight: 1.5 }}>
+              Cloud-Speicher für deine Musikschule erforderlich
+            </p>
+          </div>
+
+          <div style={{
+            background: isLight ? '#fffbeb' : 'rgba(217, 119, 6, 0.1)',
+            border: `1px solid ${isLight ? '#fde68a' : 'rgba(217, 119, 6, 0.25)'}`,
+            borderRadius: '16px',
+            padding: '16px',
+            textAlign: 'left',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Lock size={16} color="#d97706" />
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: isLight ? '#92400e' : '#fde68a' }}>
+                Funktion ist aktuell nicht freigeschaltet
+              </span>
+            </div>
+            <p style={{ fontSize: '0.78rem', color: isLight ? '#78350f' : '#cbd5e1', margin: 0, lineHeight: 1.5 }}>
+              Die <b>Audio-Biografie</b>, Studio-Playlists und das verlustfreie <b>24-Bit Hi-Res Studio-Mastering</b> stehen deiner Musikschule erst nach Buchung des <b>Audio-Tresor Speicher-Add-ons</b> zur Verfügung.
+            </p>
+            <p style={{ fontSize: '0.74rem', color: colors.textSecondary, margin: 0, lineHeight: 1.4 }}>
+              {isTeacher
+                ? '💡 Schulleitung & Verwaltung können den Audio-Tresor im Sekretariats-Dashboard unter "Abrechnung & Cloud-Speicher" jederzeit ab +10 GB aktivieren.'
+                : '💡 Bitte wende dich an deine Lehrkraft oder das Sekretariat deiner Musikschule, um den Audio-Tresor zu buchen.'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onBackToHub}
+            style={{
+              width: '100%',
+              padding: '12px 20px',
+              borderRadius: '14px',
+              border: 'none',
+              background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)',
+              color: colors.textPrimary,
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale"
+          >
+            <span>Zurück zum Hausaufgabenheft / Protokoll</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -3031,6 +3474,43 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                         <span style={{ fontSize: '0.8rem', color: colors.textSecondary, marginTop: '2px', display: 'block' }}>
                           {pl.description} • {pl.tracks.length} Songs • Erstellt {pl.createdAt}
                         </span>
+
+                        {/* 🎉 Live Stolz- & Applaus-Plakette */}
+                        {(() => {
+                          const reactionKey = `campus_reactions_${studentId}_${pl.id}`;
+                          let reactions = { bravo: 0, love: 0, fire: 0, star: 0 };
+                          try {
+                            const stored = localStorage.getItem(reactionKey);
+                            if (stored) reactions = JSON.parse(stored);
+                          } catch {}
+                          const totalReactions = reactions.bravo + reactions.love + reactions.fire + reactions.star;
+                          if (totalReactions === 0) return null;
+
+                          return (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(239, 68, 68, 0.12) 100%)',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              padding: '3px 10px',
+                              borderRadius: '100px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              color: '#f59e0b',
+                              marginTop: '6px'
+                            }}>
+                              <span>🎉 {totalReactions}× Applaus erhalten</span>
+                              <span style={{ color: colors.textSecondary }}>•</span>
+                              <span>
+                                {reactions.love > 0 && `❤️ ${reactions.love} `}
+                                {reactions.bravo > 0 && `👏 ${reactions.bravo} `}
+                                {reactions.fire > 0 && `🔥 ${reactions.fire} `}
+                                {reactions.star > 0 && `⭐ ${reactions.star}`}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -3380,6 +3860,54 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             {/* STEP 1: TITLE & DESC */}
             {wizardStep === 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* 💡 Didaktische Vorlagen (1-Klick-Auswahl) */}
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                    💡 Didaktische Vorlagen & Entwürfe (1-Klick-Auswahl):
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
+                    {PEDAGOGICAL_PLAYLIST_TEMPLATES.map((tpl) => {
+                      const isChosen = wizardTitle === tpl.title;
+                      return (
+                        <button
+                          key={tpl.id}
+                          type="button"
+                          onClick={() => {
+                            setWizardTitle(tpl.title);
+                            setWizardDesc(tpl.description);
+                            setWizardTheme(tpl.vibeTheme);
+                            setWizardIcon(tpl.iconName);
+                          }}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '14px',
+                            border: isChosen ? '1.5px solid #10b981' : `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
+                            background: isChosen ? (isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.18)') : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)'),
+                            color: colors.textPrimary,
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                            gap: '3px',
+                            textAlign: 'left',
+                            boxShadow: isChosen ? '0 2px 8px rgba(16, 185, 129, 0.25)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale"
+                        >
+                          <span style={{ fontSize: '1.05rem', lineHeight: 1 }}>{tpl.emoji}</span>
+                          <strong style={{ fontSize: '0.74rem', color: isChosen ? '#10b981' : colors.textPrimary }}>
+                            {tpl.title.replace(/^[^\s]+\s/, '')}
+                          </strong>
+                          <span style={{ fontSize: '0.64rem', color: colors.textSecondary }}>{tpl.tag}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, marginBottom: '6px' }}>
                     Titel der Playlist:
@@ -3755,69 +4283,126 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   </button>
                 </div>
 
-                {/* 🎛️ Instrument & Source Selector: Akustik vs Drums (-12 dB Pad) */}
+                {/* 🎛️ Audiophile Instrument & Source Profile Selector */}
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gap: '4px',
                   background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.3)',
-                  borderRadius: '100px',
-                  padding: '3px',
+                  borderRadius: '14px',
+                  padding: '4px',
                   border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.1)'}`
                 }}>
+                  {/* Option 1: Acoustic */}
                   <button
                     type="button"
-                    onClick={() => setIsDrumPadMode(false)}
+                    onClick={() => setSelectedProfile('acoustic_audiophile')}
                     style={{
-                      flex: 1,
-                      padding: '7px 12px',
-                      borderRadius: '100px',
+                      padding: '7px 6px',
+                      borderRadius: '10px',
                       border: 'none',
-                      background: !isDrumPadMode 
+                      background: selectedProfile === 'acoustic_audiophile' 
                         ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
                         : 'transparent',
-                      color: !isDrumPadMode ? '#ffffff' : colors.textSecondary,
-                      fontSize: '0.74rem',
+                      color: selectedProfile === 'acoustic_audiophile' ? '#ffffff' : colors.textSecondary,
+                      fontSize: '0.70rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px',
-                      boxShadow: !isDrumPadMode ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
-                      transition: 'all 0.15s ease'
+                      gap: '4px',
+                      boxShadow: selectedProfile === 'acoustic_audiophile' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    <span>🎻 Akustik (Gitarre, Klavier, Gesang)</span>
+                    <span>🎻 Akustik</span>
                   </button>
 
+                  {/* Option 2: Grand Piano */}
                   <button
                     type="button"
-                    onClick={() => setIsDrumPadMode(true)}
+                    onClick={() => setSelectedProfile('grand_piano')}
                     style={{
-                      flex: 1,
-                      padding: '7px 12px',
-                      borderRadius: '100px',
+                      padding: '7px 6px',
+                      borderRadius: '10px',
                       border: 'none',
-                      background: isDrumPadMode 
-                        ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                      background: selectedProfile === 'grand_piano' 
+                        ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)' 
                         : 'transparent',
-                      color: isDrumPadMode ? '#ffffff' : colors.textSecondary,
-                      fontSize: '0.74rem',
+                      color: selectedProfile === 'grand_piano' ? '#ffffff' : colors.textSecondary,
+                      fontSize: '0.70rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px',
-                      boxShadow: isDrumPadMode ? '0 2px 8px rgba(245, 158, 11, 0.3)' : 'none',
-                      transition: 'all 0.15s ease'
+                      gap: '4px',
+                      boxShadow: selectedProfile === 'grand_piano' ? '0 2px 8px rgba(14, 165, 233, 0.3)' : 'none',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    <span>🥁 Drums & Pad (-12 dB)</span>
+                    <span>🎹 Klavier</span>
+                  </button>
+
+                  {/* Option 3: Brass & Vocals */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProfile('brass_vocals')}
+                    style={{
+                      padding: '7px 6px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: selectedProfile === 'brass_vocals' 
+                        ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' 
+                        : 'transparent',
+                      color: selectedProfile === 'brass_vocals' ? '#ffffff' : colors.textSecondary,
+                      fontSize: '0.70rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      boxShadow: selectedProfile === 'brass_vocals' ? '0 2px 8px rgba(139, 92, 246, 0.3)' : 'none',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span>🎷 Gesang/Bläser</span>
+                  </button>
+
+                  {/* Option 4: Drums */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProfile('drums_percussion')}
+                    style={{
+                      padding: '7px 6px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: selectedProfile === 'drums_percussion' 
+                        ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                        : 'transparent',
+                      color: selectedProfile === 'drums_percussion' ? '#ffffff' : colors.textSecondary,
+                      fontSize: '0.70rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      boxShadow: selectedProfile === 'drums_percussion' ? '0 2px 8px rgba(245, 158, 11, 0.3)' : 'none',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span>🥁 Drums (-12dB)</span>
                   </button>
                 </div>
 
-                {isDrumPadMode && (
+                {selectedProfile === 'drums_percussion' && (
                   <div style={{
                     background: isLight ? '#fffbeb' : 'rgba(245, 158, 11, 0.12)',
                     border: `1px solid ${isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.3)'}`,
@@ -3830,6 +4415,40 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     <Volume2 size={15} color="#f59e0b" style={{ flexShrink: 0 }} />
                     <span style={{ fontSize: '0.72rem', color: isLight ? '#92400e' : '#fde68a', fontWeight: 600, lineHeight: 1.35 }}>
                       <b>Drum-Pad aktiv:</b> -12 dB Headroom-Schutz & Kick-Tiefbass (35 Hz). <i>Tipp: Smartphone 1,5 bis 2 Meter vor das Kit stellen.</i>
+                    </span>
+                  </div>
+                )}
+
+                {selectedProfile === 'grand_piano' && (
+                  <div style={{
+                    background: isLight ? '#f0f9ff' : 'rgba(14, 165, 233, 0.12)',
+                    border: `1px solid ${isLight ? '#bae6fd' : 'rgba(14, 165, 233, 0.3)'}`,
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <Music size={15} color="#0ea5e9" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.72rem', color: isLight ? '#0369a1' : '#bae6fd', fontWeight: 600, lineHeight: 1.35 }}>
+                      <b>Flügel-Modus:</b> 118% M/S Stereo-Breite & selektive 220 Hz Entdröhnung für warme, offene Klavierklänge.
+                    </span>
+                  </div>
+                )}
+
+                {selectedProfile === 'brass_vocals' && (
+                  <div style={{
+                    background: isLight ? '#faf5ff' : 'rgba(139, 92, 246, 0.12)',
+                    border: `1px solid ${isLight ? '#e9d5ff' : 'rgba(139, 92, 246, 0.3)'}`,
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <Zap size={15} color="#8b5cf6" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.72rem', color: isLight ? '#6b21a8' : '#e9d5ff', fontWeight: 600, lineHeight: 1.35 }}>
+                      <b>Präsenz & De-Harsh:</b> +1.4 dB Stimmpräsenz bei 3.2 kHz & aktiver 6.8 kHz Zischlaut-Schutz.
                     </span>
                   </div>
                 )}
@@ -3905,7 +4524,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                         Studio Audio-Processing (-13 LUFS)
                       </div>
                       <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.3 }}>
-                        Organischer Klassik- & Jazz-Klang mit natürlicher Raumakustik.
+                        Festlicher Gala-Konzertsaal-Klang mit edler 3D-Konzertakustik.
                       </p>
                     </div>
 
@@ -4502,6 +5121,17 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 <span>Hörern Download der Songs erlauben (WAV)</span>
               </label>
 
+              {/* Applause / Reactions Toggle */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', cursor: 'pointer', color: colors.textPrimary, fontWeight: 700 }}>
+                <input
+                  type="checkbox"
+                  checked={shareAllowApplause}
+                  onChange={(e) => setShareAllowApplause(e.target.checked)}
+                  style={{ accentColor: '#10b981', width: '17px', height: '17px' }}
+                />
+                <span>Icon-Applaus & Reaktionen erlauben (👏 Bravo, ❤️ Herz, 🔥 Feuer, ⭐ Stern)</span>
+              </label>
+
               {/* Anonymize Toggle */}
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', cursor: 'pointer', color: colors.textPrimary, fontWeight: 700 }}>
                 <input
@@ -4513,71 +5143,120 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 <span>Name anonymisieren (z. B. "Schülerin der Musikschule")</span>
               </label>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: colors.textPrimary, marginBottom: '6px', fontWeight: 800 }}>
-                  Optionaler 4-stelliger PIN-Schutz:
-                </label>
-                <input
-                  type="text"
-                  maxLength={4}
-                  placeholder="z.B. 1234 (leer lassen für direkten Zugriff)"
-                  value={sharePin}
-                  onChange={(e) => setSharePin(e.target.value.replace(/\D/g, ''))}
-                  style={{
-                    width: '100%',
-                    padding: '11px 14px',
-                    borderRadius: '12px',
-                    border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.25)'}`,
-                    background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.35)',
-                    color: colors.textPrimary,
-                    fontSize: '0.94rem',
-                    fontWeight: 800,
-                    boxSizing: 'border-box'
-                  }}
-                />
+              {/* Mandatory 4-Digit PIN Security (§ 15 Abs. 3 UrhG) */}
+              <div style={{
+                background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.08)',
+                border: `1.5px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.25)'}`,
+                borderRadius: '16px',
+                padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.82rem', color: colors.textPrimary, fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Lock size={15} color="#10b981" />
+                    <span>Deine feste Familien-PIN (Gilt für alle deine Playlists):</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newPin = Math.floor(1000 + Math.random() * 9000).toString();
+                      setSharePin(newPin);
+                      try {
+                        localStorage.setItem(`campus_share_pin_${student?.id || studentId}`, newPin);
+                        if (shareTargetPlaylistId) {
+                          localStorage.setItem(`campus_share_pin_${student?.id || studentId}_${shareTargetPlaylistId}`, newPin);
+                        }
+                      } catch {}
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#10b981',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>🎲 PIN neu würfeln</span>
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={sharePin}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setSharePin(val);
+                      try {
+                        localStorage.setItem(`campus_share_pin_${student?.id || studentId}`, val);
+                        if (shareTargetPlaylistId) {
+                          localStorage.setItem(`campus_share_pin_${student?.id || studentId}_${shareTargetPlaylistId}`, val);
+                        }
+                      } catch {}
+                    }}
+                    style={{
+                      width: '120px',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: `1.5px solid #10b981`,
+                      background: isLight ? '#ffffff' : 'rgba(0, 0, 0, 0.45)',
+                      color: colors.textPrimary,
+                      fontSize: '1.25rem',
+                      fontWeight: 900,
+                      letterSpacing: '6px',
+                      textAlign: 'center',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <span style={{ fontSize: '0.74rem', color: colors.textSecondary, lineHeight: 1.35 }}>
+                    Oma & Familie müssen sich nur diesen einen 4-stelligen Code merken, um alle deine Songs & Alben anzuhören.
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Link Preview Box */}
+            {/* Generated Share Message Box */}
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', color: colors.textPrimary, marginBottom: '6px', fontWeight: 800 }}>
-                Generierter Freigabe-Link:
+                Generierte Freigabe-Nachricht für WhatsApp / SMS / Mail:
               </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  readOnly
-                  value={effectiveShareUrl}
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                  style={{
-                    flex: 1,
-                    padding: '10px 14px',
-                    borderRadius: '12px',
-                    border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-                    background: isLight ? '#f1f5f9' : 'rgba(0, 0, 0, 0.5)',
-                    color: colors.textPrimary,
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    boxSizing: 'border-box'
-                  }}
-                />
+              <div style={{
+                padding: '12px 14px',
+                borderRadius: '14px',
+                border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
+                background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.45)',
+                color: colors.textPrimary,
+                fontSize: '0.78rem',
+                fontFamily: 'monospace',
+                whiteSpace: 'pre-wrap',
+                lineHeight: 1.45,
+                userSelect: 'all'
+              }}>
+                {fullShareText}
               </div>
             </div>
 
-            {/* Action Buttons: Copy Link & Open in New Tab */}
+            {/* Action Buttons: Native Share Sheet & Direct Preview */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button
                 type="button"
                 onClick={handleShareLink}
                 style={{
                   width: '100%',
-                  padding: '13px',
+                  padding: '14px',
                   borderRadius: '100px',
                   border: 'none',
                   background: copySuccess ? '#059669' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   color: 'white',
                   fontWeight: 900,
-                  fontSize: '0.88rem',
+                  fontSize: '0.92rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -4588,8 +5267,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 }}
                 className="hover-scale"
               >
-                {copySuccess ? <Check size={16} strokeWidth={3} /> : <Copy size={16} />}
-                <span>{copySuccess ? 'Link in Zwischenablage kopiert! 🎉' : 'Freigabe-Link kopieren'}</span>
+                {copySuccess ? <Check size={18} strokeWidth={3} /> : <Share2 size={18} />}
+                <span>{copySuccess ? 'In Zwischenablage kopiert! 🎉' : '🎵 Playlist mit Familie teilen'}</span>
               </button>
 
               <button
@@ -4608,14 +5287,27 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s ease'
+                  gap: '6px'
                 }}
                 className="hover-scale"
               >
                 <ExternalLink size={15} color="#10b981" />
-                <span>Link im neuen Tab öffnen / testen</span>
+                <span>PIN-Eingabeseite testen (neuer Tab)</span>
               </button>
+
+              {/* 🔒 Privater Familien-Zugang Hinweis nach § 15 Abs. 3 UrhG */}
+              <div style={{
+                background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.3)',
+                border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+                borderRadius: '14px',
+                padding: '12px 14px',
+                marginTop: '4px'
+              }}>
+                <span style={{ display: 'block', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.45 }}>
+                  🔒 <strong>Privater Familien-Zugang:</strong><br />
+                  Diese Audio-Aufnahmen enthalten urheberrechtlich geschützte Musikstücke. Um die gesetzlichen Bestimmungen einzuhalten, darfst du diesen Link und die PIN ausschließlich an deine Familie und enge persönliche Freunde weitergeben (§ 15 Abs. 3 UrhG). Ein öffentliches Teilen (z. B. in sozialen Netzwerken oder auf öffentlichen Webseiten) ist nicht gestattet.
+                </span>
+              </div>
             </div>
           </div>
         </div>

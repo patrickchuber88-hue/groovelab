@@ -16,6 +16,7 @@ import { MeisterwerkDocumentationModal, ALL_STICKERS } from './MeisterwerkDocume
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
 import { cleanHomeworkNotesText, maskLastName } from '../utils/nameHelper';
+import { validateNewPin } from '../utils/pinValidation';
 
 const showMissionsFeature = false;
 
@@ -11153,11 +11154,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         {activeTab === 'homework_book' && studentUser && (
           <MeisterwerkDocumentationModal
             student={{
+              ...studentUser,
               id: studentId,
               first_name: studentUser ? studentUser.first_name : '',
               last_name: studentUser ? studentUser.last_name : '',
               photo_url: (studentUser && studentUser.photo_url) || '/avatar_ghost.jpg',
-              is_campus_active: studentUser ? studentUser.is_campus_active : false
+              is_campus_active: studentUser ? studentUser.is_campus_active : false,
+              school_id: studentUser?.school_id,
+              schoolId: studentUser?.school_id,
+              schools: studentUser?.schools,
+              school_name: studentUser?.schools?.name || studentUser?.school_name,
+              instrument: studentUser?.instrument
             }}
             onClose={() => {}}
             teacherId={studentUser ? studentUser.teacher_id : null}
@@ -14713,6 +14720,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               return;
                             }
 
+                            const dayOfBirth = (studentUser as any)?.day_of_birth || (Array.isArray((studentUser as any)?.activation_days) ? (studentUser as any)?.activation_days[0]?.day_of_birth : (studentUser as any)?.activation_days?.day_of_birth);
+                            const validation = validateNewPin(pinFormNew, dayOfBirth);
+                            if (!validation.isValid) {
+                              setPinFormError(validation.error || 'Ungültige PIN.');
+                              return;
+                            }
+
                             setIsSavingPin(true);
                             setPinFormError('');
 
@@ -15620,6 +15634,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 }
                 if (pinFormNew !== pinFormConfirm) {
                   setPinFormError('Die PINs stimmen nicht überein.');
+                  return;
+                }
+
+                const dayOfBirth = (studentUser as any)?.day_of_birth || (Array.isArray((studentUser as any)?.activation_days) ? (studentUser as any)?.activation_days[0]?.day_of_birth : (studentUser as any)?.activation_days?.day_of_birth);
+                const validation = validateNewPin(pinFormNew, dayOfBirth);
+                if (!validation.isValid) {
+                  setPinFormError(validation.error || 'Ungültige PIN.');
                   return;
                 }
 

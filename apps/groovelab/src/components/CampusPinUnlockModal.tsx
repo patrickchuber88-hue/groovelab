@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Key, Delete, X, Lock } from 'lucide-react';
+import { validateNewPin } from '../utils/pinValidation';
 
 interface CampusPinUnlockModalProps {
   user: any;
@@ -70,6 +71,15 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
 
     try {
       if (isSetupMode) {
+        // Validate proposed PIN against trivial and birthday patterns
+        const validation = validateNewPin(pinInput, studentBirthDay || user.day_of_birth);
+        if (!validation.isValid) {
+          alert(validation.error || 'Ungültige PIN.');
+          setPinInput('');
+          setLoading(false);
+          return;
+        }
+
         // Setup new personal 4-digit PIN
         const authQrToken = user.qr_token || user.ausweis_nummer || user.id;
         if (authQrToken) {

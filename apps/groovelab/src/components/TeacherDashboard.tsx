@@ -1308,17 +1308,22 @@ export function TeacherDashboard({
   useEffect(() => {
     (window as any).openTageskompass = (std: any) => {
       setDocStudent({
+        ...std,
         id: std.id,
         first_name: std.first_name || std.name?.split(' ')[0],
         last_name: std.last_name || std.name?.split(' ').slice(1).join(' '),
         photo_url: std.photo_url || '/avatar_ghost.jpg',
-        is_campus_active: std.is_campus_active
+        is_campus_active: std.is_campus_active,
+        school_id: std.school_id || teacher?.school_id,
+        schoolId: std.school_id || teacher?.school_id,
+        schools: std.schools || (teacher as any)?.schools,
+        school_name: std.schools?.name || std.school_name
       });
     };
     return () => {
       delete (window as any).openTageskompass;
     };
-  }, []);
+  }, [teacher?.school_id]);
 
   const performDirectTeacherCheckin = async () => {
     setCheckingInStatus('verifying');
@@ -6864,11 +6869,16 @@ export function TeacherDashboard({
                     onClick={() => {
                       const foundStud = allStudents.find(s => s.id === prep.studentId);
                       setDocStudent({
+                        ...(foundStud || {}),
                         id: prep.studentId,
                         first_name: prep.studentName.split(' ')[0],
                         last_name: prep.studentName.split(' ').slice(1).join(' '),
                         photo_url: '/avatar_ghost.jpg',
-                        is_campus_active: foundStud ? foundStud.is_campus_active : false
+                        is_campus_active: foundStud ? foundStud.is_campus_active : false,
+                        school_id: foundStud?.school_id || teacher?.school_id,
+                        schoolId: foundStud?.school_id || teacher?.school_id,
+                        schools: foundStud?.schools || (teacher as any)?.schools,
+                        school_name: foundStud?.schools?.name || foundStud?.school_name
                       });
                     }}
                   >
@@ -7146,11 +7156,16 @@ export function TeacherDashboard({
                       onClick={() => {
                         const foundStud = allStudents.find(s => s.id === prep.studentId);
                         setDocStudent({
+                          ...(foundStud || {}),
                           id: prep.studentId,
                           first_name: prep.studentName.split(' ')[0],
                           last_name: prep.studentName.split(' ').slice(1).join(' '),
                           photo_url: '/avatar_ghost.jpg',
-                          is_campus_active: foundStud ? foundStud.is_campus_active : false
+                          is_campus_active: foundStud ? foundStud.is_campus_active : false,
+                          school_id: foundStud?.school_id || teacher?.school_id,
+                          schoolId: foundStud?.school_id || teacher?.school_id,
+                          schools: foundStud?.schools || (teacher as any)?.schools,
+                          school_name: foundStud?.schools?.name || foundStud?.school_name
                         });
                       }}
                       style={{
@@ -9363,11 +9378,16 @@ export function TeacherDashboard({
           }}
           onOpenTageskompass={(std) => {
             setDocStudent({
+              ...std,
               id: std.id,
               first_name: std.first_name,
               last_name: std.last_name,
               photo_url: std.photo_url || '/avatar_ghost.jpg',
-              is_campus_active: std.is_campus_active
+              is_campus_active: std.is_campus_active,
+              school_id: std.school_id || teacher?.school_id,
+              schoolId: std.school_id || teacher?.school_id,
+              schools: std.schools || (teacher as any)?.schools,
+              school_name: std.schools?.name || std.school_name
             });
             setSelectedStudentProfile(null);
           }}

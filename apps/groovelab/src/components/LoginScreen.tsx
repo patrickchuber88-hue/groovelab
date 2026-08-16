@@ -7,6 +7,7 @@ import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, ge
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { LegalTextModal } from './LegalTextModal';
 import { DpoAuditPortal } from './DpoAuditPortal';
+import { validateNewPin } from '../utils/pinValidation';
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
@@ -7937,6 +7938,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <button
               onClick={async () => {
                 if (pinSetupInput.length !== 4) return;
+                const dayOfBirth = pinSetupUser?.day_of_birth || (Array.isArray(pinSetupUser?.activation_days) ? pinSetupUser?.activation_days[0]?.day_of_birth : pinSetupUser?.activation_days?.day_of_birth);
+                const validation = validateNewPin(pinSetupInput, dayOfBirth);
+                if (!validation.isValid) {
+                  alert(validation.error || 'Ungültige PIN.');
+                  setPinSetupInput('');
+                  return;
+                }
+
                 setLoading(true);
                 try {
                   const authQrToken = pinSetupUser?.qr_token || pinSetupUser?.ausweis_nummer || pinSetupUser?.id;

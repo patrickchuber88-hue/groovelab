@@ -4,6 +4,7 @@ import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, *
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText } from '../utils/nameHelper';
 import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
+import { validateNewPin } from '../utils/pinValidation';
 
 import { useMasterPricing } from '../context/MasterPricingContext';
 
@@ -2516,6 +2517,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     if (!pinInput || pinInput.length !== 4 || pinLoading || !profile) return;
 
     if (pinPurpose === 'setup_initial_pin') {
+      const validation = validateNewPin(pinInput, (profile as any)?.day_of_birth);
+      if (!validation.isValid) {
+        setPinError(validation.error || 'Ungültige PIN.');
+        setPinInput('');
+        return;
+      }
+
       setPinLoading(true);
       setPinError(null);
       try {

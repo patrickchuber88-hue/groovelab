@@ -922,10 +922,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const chunks: BlobPart[] = [];
       
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
+        if (e.data && e.data.size > 0) chunks.push(e.data);
       };
       
       recorder.onstop = async () => {
+        try {
+          stream.getTracks().forEach(track => track.stop());
+        } catch (e) {}
+
         const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
@@ -1015,7 +1019,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       setAudioDuration(0);
       setIsRecordingAudio(true);
-      recorder.start();
+      recorder.start(250);
       setMediaRecorderInstance(recorder);
       mediaRecorderRef.current = recorder;
       
@@ -1036,8 +1040,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const stopRecordingAudio = (activeRecorder?: MediaRecorder) => {
     const rec = activeRecorder || mediaRecorderInstance;
     if (rec && rec.state !== 'inactive') {
+      try {
+        rec.requestData();
+      } catch (e) {}
       rec.stop();
-      rec.stream.getTracks().forEach(track => track.stop());
     }
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
@@ -11096,7 +11102,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ) : activeModalTab === 'audiobiography' ? (
         /* AUDIO-BIOGRAFIE VIEW (AKUSTISCHES STAMMBAUCH & MEILENSTEINE) */
         <AudioBiographyView
-          student={student}
+          student={{
+            ...student,
+            school_id: student?.school_id || (student as any)?.schoolId || studentSchoolId || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id') || localStorage.getItem('school_id'),
+            school_name: schoolName || (student as any)?.school_name,
+            schools: (student as any)?.schools || (window as any).__groovelab_active_school
+          }}
           teacherId={teacherId}
           isTeacher={isTeacherTools}
           onBackToHub={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}

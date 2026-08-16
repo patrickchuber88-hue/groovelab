@@ -7372,7 +7372,7 @@ function App() {
   }
 
   // 0.9 PUBLIC SHARED AUDIO-BIOGRAPHY LANDING PAGE
-  if (location.pathname.startsWith('/shared-biography/') || location.pathname.startsWith('/shared/')) {
+  if (location.pathname.startsWith('/shared-biography/') || location.pathname.startsWith('/shared/') || location.pathname.startsWith('/bio/')) {
     const studentIdParam = location.pathname.split('/').filter(Boolean).pop();
     return (
       <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#090d16', color: '#64748b' }}>Lade Audio-Biografie...</div>}>

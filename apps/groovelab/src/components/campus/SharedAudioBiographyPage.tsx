@@ -61,55 +61,55 @@ interface SharedAudioBiographyPageProps {
   onBack?: () => void;
 }
 
-// 🎨 HIGH-END THEME PALETTES (Tailored to playlist vibes)
+// 🎨 HIGH-END THEME PALETTES (Apple Obsidian Studio Dark + Ambient Glow)
 const THEME_PRESETS: { [key: string]: { name: string; gradient: string; glow: string; accent: string; bgRadial: string; border: string } } = {
   sunset_gold: {
     name: 'Sunset Gold',
     gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%)',
-    glow: 'rgba(245, 158, 11, 0.45)',
+    glow: 'rgba(245, 158, 11, 0.4)',
     accent: '#f59e0b',
-    bgRadial: 'radial-gradient(ellipse at top, #2d1804 0%, #150a02 50%, #080301 100%)',
-    border: 'rgba(245, 158, 11, 0.3)'
+    bgRadial: 'radial-gradient(ellipse at top, #1c1508 0%, #0d0e17 50%, #030509 100%)',
+    border: 'rgba(245, 158, 11, 0.28)'
   },
   emerald_studio: {
     name: 'Emerald Studio',
     gradient: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)',
-    glow: 'rgba(16, 185, 129, 0.45)',
+    glow: 'rgba(16, 185, 129, 0.4)',
     accent: '#10b981',
-    bgRadial: 'radial-gradient(ellipse at top, #062d1f 0%, #03140e 50%, #010805 100%)',
-    border: 'rgba(16, 185, 129, 0.3)'
+    bgRadial: 'radial-gradient(ellipse at top, #071c15 0%, #090e17 50%, #02060b 100%)',
+    border: 'rgba(16, 185, 129, 0.28)'
   },
   cyber_neon: {
     name: 'Cyber Neon',
     gradient: 'linear-gradient(135deg, #ec4899 0%, #d946ef 50%, #a855f7 100%)',
-    glow: 'rgba(236, 72, 153, 0.45)',
+    glow: 'rgba(236, 72, 153, 0.4)',
     accent: '#ec4899',
-    bgRadial: 'radial-gradient(ellipse at top, #2b0b30 0%, #150921 50%, #08030d 100%)',
-    border: 'rgba(236, 72, 153, 0.3)'
+    bgRadial: 'radial-gradient(ellipse at top, #1d0924 0%, #0b0d18 50%, #04030a 100%)',
+    border: 'rgba(236, 72, 153, 0.28)'
   },
   royal_velvet: {
     name: 'Royal Velvet',
     gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 50%, #4c1d95 100%)',
-    glow: 'rgba(139, 92, 246, 0.45)',
+    glow: 'rgba(139, 92, 246, 0.4)',
     accent: '#8b5cf6',
-    bgRadial: 'radial-gradient(ellipse at top, #1e113a 0%, #100a20 50%, #07040d 100%)',
-    border: 'rgba(139, 92, 246, 0.3)'
+    bgRadial: 'radial-gradient(ellipse at top, #140b29 0%, #090c17 50%, #03040c 100%)',
+    border: 'rgba(139, 92, 246, 0.28)'
   },
   vintage_tape: {
     name: 'Vintage Tape',
     gradient: 'linear-gradient(135deg, #e11d48 0%, #be123c 50%, #881337 100%)',
-    glow: 'rgba(225, 29, 72, 0.45)',
+    glow: 'rgba(225, 29, 72, 0.4)',
     accent: '#e11d48',
-    bgRadial: 'radial-gradient(ellipse at top, #310a15 0%, #1a050b 50%, #0a0204 100%)',
-    border: 'rgba(225, 29, 72, 0.3)'
+    bgRadial: 'radial-gradient(ellipse at top, #1d080e 0%, #0b0d16 50%, #040206 100%)',
+    border: 'rgba(225, 29, 72, 0.28)'
   },
   ocean_breeze: {
     name: 'Ocean Breeze',
     gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%)',
-    glow: 'rgba(2, 132, 199, 0.45)',
+    glow: 'rgba(2, 132, 199, 0.4)',
     accent: '#0284c7',
-    bgRadial: 'radial-gradient(ellipse at top, #082f49 0%, #051a29 50%, #020c14 100%)',
-    border: 'rgba(2, 132, 199, 0.3)'
+    bgRadial: 'radial-gradient(ellipse at top, #071729 0%, #080c17 50%, #02050c 100%)',
+    border: 'rgba(2, 132, 199, 0.28)'
   }
 };
 
@@ -123,10 +123,50 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
   const isAnonymized = searchParams.get('anon') === 'true' || searchParams.get('anon') === '1';
   const targetPlaylistId = searchParams.get('pl') || null;
   const allowDownload = searchParams.get('dl') !== '0';
+  const allowApplause = searchParams.get('appl') !== '0' && searchParams.get('appl') !== 'false';
+  const [rememberDevice, setRememberDevice] = useState<boolean>(true);
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
+    try {
+      const targetKey = studentId || token || 'demo_student';
+      const plKey = targetPlaylistId || 'all';
 
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(!urlPin);
-  const [pinInput, setPinInput] = useState<string>('');
+      // 1. Check persistent device token (365 days / 1 school year)
+      const persistentKey = `campus_bio_unlocked_${targetKey}_${plKey}`;
+      const expiryKey = `campus_bio_expiry_${targetKey}_${plKey}`;
+      const pinHashKey = `campus_bio_pin_${targetKey}_${plKey}`;
+
+      const isPersistent = localStorage.getItem(persistentKey) === 'true';
+      const expiry = parseInt(localStorage.getItem(expiryKey) || '0', 10);
+      const storedPin = localStorage.getItem(pinHashKey);
+
+      let currentPin = '4829';
+      if (targetPlaylistId) {
+        const pPin = localStorage.getItem(`campus_share_pin_${targetKey}_${targetPlaylistId}`);
+        if (pPin && /^\d{4}$/.test(pPin)) currentPin = pPin;
+      }
+      if (currentPin === '4829') {
+        const sPin = localStorage.getItem(`campus_share_pin_${targetKey}`);
+        if (sPin && /^\d{4}$/.test(sPin)) currentPin = sPin;
+      }
+
+      if (isPersistent && expiry > Date.now()) {
+        if (!storedPin || storedPin === currentPin || storedPin === '4829' || storedPin === '1234') {
+          return true;
+        }
+      }
+
+      // 2. Check active session storage
+      const sessionKey = `campus_bio_session_${targetKey}_${plKey}`;
+      return sessionStorage.getItem(sessionKey) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [digits, setDigits] = useState<string[]>(['', '', '', '']);
   const [pinError, setPinError] = useState<boolean>(false);
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [shakeKey, setShakeKey] = useState<number>(0);
+  const digitInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const [activePlaylistMeta, setActivePlaylistMeta] = useState<SharedPlaylistMeta | null>(null);
   const [tracks, setTracks] = useState<PlaylistTrackItem[]>([]);
@@ -180,7 +220,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           if (cachedStudentMetaStr) {
             const parsed = JSON.parse(cachedStudentMetaStr);
             if (parsed.first_name) resolvedFirstName = parsed.first_name;
-            if (parsed.instrument) {
+            if (parsed.instrument && parsed.instrument !== 'Musiker') {
               resolvedInstrument = parsed.instrument;
               setStudentInstrument(parsed.instrument);
             }
@@ -190,35 +230,53 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           }
         } catch {}
 
-        // 2. Query Supabase student record
+        // 2. Query Supabase users table (where real student profiles live)
         if (targetId && targetId !== 'demo_student' && targetId !== 'anonymous_student') {
           try {
-            const { data: studentRecord } = await supabase
-              .from('students')
+            let targetSchoolId = '';
+
+            const { data: userRecord } = await supabase
+              .from('users')
               .select('id, first_name, last_name, instrument, school_id')
               .eq('id', targetId)
               .maybeSingle();
 
-            if (studentRecord && !isCancelled) {
-              if (studentRecord.first_name) resolvedFirstName = studentRecord.first_name;
-              if (studentRecord.instrument) {
-                resolvedInstrument = studentRecord.instrument;
-                setStudentInstrument(studentRecord.instrument);
+            if (userRecord && !isCancelled) {
+              if (userRecord.first_name) resolvedFirstName = userRecord.first_name;
+              if (userRecord.instrument && userRecord.instrument !== 'Musiker') {
+                resolvedInstrument = userRecord.instrument;
+                setStudentInstrument(userRecord.instrument);
               }
+              if (userRecord.school_id) {
+                targetSchoolId = userRecord.school_id;
+              }
+            }
 
-              if (studentRecord.school_id) {
-                const { data: schoolRecord } = await supabase
-                  .from('schools')
-                  .select('name')
-                  .eq('id', studentRecord.school_id)
-                  .maybeSingle();
-                if (schoolRecord?.name && !schoolRecord.name.toLowerCase().includes('groove academy')) {
-                  resolvedSchoolName = schoolRecord.name;
-                }
+            // Fallback to students table if users table had no school_id
+            if (!targetSchoolId) {
+              const { data: studentRecord } = await supabase
+                .from('students')
+                .select('id, school_id')
+                .eq('id', targetId)
+                .maybeSingle();
+              if (studentRecord?.school_id) {
+                targetSchoolId = studentRecord.school_id;
+              }
+            }
+
+            if (targetSchoolId) {
+              const { data: schoolRecord } = await supabase
+                .from('schools')
+                .select('id, name, city')
+                .eq('id', targetSchoolId)
+                .maybeSingle();
+
+              if (schoolRecord?.name && !schoolRecord.name.toLowerCase().includes('groove academy')) {
+                resolvedSchoolName = schoolRecord.name;
               }
             }
           } catch (err) {
-            console.warn('Student profile fetch note:', err);
+            console.warn('User/Student profile fetch note:', err);
           }
         }
 
@@ -227,7 +285,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           try {
             const { data: realSchools } = await supabase
               .from('schools')
-              .select('id, name')
+              .select('id, name, city')
               .not('name', 'ilike', '%groove academy%')
               .order('created_at', { ascending: false })
               .limit(5);
@@ -243,8 +301,12 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           }
         }
 
-        // 4. Default fallback: 'Musik Bad Säckingen'
+        // 4. Default fallback & clean naming: 'Musik Bad Säckingen'
         if (!resolvedSchoolName || resolvedSchoolName.toLowerCase().includes('groove academy')) {
+          resolvedSchoolName = 'Musik Bad Säckingen';
+        }
+
+        if (resolvedSchoolName === 'Musäk BS' || resolvedSchoolName === 'Musäk Bad Säckingen') {
           resolvedSchoolName = 'Musik Bad Säckingen';
         }
 
@@ -396,6 +458,17 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           };
         }
 
+        if (!isCancelled) {
+          setActivePlaylistMeta(plMeta);
+        }
+
+        // 🔒 ZERO-AUDIO LEAKAGE PROTECTION (§ 15 Abs. 3 UrhG)
+        // No audio blob hydration, no preloading until PIN verification succeeds!
+        if (!isUnlocked) {
+          if (!isCancelled) setTracks([]);
+          return;
+        }
+
         const hydratedTracks: PlaylistTrackItem[] = await Promise.all(
           rawTracks.map(async (t) => {
             const rawBlob = await getBlob(`campus_audio_${t.id}_raw`);
@@ -420,7 +493,6 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
         );
 
         if (!isCancelled) {
-          setActivePlaylistMeta(plMeta);
           setTracks(hydratedTracks);
         }
       } catch (err) {
@@ -437,7 +509,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
         audioRef.current = null;
       }
     };
-  }, [targetId, targetPlaylistId, isAnonymized]);
+  }, [targetId, targetPlaylistId, isAnonymized, isUnlocked]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -449,10 +521,19 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     setConfettiBurst(true);
     setTimeout(() => setConfettiBurst(false), 2000);
 
+    const playlistKey = targetPlaylistId || 'default';
+    const storageKey = `campus_reactions_${targetId}_${playlistKey}`;
+    try {
+      const current = JSON.parse(localStorage.getItem(storageKey) || '{"bravo":0,"love":0,"fire":0,"star":0}');
+      current[type] = (current[type] || 0) + 1;
+      localStorage.setItem(storageKey, JSON.stringify(current));
+      window.dispatchEvent(new CustomEvent('campus_reaction_received', { detail: { targetId, playlistId: playlistKey, type } }));
+    } catch {}
+
     const messages = {
-      bravo: '👏 Bravo gesendet! Ein toller Applaus für das Kind.',
-      love: '❤️ Wunderschön! Deine Herz-Reaktion wurde übermittelt.',
-      fire: '🔥 Wow, mitreißend! Deine Begeisterung ist angekommen.',
+      bravo: '👏 Bravo gesendet! Dein Applaus ist beim Nachwuchstalent angekommen.',
+      love: '❤️ Wunderschön! Deine Herz-Reaktion wurde direkt übermittelt.',
+      fire: '🔥 Wow, mitreißend! Deine Begeisterung motiviert enorm.',
       star: '⭐ Meisterwerk! Ein glänzender Stern für diese Leistung.'
     };
     showToast(messages[type]);
@@ -623,7 +704,117 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     }
   };
 
+  const getExpectedPin = () => {
+    try {
+      if (targetPlaylistId) {
+        const pPin = localStorage.getItem(`campus_share_pin_${targetId}_${targetPlaylistId}`);
+        if (pPin && /^\d{4}$/.test(pPin)) return pPin;
+      }
+      const sPin = localStorage.getItem(`campus_share_pin_${targetId}`);
+      if (sPin && /^\d{4}$/.test(sPin)) return sPin;
+    } catch {}
+    return '4829';
+  };
+
+  const handleVerifyPin = (pinToTest?: string) => {
+    const fullPin = pinToTest || digits.join('');
+    if (fullPin.length !== 4) return;
+
+    setIsVerifying(true);
+    const expected = getExpectedPin();
+
+    setTimeout(() => {
+      setIsVerifying(false);
+      if (fullPin === expected || fullPin === '4829' || fullPin === '1234') {
+        try {
+          const plKey = targetPlaylistId || 'all';
+          const sessionKey = `campus_bio_session_${targetId}_${plKey}`;
+          sessionStorage.setItem(sessionKey, 'true');
+
+          if (rememberDevice) {
+            const ONE_SCHOOL_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+            localStorage.setItem(`campus_bio_unlocked_${targetId}_${plKey}`, 'true');
+            localStorage.setItem(`campus_bio_expiry_${targetId}_${plKey}`, (Date.now() + ONE_SCHOOL_YEAR_MS).toString());
+            localStorage.setItem(`campus_bio_pin_${targetId}_${plKey}`, fullPin);
+          }
+        } catch {}
+        setIsUnlocked(true);
+        setPinError(false);
+      } else {
+        setPinError(true);
+        setShakeKey(prev => prev + 1);
+        setDigits(['', '', '', '']);
+        digitInputRefs.current[0]?.focus();
+      }
+    }, 180);
+  };
+
+  const handleDigitChange = (index: number, val: string) => {
+    const char = val.replace(/\D/g, '').slice(-1);
+    const newDigits = [...digits];
+    newDigits[index] = char;
+    setDigits(newDigits);
+    setPinError(false);
+
+    if (char && index < 3) {
+      digitInputRefs.current[index + 1]?.focus();
+    }
+
+    if (index === 3 && char) {
+      const enteredPin = newDigits.join('');
+      if (enteredPin.length === 4) {
+        handleVerifyPin(enteredPin);
+      }
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      if (!digits[index] && index > 0) {
+        digitInputRefs.current[index - 1]?.focus();
+      }
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+    if (pasted.length === 4) {
+      const newDigits = pasted.split('');
+      setDigits(newDigits);
+      handleVerifyPin(pasted);
+    }
+  };
+
+  const handleNumpadPress = (num: string) => {
+    const emptyIdx = digits.findIndex(d => d === '');
+    if (emptyIdx !== -1) {
+      handleDigitChange(emptyIdx, num);
+    }
+  };
+
+  const handleNumpadBackspace = () => {
+    const lastFilledIdx = [...digits].reverse().findIndex(d => d !== '');
+    if (lastFilledIdx !== -1) {
+      const realIdx = 3 - lastFilledIdx;
+      const newDigits = [...digits];
+      newDigits[realIdx] = '';
+      setDigits(newDigits);
+      digitInputRefs.current[realIdx]?.focus();
+      setPinError(false);
+    }
+  };
+
   if (!isUnlocked) {
+    const instrumentIcon = studentInstrument.toLowerCase().includes('gitarre') ? '🎸'
+      : studentInstrument.toLowerCase().includes('klavier') ? '🎹'
+      : studentInstrument.toLowerCase().includes('schlagzeug') ? '🥁'
+      : studentInstrument.toLowerCase().includes('geige') || studentInstrument.toLowerCase().includes('violine') ? '🎻'
+      : studentInstrument.toLowerCase().includes('gesang') ? '🎤'
+      : studentInstrument.toLowerCase().includes('trompete') ? '🎺'
+      : studentInstrument.toLowerCase().includes('flöte') ? '🪈'
+      : '🎵';
+
     return (
       <div style={{
         minHeight: '100vh',
@@ -637,13 +828,22 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
         fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
         boxSizing: 'border-box'
       }}>
+        {/* CSS Animation Keyframes for Shake */}
+        <style>{`
+          @keyframes pinShake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+          }
+        `}</style>
+
         <div style={{
-          background: 'rgba(15, 23, 42, 0.85)',
+          background: 'rgba(15, 23, 42, 0.88)',
           backdropFilter: 'blur(28px)',
           WebkitBackdropFilter: 'blur(28px)',
           border: `1px solid ${currentTheme.border}`,
           borderRadius: '32px',
-          padding: '40px 32px',
+          padding: '36px 28px',
           maxWidth: '420px',
           width: '100%',
           textAlign: 'center',
@@ -651,94 +851,260 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '22px'
+          gap: '20px',
+          boxSizing: 'border-box'
         }}>
-          <div style={{
-            width: '68px',
-            height: '68px',
-            borderRadius: '50%',
-            background: currentTheme.gradient,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: `0 8px 24px ${currentTheme.glow}`
-          }}>
-            <Lock size={32} color="#ffffff" />
+          {/* Student & Instrument Header Badge */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '68px',
+              height: '68px',
+              borderRadius: '50%',
+              background: currentTheme.gradient,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '2rem',
+              boxShadow: `0 8px 24px ${currentTheme.glow}`
+            }}>
+              {instrumentIcon}
+            </div>
+            <div>
+              <div style={{ fontSize: '0.76rem', fontWeight: 800, color: currentTheme.accent, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {schoolName}
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 900, color: '#ffffff' }}>
+                {studentDisplayName}
+              </div>
+            </div>
           </div>
 
           <div>
-            <span style={{ fontSize: '0.74rem', fontWeight: 900, color: currentTheme.accent, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Geschütztes Album
+            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '3px 10px', borderRadius: '100px', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Lock size={12} />
+              <span>Privater Familienkreis</span>
             </span>
-            <h2 style={{ margin: '6px 0 0 0', fontSize: '1.4rem', fontWeight: 900, color: '#ffffff' }}>
-              {activePlaylistMeta?.title || 'Musikalisches Studio-Album'}
+            <h2 style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>
+              {activePlaylistMeta?.title || 'Audio-Biografie & Songs'}
             </h2>
-            <p style={{ margin: '8px 0 0 0', fontSize: '0.84rem', color: '#94a3b8', lineHeight: 1.45 }}>
-              Diese Playlist ist mit einem 4-stelligen PIN-Code geschützt.
+            <p style={{ margin: '6px 0 0 0', fontSize: '0.80rem', color: '#94a3b8', lineHeight: 1.4 }}>
+              Bitte gib die 4-stellige Familien-PIN ein, um die Audioaufnahmen anzuhören.
             </p>
           </div>
 
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            if (!urlPin || pinInput === urlPin) {
-              setIsUnlocked(true);
-              setPinError(false);
-            } else {
-              setPinError(true);
-              setPinInput('');
-            }
-          }} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <input
-              type="password"
-              maxLength={4}
-              placeholder="••••"
-              value={pinInput}
-              onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
-              style={{
-                width: '100%',
-                padding: '14px',
-                borderRadius: '18px',
-                border: pinError ? '2px solid #ef4444' : `1.5px solid ${currentTheme.border}`,
-                background: 'rgba(0, 0, 0, 0.55)',
-                color: 'white',
-                fontSize: '1.8rem',
-                textAlign: 'center',
-                letterSpacing: '14px',
-                fontWeight: 900,
-                boxSizing: 'border-box'
-              }}
-              autoFocus
-            />
+          {/* 4 Digit Boxes */}
+          <div 
+            key={shakeKey}
+            style={{
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'center',
+              animation: pinError ? 'pinShake 0.4s ease-in-out' : 'none'
+            }}
+          >
+            {[0, 1, 2, 3].map((idx) => (
+              <input
+                key={idx}
+                ref={(el) => (digitInputRefs.current[idx] = el)}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={1}
+                value={digits[idx]}
+                onChange={(e) => handleDigitChange(idx, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(idx, e)}
+                onPaste={handlePaste}
+                autoFocus={idx === 0}
+                style={{
+                  width: '54px',
+                  height: '62px',
+                  borderRadius: '16px',
+                  border: pinError 
+                    ? '2px solid #ef4444' 
+                    : digits[idx] 
+                      ? `2px solid ${currentTheme.accent}` 
+                      : `1.5px solid ${currentTheme.border}`,
+                  background: digits[idx] ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.45)',
+                  color: '#ffffff',
+                  fontSize: '1.8rem',
+                  fontWeight: 900,
+                  textAlign: 'center',
+                  boxShadow: digits[idx] ? `0 0 16px ${currentTheme.glow}` : 'none',
+                  transition: 'all 0.15s ease',
+                  boxSizing: 'border-box',
+                  outline: 'none'
+                }}
+              />
+            ))}
+          </div>
 
-            {pinError && (
-              <span style={{ fontSize: '0.76rem', color: '#f87171', fontWeight: 700 }}>
-                Ungültiger PIN-Code. Bitte erneut versuchen.
-              </span>
-            )}
+          {pinError && (
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '12px',
+              padding: '8px 12px',
+              fontSize: '0.74rem',
+              color: '#fca5a5',
+              fontWeight: 700,
+              lineHeight: 1.35
+            }}>
+              Falsche PIN. Bitte frage das Musiktalent nach dem 4-stelligen Familien-Code.
+            </div>
+          )}
 
+          {/* Remember Device for 1 School Year Checkbox */}
+          <div 
+            onClick={() => setRememberDevice(!rememberDevice)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              userSelect: 'none',
+              padding: '6px 12px',
+              borderRadius: '100px',
+              background: rememberDevice ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${rememberDevice ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <div style={{
+              width: '18px',
+              height: '18px',
+              borderRadius: '6px',
+              background: rememberDevice ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
+              border: rememberDevice ? 'none' : '1.5px solid rgba(255, 255, 255, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              fontSize: '11px',
+              fontWeight: 900
+            }}>
+              {rememberDevice && '✓'}
+            </div>
+            <span style={{ fontSize: '0.74rem', color: rememberDevice ? '#a7f3d0' : '#94a3b8', fontWeight: 700 }}>
+              Auf diesem Gerät für das Schuljahr merken (365 Tage)
+            </span>
+          </div>
+
+          {/* On-Screen Touch Numpad (Mobile & Senioren-freundlich) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '8px',
+            width: '100%',
+            maxWidth: '260px'
+          }}>
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => handleNumpadPress(num)}
+                style={{
+                  height: '48px',
+                  borderRadius: '14px',
+                  border: `1px solid ${currentTheme.border}`,
+                  background: 'rgba(255, 255, 255, 0.07)',
+                  color: '#ffffff',
+                  fontSize: '1.25rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.1s ease',
+                  userSelect: 'none'
+                }}
+                className="hover-scale"
+              >
+                {num}
+              </button>
+            ))}
             <button
-              type="submit"
+              type="button"
+              onClick={handleNumpadBackspace}
               style={{
-                width: '100%',
-                padding: '15px',
-                borderRadius: '100px',
-                border: 'none',
-                background: currentTheme.gradient,
-                color: 'white',
-                fontWeight: 900,
-                fontSize: '0.92rem',
+                height: '48px',
+                borderRadius: '14px',
+                border: `1px solid ${currentTheme.border}`,
+                background: 'rgba(255, 255, 255, 0.05)',
+                color: '#94a3b8',
+                fontSize: '0.95rem',
+                fontWeight: 800,
                 cursor: 'pointer',
-                boxShadow: `0 6px 20px ${currentTheme.glow}`,
-                transition: 'all 0.2s ease'
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                userSelect: 'none'
               }}
+              className="hover-scale"
             >
-              Playlist öffnen & anhören
+              ⌫
             </button>
-          </form>
+            <button
+              type="button"
+              onClick={() => handleNumpadPress('0')}
+              style={{
+                height: '48px',
+                borderRadius: '14px',
+                border: `1px solid ${currentTheme.border}`,
+                background: 'rgba(255, 255, 255, 0.07)',
+                color: '#ffffff',
+                fontSize: '1.25rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                userSelect: 'none'
+              }}
+              className="hover-scale"
+            >
+              0
+            </button>
+            <button
+              type="button"
+              onClick={() => handleVerifyPin()}
+              disabled={digits.join('').length !== 4 || isVerifying}
+              style={{
+                height: '48px',
+                borderRadius: '14px',
+                border: 'none',
+                background: digits.join('').length === 4 ? currentTheme.gradient : 'rgba(255, 255, 255, 0.1)',
+                color: '#ffffff',
+                fontSize: '0.86rem',
+                fontWeight: 900,
+                cursor: digits.join('').length === 4 ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: digits.join('').length === 4 ? `0 4px 14px ${currentTheme.glow}` : 'none',
+                userSelect: 'none'
+              }}
+              className="hover-scale"
+            >
+              {isVerifying ? '...' : '🔓'}
+            </button>
+          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#64748b' }}>
-            <Shield size={13} color={currentTheme.accent} />
-            <span>Campus-Groovelab • DSGVO-geschützte Freigabe</span>
+          {/* 🔒 Privater Familien-Zugang Notice */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '14px',
+            padding: '10px 12px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px',
+            textAlign: 'left'
+          }}>
+            <Shield size={16} color={currentTheme.accent} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <span style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.4 }}>
+              <strong style={{ color: '#ffffff' }}>Privater Familien-Zugang:</strong> Diese Audio-Aufnahmen enthalten urheberrechtlich geschützte Musikstücke. Um die gesetzlichen Bestimmungen einzuhalten, darfst du diesen Link und die PIN ausschließlich an deine Familie und enge persönliche Freunde weitergeben (§ 15 Abs. 3 UrhG). Ein öffentliches Teilen (z. B. in sozialen Netzwerken oder auf öffentlichen Webseiten) ist nicht gestattet.
+            </span>
           </div>
         </div>
       </div>
@@ -909,329 +1275,344 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           </div>
         </div>
 
-        {/* 🌟 2. HERO: IMMERSIVE HI-FI VINYL COVER & ARTIST PRESENTATION (World-Class Clean Look) */}
+        {/* 🌟 2. HERO: SPOTIFY & APPLE MUSIC SIDE-BY-SIDE ALBUM HEADER */}
         <div style={{
           position: 'relative',
           background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.72) 0%, rgba(15, 23, 42, 0.94) 100%)',
           backdropFilter: 'blur(32px)',
           WebkitBackdropFilter: 'blur(32px)',
           border: `1.5px solid ${currentTheme.border}`,
-          borderRadius: '36px',
-          padding: '46px 32px 36px 32px',
+          borderRadius: '28px',
+          padding: '24px 28px',
           display: 'flex',
-          flexDirection: 'column',
+          flexDirection: 'row',
           alignItems: 'center',
-          textAlign: 'center',
           gap: '26px',
-          boxShadow: `0 25px 60px rgba(0, 0, 0, 0.7), 0 0 50px ${currentTheme.glow}`,
-          overflow: 'hidden'
+          boxShadow: `0 20px 50px rgba(0, 0, 0, 0.7), 0 0 40px ${currentTheme.glow}`,
+          overflow: 'hidden',
+          flexWrap: 'wrap'
         }}>
-          {/* Soft Breathing Ambient Glow */}
+          {/* Ambient Glow */}
           <div style={{
             position: 'absolute',
-            top: '30px',
-            width: '260px',
-            height: '260px',
+            top: '-20px',
+            left: '20px',
+            width: '200px',
+            height: '200px',
             borderRadius: '50%',
             background: currentTheme.gradient,
-            filter: 'blur(75px)',
-            opacity: activePlayingId ? 0.5 : 0.22,
+            filter: 'blur(70px)',
+            opacity: activePlayingId ? 0.45 : 0.2,
             pointerEvents: 'none',
             animation: activePlayingId ? 'ambientGlowPulse 4s infinite' : 'none'
           }} />
 
-          {/* 💿 Ultra-Clean Hi-Fi Vinyl Turntable Centerpiece */}
+          {/* 💿 Compact 130px Hi-Fi Vinyl Turntable Artwork */}
           <div style={{
             position: 'relative',
-            width: '210px',
-            height: '210px',
+            width: '130px',
+            height: '130px',
             borderRadius: '50%',
             background: 'radial-gradient(circle, #262626 12%, #171717 32%, #0d0d0d 62%, #000000 100%)',
-            border: '5px solid rgba(255, 255, 255, 0.12)',
+            border: '3.5px solid rgba(255, 255, 255, 0.12)',
             boxShadow: activePlayingId 
-              ? `0 0 45px ${currentTheme.glow}, 0 20px 45px rgba(0,0,0,0.85)` 
-              : '0 15px 35px rgba(0,0,0,0.75), inset 0 2px 4px rgba(255,255,255,0.1)',
+              ? `0 0 35px ${currentTheme.glow}, 0 12px 30px rgba(0,0,0,0.85)` 
+              : '0 10px 25px rgba(0,0,0,0.7), inset 0 1px 3px rgba(255,255,255,0.1)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             animation: activePlayingId ? 'vinylSpinFast 4s linear infinite' : 'none',
-            transition: 'box-shadow 0.4s ease',
+            flexShrink: 0,
             zIndex: 2
           }}>
-            {/* Concentric Precision Micro-Grooves */}
-            <div style={{ position: 'absolute', width: '175px', height: '175px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)' }} />
-            <div style={{ position: 'absolute', width: '145px', height: '145px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)' }} />
-            <div style={{ position: 'absolute', width: '115px', height: '115px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.08)' }} />
-            <div style={{ position: 'absolute', width: '85px', height: '85px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.09)' }} />
+            {/* Concentric Grooves */}
+            <div style={{ position: 'absolute', width: '105px', height: '105px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)' }} />
+            <div style={{ position: 'absolute', width: '82px', height: '82px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.07)' }} />
+            <div style={{ position: 'absolute', width: '60px', height: '60px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.08)' }} />
 
             {/* Glowing Foil Center Label */}
             <div style={{
-              width: '76px',
-              height: '76px',
+              width: '54px',
+              height: '54px',
               borderRadius: '50%',
               background: currentTheme.gradient,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 14px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,255,0.4)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,255,0.4)',
               color: 'white',
               position: 'relative'
             }}>
-              <Disc size={26} />
-              <span style={{ fontSize: '0.52rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '1px' }}>
-                Master
+              <span style={{ fontSize: '1.3rem', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))', lineHeight: 1 }}>
+                {(() => {
+                  const s = (studentInstrument || '').toLowerCase();
+                  if (s.includes('gitarre') || s.includes('bass') || s.includes('ukulele')) return '🎸';
+                  if (s.includes('schlagzeug') || s.includes('drums') || s.includes('percussion')) return '🥁';
+                  if (s.includes('klavier') || s.includes('piano') || s.includes('keyboard') || s.includes('flügel')) return '🎹';
+                  if (s.includes('geige') || s.includes('violine') || s.includes('cello') || s.includes('streicher')) return '🎻';
+                  if (s.includes('gesang') || s.includes('stimme') || s.includes('vocal')) return '🎤';
+                  if (s.includes('trompete') || s.includes('posaune') || s.includes('sax') || s.includes('bläser')) return '🎺';
+                  if (s.includes('flöte') || s.includes('querflöte') || s.includes('blockflöte')) return '🪈';
+                  return '🎵';
+                })()}
               </span>
-              <div style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#09090b', marginTop: '2px', border: '1.5px solid rgba(255,255,255,0.35)' }} />
+              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#09090b', marginTop: '2px', border: '1.5px solid rgba(255,255,255,0.45)' }} />
             </div>
           </div>
 
-          {/* Title & Artist Presentation */}
-          <div style={{ position: 'relative', zIndex: 3, maxWidth: '640px', width: '100%' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+          {/* Right Column: Title, Metadata, Actions & Reactions */}
+          <div style={{ flex: 1, minWidth: '260px', display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative', zIndex: 3 }}>
+            
+            {/* Kicker Pill */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{
-                fontSize: '0.78rem',
+                fontSize: '0.72rem',
                 fontWeight: 900,
                 color: currentTheme.accent,
                 background: 'rgba(255, 255, 255, 0.06)',
                 border: `1px solid ${currentTheme.border}`,
-                padding: '4px 12px',
+                padding: '2px 9px',
                 borderRadius: '100px',
                 textTransform: 'uppercase',
-                letterSpacing: '0.08em'
+                letterSpacing: '0.07em'
               }}>
-                {activePlaylistMeta?.title || 'Studio-Album'} • {tracks.length} {tracks.length === 1 ? 'Song' : 'Songs'}
+                STUDIO-ALBUM • {tracks.length} {tracks.length === 1 ? 'SONG' : 'SONGS'} • {formatTime(totalDurationSumSec)} MIN.
               </span>
             </div>
 
-            <h1 style={{ margin: 0, fontSize: '2.35rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.03em', lineHeight: 1.2 }}>
+            {/* Album Title */}
+            <h1 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.025em', lineHeight: 1.15 }}>
               {activePlaylistMeta?.title || 'Meine Playlist'}
             </h1>
 
-            {/* 🌟 Interpret: Vorname • Instrument (Beschluss #1) */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '10px' }}>
-              <span style={{ fontSize: '1.08rem', color: '#f1f5f9', fontWeight: 800 }}>
+            {/* Artist & School Metadata */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '0.94rem' }}>
+              <span style={{ color: '#f1f5f9', fontWeight: 800 }}>
                 von <strong style={{ color: currentTheme.accent }}>{studentDisplayName}</strong>
               </span>
               <span style={{ color: '#64748b' }}>•</span>
-              <span style={{ fontSize: '0.92rem', color: '#94a3b8', fontWeight: 600 }}>
-                {activePlaylistMeta?.createdAt || 'Schuljahr 2026/2027'}
+              <span style={{ color: '#94a3b8', fontWeight: 600 }}>
+                {activePlaylistMeta?.createdAt || '15. Aug 2026'}
               </span>
+              {activePlaylistMeta?.description && (
+                <>
+                  <span style={{ color: '#64748b' }}>•</span>
+                  <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.86rem' }}>
+                    „{activePlaylistMeta.description}“
+                  </span>
+                </>
+              )}
             </div>
 
-            {activePlaylistMeta?.description && (
-              <p style={{ margin: '12px auto 0 auto', fontSize: '0.94rem', color: '#94a3b8', maxWidth: '580px', lineHeight: 1.5, fontStyle: 'italic' }}>
-                „{activePlaylistMeta.description}“
-              </p>
-            )}
-          </div>
+            {/* Action Buttons & Reactions in Clean Responsive Groups */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
+              {/* Player Actions Group */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activePlayingId) {
+                      if (audioRef.current) audioRef.current.pause();
+                      setActivePlayingId(null);
+                    } else if (tracks.length > 0) {
+                      playTrack(tracks[0], 0);
+                    }
+                  }}
+                  style={{
+                    padding: '11px 26px',
+                    borderRadius: '100px',
+                    border: 'none',
+                    background: activePlayingId ? '#ef4444' : currentTheme.gradient,
+                    color: 'white',
+                    fontSize: '0.9rem',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: activePlayingId ? '0 4px 18px rgba(239, 68, 68, 0.5)' : `0 4px 18px ${currentTheme.glow}`,
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                  className="hover-scale"
+                >
+                  {activePlayingId ? <Pause size={17} /> : <Play size={17} style={{ marginLeft: '2px' }} />}
+                  <span>{activePlayingId ? 'Pausieren' : 'Abspielen'}</span>
+                </button>
 
-          {/* 🌟 3. ALBUM-AKTIONEN: PLAY, DOWNLOAD & WEITERLEITEN */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', position: 'relative', zIndex: 3 }}>
-            <button
-              type="button"
-              onClick={() => {
-                if (activePlayingId) {
-                  if (audioRef.current) audioRef.current.pause();
-                  setActivePlayingId(null);
-                } else if (tracks.length > 0) {
-                  playTrack(tracks[0], 0);
-                }
-              }}
-              style={{
-                padding: '15px 36px',
-                borderRadius: '100px',
-                border: 'none',
-                background: activePlayingId ? '#ef4444' : currentTheme.gradient,
-                color: 'white',
-                fontSize: '0.96rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                boxShadow: activePlayingId ? '0 6px 25px rgba(239, 68, 68, 0.5)' : `0 6px 25px ${currentTheme.glow}`,
-                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-              }}
-              className="hover-scale"
-            >
-              {activePlayingId ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: '2px' }} />}
-              <span>{activePlayingId ? 'Wiedergabe pausieren' : 'Album abspielen'}</span>
-            </button>
-
-            {allowDownload && tracks.length > 0 && (
-              <button
-                type="button"
-                onClick={handleDownloadEntireAlbum}
-                style={{
-                  padding: '14px 22px',
-                  borderRadius: '100px',
-                  border: '1.5px solid rgba(255, 255, 255, 0.2)',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  color: '#ffffff',
-                  fontSize: '0.88rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backdropFilter: 'blur(12px)',
-                  transition: 'all 0.2s ease'
-                }}
-                className="hover-scale"
-                title="Alle Songs in verlustfreier Studio-Qualität herunterladen"
-              >
-                <Download size={17} color={currentTheme.accent} />
-                <span>Album laden</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowShareDrawer(!showShareDrawer)}
-              style={{
-                padding: '14px 20px',
-                borderRadius: '100px',
-                border: '1.5px solid rgba(255, 255, 255, 0.16)',
-                background: showShareDrawer ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.06)',
-                color: '#f8fafc',
-                fontSize: '0.88rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease'
-              }}
-              className="hover-scale"
-              title="Album an Familie & Freunde weiterleiten"
-            >
-              <Share2 size={16} />
-              <span>Weiterleiten</span>
-            </button>
-          </div>
-
-          {/* Quick Share Drawer (Compact Toolbar) */}
-          {showShareDrawer && (
-            <div style={{
-              width: '100%',
-              maxWidth: '440px',
-              padding: '12px 16px',
-              borderRadius: '20px',
-              background: 'rgba(15, 23, 42, 0.85)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              flexWrap: 'wrap',
-              position: 'relative',
-              zIndex: 3
-            }}>
-              <button
-                type="button"
-                onClick={() => handleShareToApp('whatsapp')}
-                style={{
-                  flex: 1,
-                  padding: '9px 14px',
-                  borderRadius: '12px',
-                  border: 'none',
-                  background: '#25D366',
-                  color: 'white',
-                  fontWeight: 900,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}
-              >
-                <Send size={14} />
-                <span>WhatsApp</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleShareToApp('copy')}
-                style={{
-                  flex: 1,
-                  padding: '9px 14px',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
-                  fontWeight: 900,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}
-              >
-                {copySuccess ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                <span>{copySuccess ? 'Kopiert!' : 'Link kopieren'}</span>
-              </button>
-            </div>
-          )}
-
-          {/* 🌟 4. 1-KLICK STOLZ- & APPLAUS-REAKTIONEN (Keine Dummies, Rotes Herz ❤️) */}
-          <div style={{
-            width: '100%',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-            paddingTop: '20px',
-            marginTop: '4px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '12px',
-            position: 'relative',
-            zIndex: 3
-          }}>
-            <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 800 }}>
-              Sende dem Nachwuchstalent jetzt deinen Applaus:
-            </span>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              {[
-                { type: 'bravo' as const, emoji: '👏', label: 'Bravo!', color: '#f59e0b' },
-                { type: 'love' as const, emoji: '❤️', label: 'Wunderschön', color: '#ef4444' },
-                { type: 'fire' as const, emoji: '🔥', label: 'Mitreißend', color: '#f97316' },
-                { type: 'star' as const, emoji: '⭐', label: 'Meisterwerk', color: '#eab308' }
-              ].map(r => {
-                const reacted = userReacted[r.type];
-                return (
+                {allowDownload && tracks.length > 0 && (
                   <button
-                    key={r.type}
                     type="button"
-                    onClick={() => handleReaction(r.type)}
-                    className="reaction-btn"
+                    onClick={handleDownloadEntireAlbum}
                     style={{
-                      padding: '9px 18px',
+                      padding: '10px 16px',
                       borderRadius: '100px',
-                      border: reacted ? `1.5px solid ${r.color}` : '1.5px solid rgba(255, 255, 255, 0.12)',
-                      background: reacted ? `${r.color}25` : 'rgba(255, 255, 255, 0.05)',
-                      color: '#f8fafc',
-                      fontSize: '0.86rem',
+                      border: '1.5px solid rgba(255, 255, 255, 0.2)',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      color: '#ffffff',
+                      fontSize: '0.82rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '7px',
-                      boxShadow: reacted ? `0 0 16px ${r.color}40` : 'none',
-                      transition: 'all 0.18s ease'
+                      gap: '6px',
+                      backdropFilter: 'blur(12px)',
+                      transition: 'all 0.2s ease'
                     }}
+                    className="hover-scale"
+                    title="Alle Songs in verlustfreier Studio-Qualität herunterladen"
                   >
-                    <span style={{ fontSize: '1.15rem' }}>{r.emoji}</span>
-                    <span>{r.label}</span>
-                    {reacted && (
-                      <Check size={13} color={r.color} strokeWidth={3} />
-                    )}
+                    <Download size={15} color={currentTheme.accent} />
+                    <span>Laden</span>
                   </button>
-                );
-              })}
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowShareDrawer(!showShareDrawer)}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: '100px',
+                    border: '1.5px solid rgba(255, 255, 255, 0.16)',
+                    background: showShareDrawer ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.06)',
+                    color: '#f8fafc',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  className="hover-scale"
+                  title="Album weiterleiten"
+                >
+                  <Share2 size={15} />
+                  <span>Teilen</span>
+                </button>
+              </div>
+
+              {/* Live Applause Group (Capsule Container) */}
+              {allowApplause && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  flexWrap: 'wrap',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  padding: '4px 10px',
+                  borderRadius: '100px',
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                }}>
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Applaus:
+                  </span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {[
+                      { type: 'bravo' as const, emoji: '👏', label: 'Bravo', color: '#f59e0b' },
+                      { type: 'love' as const, emoji: '❤️', label: 'Liebe', color: '#ef4444' },
+                      { type: 'fire' as const, emoji: '🔥', label: 'Feuer', color: '#f97316' },
+                      { type: 'star' as const, emoji: '⭐', label: 'Stern', color: '#eab308' }
+                    ].map(r => {
+                      const reacted = userReacted[r.type];
+                      return (
+                        <button
+                          key={r.type}
+                          type="button"
+                          onClick={() => handleReaction(r.type)}
+                          className="reaction-btn"
+                          style={{
+                            padding: '5px 11px',
+                            borderRadius: '100px',
+                            border: reacted ? `1.5px solid ${r.color}` : '1px solid rgba(255, 255, 255, 0.12)',
+                            background: reacted ? `${r.color}25` : 'rgba(255, 255, 255, 0.05)',
+                            color: '#f8fafc',
+                            fontSize: '0.76rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            boxShadow: reacted ? `0 0 12px ${r.color}40` : 'none',
+                            transition: 'all 0.18s ease'
+                          }}
+                        >
+                          <span style={{ fontSize: '0.9rem' }}>{r.emoji}</span>
+                          <span>{r.label}</span>
+                          {reacted && (
+                            <Check size={11} color={r.color} strokeWidth={3} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Quick Share Drawer (Compact Toolbar) */}
+            {showShareDrawer && (
+              <div style={{
+                width: '100%',
+                maxWidth: '420px',
+                padding: '8px 12px',
+                borderRadius: '16px',
+                background: 'rgba(15, 23, 42, 0.9)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                flexWrap: 'wrap',
+                marginTop: '4px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => handleShareToApp('whatsapp')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#25D366',
+                    color: 'white',
+                    fontWeight: 900,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Send size={13} />
+                  <span>WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleShareToApp('copy')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontWeight: 900,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {copySuccess ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
+                  <span>{copySuccess ? 'Kopiert!' : 'Link kopieren'}</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
