@@ -144,7 +144,13 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
   const getPaidInvoices = (schoolId: string): string[] => {
     if (typeof window === 'undefined') return [];
-    return JSON.parse(localStorage.getItem(`paid_invoices_${schoolId}`) || '[]');
+    try {
+      const stored = localStorage.getItem(`paid_invoices_${schoolId}`);
+      const parsed = stored ? JSON.parse(stored) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   };
 
   const toggleInvoicePaid = (schoolId: string, invoiceId: string) => {
@@ -712,7 +718,14 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           const invId = `RE-${y}-${monthStr}`;
           
           const dbMatch = schoolInvoicesFromDb.find(i => i.id === invId || i.id === `INV-${y}-${monthStr}`);
-          const paidInvoicesList = JSON.parse(localStorage.getItem(`paid_invoices_${inv.schoolId}`) || '[]');
+          let paidInvoicesList: string[] = [];
+          try {
+            const raw = localStorage.getItem(`paid_invoices_${inv.schoolId}`);
+            paidInvoicesList = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(paidInvoicesList)) paidInvoicesList = [];
+          } catch {
+            paidInvoicesList = [];
+          }
           const isMarkedPaid = paidInvoicesList.includes(invId);
           
           let status = 'open';

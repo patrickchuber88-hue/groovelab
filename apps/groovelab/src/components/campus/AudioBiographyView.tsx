@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Play, Pause, Mic, Square, Shield, Lock, Unlock, Share2, Check, Star, Award, 
-  Sparkles, Volume2, RotateCcw, Copy, ExternalLink, Calendar, Disc, Clock, 
+  Sparkles, Volume2, VolumeX, RotateCcw, Copy, ExternalLink, Calendar, Disc, Clock, 
   Info, Sliders, Music, Zap, Flame, Heart, Upload, MessageSquare, MessageCircle, ChevronRight,
-  FileText, X, AlertCircle, ChevronDown, ListMusic, SkipForward, Gift, Bell, Lightbulb,
-  Sun, Moon, CheckCircle2, History, Plus, Trash2, Edit3, SlidersHorizontal, Radio, Layers, Download
+  ChevronLeft, FileText, X, AlertCircle, ChevronDown, ListMusic, SkipForward, SkipBack, Gift, Bell, Lightbulb,
+  Sun, Moon, CheckCircle2, History, Plus, Trash2, Edit3, SlidersHorizontal, Radio, Layers, Download,
+  Folder, FolderOpen, BookOpen, Trophy, Maximize2
 } from 'lucide-react';
 
 import { supabase } from '../../lib/supabase';
@@ -52,9 +53,319 @@ export interface CustomPlaylist {
   description?: string;
   vibeTheme: 'sunset_gold' | 'midnight_neon' | 'forest_emerald' | 'royal_ruby' | 'vintage_charcoal' | 'ocean_cyan' | 'vintage_tape' | 'ocean_breeze' | 'cyber_neon' | 'royal_velvet' | 'emerald_studio' | 'christmas_gold';
   iconName: string;
+  coverPresetId?: string;
+  schoolYear?: string;
   tracks: CustomPlaylistTrack[];
   createdAt: string;
 }
+
+export interface SchoolYearCoverConfig {
+  vol: number;
+  volLabel: string;
+  themeTitle: string;
+  subTitle: string;
+  gradient: string;
+  accentColor: string;
+  badge: string;
+  iconName: string;
+}
+
+export const SCHOOL_YEAR_COVERS: SchoolYearCoverConfig[] = [
+  { vol: 1, volLabel: 'VOL. 01', themeTitle: 'FIRST NOTES', subTitle: '1. Lernjahr • Start & Erste Töne', gradient: 'linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%)', accentColor: '#10b981', badge: '1. LERNJAHR', iconName: 'sparkles' },
+  { vol: 2, volLabel: 'VOL. 02', themeTitle: 'RISING RHYTHM', subTitle: '2. Lernjahr • Timing & Rhythmus', gradient: 'linear-gradient(135deg, #ea580c 0%, #f97316 50%, #fbbf24 100%)', accentColor: '#f97316', badge: '2. LERNJAHR', iconName: 'sliders' },
+  { vol: 3, volLabel: 'VOL. 03', themeTitle: 'MELODY FLOW', subTitle: '3. Lernjahr • Melodien & Phrasierung', gradient: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 50%, #38bdf8 100%)', accentColor: '#06b6d4', badge: '3. LERNJAHR', iconName: 'music' },
+  { vol: 4, volLabel: 'VOL. 04', themeTitle: 'SOUND HORIZON', subTitle: '4. Lernjahr • Harmonik & Klangfarben', gradient: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 50%, #c084fc 100%)', accentColor: '#8b5cf6', badge: '4. LERNJAHR', iconName: 'zap' },
+  { vol: 5, volLabel: 'VOL. 05', themeTitle: 'HALFTIME MASTER', subTitle: '5. Lernjahr • Halbzeit & Meilensteine', gradient: 'linear-gradient(135deg, #b45309 0%, #d97706 50%, #fde047 100%)', accentColor: '#f59e0b', badge: '5. LERNJAHR', iconName: 'trophy' },
+  { vol: 6, volLabel: 'VOL. 06', themeTitle: 'GROOVE ENGINE', subTitle: '6. Lernjahr • Dynamik & Band-Drive', gradient: 'linear-gradient(135deg, #e11d48 0%, #f43f5e 50%, #fb7185 100%)', accentColor: '#f43f5e', badge: '6. LERNJAHR', iconName: 'disc' },
+  { vol: 7, volLabel: 'VOL. 07', themeTitle: 'HARMONY VIBES', subTitle: '7. Lernjahr • Mehrstimmigkeit & Tiefe', gradient: 'linear-gradient(135deg, #0d9488 0%, #14b8a6 50%, #5eead4 100%)', accentColor: '#14b8a6', badge: '7. LERNJAHR', iconName: 'headphones' },
+  { vol: 8, volLabel: 'VOL. 08', themeTitle: 'VIRTUOSO TRACKS', subTitle: '8. Lernjahr • Virtuoses Repertoire', gradient: 'linear-gradient(135deg, #4338ca 0%, #6366f1 50%, #a855f7 100%)', accentColor: '#6366f1', badge: '8. LERNJAHR', iconName: 'flame' },
+  { vol: 9, volLabel: 'VOL. 09', themeTitle: 'MASTERWORKS', subTitle: '9. Lernjahr • Große Werke & Soli', gradient: 'linear-gradient(135deg, #1e293b 0%, #334155 50%, #64748b 100%)', accentColor: '#94a3b8', badge: '9. LERNJAHR', iconName: 'award' },
+  { vol: 10, volLabel: 'VOL. 10', themeTitle: 'DECADE LEGEND', subTitle: '10. Lernjahr • Meisterklasse & Jubiläum', gradient: 'linear-gradient(135deg, #18181b 0%, #ca8a04 50%, #fef08a 100%)', accentColor: '#eab308', badge: '10. JUBILÄUM', iconName: 'trophy' }
+];
+
+export interface UniversalPlaylistCoverConfig {
+  id: string;
+  category: 'kids' | 'urban_vibes' | 'classic_jazz' | 'events_stage';
+  categoryLabel: string;
+  defaultTitle: string;
+  subTitle: string;
+  gradient: string;
+  accentColor: string;
+  badge: string;
+  iconName: string;
+  emoji: string;
+  vibeTheme: CustomPlaylist['vibeTheme'];
+}
+
+export const UNIVERSAL_PLAYLIST_COVERS: UniversalPlaylistCoverConfig[] = [
+  // 1. Kids & Einsteiger (5)
+  {
+    id: 'cov_gaming_xp',
+    category: 'kids',
+    categoryLabel: 'Kids & Einsteiger',
+    defaultTitle: 'Gaming & XP Level-Up',
+    subTitle: 'Pixel Sound, Boss Themes & Highscores',
+    gradient: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 50%, #10b981 100%)',
+    accentColor: '#06b6d4',
+    badge: 'GAMING XP',
+    iconName: 'zap',
+    emoji: '🎮',
+    vibeTheme: 'cyber_neon'
+  },
+  {
+    id: 'cov_comic_pop',
+    category: 'kids',
+    categoryLabel: 'Kids & Einsteiger',
+    defaultTitle: 'Bubblegum Comic Pop',
+    subTitle: 'Gute Laune, Spass & bunte Melodien',
+    gradient: 'linear-gradient(135deg, #ec4899 0%, #f43f5e 50%, #fbbf24 100%)',
+    accentColor: '#ec4899',
+    badge: 'COMIC POP',
+    iconName: 'sparkles',
+    emoji: '🍬',
+    vibeTheme: 'cyber_neon'
+  },
+  {
+    id: 'cov_magic_sounds',
+    category: 'kids',
+    categoryLabel: 'Kids & Einsteiger',
+    defaultTitle: 'Zauberklänge & Märchen',
+    subTitle: 'Magische Melodien & Fantasiereisen',
+    gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%)',
+    accentColor: '#8b5cf6',
+    badge: 'MAGIC SOUNDS',
+    iconName: 'sparkles',
+    emoji: '✨',
+    vibeTheme: 'midnight_neon'
+  },
+  {
+    id: 'cov_animal_groove',
+    category: 'kids',
+    categoryLabel: 'Kids & Einsteiger',
+    defaultTitle: 'Dschungel & Tier-Grooves',
+    subTitle: 'Wilde Rhythmen & lustige Tierlieder',
+    gradient: 'linear-gradient(135deg, #15803d 0%, #84cc16 50%, #eab308 100%)',
+    accentColor: '#84cc16',
+    badge: 'ANIMAL GROOVE',
+    iconName: 'music',
+    emoji: '🦁',
+    vibeTheme: 'forest_emerald'
+  },
+  {
+    id: 'cov_first_songs',
+    category: 'kids',
+    categoryLabel: 'Kids & Einsteiger',
+    defaultTitle: 'Meine ersten Songs',
+    subTitle: 'Die allerersten Lieblingslieder',
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #38bdf8 100%)',
+    accentColor: '#f59e0b',
+    badge: 'FIRST SONGS',
+    iconName: 'heart',
+    emoji: '🌱',
+    vibeTheme: 'sunset_gold'
+  },
+
+  // 2. Pop, Rock & Urban Vibes (5)
+  {
+    id: 'cov_chart_hits',
+    category: 'urban_vibes',
+    categoryLabel: 'Pop, Rock & Beats',
+    defaultTitle: 'Top Hits & Radio Charts',
+    subTitle: 'Aktuelle Chart-Hits & Ohrwürmer',
+    gradient: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 50%, #ec4899 100%)',
+    accentColor: '#06b6d4',
+    badge: 'CHART HITS',
+    iconName: 'music',
+    emoji: '🔥',
+    vibeTheme: 'cyber_neon'
+  },
+  {
+    id: 'cov_rock_garage',
+    category: 'urban_vibes',
+    categoryLabel: 'Pop, Rock & Beats',
+    defaultTitle: 'Rock Garage & Distortion',
+    subTitle: 'Riffs, Power-Chords & Drive',
+    gradient: 'linear-gradient(135deg, #0f172a 0%, #b91c1c 50%, #f97316 100%)',
+    accentColor: '#ef4444',
+    badge: 'ROCK GARAGE',
+    iconName: 'flame',
+    emoji: '🎸',
+    vibeTheme: 'royal_ruby'
+  },
+  {
+    id: 'cov_lofi_chill',
+    category: 'urban_vibes',
+    categoryLabel: 'Pop, Rock & Beats',
+    defaultTitle: 'Lo-Fi Beats & Chillout',
+    subTitle: 'Relaxte Akkorde & Study Flow',
+    gradient: 'linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f472b6 100%)',
+    accentColor: '#c084fc',
+    badge: 'LO-FI CHILL',
+    iconName: 'headphones',
+    emoji: '☕',
+    vibeTheme: 'midnight_neon'
+  },
+  {
+    id: 'cov_urban_trap',
+    category: 'urban_vibes',
+    categoryLabel: 'Pop, Rock & Beats',
+    defaultTitle: 'Urban Flow & 808 Beats',
+    subTitle: 'Hip-Hop Vibes, Trap & Flow',
+    gradient: 'linear-gradient(135deg, #09090b 0%, #18181b 50%, #10b981 100%)',
+    accentColor: '#10b981',
+    badge: 'URBAN FLOW',
+    iconName: 'disc',
+    emoji: '🕶️',
+    vibeTheme: 'emerald_studio'
+  },
+  {
+    id: 'cov_summer_vibes',
+    category: 'urban_vibes',
+    categoryLabel: 'Pop, Rock & Beats',
+    defaultTitle: 'Sommerhits & Beach Jam',
+    subTitle: 'Sonnige Klänge & Urlaubsfeeling',
+    gradient: 'linear-gradient(135deg, #ea580c 0%, #f59e0b 50%, #06b6d4 100%)',
+    accentColor: '#f59e0b',
+    badge: 'SUMMER JAM',
+    iconName: 'sun',
+    emoji: '☀️',
+    vibeTheme: 'ocean_breeze'
+  },
+
+  // 3. Klassik, Jazz & Akustik (5)
+  {
+    id: 'cov_classical_gold',
+    category: 'classic_jazz',
+    categoryLabel: 'Klassik & Jazz',
+    defaultTitle: 'Klassik Meisterwerke',
+    subTitle: 'Große Meister, Sonaten & Etüden',
+    gradient: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #d97706 100%)',
+    accentColor: '#d97706',
+    badge: 'KLASSIK MEISTER',
+    iconName: 'award',
+    emoji: '🎻',
+    vibeTheme: 'forest_emerald'
+  },
+  {
+    id: 'cov_piano_dreams',
+    category: 'classic_jazz',
+    categoryLabel: 'Klassik & Jazz',
+    defaultTitle: 'Piano Dreams & Balladen',
+    subTitle: 'Sanfte Tastenklänge & Emotionen',
+    gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #6366f1 100%)',
+    accentColor: '#6366f1',
+    badge: 'PIANO DREAMS',
+    iconName: 'music',
+    emoji: '🎹',
+    vibeTheme: 'midnight_neon'
+  },
+  {
+    id: 'cov_smooth_jazz',
+    category: 'classic_jazz',
+    categoryLabel: 'Klassik & Jazz',
+    defaultTitle: 'Smooth Jazz & Soul Lounge',
+    subTitle: 'Groovige Akkorde, Swing & Improvisation',
+    gradient: 'linear-gradient(135deg, #78350f 0%, #b45309 50%, #f59e0b 100%)',
+    accentColor: '#f59e0b',
+    badge: 'JAZZ LOUNGE',
+    iconName: 'music',
+    emoji: '🎷',
+    vibeTheme: 'sunset_gold'
+  },
+  {
+    id: 'cov_acoustic_camp',
+    category: 'classic_jazz',
+    categoryLabel: 'Klassik & Jazz',
+    defaultTitle: 'Acoustic Guitar & Unplugged',
+    subTitle: 'Fingerpicking & Lagerfeuer-Songs',
+    gradient: 'linear-gradient(135deg, #27272a 0%, #3f3f46 50%, #059669 100%)',
+    accentColor: '#059669',
+    badge: 'UNPLUGGED',
+    iconName: 'music',
+    emoji: '🪕',
+    vibeTheme: 'vintage_charcoal'
+  },
+  {
+    id: 'cov_cinema_score',
+    category: 'classic_jazz',
+    categoryLabel: 'Klassik & Jazz',
+    defaultTitle: 'Filmscore & Epische Soundtracks',
+    subTitle: 'Großes Kino & heroische Orchester-Sounds',
+    gradient: 'linear-gradient(135deg, #020617 0%, #0f172a 50%, #38bdf8 100%)',
+    accentColor: '#38bdf8',
+    badge: 'CINEMA SCORE',
+    iconName: 'award',
+    emoji: '🎬',
+    vibeTheme: 'royal_velvet'
+  },
+
+  // 4. Events, Bühne & Saison (5)
+  {
+    id: 'cov_christmas_magic',
+    category: 'events_stage',
+    categoryLabel: 'Bühne & Saison',
+    defaultTitle: 'Weihnachten & Winterzauber',
+    subTitle: 'Festliche Klänge für Heiligabend',
+    gradient: 'linear-gradient(135deg, #991b1b 0%, #b91c1c 50%, #f59e0b 100%)',
+    accentColor: '#f59e0b',
+    badge: 'WEIHNACHTEN',
+    iconName: 'gift',
+    emoji: '🎄',
+    vibeTheme: 'christmas_gold'
+  },
+  {
+    id: 'cov_stage_live',
+    category: 'events_stage',
+    categoryLabel: 'Bühne & Saison',
+    defaultTitle: 'Konzert & Live Auftritt',
+    subTitle: 'Bühnenreif vorbereitet fürs Scheinwerferlicht',
+    gradient: 'linear-gradient(135deg, #581c87 0%, #7e22ce 50%, #f43f5e 100%)',
+    accentColor: '#f43f5e',
+    badge: 'STAGE LIVE',
+    iconName: 'trophy',
+    emoji: '🏆',
+    vibeTheme: 'royal_velvet'
+  },
+  {
+    id: 'cov_exam_prep',
+    category: 'events_stage',
+    categoryLabel: 'Bühne & Saison',
+    defaultTitle: 'Prüfungs- & Vorspiel-Repertoire',
+    subTitle: 'Präzise & punktgenau einstudiert',
+    gradient: 'linear-gradient(135deg, #1e1b4b 0%, #4338ca 50%, #06b6d4 100%)',
+    accentColor: '#06b6d4',
+    badge: 'PRÜFUNG & VORSPIEL',
+    iconName: 'sliders',
+    emoji: '🎯',
+    vibeTheme: 'midnight_neon'
+  },
+  {
+    id: 'cov_favorites_heart',
+    category: 'events_stage',
+    categoryLabel: 'Bühne & Saison',
+    defaultTitle: 'Meine absoluten Lieblingsstücke',
+    subTitle: 'Herzens-Songs, die ich immer wieder spiele',
+    gradient: 'linear-gradient(135deg, #be123c 0%, #e11d48 50%, #f43f5e 100%)',
+    accentColor: '#f43f5e',
+    badge: 'FAVORITES',
+    iconName: 'heart',
+    emoji: '❤️',
+    vibeTheme: 'vintage_tape'
+  },
+  {
+    id: 'cov_band_jam',
+    category: 'events_stage',
+    categoryLabel: 'Bühne & Saison',
+    defaultTitle: 'Band-Probe & Jam-Session',
+    subTitle: 'Zusammen grooven & Ensemblespiel',
+    gradient: 'linear-gradient(135deg, #1e293b 0%, #ca8a04 50%, #facc15 100%)',
+    accentColor: '#facc15',
+    badge: 'BAND & ENSEMBLE',
+    iconName: 'disc',
+    emoji: '🥁',
+    vibeTheme: 'sunset_gold'
+  }
+];
 
 interface SchoolYearLP {
   id: string;
@@ -64,6 +375,9 @@ interface SchoolYearLP {
   accentColor: string;
   gradient: string;
   isCurrent: boolean;
+  volNum: number;
+  volLabel: string;
+  themeTitle: string;
   tracksCount: number;
   totalDurationMin: number;
 }
@@ -89,16 +403,6 @@ const VIBE_THEMES = [
   { id: 'cyber_neon', name: 'Cyber Neon', color: '#ec4899', gradient: 'linear-gradient(135deg, #ec4899 0%, #d946ef 50%, #a855f7 100%)', desc: 'Pop-Star & Charts' },
   { id: 'royal_velvet', name: 'Royal Velvet', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 50%, #4c1d95 100%)', desc: 'Bühnenreif & Festlich' },
   { id: 'emerald_studio', name: 'Emerald Studio', color: '#10b981', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)', desc: 'Campus-Grün & Erfolg' }
-];
-
-
-const ACCENT_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4'];
-const ACCENT_GRADIENTS = [
-  'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-  'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-  'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-  'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
-  'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)'
 ];
 
 export interface PlaylistTemplate {
@@ -170,7 +474,7 @@ export const PEDAGOGICAL_PLAYLIST_TEMPLATES: PlaylistTemplate[] = [
 
 /**
  * Dynamically computes active music school years starting from student registration date (created_at).
- * Includes the timeless golden Milestone-LP and active school year albums.
+ * Includes the timeless golden Milestone-LP and active school year albums mapped to 10-year rotational cover series.
  */
 export function computeActiveSchoolYears(createdAt?: string): SchoolYearLP[] {
   let regStartYear = 2026;
@@ -198,6 +502,9 @@ export function computeActiveSchoolYears(createdAt?: string): SchoolYearLP[] {
     accentColor: '#f59e0b',
     gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
     isCurrent: false,
+    volNum: 0,
+    volLabel: 'MEISTER-LP',
+    themeTitle: 'MASTERWORKS',
     tracksCount: 0,
     totalDurationMin: 0
   });
@@ -207,16 +514,20 @@ export function computeActiveSchoolYears(createdAt?: string): SchoolYearLP[] {
   for (let y = maxYear; y >= minYear; y--) {
     const isCurrent = y === maxYear;
     const volNum = totalYears - (maxYear - y);
-    const colorIdx = (maxYear - y) % ACCENT_COLORS.length;
+    const coverVol = ((volNum - 1) % 10) + 1;
+    const coverConfig = SCHOOL_YEAR_COVERS.find(c => c.vol === coverVol) || SCHOOL_YEAR_COVERS[0];
 
     yearsList.push({
       id: `lp_${y}_${y + 1}`,
       year: `${y}/${y + 1}`,
-      title: `Vol. ${volNum} – ${isCurrent ? 'Aktuelle Meisterreise' : 'Meilenstein-Archiv'}`,
-      subtitle: isCurrent ? 'Meisterstücke, Soli & Lieblingssongs' : 'Repertoire & Fingerfertigkeit',
-      accentColor: ACCENT_COLORS[colorIdx],
-      gradient: ACCENT_GRADIENTS[colorIdx],
+      title: `${coverConfig.volLabel} • ${coverConfig.themeTitle}`,
+      subtitle: `${volNum}. Lernjahr (${y}/${y + 1}) • ${isCurrent ? 'Aktuelles Schuljahr' : 'Archiv'}`,
+      accentColor: coverConfig.accentColor,
+      gradient: coverConfig.gradient,
       isCurrent,
+      volNum,
+      volLabel: coverConfig.volLabel,
+      themeTitle: coverConfig.themeTitle,
       tracksCount: 0,
       totalDurationMin: 0
     });
@@ -317,13 +628,32 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   // UI Theme state: Default is 'light' (Apple Paper Light Mode)
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
 
-  // Top-Level View Tab: 'milestones' vs 'playlists'
-  const [activeMainTab, setActiveMainTab] = useState<'milestones' | 'playlists'>('milestones');
+  // Top-Level View Tab: 'overview' (Startansicht / CD-Regal), 'milestones', 'playlists'
+  const [activeMainTab, setActiveMainTab] = useState<'overview' | 'milestones' | 'playlists'>('overview');
 
   const [milestones, setMilestones] = useState<MilestoneData[]>([]);
   const [customPlaylists, setCustomPlaylists] = useState<CustomPlaylist[]>([]);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
   const [activePlayingId, setActivePlayingId] = useState<string | null>(null);
+
+  // 💽 Persistent Mini-Player & Album Queue States
+  const [playbackQueue, setPlaybackQueue] = useState<Array<{ id: string; title: string; subtitle?: string; audioUrl: string; masteredAudioUrl?: string; duration?: number; albumTitle?: string }>>([]);
+  const [currentQueueIndex, setCurrentQueueIndex] = useState<number>(0);
+  const [currentAlbumMeta, setCurrentAlbumMeta] = useState<{ title: string; subtitle?: string; gradient?: string; accentColor?: string } | null>(null);
+  const [audioCurrentTime, setAudioCurrentTime] = useState<number>(0);
+  const [audioDuration, setAudioDuration] = useState<number>(0);
+  const [audioVolume, setAudioVolume] = useState<number>(1);
+  const [isMiniPlayerMuted, setIsMiniPlayerMuted] = useState<boolean>(false);
+  const [isMiniPlayerPlaying, setIsMiniPlayerPlaying] = useState<boolean>(false);
+
+  // 📁 Schuljahr-Ordner Modal & 📖 Digitales Liner-Notes Booklet Modal States
+  const [activeSchoolYearFolderModal, setActiveSchoolYearFolderModal] = useState<SchoolYearLP | null>(null);
+  const [activeLinerNotesModal, setActiveLinerNotesModal] = useState<{
+    title: string;
+    subtitle?: string;
+    gradient?: string;
+    tracks: Array<{ title: string; subtitle?: string; personalNote?: string; recordedAt?: string; duration?: number; schoolYear?: string }>;
+  } | null>(null);
 
   // Cache student metadata for seamless shared playlist experience
   useEffect(() => {
@@ -435,6 +765,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [wizardDesc, setWizardDesc] = useState<string>('');
   const [wizardTheme, setWizardTheme] = useState<CustomPlaylist['vibeTheme']>('sunset_gold');
   const [wizardIcon, setWizardIcon] = useState<string>('music');
+  const [wizardCoverPresetId, setWizardCoverPresetId] = useState<string>('cov_chart_hits');
+  const [wizardCoverCategory, setWizardCoverCategory] = useState<'all' | 'kids' | 'urban_vibes' | 'classic_jazz' | 'events_stage'>('all');
   const [wizardSelectedMilestones, setWizardSelectedMilestones] = useState<string[]>([]);
 
   // Reflection Popover State
@@ -966,6 +1298,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         audioRef.current.pause();
       }
       setActivePlayingId(null);
+      setIsMiniPlayerPlaying(false);
       setCurrentPlayingTrackMeta(null);
       setIsPlayingPlaylist(false);
       setIsPlayingABComparison(false);
@@ -995,16 +1328,20 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       if (targetUrl) {
         const newAudio = new Audio(targetUrl);
         newAudio.currentTime = currentPos;
+        newAudio.volume = isMiniPlayerMuted ? 0 : audioVolume;
+        newAudio.ontimeupdate = () => setAudioCurrentTime(newAudio.currentTime);
+        newAudio.onloadedmetadata = () => setAudioDuration(newAudio.duration || 0);
         audioRef.current.pause();
         audioRef.current = newAudio;
         if (!isPaused) {
-          newAudio.play().catch(console.warn);
+          newAudio.play().then(() => setIsMiniPlayerPlaying(true)).catch(console.warn);
         }
         newAudio.onended = () => {
           if (isPlayingPlaylist) {
             playNextInPlaylist();
           } else {
             setActivePlayingId(null);
+            setIsMiniPlayerPlaying(false);
           }
         };
       }
@@ -1016,8 +1353,19 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       audioRef.current.pause();
     }
     const audio = new Audio(url);
+    audio.volume = isMiniPlayerMuted ? 0 : audioVolume;
     audioRef.current = audio;
-    audio.play().catch(e => console.warn('Playback error:', e));
+    
+    audio.ontimeupdate = () => {
+      setAudioCurrentTime(audio.currentTime);
+    };
+    audio.onloadedmetadata = () => {
+      setAudioDuration(audio.duration || 0);
+    };
+
+    audio.play().then(() => {
+      setIsMiniPlayerPlaying(true);
+    }).catch(e => console.warn('Playback error:', e));
     setActivePlayingId(trackId);
     
     audio.onended = () => {
@@ -1025,15 +1373,43 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         playNextInPlaylist();
       } else {
         setActivePlayingId(null);
+        setIsMiniPlayerPlaying(false);
       }
     };
   };
 
+  // 💽 Unified Album & Playlist Queue Player
+  const playAlbumQueue = async (
+    albumTitle: string,
+    albumSubtitle: string,
+    tracks: Array<{ id: string; title: string; subtitle?: string; audioUrl: string; masteredAudioUrl?: string; duration?: number; albumTitle?: string }>,
+    coverGradient?: string,
+    accentColor?: string
+  ) => {
+    if (!tracks || tracks.length === 0) {
+      alert(`"${albumTitle}" enthält noch keine Audio-Aufnahmen. Nimm zuerst Songs auf!`);
+      return;
+    }
+
+    setPlaybackQueue(tracks);
+    setCurrentQueueIndex(0);
+    setCurrentAlbumMeta({ title: albumTitle, subtitle: albumSubtitle, gradient: coverGradient, accentColor });
+    setIsPlayingPlaylist(true);
+    setIsPlayingABComparison(false);
+
+    const firstTrack = tracks[0];
+    const url = await resolvePlayableUrl(firstTrack.audioUrl, firstTrack.masteredAudioUrl, firstTrack.id, audioMode);
+    if (url && firstTrack.id) {
+      setCurrentPlayingTrackMeta({ rawUrl: firstTrack.audioUrl || url, masteredUrl: firstTrack.masteredAudioUrl || url, trackId: firstTrack.id });
+      playAudioUrl(url, firstTrack.id);
+    }
+  };
+
   // Continuous Playlist Engine
   const activeCustomPlaylist = customPlaylists.find(p => p.id === selectedCustomPlaylistId) || customPlaylists[0];
-  const activePlaylistTracks = shelfMode === 'years' 
-    ? milestones.filter(m => m.audioUrl) 
-    : (activeCustomPlaylist?.tracks || []);
+  const activePlaylistTracks = playbackQueue.length > 0 
+    ? playbackQueue 
+    : (shelfMode === 'years' ? milestones.filter(m => m.audioUrl) : (activeCustomPlaylist?.tracks || []));
 
   const startContinuousPlaylist = async () => {
     if (activePlaylistTracks.length === 0) {
@@ -1041,37 +1417,89 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       return;
     }
 
-    if (isPlayingPlaylist) {
+    if (isPlayingPlaylist && isMiniPlayerPlaying) {
       if (audioRef.current) {
         audioRef.current.pause();
       }
-      setIsPlayingPlaylist(false);
-      setActivePlayingId(null);
+      setIsMiniPlayerPlaying(false);
+    } else if (isPlayingPlaylist && !isMiniPlayerPlaying) {
+      if (audioRef.current) {
+        audioRef.current.play().then(() => setIsMiniPlayerPlaying(true)).catch(console.warn);
+      }
     } else {
       setIsPlayingPlaylist(true);
       setIsPlayingABComparison(false);
       setPlaylistCurrentTrackIdx(0);
+      setCurrentQueueIndex(0);
       const firstTrack = activePlaylistTracks[0];
       const url = await resolvePlayableUrl(firstTrack?.audioUrl, firstTrack?.masteredAudioUrl, firstTrack?.id, audioMode);
       if (url && firstTrack?.id) {
+        setCurrentPlayingTrackMeta({ rawUrl: firstTrack.audioUrl || url, masteredUrl: firstTrack.masteredAudioUrl || url, trackId: firstTrack.id });
         playAudioUrl(url, firstTrack.id);
       }
     }
   };
 
   const playNextInPlaylist = async () => {
-    const nextIdx = playlistCurrentTrackIdx + 1;
-    if (nextIdx < activePlaylistTracks.length) {
+    const queueToUse = playbackQueue.length > 0 ? playbackQueue : activePlaylistTracks;
+    const currentIdx = playbackQueue.length > 0 ? currentQueueIndex : playlistCurrentTrackIdx;
+    const nextIdx = currentIdx + 1;
+    if (nextIdx < queueToUse.length) {
+      if (playbackQueue.length > 0) setCurrentQueueIndex(nextIdx);
       setPlaylistCurrentTrackIdx(nextIdx);
-      const nextTrack = activePlaylistTracks[nextIdx];
+      const nextTrack = queueToUse[nextIdx];
       const url = await resolvePlayableUrl(nextTrack?.audioUrl, nextTrack?.masteredAudioUrl, nextTrack?.id, audioMode);
       if (url && nextTrack?.id) {
+        setCurrentPlayingTrackMeta({ rawUrl: nextTrack.audioUrl || url, masteredUrl: nextTrack.masteredAudioUrl || url, trackId: nextTrack.id });
         playAudioUrl(url, nextTrack.id);
       }
     } else {
       setIsPlayingPlaylist(false);
       setActivePlayingId(null);
+      setIsMiniPlayerPlaying(false);
       setPlaylistCurrentTrackIdx(0);
+      setCurrentQueueIndex(0);
+    }
+  };
+
+  const playPrevInPlaylist = async () => {
+    if (audioRef.current && audioRef.current.currentTime > 3) {
+      audioRef.current.currentTime = 0;
+      setAudioCurrentTime(0);
+      return;
+    }
+    const queueToUse = playbackQueue.length > 0 ? playbackQueue : activePlaylistTracks;
+    const currentIdx = playbackQueue.length > 0 ? currentQueueIndex : playlistCurrentTrackIdx;
+    const prevIdx = currentIdx - 1;
+    if (prevIdx >= 0) {
+      if (playbackQueue.length > 0) setCurrentQueueIndex(prevIdx);
+      setPlaylistCurrentTrackIdx(prevIdx);
+      const prevTrack = queueToUse[prevIdx];
+      const url = await resolvePlayableUrl(prevTrack?.audioUrl, prevTrack?.masteredAudioUrl, prevTrack?.id, audioMode);
+      if (url && prevTrack?.id) {
+        setCurrentPlayingTrackMeta({ rawUrl: prevTrack.audioUrl || url, masteredUrl: prevTrack.masteredAudioUrl || url, trackId: prevTrack.id });
+        playAudioUrl(url, prevTrack.id);
+      }
+    } else if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      setAudioCurrentTime(0);
+    }
+  };
+
+  const toggleMiniPlayerPlay = () => {
+    if (!audioRef.current) return;
+    if (audioRef.current.paused) {
+      audioRef.current.play().then(() => setIsMiniPlayerPlaying(true)).catch(console.warn);
+    } else {
+      audioRef.current.pause();
+      setIsMiniPlayerPlaying(false);
+    }
+  };
+
+  const seekMiniPlayer = (newTime: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+      setAudioCurrentTime(newTime);
     }
   };
 
@@ -1859,6 +2287,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       description: wizardDesc.trim() || 'Persönliche Song-Sammlung',
       vibeTheme: wizardTheme,
       iconName: wizardIcon,
+      coverPresetId: wizardCoverPresetId,
       tracks: initialTracks,
       createdAt: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
     };
@@ -1871,6 +2300,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     setWizardStep(1);
     setWizardTitle('');
     setWizardDesc('');
+    setWizardCoverPresetId('cov_chart_hits');
     setWizardSelectedMilestones([]);
   };
 
@@ -2191,6 +2621,1444 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const station9 = milestones.find(m => m.stepNumber === 9 && m.audioUrl);
   const canPlayAB = !!station1 && !!station9;
   const abRecordedCount = (station1 ? 1 : 0) + (station9 ? 1 : 0);
+
+  const formatSeconds = (sec?: number) => {
+    if (!sec || isNaN(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const calcTracksDurationFormatted = (tracks: Array<{ duration?: number }>) => {
+    const totalSec = tracks.reduce((acc, t) => acc + (t.duration || 60), 0);
+    const min = Math.ceil(totalSec / 60);
+    return `${min} Min.`;
+  };
+
+  // 🎨 Dedicated Spotify Editorial Icon Renderer
+  const renderCoverIcon = (iconName: string, size = 26, color = '#ffffff') => {
+    const props = { size, color, strokeWidth: 2.2 };
+    switch (iconName) {
+      case 'sparkles': return <Sparkles {...props} />;
+      case 'sliders': return <Sliders {...props} />;
+      case 'music': return <Music {...props} />;
+      case 'gift': return <Gift {...props} />;
+      case 'bell': return <Bell {...props} />;
+      case 'zap': return <Zap {...props} />;
+      case 'lightbulb': return <Lightbulb {...props} />;
+      case 'flame': return <Flame {...props} />;
+      case 'heart': return <Heart {...props} />;
+      case 'sun': return <Sun {...props} />;
+      case 'disc': return <Disc {...props} />;
+      case 'award': return <Award {...props} />;
+      case 'star': return <Star {...props} />;
+      case 'radio': return <Radio {...props} />;
+      case 'volume-2': return <Volume2 {...props} />;
+      default: return <Music {...props} />;
+    }
+  };
+
+  // 🎨 High-Performance Spotify Editorial Vector Artwork Renderer (1:1 Square)
+  const renderSpotifyCoverArtwork = ({
+    gradient,
+    accentColor,
+    badge,
+    title,
+    subtitle,
+    volLabel,
+    iconName,
+    emoji,
+    isMilestoneMaster = false,
+    progressLabel
+  }: {
+    gradient: string;
+    accentColor: string;
+    badge?: string;
+    title: string;
+    subtitle?: string;
+    volLabel?: string;
+    iconName?: string;
+    emoji?: string;
+    isMilestoneMaster?: boolean;
+    progressLabel?: string;
+  }) => {
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        background: gradient,
+        borderRadius: '14px',
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: '16px',
+        boxSizing: 'border-box',
+        boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.18)'
+      }}>
+        {/* Subtle Geometric Overlay */}
+        <div style={{
+          position: 'absolute',
+          top: '-20%',
+          right: '-20%',
+          width: '70%',
+          height: '70%',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.22) 0%, transparent 70%)',
+          pointerEvents: 'none'
+        }} />
+
+        {/* Diagonal Light Streak */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.02) 40%, transparent 60%)',
+          pointerEvents: 'none'
+        }} />
+
+        {/* Top Header Row: Spotify Editorial Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
+          <span style={{
+            fontSize: '0.62rem',
+            fontWeight: 900,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: '#ffffff',
+            background: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            {volLabel || badge || 'PLAYLIST'}
+          </span>
+
+          {isMilestoneMaster ? (
+            <div style={{
+              width: '26px',
+              height: '26px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+            }}>
+              <Award size={14} color="#b45309" />
+            </div>
+          ) : emoji ? (
+            <span style={{ fontSize: '1.25rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}>{emoji}</span>
+          ) : null}
+        </div>
+
+        {/* Center Artwork Graphic / Icon */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          zIndex: 2,
+          margin: 'auto 0'
+        }}>
+          {isMilestoneMaster ? (
+            <div style={{
+              width: '68px',
+              height: '68px',
+              borderRadius: '50%',
+              background: 'rgba(0, 0, 0, 0.35)',
+              border: '2px solid rgba(255, 255, 255, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
+            }}>
+              <Sparkles size={34} color="#fde047" />
+            </div>
+          ) : (
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '16px',
+              background: 'rgba(0, 0, 0, 0.3)',
+              backdropFilter: 'blur(8px)',
+              border: '1.5px solid rgba(255, 255, 255, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 6px 18px rgba(0,0,0,0.3)'
+            }}>
+              {renderCoverIcon(iconName || 'music', 28, '#ffffff')}
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Title & Subtitle Banner inside Cover */}
+        <div style={{ zIndex: 2, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span style={{
+            fontSize: '1rem',
+            fontWeight: 900,
+            color: '#ffffff',
+            letterSpacing: '-0.02em',
+            textShadow: '0 2px 8px rgba(0, 0, 0, 0.6)',
+            lineHeight: 1.2,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {title}
+          </span>
+          {subtitle && (
+            <span style={{
+              fontSize: '0.68rem',
+              fontWeight: 700,
+              color: 'rgba(255, 255, 255, 0.85)',
+              textShadow: '0 1px 4px rgba(0, 0, 0, 0.6)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+              {subtitle}
+            </span>
+          )}
+          {progressLabel && (
+            <span style={{
+              marginTop: '4px',
+              fontSize: '0.64rem',
+              fontWeight: 900,
+              color: '#fef3c7',
+              background: 'rgba(0, 0, 0, 0.5)',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              alignSelf: 'flex-start'
+            }}>
+              ⭐ {progressLabel}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // 🟢 Pure Spotify 1:1 Square Card Component
+  const renderSpotifyCoverCard = (item: {
+    id: string;
+    title: string;
+    subtitle: string;
+    badge?: string;
+    trackCount: number;
+    totalDurationMin?: number;
+    gradient: string;
+    accentColor: string;
+    iconName?: string;
+    coverEmoji?: string;
+    volLabel?: string;
+    isMilestoneMaster?: boolean;
+    progressLabel?: string;
+    isPlayingThisAlbum?: boolean;
+    isBoxsetFolder?: boolean;
+    onPlay: (e: React.MouseEvent) => void;
+    onOpen: () => void;
+    onShare?: (e: React.MouseEvent) => void;
+    onBooklet?: (e: React.MouseEvent) => void;
+  }) => {
+    const isPlaying = !!item.isPlayingThisAlbum;
+
+    return (
+      <div
+        key={item.id}
+        onClick={item.onOpen}
+        style={{
+          flex: '0 0 auto',
+          width: isMobileOrSim ? '180px' : '220px',
+          scrollSnapAlign: 'start',
+          borderRadius: '16px',
+          background: isLight ? '#ffffff' : 'rgba(30, 41, 59, 0.6)',
+          border: `1.5px solid ${isPlaying ? item.accentColor : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)')}`,
+          padding: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          cursor: 'pointer',
+          boxShadow: isPlaying 
+            ? `0 12px 30px ${item.accentColor}33` 
+            : (isLight ? '0 4px 14px rgba(0, 0, 0, 0.04)' : '0 6px 20px rgba(0, 0, 0, 0.3)'),
+          position: 'relative',
+          boxSizing: 'border-box'
+        }}
+        className="spotify-card-hover"
+      >
+        {/* 1:1 Square Artwork Container */}
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '1 / 1',
+          borderRadius: '12px',
+          overflow: 'hidden'
+        }}>
+          {renderSpotifyCoverArtwork({
+            gradient: item.gradient,
+            accentColor: item.accentColor,
+            badge: item.badge,
+            title: item.title,
+            subtitle: item.subtitle,
+            volLabel: item.volLabel,
+            iconName: item.iconName,
+            emoji: item.coverEmoji,
+            isMilestoneMaster: item.isMilestoneMaster,
+            progressLabel: item.progressLabel
+          })}
+
+          {/* 🟢 Spotify Floating Play Button (Bottom-Right Hover) */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              item.onPlay(e);
+            }}
+            title={isPlaying ? "Wiedergabe pausieren" : "Playlist abspielen"}
+            style={{
+              position: 'absolute',
+              bottom: '10px',
+              right: '10px',
+              width: '46px',
+              height: '46px',
+              borderRadius: '50%',
+              background: '#10b981',
+              border: 'none',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.45)',
+              opacity: isPlaying ? 1 : undefined,
+              zIndex: 10
+            }}
+            className="spotify-play-btn"
+          >
+            {isPlaying ? (
+              <Pause size={20} fill="#ffffff" color="#ffffff" />
+            ) : (
+              <Play size={20} fill="#ffffff" color="#ffffff" style={{ marginLeft: '2px' }} />
+            )}
+          </button>
+        </div>
+
+        {/* Card Typography & Details */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+            <h4 style={{
+              margin: 0,
+              fontSize: '0.92rem',
+              fontWeight: 900,
+              color: isPlaying ? '#10b981' : colors.textPrimary,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              letterSpacing: '-0.01em'
+            }}>
+              {item.title}
+            </h4>
+
+            {item.onBooklet && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); item.onBooklet!(e); }}
+                title="Booklet anzeigen"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: colors.textSecondary,
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                className="hover-scale"
+              >
+                <BookOpen size={14} />
+              </button>
+            )}
+          </div>
+
+          <span style={{
+            fontSize: '0.74rem',
+            color: colors.textSecondary,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            fontWeight: 500
+          }}>
+            {item.subtitle}
+          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                fontSize: '0.66rem',
+                fontWeight: 800,
+                color: colors.textMuted
+              }}>
+                {item.trackCount} {item.trackCount === 1 ? 'Track' : 'Tracks'}
+                {item.totalDurationMin ? ` • ${item.totalDurationMin} Min.` : ''}
+              </span>
+            </div>
+
+            {item.isBoxsetFolder && (
+              <span style={{
+                fontSize: '0.66rem',
+                fontWeight: 800,
+                color: '#06b6d4',
+                background: isLight ? '#e0f2fe' : 'rgba(6, 182, 212, 0.15)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}>
+                <Folder size={10} />
+                Ordner
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 🌟 1. TAB: MASTER ÜBERSICHT (SPOTIFY PLAYLIST HUB MIT NEBENEINANDER LIEGENDEN COVERN)
+  const renderOverviewShelf = () => {
+    const completedMilestones = milestones.filter(m => !!m.audioUrl);
+    const milestonesRecordedCount = completedMilestones.length;
+    const milestonesTotalSec = completedMilestones.reduce((acc, m) => acc + (m.duration || 60), 0);
+    const milestonesMin = Math.ceil(milestonesTotalSec / 60);
+
+    const isCurrentSchoolYear = (dateStr?: string) => {
+      if (!dateStr) return true;
+      return dateStr.includes('2026') || dateStr.includes('2027') || !dateStr.includes('/');
+    };
+
+    const currentYearPlaylists = customPlaylists.filter(pl => isCurrentSchoolYear(pl.createdAt));
+    const schoolYearAlbums = activeSchoolYears.filter(y => y.id !== 'lp_timeless_master');
+
+    const isMilestonesPlaying = isPlayingPlaylist && (currentAlbumMeta?.title.includes('Meilenstein') || (playbackQueue.length > 0 && playbackQueue[0]?.id.startsWith('ms_')));
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
+
+        {/* ⭐ SEKTION 1: MEINE MEILENSTEIN-PLAYLIST (ZEITLOS) */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Award size={18} color="#f59e0b" />
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: colors.textPrimary }}>
+                1. Meine Meilenstein-Playlist (Zeitlos)
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('milestones')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#10b981',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <span>Zur 9-Stationen Chronik</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* Horizontale Leiste: Nebeneinander platziert */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'row',
+            gap: '18px',
+            overflowX: 'auto',
+            paddingBottom: '12px',
+            scrollSnapType: 'x mandatory',
+            WebkitOverflowScrolling: 'touch'
+          }}>
+            {renderSpotifyCoverCard({
+              id: 'sp_milestones_master',
+              title: 'Meine Meilenstein-LP',
+              subtitle: '9 Meilensteine • Lebenswerk',
+              badge: '⭐ MASTER-LP',
+              volLabel: 'MEISTER-LP',
+              trackCount: completedMilestones.length,
+              totalDurationMin: milestonesMin,
+              gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 45%, #b45309 100%)',
+              accentColor: '#f59e0b',
+              isMilestoneMaster: true,
+              progressLabel: `${milestonesRecordedCount}/9 gemeistert`,
+              isPlayingThisAlbum: isMilestonesPlaying,
+              onPlay: () => {
+                const tracksToPlay = completedMilestones.map(m => ({
+                  id: m.id,
+                  title: m.title,
+                  subtitle: m.subtitle,
+                  audioUrl: m.audioUrl!,
+                  masteredAudioUrl: m.masteredAudioUrl,
+                  duration: m.duration || 60,
+                  albumTitle: '🌟 Meine Meilenstein-LP'
+                }));
+                playAlbumQueue('🌟 Meine Meilenstein-LP (Zeitlos)', '9 Schlüssel-Meilensteine', tracksToPlay, 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', '#f59e0b');
+              },
+              onOpen: () => setActiveMainTab('milestones'),
+              onBooklet: () => {
+                setActiveLinerNotesModal({
+                  title: '🌟 Meine Meilenstein-LP (Zeitlos)',
+                  subtitle: 'Die 9 Meilensteine deiner musikalischen Heldenreise',
+                  gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  tracks: milestones.map(m => ({
+                    title: m.title,
+                    subtitle: m.subtitle,
+                    personalNote: m.personalNote,
+                    recordedAt: m.recordedAt,
+                    duration: m.duration,
+                    schoolYear: m.schoolYear
+                  }))
+                });
+              },
+              onShare: () => {
+                setShareTargetPlaylistId(null);
+                setShowShareModal(true);
+              }
+            })}
+          </div>
+        </div>
+
+        {/* 🔥 SEKTION 2: PLAYLISTEN IM LAUFENDEN SCHULJAHR (2026/2027) */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Flame size={18} color="#ef4444" />
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: colors.textPrimary }}>
+                2. Playlisten im laufenden Schuljahr (2026/2027)
+              </h3>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setWizardStep(1);
+                setShowPlaylistWizard(true);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                border: 'none',
+                color: 'white',
+                padding: '6px 14px',
+                borderRadius: '100px',
+                fontSize: '0.76rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                boxShadow: '0 2px 10px rgba(245, 158, 11, 0.3)'
+              }}
+              className="hover-scale"
+            >
+              <Plus size={14} />
+              <span>Neue Playlist erstellen</span>
+            </button>
+          </div>
+
+          {/* Horizontale Leiste: Nebeneinander platziert */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'row',
+            gap: '18px',
+            overflowX: 'auto',
+            paddingBottom: '12px',
+            scrollSnapType: 'x mandatory',
+            WebkitOverflowScrolling: 'touch'
+          }}>
+            {/* Quick-Create Spotify Card */}
+            <div
+              onClick={() => {
+                setWizardStep(1);
+                setShowPlaylistWizard(true);
+              }}
+              style={{
+                flex: '0 0 auto',
+                width: isMobileOrSim ? '180px' : '220px',
+                scrollSnapAlign: 'start',
+                borderRadius: '16px',
+                border: `2px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.25)'}`,
+                background: isLight ? 'rgba(241, 245, 249, 0.5)' : 'rgba(255, 255, 255, 0.03)',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                gap: '10px',
+                minHeight: isMobileOrSim ? '240px' : '280px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxSizing: 'border-box'
+              }}
+              className="hover-scale"
+            >
+              <div style={{
+                width: '50px',
+                height: '50px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)'
+              }}>
+                <Plus size={24} strokeWidth={2.8} />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.88rem', fontWeight: 900, color: colors.textPrimary, display: 'block' }}>
+                  Neue Playlist
+                </span>
+                <span style={{ fontSize: '0.72rem', color: colors.textMuted, marginTop: '2px', display: 'block' }}>
+                  Cover & Songs wählen
+                </span>
+              </div>
+            </div>
+
+            {/* Render Current Year Custom Playlists */}
+            {currentYearPlaylists.map((pl) => {
+              const presetConfig = UNIVERSAL_PLAYLIST_COVERS.find(c => c.id === pl.coverPresetId);
+              const themeObj = VIBE_THEMES.find(v => v.id === pl.vibeTheme) || VIBE_THEMES[0];
+              const effectiveGradient = presetConfig?.gradient || themeObj.gradient;
+              const effectiveAccent = presetConfig?.accentColor || themeObj.color;
+              const effectiveBadge = presetConfig?.badge || `${pl.tracks.length} TRACKS`;
+              const isPlayingThis = isPlayingPlaylist && (currentAlbumMeta?.title === pl.title || (activeCustomPlaylist?.id === pl.id && isMiniPlayerPlaying));
+
+              return renderSpotifyCoverCard({
+                id: pl.id,
+                title: pl.title,
+                subtitle: pl.description || 'Studio Playlist',
+                badge: effectiveBadge,
+                trackCount: pl.tracks.length,
+                totalDurationMin: Math.ceil(pl.tracks.reduce((acc, t) => acc + (t.duration || 60), 0) / 60),
+                gradient: effectiveGradient,
+                accentColor: effectiveAccent,
+                iconName: presetConfig?.iconName || pl.iconName,
+                coverEmoji: presetConfig?.emoji || (pl.iconName === 'gift' ? '🎄' : pl.iconName === 'sun' ? '☀️' : pl.iconName === 'heart' ? '⭐' : '🎵'),
+                isPlayingThisAlbum: isPlayingThis,
+                onPlay: () => {
+                  playAlbumQueue(pl.title, pl.description || 'Studio Album', pl.tracks, effectiveGradient, effectiveAccent);
+                },
+                onOpen: () => {
+                  setSelectedCustomPlaylistId(pl.id);
+                  setActiveMainTab('playlists');
+                },
+                onBooklet: () => {
+                  setActiveLinerNotesModal({
+                    title: pl.title,
+                    subtitle: pl.description,
+                    gradient: effectiveGradient,
+                    tracks: pl.tracks.map(t => ({
+                      title: t.title,
+                      subtitle: t.subtitle,
+                      personalNote: t.personalNote,
+                      recordedAt: t.recordedAt,
+                      duration: t.duration
+                    }))
+                  });
+                },
+                onShare: () => {
+                  setShareTargetPlaylistId(pl.id);
+                  setShowShareModal(true);
+                }
+              });
+            })}
+          </div>
+        </div>
+
+        {/* 📚 SEKTION 3: SCHULJAHRES-ALBEN (10-JAHRES-ROTATION) */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Folder size={18} color="#06b6d4" />
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: colors.textPrimary }}>
+                3. Schuljahres-Alben (10-Jahres-Rotation)
+              </h3>
+            </div>
+            <span style={{ fontSize: '0.76rem', color: colors.textMuted, fontWeight: 600 }}>
+              Play-Button startet die Jahres-LP • Klick öffnet den Schuljahr-Ordner
+            </span>
+          </div>
+
+          {/* Horizontale Leiste: Nebeneinander platziert */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'row',
+            gap: '18px',
+            overflowX: 'auto',
+            paddingBottom: '12px',
+            scrollSnapType: 'x mandatory',
+            WebkitOverflowScrolling: 'touch'
+          }}>
+            {schoolYearAlbums.map((lp) => {
+              const yearPlaylists = customPlaylists.filter(pl => pl.createdAt && pl.createdAt.includes(lp.year));
+              const yearMilestones = milestones.filter(m => m.audioUrl && (m.schoolYear === lp.year || (lp.isCurrent && !m.schoolYear)));
+              const allYearTracks = [
+                ...yearMilestones.map(m => ({
+                  id: m.id,
+                  title: m.title,
+                  subtitle: m.subtitle,
+                  audioUrl: m.audioUrl!,
+                  masteredAudioUrl: m.masteredAudioUrl,
+                  duration: m.duration || 60,
+                  albumTitle: lp.title
+                })),
+                ...yearPlaylists.flatMap(pl => pl.tracks.map(t => ({ ...t, albumTitle: pl.title })))
+              ];
+
+              const totalTracks = allYearTracks.length;
+              const totalMin = Math.ceil(allYearTracks.reduce((acc, t) => acc + (t.duration || 60), 0) / 60);
+              const isPlayingThisLP = isPlayingPlaylist && currentAlbumMeta?.title === lp.title;
+
+              return renderSpotifyCoverCard({
+                id: lp.id,
+                title: lp.title,
+                subtitle: `${lp.subtitle} (${totalTracks} Tracks)`,
+                badge: lp.volLabel,
+                volLabel: lp.volLabel,
+                trackCount: totalTracks,
+                totalDurationMin: totalMin,
+                gradient: lp.gradient,
+                accentColor: lp.accentColor,
+                iconName: SCHOOL_YEAR_COVERS.find(c => c.vol === lp.volNum)?.iconName || 'disc',
+                isBoxsetFolder: true,
+                isPlayingThisAlbum: isPlayingThisLP,
+                onPlay: () => {
+                  playAlbumQueue(lp.title, lp.subtitle, allYearTracks, lp.gradient, lp.accentColor);
+                },
+                onOpen: () => {
+                  setActiveSchoolYearFolderModal(lp);
+                },
+                onBooklet: () => {
+                  setActiveLinerNotesModal({
+                    title: `${lp.title} (Liner-Notes)`,
+                    subtitle: `Gesamt-Chronik aller Aufnahmen im Schuljahr ${lp.year}`,
+                    gradient: lp.gradient,
+                    tracks: allYearTracks.map(t => ({
+                      title: t.title,
+                      subtitle: t.subtitle,
+                      duration: t.duration,
+                      schoolYear: lp.year
+                    }))
+                  });
+                },
+                onShare: () => {
+                  setShareTargetPlaylistId(null);
+                  setShowShareModal(true);
+                }
+              });
+            })}
+          </div>
+        </div>
+
+      </div>
+    );
+  };
+
+  // 📁 MODAL: SCHULJAHR-ORDNER & DETAIL-REGAL
+  const renderSchoolYearFolderModal = () => {
+    if (!activeSchoolYearFolderModal) return null;
+    const lp = activeSchoolYearFolderModal;
+
+    const yearPlaylists = customPlaylists.filter(pl => pl.createdAt && pl.createdAt.includes(lp.year));
+    const yearMilestones = milestones.filter(m => m.audioUrl && (m.schoolYear === lp.year || (lp.isCurrent && !m.schoolYear)));
+    const allYearTracks = [
+      ...yearMilestones.map(m => ({
+        id: m.id,
+        title: m.title,
+        subtitle: m.subtitle,
+        audioUrl: m.audioUrl!,
+        masteredAudioUrl: m.masteredAudioUrl,
+        duration: m.duration || 60,
+        albumTitle: lp.title
+      })),
+      ...yearPlaylists.flatMap(pl => pl.tracks.map(t => ({ ...t, albumTitle: pl.title })))
+    ];
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.82)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '16px'
+      }}>
+        <div style={{
+          background: isLight ? '#ffffff' : '#1e293b',
+          border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+          borderRadius: '28px',
+          padding: '28px',
+          maxWidth: '740px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          color: colors.textPrimary,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '22px',
+          boxShadow: '0 30px 70px rgba(0, 0, 0, 0.8)'
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '14px',
+                background: lp.gradient,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                boxShadow: '0 6px 18px rgba(0,0,0,0.3)'
+              }}>
+                <FolderOpen size={24} />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: lp.accentColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Schuljahr-Archiv
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900 }}>
+                  Schuljahr {lp.year} – Playlists & Aufnahmen
+                </h3>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveSchoolYearFolderModal(null)}
+              style={{
+                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: colors.textSecondary,
+                cursor: 'pointer'
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Quick Action: Play entire school year */}
+          <div style={{
+            background: isLight ? '#f8fafc' : 'rgba(15, 23, 42, 0.6)',
+            border: `1px solid ${colors.panelBorder}`,
+            borderRadius: '18px',
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px'
+          }}>
+            <div>
+              <span style={{ fontSize: '0.9rem', fontWeight: 900, color: colors.textPrimary, display: 'block' }}>
+                Gesamte Jahres-LP abspielen
+              </span>
+              <span style={{ fontSize: '0.76rem', color: colors.textMuted }}>
+                {allYearTracks.length} Aufnahmen • {Math.ceil(allYearTracks.reduce((acc, t) => acc + (t.duration || 60), 0) / 60)} Minuten Gesamt-Laufzeit
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                playAlbumQueue(`Schuljahr ${lp.year} (Gesamt-LP)`, lp.subtitle, allYearTracks, lp.gradient, lp.accentColor);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                color: 'white',
+                padding: '10px 18px',
+                borderRadius: '100px',
+                fontSize: '0.82rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)'
+              }}
+              className="hover-scale"
+            >
+              <Play size={16} />
+              <span>Ganzes Schuljahr abspielen</span>
+            </button>
+          </div>
+
+          {/* Playlists in this school year */}
+          <div>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.94rem', fontWeight: 900, color: colors.textPrimary }}>
+              Playlists in diesem Schuljahr ({yearPlaylists.length})
+            </h4>
+
+            {yearPlaylists.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.2)', borderRadius: '14px', color: colors.textMuted, fontSize: '0.82rem' }}>
+                Keine separaten Playlists für dieses Schuljahr angelegt.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: isMobileOrSim ? '1fr' : 'repeat(2, 1fr)', gap: '12px' }}>
+                {yearPlaylists.map((pl) => {
+                  const themeObj = VIBE_THEMES.find(v => v.id === pl.vibeTheme) || VIBE_THEMES[0];
+                  return (
+                    <div
+                      key={pl.id}
+                      style={{
+                        background: isLight ? '#ffffff' : 'rgba(30, 41, 59, 0.8)',
+                        border: `1px solid ${colors.cardBorder}`,
+                        borderRadius: '16px',
+                        padding: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '10px',
+                          background: themeObj.gradient,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white'
+                        }}>
+                          <Music size={18} />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.86rem', fontWeight: 900, color: colors.textPrimary, display: 'block' }}>
+                            {pl.title}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: colors.textMuted }}>
+                            {pl.tracks.length} Songs • -13 LUFS
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playAlbumQueue(pl.title, pl.description || 'Playlist', pl.tracks, themeObj.gradient, themeObj.color);
+                        }}
+                        style={{
+                          background: '#10b981',
+                          border: 'none',
+                          color: 'white',
+                          borderRadius: '50%',
+                          width: '34px',
+                          height: '34px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Play size={15} style={{ marginLeft: '2px' }} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Milestones in this school year */}
+          <div>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.94rem', fontWeight: 900, color: colors.textPrimary }}>
+              Gemeisterte Meilensteine in diesem Schuljahr ({yearMilestones.length})
+            </h4>
+
+            {yearMilestones.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.2)', borderRadius: '14px', color: colors.textMuted, fontSize: '0.82rem' }}>
+                Keine Meilensteine in diesem Schuljahr aufgezeichnet.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {yearMilestones.map((ms) => (
+                  <div
+                    key={ms.id}
+                    style={{
+                      background: isLight ? '#ffffff' : 'rgba(30, 41, 59, 0.8)',
+                      border: `1px solid ${colors.cardBorder}`,
+                      borderRadius: '14px',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: '#f59e0b',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.72rem',
+                        fontWeight: 900
+                      }}>
+                        <Check size={14} strokeWidth={3} />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: colors.textPrimary, display: 'block' }}>
+                          Station {ms.stepNumber}: {ms.title}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: colors.textMuted }}>
+                          {ms.subtitle}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handlePlayToggle(ms.audioUrl, ms.masteredAudioUrl, ms.id)}
+                      style={{
+                        background: activePlayingId === ms.id ? '#f59e0b' : '#10b981',
+                        border: 'none',
+                        color: 'white',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {activePlayingId === ms.id ? <Pause size={14} /> : <Play size={14} style={{ marginLeft: '2px' }} />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 📖 MODAL: DIGITALES LINER-NOTES BOOKLET
+  const renderLinerNotesModal = () => {
+    if (!activeLinerNotesModal) return null;
+    const bk = activeLinerNotesModal;
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.85)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '16px'
+      }}>
+        <div style={{
+          background: isLight ? '#ffffff' : '#1e293b',
+          border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+          borderRadius: '28px',
+          padding: '28px',
+          maxWidth: '680px',
+          width: '100%',
+          maxHeight: '88vh',
+          overflowY: 'auto',
+          color: colors.textPrimary,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+          boxShadow: '0 30px 70px rgba(0, 0, 0, 0.8)'
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <BookOpen size={22} color="#10b981" />
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>
+                  Digitales CD-Booklet & Liner-Notes
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900 }}>
+                  {bk.title}
+                </h3>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveLinerNotesModal(null)}
+              style={{
+                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: colors.textSecondary,
+                cursor: 'pointer'
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <p style={{ margin: 0, fontSize: '0.84rem', color: colors.textSecondary, lineHeight: 1.45 }}>
+            {bk.subtitle || 'Persönliche Notizen, didaktische Meilenstein-Erklärungen und Tonstudio-Aufnahmeberichte.'}
+          </p>
+
+          {/* Tracks Liner-Notes List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {bk.tracks.map((t, idx) => (
+              <div
+                key={idx}
+                style={{
+                  background: isLight ? '#f8fafc' : 'rgba(15, 23, 42, 0.65)',
+                  border: `1px solid ${colors.panelBorder}`,
+                  borderRadius: '16px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#10b981', background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.15)', padding: '2px 8px', borderRadius: '6px' }}>
+                      #{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                    </span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 900, color: colors.textPrimary }}>
+                      {t.title}
+                    </span>
+                  </div>
+                  {t.schoolYear && (
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: colors.textMuted }}>
+                      {t.schoolYear}
+                    </span>
+                  )}
+                </div>
+
+                {t.subtitle && (
+                  <span style={{ fontSize: '0.76rem', color: colors.textMuted }}>
+                    {t.subtitle}
+                  </span>
+                )}
+
+                {t.personalNote ? (
+                  <div style={{
+                    marginTop: '4px',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.05)',
+                    borderLeft: '3px solid #10b981',
+                    fontSize: '0.78rem',
+                    color: colors.textSecondary,
+                    fontStyle: 'italic'
+                  }}>
+                    💬 "{t.personalNote}"
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '0.74rem', color: colors.textMuted, fontStyle: 'italic', marginTop: '2px' }}>
+                    Noch keine persönliche Notiz hinterlegt.
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 💽 PERSISTENT FLOATING BOTTOM MINI-PLAYER (APPLE MUSIC STYLE)
+  const renderFloatingMiniPlayer = () => {
+    if (!activePlayingId && !isPlayingPlaylist && !isMiniPlayerPlaying) return null;
+
+    const currentTrack = (playbackQueue.length > 0 ? playbackQueue[currentQueueIndex] : null) ||
+      milestones.find(m => m.id === activePlayingId) ||
+      customPlaylists.flatMap(p => p.tracks).find(t => t.id === activePlayingId) || {
+        title: currentAlbumMeta?.title || 'Wiedergabe aktiv',
+        subtitle: currentAlbumMeta?.subtitle || 'Campus-Groovelab Studio Player'
+      };
+
+    const albumName = currentAlbumMeta?.title || (shelfMode === 'years' ? '🌟 Meine Meilenstein-LP' : activeCustomPlaylist?.title || 'Studio-Album');
+
+    return (
+      <div style={{
+        position: 'fixed',
+        bottom: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 'min(94%, 860px)',
+        zIndex: 99998,
+        background: isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(25px)',
+        WebkitBackdropFilter: 'blur(25px)',
+        border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
+        borderRadius: '24px',
+        padding: '12px 18px',
+        boxShadow: isLight ? '0 16px 45px rgba(0, 0, 0, 0.12)' : '0 20px 50px rgba(0, 0, 0, 0.7)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        boxSizing: 'border-box'
+      }}>
+        {/* Progress Scrubber */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: colors.textMuted, minWidth: '32px' }}>
+            {formatSeconds(audioCurrentTime)}
+          </span>
+          <div
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const pos = (e.clientX - rect.left) / rect.width;
+              if (audioDuration > 0) seekMiniPlayer(pos * audioDuration);
+            }}
+            style={{
+              flex: 1,
+              height: '5px',
+              borderRadius: '100px',
+              background: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.15)',
+              position: 'relative',
+              cursor: 'pointer'
+            }}
+          >
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: `${audioDuration > 0 ? (audioCurrentTime / audioDuration) * 100 : 0}%`,
+              background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+              borderRadius: '100px'
+            }} />
+          </div>
+          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: colors.textMuted, minWidth: '32px', textAlign: 'right' }}>
+            {formatSeconds(audioDuration)}
+          </span>
+        </div>
+
+        {/* Main Player Row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px' }}>
+          
+          {/* Left: Mini-Disc Artwork + Song Title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '160px', flex: 1 }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, #0f172a 20%, #334155 22%, #0f172a 40%, #1e293b 60%, #0f172a 80%, #334155 100%)',
+              border: '1.5px solid rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              animation: isMiniPlayerPlaying ? 'vinylSpin 3.5s linear infinite' : 'none'
+            }}>
+              <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#10b981' }} />
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+              <span style={{
+                display: 'block',
+                fontSize: '0.86rem',
+                fontWeight: 900,
+                color: colors.textPrimary,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {currentTrack.title}
+              </span>
+              <span style={{
+                display: 'block',
+                fontSize: '0.72rem',
+                color: colors.textMuted,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {albumName}
+              </span>
+            </div>
+          </div>
+
+          {/* Center: Playback Controls (Skip Prev, Play/Pause, Skip Next) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={playPrevInPlaylist}
+              title="Vorheriger Song"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: colors.textPrimary,
+                cursor: 'pointer',
+                padding: '6px'
+              }}
+              className="hover-scale"
+            >
+              <SkipBack size={18} />
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleMiniPlayerPlay}
+              title={isMiniPlayerPlaying ? "Pause" : "Play"}
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)'
+              }}
+              className="hover-scale"
+            >
+              {isMiniPlayerPlaying ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: '2px' }} />}
+            </button>
+
+            <button
+              type="button"
+              onClick={playNextInPlaylist}
+              title="Nächster Song"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: colors.textPrimary,
+                cursor: 'pointer',
+                padding: '6px'
+              }}
+              className="hover-scale"
+            >
+              <SkipForward size={18} />
+            </button>
+          </div>
+
+          {/* Right: Studio Audio-Processing Switcher & Volume */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: isMobileOrSim ? 0 : 1, justifyContent: 'flex-end' }}>
+            {!isMobileOrSim && (
+              <button
+                type="button"
+                onClick={() => switchAudioMode(audioMode === 'master' ? 'raw' : 'master')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 10px',
+                  borderRadius: '100px',
+                  border: `1px solid ${audioMode === 'master' ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255,255,255,0.2)')}`,
+                  background: audioMode === 'master' ? (isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.2)') : 'transparent',
+                  color: audioMode === 'master' ? '#10b981' : colors.textMuted,
+                  fontSize: '0.72rem',
+                  fontWeight: 900,
+                  cursor: 'pointer'
+                }}
+              >
+                <Sparkles size={12} color="#10b981" />
+                <span>{audioMode === 'master' ? '✨ Studio (-13 LUFS)' : '🎙️ RAW'}</span>
+              </button>
+            )}
+
+            {/* Volume toggle */}
+            {!isMobileOrSim && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioRef.current) {
+                    const newMuted = !isMiniPlayerMuted;
+                    setIsMiniPlayerMuted(newMuted);
+                    audioRef.current.volume = newMuted ? 0 : audioVolume;
+                  }
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: colors.textSecondary,
+                  cursor: 'pointer',
+                  padding: '4px'
+                }}
+              >
+                {isMiniPlayerMuted ? <VolumeX size={16} color="#ef4444" /> : <Volume2 size={16} />}
+              </button>
+            )}
+
+            {/* Stop & Close Mini-Player */}
+            <button
+              type="button"
+              onClick={() => {
+                if (audioRef.current) audioRef.current.pause();
+                setActivePlayingId(null);
+                setIsMiniPlayerPlaying(false);
+                setIsPlayingPlaylist(false);
+              }}
+              title="Player schließen"
+              style={{
+                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '30px',
+                height: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: colors.textSecondary,
+                cursor: 'pointer'
+              }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderVinylShelf = () => (
     <div style={{
@@ -2749,9 +4617,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                           <span style={{ fontSize: '0.78rem', fontWeight: 800, color: isTrackPlaying ? '#10b981' : colors.textPrimary, display: 'block', lineHeight: 1.25 }}>
                             {t.title}
                           </span>
-                          {t.personalNote && (
+                          {(t as any).personalNote && (
                             <span style={{ fontSize: '0.66rem', color: colors.textSecondary, fontStyle: 'italic', fontWeight: 500 }}>
-                              "{t.personalNote.slice(0, 24)}..."
+                              "{(t as any).personalNote.slice(0, 24)}..."
                             </span>
                           )}
                         </div>
@@ -2985,7 +4853,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       boxSizing: 'border-box',
       transition: 'background 0.3s ease, color 0.3s ease'
     }}>
-      {/* Keyframe animations */}
+      {/* Keyframe animations & Spotify Hover Styles */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes soundBarPulse {
           0%, 100% { height: 4px; }
@@ -3003,6 +4871,25 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           0% { transform: scale(0.6); opacity: 0; }
           50% { transform: scale(1.15); opacity: 1; }
           100% { transform: scale(1); opacity: 1; }
+        }
+        .spotify-card-hover {
+          transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease !important;
+        }
+        .spotify-card-hover:hover {
+          transform: translateY(-5px) !important;
+        }
+        .spotify-play-btn {
+          opacity: 0;
+          transform: translateY(8px) scale(0.85);
+          transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease !important;
+        }
+        .spotify-card-hover:hover .spotify-play-btn {
+          opacity: 1 !important;
+          transform: translateY(0) scale(1) !important;
+        }
+        .spotify-play-btn:hover {
+          transform: translateY(0) scale(1.08) !important;
+          background: #059669 !important;
         }
       `}} />
 
@@ -3031,7 +4918,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           <span>← Zurück zum Aufgabenheft</span>
         </button>
 
-        {/* 🌟 1. APPLE MAIN SEGMENTED TABS: MEILENSTEINE vs PLAYLISTS */}
+        {/* 🌟 1. APPLE MAIN SEGMENTED TABS: ÜBERSICHT vs MEILENSTEINE vs PLAYLISTS */}
         <div style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -3041,6 +4928,29 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           padding: '4px',
           gap: '4px'
         }}>
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('overview')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '100px',
+              border: 'none',
+              background: activeMainTab === 'overview' ? (isLight ? '#ffffff' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') : 'transparent',
+              color: activeMainTab === 'overview' ? (isLight ? '#0f172a' : '#ffffff') : colors.textSecondary,
+              fontSize: '0.78rem',
+              fontWeight: 900,
+              cursor: 'pointer',
+              boxShadow: activeMainTab === 'overview' && isLight ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Disc size={14} color={activeMainTab === 'overview' ? (isLight ? '#10b981' : '#ffffff') : undefined} />
+            <span>Übersicht</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveMainTab('milestones')}
@@ -3231,92 +5141,29 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               letterSpacing: '-0.02em',
               color: colors.textPrimary
             }}>
-              {activeMainTab === 'milestones' ? 'Meine Audio-Biografie & Meilenstein-Chronik' : 'Meine Custom Playlists & Studio-Alben'}
+              {activeMainTab === 'overview' 
+                ? 'Meine Audio-Biografie – CD & Album-Regal' 
+                : activeMainTab === 'milestones' 
+                  ? 'Meine Audio-Biografie & Meilenstein-Chronik' 
+                  : 'Meine Custom Playlists & Studio-Alben'}
             </h2>
           </div>
           <p style={{ margin: 0, fontSize: '0.86rem', color: colors.textSecondary, maxWidth: '640px', lineHeight: 1.45, fontWeight: 500 }}>
-            {activeMainTab === 'milestones' 
-              ? 'Deine musikalische Heldenreise in 9 Stationen – mit automatischem Studio Audio-Processing (-13 LUFS Klassik & Jazz Referenz).' 
-              : 'Erstelle eigene Alben mit automatischem Studio Audio-Processing (-13 LUFS Klassik & Jazz Referenz).'}
+            {activeMainTab === 'overview'
+              ? 'Alle deine Playlisten, Meilensteine und Schuljahres-LPs im edlen CD-Cover Format – lückenlos abspielbar mit automatischem Studio-Mastering (-13 LUFS).'
+              : activeMainTab === 'milestones' 
+                ? 'Deine musikalische Heldenreise in 9 Stationen – mit automatischem Studio Audio-Processing (-13 LUFS Klassik & Jazz Referenz).' 
+                : 'Erstelle eigene Alben mit automatischem Studio Audio-Processing (-13 LUFS Klassik & Jazz Referenz).'}
           </p>
-        </div>
-
-        {/* Interactive Apple Live A/B Audio Switcher: Studio Processing vs RAW */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: isMobileOrSim ? 'flex-start' : 'flex-end',
-          gap: '6px'
-        }}>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            background: isLight ? '#e2e8f0' : 'rgba(0, 0, 0, 0.5)',
-            padding: '3px',
-            borderRadius: '100px',
-            border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
-            gap: '2px'
-          }}>
-            <button
-              type="button"
-              onClick={() => switchAudioMode('master')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 14px',
-                borderRadius: '100px',
-                border: 'none',
-                background: audioMode === 'master' 
-                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                  : 'transparent',
-                color: audioMode === 'master' ? '#ffffff' : colors.textSecondary,
-                fontSize: '0.74rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                boxShadow: audioMode === 'master' ? '0 2px 8px rgba(16, 185, 129, 0.35)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Sparkles size={13} color={audioMode === 'master' ? '#ffffff' : '#10b981'} />
-              <span>✨ Studio-Processing (-13 LUFS)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => switchAudioMode('raw')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 14px',
-                borderRadius: '100px',
-                border: 'none',
-                background: audioMode === 'raw' 
-                  ? (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.2)') 
-                  : 'transparent',
-                color: audioMode === 'raw' ? colors.textPrimary : colors.textSecondary,
-                fontSize: '0.74rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                boxShadow: audioMode === 'raw' && isLight ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Mic size={13} color={audioMode === 'raw' ? '#f59e0b' : undefined} />
-              <span>🎙️ Pure RAW</span>
-            </button>
-          </div>
-          <span style={{ fontSize: '0.68rem', color: colors.textMuted, fontWeight: 700, paddingRight: '4px' }}>
-            {audioMode === 'master' ? '✨ Studio Audio-Processing aktiv' : '🎙️ Pure RAW (Unbearbeitete Direktaufnahme)'}
-          </span>
         </div>
       </div>
 
 
 
-      {/* TAB CONTENT: 1. MILESTONES OR 2. CUSTOM PLAYLISTS */}
-      {activeMainTab === 'milestones' ? (
+      {/* TAB CONTENT: 1. OVERVIEW (DEFAULT), 2. MILESTONES, OR 3. CUSTOM PLAYLISTS */}
+      {activeMainTab === 'overview' ? (
+        renderOverviewShelf()
+      ) : activeMainTab === 'milestones' ? (
         <>
           {/* Timeline Node Chips */}
           <div style={{
@@ -4243,14 +6090,17 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             background: isLight ? '#ffffff' : '#1e293b',
             border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
             borderRadius: '28px',
-            padding: '30px',
-            maxWidth: '520px',
+            padding: isMobileOrSim ? '20px' : '28px',
+            maxWidth: wizardStep === 2 ? '780px' : '520px',
+            maxHeight: '92vh',
+            overflowY: 'auto',
             width: '100%',
             color: colors.textPrimary,
             display: 'flex',
             flexDirection: 'column',
             gap: '20px',
-            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7)'
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7)',
+            transition: 'max-width 0.25s ease'
           }}>
             {/* Header & Step Indicator */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -4262,7 +6112,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 </div>
                 <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900 }}>
                   {wizardStep === 1 && '1. Playlist-Name & Thema'}
-                  {wizardStep === 2 && '2. Cover & Vinyl-Vibe wählen'}
+                  {wizardStep === 2 && '2. Spotify Playlist-Cover wählen'}
                   {wizardStep === 3 && '3. Tracks zusammenstellen'}
                 </h3>
               </div>
@@ -4398,53 +6248,162 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   }}
                   className="hover-scale"
                 >
-                  <span>Weiter: Cover & Vibe wählen</span>
+                  <span>Weiter: Spotify-Cover wählen</span>
                   <ChevronRight size={16} />
                 </button>
               </div>
             )}
 
-            {/* STEP 2: COVER & VIBE STUDIO */}
+            {/* STEP 2: 20 UNIVERSAL SPOTIFY COVERS (5x4 GRID WITH CATEGORY TABS) */}
             {wizardStep === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <span style={{ fontSize: '0.82rem', color: colors.textSecondary }}>
-                  Wähle ein Farbthema für das Vinyl-Cover im Schallplatten-Regal:
-                </span>
+                <div>
+                  <span style={{ fontSize: '0.82rem', color: colors.textSecondary }}>
+                    Wähle aus 20 universellen Spotify-Covern für jedes Alter & Musikgenre:
+                  </span>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                  {VIBE_THEMES.map(themeItem => {
-                    const isSelected = wizardTheme === themeItem.id;
-                    return (
-                      <div
-                        key={themeItem.id}
-                        onClick={() => setWizardTheme(themeItem.id as any)}
-                        style={{
-                          padding: '12px',
-                          borderRadius: '16px',
-                          border: `2px solid ${isSelected ? themeItem.color : (isLight ? '#e2e8f0' : 'rgba(255,255,255,0.1)')}`,
-                          background: isSelected ? (isLight ? '#f0fdf4' : 'rgba(255,255,255,0.08)') : (isLight ? '#f8fafc' : 'rgba(0,0,0,0.2)'),
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: themeItem.gradient, boxShadow: `0 2px 8px ${themeItem.color}44` }} />
-                        <div>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 900, display: 'block', color: colors.textPrimary }}>
-                            {themeItem.name}
-                          </span>
-                          <span style={{ fontSize: '0.68rem', color: colors.textSecondary }}>
-                            {themeItem.desc}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {/* 🏷️ Category Filter Tabs */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    overflowX: 'auto',
+                    paddingBottom: '4px',
+                    marginTop: '10px'
+                  }}>
+                    {[
+                      { id: 'all', label: 'Alle (20)' },
+                      { id: 'kids', label: '👶 Kids & Einsteiger' },
+                      { id: 'urban_vibes', label: '⚡ Vibes & Urban' },
+                      { id: 'classic_jazz', label: '🎻 Klassik & Jazz' },
+                      { id: 'events_stage', label: '🎤 Bühne & Events' }
+                    ].map(cat => {
+                      const isCatActive = wizardCoverCategory === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setWizardCoverCategory(cat.id as any)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '100px',
+                            border: `1.5px solid ${isCatActive ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)')}`,
+                            background: isCatActive ? (isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.2)') : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.05)'),
+                            color: isCatActive ? '#10b981' : colors.textPrimary,
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale"
+                        >
+                          {cat.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                {/* 5x4 / Responsive Grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobileOrSim ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+                  gap: '12px',
+                  maxHeight: '380px',
+                  overflowY: 'auto',
+                  paddingRight: '4px'
+                }}>
+                  {UNIVERSAL_PLAYLIST_COVERS
+                    .filter(cov => wizardCoverCategory === 'all' || cov.category === wizardCoverCategory)
+                    .map(cov => {
+                      const isChosen = wizardCoverPresetId === cov.id;
+                      return (
+                        <div
+                          key={cov.id}
+                          onClick={() => {
+                            setWizardCoverPresetId(cov.id);
+                            setWizardTheme(cov.vibeTheme);
+                            setWizardIcon(cov.iconName);
+                          }}
+                          style={{
+                            borderRadius: '14px',
+                            border: `2px solid ${isChosen ? '#10b981' : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)')}`,
+                            background: isChosen ? (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.15)') : (isLight ? '#ffffff' : 'rgba(0, 0, 0, 0.2)'),
+                            padding: '8px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                            position: 'relative',
+                            boxShadow: isChosen ? '0 4px 14px rgba(16, 185, 129, 0.35)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale"
+                        >
+                          {/* 1:1 Cover Artwork */}
+                          <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1', borderRadius: '10px', overflow: 'hidden' }}>
+                            {renderSpotifyCoverArtwork({
+                              gradient: cov.gradient,
+                              accentColor: cov.accentColor,
+                              badge: cov.badge,
+                              title: cov.defaultTitle,
+                              subtitle: cov.subTitle,
+                              iconName: cov.iconName,
+                              emoji: cov.emoji
+                            })}
+
+                            {/* Active Checkmark Pill */}
+                            {isChosen && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '6px',
+                                right: '6px',
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '50%',
+                                background: '#10b981',
+                                border: '2px solid #ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ffffff',
+                                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
+                                zIndex: 10
+                              }}>
+                                <Check size={12} strokeWidth={3.5} />
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 900,
+                              color: isChosen ? '#10b981' : colors.textPrimary,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {cov.defaultTitle}
+                            </span>
+                            <span style={{
+                              fontSize: '0.64rem',
+                              color: colors.textSecondary,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {cov.subTitle}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Footer buttons */}
+                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                   <button
                     type="button"
                     onClick={() => setWizardStep(1)}
@@ -6585,6 +8544,15 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* 📁 9. SCHULJAHR-ORDNER MODAL */}
+      {renderSchoolYearFolderModal()}
+
+      {/* 📖 10. DIGITALES LINER-NOTES BOOKLET MODAL */}
+      {renderLinerNotesModal()}
+
+      {/* 💽 11. PERSISTENT FLOATING BOTTOM MINI-PLAYER */}
+      {renderFloatingMiniPlayer()}
     </div>
   );
 };

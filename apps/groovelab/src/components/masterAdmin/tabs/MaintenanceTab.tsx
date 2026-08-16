@@ -6,7 +6,7 @@ import {
   ChevronRight, Download, Sparkles, Sliders, Smartphone, Check, Copy,
   Info, Bell, Calendar, Flame, Layers, Laptop, Tablet, Monitor,
   Shield, CheckCircle, ArrowUpRight, Search, Gauge, BookOpen, HelpCircle,
-  X, Compass, FileText, Cpu, CheckSquare
+  X, Compass, FileText, Cpu, CheckSquare, GraduationCap, Music
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { MaintenanceState } from '../../MaintenanceLockoutOverlay';
@@ -84,6 +84,10 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
   const [wizardGoal, setWizardGoal] = useState<'upgrade' | 'fix' | 'custom'>('upgrade');
   const [wizardSoftness, setWizardSoftness] = useState<'readonly' | 'lockout'>('readonly');
   const [wizardTiming, setWizardTiming] = useState<'sunday' | 'now_warn' | 'now_instant'>('sunday');
+
+  // --- Live Preview Interactive State ---
+  const [previewPlatform, setPreviewPlatform] = useState<'campus' | 'groovelab' | 'secretary'>('campus');
+  const [previewIsMinimized, setPreviewIsMinimized] = useState(false);
 
   // --- Maintenance State ---
   const [maintenance, setMaintenance] = useState<MaintenanceState>(() => {
@@ -1550,7 +1554,8 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               flexDirection: 'column',
               gap: '16px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              {/* Header with Title and Mode Indicator */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Eye size={16} color="#64748b" />
                   <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -1570,13 +1575,124 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 </span>
               </div>
 
+              {/* Module & View Interactive Switcher Toolbar */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '14px',
+                padding: '6px 10px',
+                gap: '8px',
+                flexWrap: 'wrap'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                    Modul:
+                  </span>
+                  <div style={{ display: 'inline-flex', background: '#e2e8f0', padding: '2px', borderRadius: '10px', gap: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewPlatform('campus')}
+                      style={{
+                        padding: '4px 9px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: previewPlatform === 'campus' ? '#ffffff' : 'transparent',
+                        color: previewPlatform === 'campus' ? '#15803d' : '#64748b',
+                        fontWeight: previewPlatform === 'campus' ? 850 : 700,
+                        fontSize: '0.72rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: previewPlatform === 'campus' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <GraduationCap size={12} color={previewPlatform === 'campus' ? '#15803d' : '#64748b'} />
+                      <span>Campus</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewPlatform('groovelab')}
+                      style={{
+                        padding: '4px 9px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: previewPlatform === 'groovelab' ? '#ffffff' : 'transparent',
+                        color: previewPlatform === 'groovelab' ? '#854d0e' : '#64748b',
+                        fontWeight: previewPlatform === 'groovelab' ? 850 : 700,
+                        fontSize: '0.72rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: previewPlatform === 'groovelab' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Music size={12} color={previewPlatform === 'groovelab' ? '#ca8a04' : '#64748b'} />
+                      <span>GrooveLab</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewPlatform('secretary')}
+                      style={{
+                        padding: '4px 9px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: previewPlatform === 'secretary' ? '#ffffff' : 'transparent',
+                        color: previewPlatform === 'secretary' ? '#b91c1c' : '#64748b',
+                        fontWeight: previewPlatform === 'secretary' ? 850 : 700,
+                        fontSize: '0.72rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: previewPlatform === 'secretary' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Shield size={12} color={previewPlatform === 'secretary' ? '#dc2626' : '#64748b'} />
+                      <span>Verwaltung</span>
+                    </button>
+                  </div>
+                </div>
+
+                {maintenance.readOnlyMode && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewIsMinimized(prev => !prev)}
+                    style={{
+                      background: previewIsMinimized ? '#fef3c7' : '#ffffff',
+                      color: previewIsMinimized ? '#b45309' : '#0f172a',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {previewIsMinimized ? '🔍 Banner einblenden' : '✕ Banner minimieren'}
+                  </button>
+                )}
+              </div>
+
               {/* Apple Hardware Bezel Mockup */}
               <div style={{
                 background: '#090d16',
                 borderRadius: '22px',
                 padding: '12px',
                 boxShadow: '0 20px 40px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.2)',
-                border: '1px solid #1e293b'
+                border: '1px solid #1e293b',
+                position: 'relative'
               }}>
                 {/* Camera Notch Dot */}
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
@@ -1584,149 +1700,441 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 </div>
 
                 {/* Internal Screen Content */}
-                {maintenance.readOnlyMode ? (
-                  /* Read-Only App Preview with Amber Header */
-                  <div style={{
-                    background: '#f8fafc',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minHeight: '340px',
-                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.1)'
-                  }}>
-                    {/* Amber Sticky Banner in Device */}
+                {maintenance.readOnlyMode ? (() => {
+                  const isStaffAdmin = previewPlatform === 'secretary';
+                  const isGroove = previewPlatform === 'groovelab';
+
+                  let bannerBg = 'linear-gradient(90deg, #f0fdf4 0%, #ecfdf5 100%)';
+                  let bannerBorder = 'rgba(52, 168, 83, 0.28)';
+                  let bannerText = '#14532d';
+                  let iconColor = '#16a34a';
+                  let badgeBg = 'rgba(52, 168, 83, 0.12)';
+                  let badgeText = '#15803d';
+                  let buttonBg = '#34a853';
+                  let buttonText = '#ffffff';
+
+                  if (isStaffAdmin) {
+                    bannerBg = 'linear-gradient(90deg, #fef2f2 0%, #fff1f2 100%)';
+                    bannerBorder = 'rgba(234, 67, 53, 0.25)';
+                    bannerText = '#991b1b';
+                    iconColor = '#dc2626';
+                    badgeBg = 'rgba(234, 67, 53, 0.12)';
+                    badgeText = '#b91c1c';
+                    buttonBg = '#ea4335';
+                    buttonText = '#ffffff';
+                  } else if (isGroove) {
+                    bannerBg = 'linear-gradient(90deg, #fefce8 0%, #fffbeb 100%)';
+                    bannerBorder = 'rgba(234, 179, 8, 0.35)';
+                    bannerText = '#78350f';
+                    iconColor = '#ca8a04';
+                    badgeBg = 'rgba(234, 179, 8, 0.18)';
+                    badgeText = '#854d0e';
+                    buttonBg = '#eab308';
+                    buttonText = '#000000';
+                  }
+
+                  return (
                     <div style={{
-                      background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
-                      color: '#ffffff',
-                      padding: '8px 12px',
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
+                      background: '#f8fafc',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '6px'
+                      flexDirection: 'column',
+                      minHeight: '380px',
+                      position: 'relative',
+                      boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.1)'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Lock size={12} />
-                        <span>⚠️ Read-Only Lesemodus aktiv</span>
-                      </div>
-                      <span style={{ fontSize: '0.62rem', background: 'rgba(0,0,0,0.25)', padding: '2px 6px', borderRadius: '4px' }}>
-                        🔒 Schreibschutz
-                      </span>
-                    </div>
-
-                    {/* App Mock Content */}
-                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: '0.78rem', color: '#0f172a' }}>Mein Hausaufgabenheft</strong>
-                        <span style={{ fontSize: '0.65rem', background: '#e2e8f0', color: '#64748b', padding: '2px 6px', borderRadius: '4px' }}>Nur Ansicht</span>
-                      </div>
-
-                      <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.70rem', color: '#334155' }}>
-                        <strong>🎸 Song: Smoke on the Water (Intro)</strong>
-                        <div style={{ color: '#64748b', marginTop: '2px' }}>Fokus auf Takt 1-8 mit Metronom 110 BPM.</div>
-                      </div>
-
-                      <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.70rem', color: '#334155' }}>
-                        <strong>📅 Nächste Unterrichtsstunde:</strong>
-                        <div style={{ color: '#64748b', marginTop: '2px' }}>Freitag 15:00 Uhr • Raum 2 (EG)</div>
-                      </div>
-
-                      {/* Disabled Save Button with Lock */}
-                      <button
-                        type="button"
-                        disabled
-                        style={{
-                          marginTop: 'auto',
-                          padding: '8px',
-                          borderRadius: '8px',
-                          background: '#e2e8f0',
-                          color: '#94a3b8',
-                          border: 'none',
-                          fontSize: '0.70rem',
-                          fontWeight: 800,
+                      {/* Top Banner (if not minimized) */}
+                      {!previewIsMinimized && (
+                        <div style={{
+                          background: bannerBg,
+                          color: bannerText,
+                          padding: '7px 12px',
+                          borderBottom: `1px solid ${bannerBorder}`,
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '5px',
-                          cursor: 'not-allowed'
-                        }}
-                      >
-                        <Lock size={11} />
-                        <span>Eintrag speichern (Schreibschutz aktiv)</span>
-                      </button>
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              background: badgeBg,
+                              borderRadius: '6px',
+                              padding: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: iconColor,
+                              flexShrink: 0
+                            }}>
+                              <Lock size={12} />
+                            </div>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <strong style={{ fontWeight: 850 }}>Read-Only Lesemodus: </strong>
+                              <span style={{ opacity: 0.9 }}>
+                                {maintenance.reason || 'Planmäßige Datenbank-Wartung aktiv'}. Notizen lesbar – Speichern pausiert.
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            <span style={{
+                              fontSize: '0.62rem',
+                              background: badgeBg,
+                              color: badgeText,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontWeight: 800,
+                              fontFamily: 'monospace'
+                            }}>
+                              ~{maintenance.estimatedDurationMinutes || 30}:00 min
+                            </span>
+                            <span style={{
+                              fontSize: '0.62rem',
+                              background: badgeBg,
+                              color: badgeText,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontWeight: 800
+                            }}>
+                              🔒 Schreibschutz
+                            </span>
+                            <div style={{
+                              background: buttonBg,
+                              color: buttonText,
+                              borderRadius: '6px',
+                              padding: '3px 8px',
+                              fontSize: '0.64rem',
+                              fontWeight: 850,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <RefreshCw size={10} /> Status prüfen
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewIsMinimized(true)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: bannerText,
+                                padding: '2px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                opacity: 0.7
+                              }}
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Simulated App Header with Platform Tabs */}
+                      <div style={{
+                        background: '#ffffff',
+                        borderBottom: '1px solid #e2e8f0',
+                        padding: '8px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '6px',
+                            background: previewPlatform === 'campus' ? 'rgba(52, 168, 83, 0.15)' : previewPlatform === 'groovelab' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(234, 67, 53, 0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: previewPlatform === 'campus' ? '#34a853' : previewPlatform === 'groovelab' ? '#ca8a04' : '#ea4335'
+                          }}>
+                            {previewPlatform === 'campus' ? <GraduationCap size={14} /> : previewPlatform === 'groovelab' ? <Music size={14} /> : <Shield size={14} />}
+                          </div>
+                          <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a' }}>
+                            {previewPlatform === 'campus' ? 'Campus' : previewPlatform === 'groovelab' ? 'GrooveLab' : 'Schulsekretariat'}
+                          </span>
+                        </div>
+
+                        {/* Top Module Tabs */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{
+                            padding: '3px 8px',
+                            borderRadius: '6px 6px 0 0',
+                            background: previewPlatform === 'campus' ? '#34a853' : 'rgba(52, 168, 83, 0.08)',
+                            color: previewPlatform === 'campus' ? '#ffffff' : '#34a853',
+                            fontSize: '0.62rem',
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <GraduationCap size={10} /> Campus
+                          </div>
+                          <div style={{
+                            padding: '3px 8px',
+                            borderRadius: '6px 6px 0 0',
+                            background: previewPlatform === 'groovelab' ? '#facc15' : 'rgba(250, 204, 21, 0.1)',
+                            color: previewPlatform === 'groovelab' ? '#09090b' : '#ca8a04',
+                            fontSize: '0.62rem',
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <Music size={10} /> GrooveLab
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mock App Content (Hausaufgabenheft / Briefing) */}
+                      <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <strong style={{ fontSize: '0.78rem', color: '#0f172a' }}>
+                            {previewPlatform === 'groovelab' ? 'Live Lab & Songs' : 'Hausaufgabenheft & Stundenplan'}
+                          </strong>
+                          <span style={{ fontSize: '0.62rem', background: '#e2e8f0', color: '#64748b', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                            Ansicht aktiv
+                          </span>
+                        </div>
+
+                        <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.70rem', color: '#334155' }}>
+                          <strong>🎸 Song: Smoke on the Water (Intro)</strong>
+                          <div style={{ color: '#64748b', marginTop: '2px' }}>Fokus auf Takt 1-8 mit Metronom 110 BPM.</div>
+                        </div>
+
+                        <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.70rem', color: '#334155' }}>
+                          <strong>📅 Nächste Unterrichtsstunde:</strong>
+                          <div style={{ color: '#64748b', marginTop: '2px' }}>Freitag 15:00 Uhr • Raum 2 (EG)</div>
+                        </div>
+
+                        {/* Disabled Save Button with Lock */}
+                        <div
+                          style={{
+                            marginTop: 'auto',
+                            padding: '8px',
+                            borderRadius: '8px',
+                            background: '#e2e8f0',
+                            color: '#94a3b8',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <Lock size={11} />
+                          <span>Eintrag speichern (Vorübergehend pausiert)</span>
+                        </div>
+                      </div>
+
+                      {/* Minimized Floating Widget in Corner (if minimized) */}
+                      {previewIsMinimized && (
+                        <div
+                          onClick={() => setPreviewIsMinimized(false)}
+                          title="Wartung aktiv (Read-Only Lesemodus) – Klicken zum Ausklappen"
+                          style={{
+                            position: 'absolute',
+                            bottom: '12px',
+                            right: '12px',
+                            zIndex: 10,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: isStaffAdmin ? 'rgba(254, 242, 242, 0.95)' : isGroove ? 'rgba(254, 252, 232, 0.95)' : 'rgba(240, 253, 244, 0.95)',
+                            border: `1.5px solid ${bannerBorder}`,
+                            borderRadius: '100px',
+                            padding: '5px 10px 5px 7px',
+                            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.15)',
+                            cursor: 'pointer',
+                            color: bannerText
+                          }}
+                        >
+                          <div style={{
+                            position: 'relative',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            background: badgeBg,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: iconColor
+                          }}>
+                            <Lock size={11} />
+                            <span style={{
+                              position: 'absolute',
+                              top: '-1px',
+                              right: '-1px',
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              background: iconColor,
+                              border: '1.5px solid white'
+                            }} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 900, lineHeight: 1.1 }}>
+                              Wartung aktiv
+                            </span>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 700, opacity: 0.85 }}>
+                              Lesemodus
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ) : (
+                  );
+                })() : (
                   /* Standard Fullscreen Dark Lockout Screen */
                   <div style={{
-                    background: 'linear-gradient(135deg, #0a0f1d 0%, #1e293b 100%)',
+                    background: 'radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 70%, #020617 100%)',
                     borderRadius: '16px',
-                    padding: '36px 20px',
+                    padding: '28px 16px',
                     color: '#ffffff',
                     textAlign: 'center',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '16px',
-                    minHeight: '340px',
+                    gap: '14px',
+                    minHeight: '380px',
                     justifyContent: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
                     boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.6)'
                   }}>
+                    {/* Background Ambient Glow */}
                     <div style={{
-                      width: '54px',
-                      height: '54px',
-                      borderRadius: '18px',
-                      background: 'rgba(239, 68, 68, 0.18)',
-                      border: '1px solid rgba(239, 68, 68, 0.4)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#f87171',
-                      boxShadow: '0 8px 24px rgba(239, 68, 68, 0.25)'
-                    }}>
-                      <Wrench size={26} />
-                    </div>
+                      position: 'absolute',
+                      width: '220px',
+                      height: '220px',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0) 70%)',
+                      filter: 'blur(30px)',
+                      pointerEvents: 'none'
+                    }} />
 
-                    <div>
-                      <div style={{ fontSize: '0.70rem', fontWeight: 900, color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
-                        Campus-Groovelab Wartungsarbeiten
+                    {/* Central Glass Card */}
+                    <div style={{
+                      position: 'relative',
+                      width: '100%',
+                      maxWidth: '380px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: '20px',
+                      padding: '22px 16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '12px',
+                      boxShadow: '0 15px 35px rgba(0,0,0,0.4)'
+                    }}>
+                      {/* Pulsing Icon */}
+                      <div style={{
+                        width: '52px',
+                        height: '52px',
+                        borderRadius: '18px',
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 8px 20px rgba(245, 158, 11, 0.35)'
+                      }}>
+                        <Wrench size={26} color="#ffffff" />
                       </div>
-                      <h4 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>
-                        Vorübergehend nicht verfügbar
-                      </h4>
-                      <p style={{ margin: '8px 0 0 0', fontSize: '0.80rem', color: '#cbd5e1', lineHeight: '1.45', maxWidth: '320px' }}>
-                        {maintenance.reason || 'Planmäßige Upgrades im Gange.'}
-                      </p>
-                    </div>
 
-                    <div style={{
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      padding: '8px 18px',
-                      borderRadius: '100px',
-                      fontSize: '0.76rem',
-                      fontWeight: 800,
-                      color: '#93c5fd',
-                      border: '1px solid rgba(255, 255, 255, 0.14)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}>
-                      <Clock size={13} />
-                      <span>Geschätzte Dauer: ca. {maintenance.estimatedDurationMinutes} Minuten</span>
-                    </div>
+                      {/* Badge & Headline */}
+                      <div>
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: 'rgba(245, 158, 11, 0.15)',
+                          border: '1px solid rgba(245, 158, 11, 0.3)',
+                          color: '#fbbf24',
+                          padding: '3px 10px',
+                          borderRadius: '100px',
+                          fontSize: '0.64rem',
+                          fontWeight: 800,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '8px'
+                        }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fbbf24' }} />
+                          Planmäßige Systemwartung
+                        </div>
 
-                    <div style={{
-                      marginTop: '8px',
-                      fontSize: '0.72rem',
-                      color: '#94a3b8',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px'
-                    }}>
-                      <Lock size={12} />
-                      <span>Root-Bypass für Schulleitung: <strong>{maintenance.bypassPin}</strong></span>
+                        <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
+                          Campus-Groovelab wird gewartet
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.45 }}>
+                          {maintenance.reason || 'Wir führen planmäßige System-Upgrades durch.'}
+                        </p>
+                      </div>
+
+                      {/* Countdown & Scope Box */}
+                      <div style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        background: 'rgba(15, 23, 42, 0.6)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '12px',
+                        padding: '10px 12px',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '8px'
+                      }}>
+                        <div style={{ borderRight: '1px solid rgba(255, 255, 255, 0.08)', paddingRight: '6px' }}>
+                          <div style={{ fontSize: '0.60rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>
+                            Geschätzte Restzeit
+                          </div>
+                          <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#f59e0b', fontFamily: 'monospace' }}>
+                            ~{maintenance.estimatedDurationMinutes || 30}:00 min
+                          </div>
+                        </div>
+                        <div style={{ paddingLeft: '6px' }}>
+                          <div style={{ fontSize: '0.60rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>
+                            Geltungsbereich
+                          </div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#e2e8f0' }}>
+                            {maintenance.scope === 'campus_only' ? 'Modul Campus' :
+                             maintenance.scope === 'groovelab_only' ? 'Modul GrooveLab' :
+                             maintenance.scope === 'schools_only' ? 'Ausgewählte Schulen' : 'Gesamte Plattform'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Refresh Button */}
+                      <div
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          borderRadius: '10px',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          color: '#ffffff',
+                          fontSize: '0.76rem',
+                          fontWeight: 800,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <RefreshCw size={12} /> Status prüfen &amp; neu laden
+                      </div>
+
+                      {/* Bypass PIN footer note */}
+                      <div style={{ fontSize: '0.65rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                        <Lock size={11} /> Root-Bypass für Schulleitung: <strong style={{ color: '#94a3b8' }}>{maintenance.bypassPin || 'CG-ROOT-8822'}</strong>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1803,13 +2211,14 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 key={idx}
                 type="button"
                 onClick={() => {
-                  setAnnouncement({
+                  const updated: BroadcastAnnouncement = {
                     ...announcement,
                     severity: p.severity,
                     title: p.title,
-                    message: p.message,
-                    isActive: true
-                  });
+                    message: p.message
+                  };
+                  setAnnouncement(updated);
+                  setSaveSuccessToast(`Vorlage "${p.label}" geladen! Klicken Sie unten auf "Live schalten" oder "Als Entwurf speichern".`);
                 }}
                 style={{
                   padding: '7px 14px',
@@ -1844,84 +2253,283 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '18px'
+              gap: '20px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Megaphone size={18} color="#0f172a" />
-                  <h4 style={{ margin: 0, fontSize: '1.10rem', fontWeight: 900, color: '#0f172a' }}>
-                    Broadcast-Banner Studio
-                  </h4>
+              {/* Studio Header with iOS Switch */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: announcement.isActive ? 'rgba(34, 197, 94, 0.15)' : '#f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: announcement.isActive ? '#16a34a' : '#64748b'
+                  }}>
+                    <Megaphone size={20} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+                      Broadcast-Banner Studio
+                    </h4>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                      Plattformweite Ankündigungen, Systemhinweise &amp; Feature-Releases
+                    </span>
+                  </div>
                 </div>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: announcement.isActive ? '#059669' : '#64748b' }}>
-                    {announcement.isActive ? '● Live geschaltet' : '○ Inaktiv'}
+                {/* Modern Apple iOS Switch Toggle */}
+                <div
+                  onClick={() => {
+                    const nextActive = !announcement.isActive;
+                    const updated = { ...announcement, isActive: nextActive };
+                    setAnnouncement(updated);
+                    persistState(maintenance, updated);
+                    setSaveSuccessToast(nextActive ? '🚀 Broadcast-Banner ist jetzt LIVE!' : '🛑 Broadcast-Banner wurde offline genommen.');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    background: announcement.isActive ? '#f0fdf4' : '#f8fafc',
+                    border: `1.5px solid ${announcement.isActive ? '#86efac' : '#e2e8f0'}`,
+                    padding: '6px 12px',
+                    borderRadius: '100px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title={announcement.isActive ? 'Klicken zum Deaktivieren' : 'Klicken zum Live-Schalten'}
+                >
+                  <span style={{
+                    fontSize: '0.76rem',
+                    fontWeight: 900,
+                    color: announcement.isActive ? '#15803d' : '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}>
+                    {announcement.isActive && (
+                      <span style={{
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        background: '#22c55e',
+                        boxShadow: '0 0 6px #22c55e'
+                      }} />
+                    )}
+                    {announcement.isActive ? 'LIVE GESCHALTET' : 'OFFLINE (ENTWURF)'}
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={announcement.isActive}
-                    onChange={(e) => setAnnouncement({ ...announcement, isActive: e.target.checked })}
-                    style={{ accentColor: '#059669', width: '18px', height: '18px', cursor: 'pointer' }}
-                  />
+
+                  {/* iOS Toggle Track */}
+                  <div style={{
+                    width: '38px',
+                    height: '22px',
+                    borderRadius: '100px',
+                    background: announcement.isActive ? '#22c55e' : '#cbd5e1',
+                    position: 'relative',
+                    transition: 'background 0.2s ease'
+                  }}>
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      position: 'absolute',
+                      top: '2px',
+                      left: announcement.isActive ? '18px' : '2px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Master Live-Status Hero Card */}
+              <div style={{
+                borderRadius: '18px',
+                padding: '16px 20px',
+                background: announcement.isActive 
+                  ? 'linear-gradient(135deg, rgba(240, 253, 244, 0.95) 0%, rgba(220, 252, 231, 0.95) 100%)' 
+                  : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                border: `1.5px solid ${announcement.isActive ? '#86efac' : '#e2e8f0'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '12px',
+                    background: announcement.isActive ? '#22c55e' : '#94a3b8',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: announcement.isActive ? '0 4px 12px rgba(34, 197, 94, 0.35)' : 'none'
+                  }}>
+                    {announcement.isActive ? <Radio size={20} className="animate-pulse" /> : <Eye size={20} />}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 900, color: announcement.isActive ? '#14532d' : '#334155' }}>
+                      {announcement.isActive ? '🟢 Banner wird aktuell live ausgespielt' : '⚪️ Banner ist aktuell nicht für Nutzer sichtbar'}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: announcement.isActive ? '#15803d' : '#64748b', marginTop: '2px' }}>
+                      {announcement.isActive 
+                        ? `Zielgruppe: ${announcement.targetAudience === 'all' ? 'Alle Benutzer (Plattformweit)' : announcement.targetAudience === 'teachers' ? 'Lehrkräfte & Verwaltung' : announcement.targetAudience === 'students' ? 'Schüler' : 'Admins'}`
+                        : 'Entwurf bereit. Klicken Sie auf "Jetzt live schalten", um das Banner zu veröffentlichen.'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 1-Click Instant Action Button in Status Card */}
+                {announcement.isActive ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = { ...announcement, isActive: false };
+                      setAnnouncement(updated);
+                      persistState(maintenance, updated);
+                      setSaveSuccessToast('🛑 Broadcast-Banner wurde sofort deaktiviert und offline genommen.');
+                    }}
+                    style={{
+                      padding: '9px 16px',
+                      borderRadius: '12px',
+                      background: '#ef4444',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.80rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale-mini"
+                  >
+                    <Power size={14} />
+                    <span>Sofort offline nehmen</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = { ...announcement, isActive: true };
+                      setAnnouncement(updated);
+                      persistState(maintenance, updated);
+                      setSaveSuccessToast('🚀 Broadcast-Banner ist jetzt LIVE für alle Zielgruppen geschaltet!');
+                    }}
+                    style={{
+                      padding: '9px 16px',
+                      borderRadius: '12px',
+                      background: '#16a34a',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.80rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale-mini"
+                  >
+                    <Zap size={14} />
+                    <span>Jetzt LIVE schalten</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Visual Severity Selection Cards (Dringlichkeit) */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Banner-Typ &amp; Dringlichkeit
                 </label>
-              </div>
-
-              {/* Severity & Audience */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Banner-Typ / Dringlichkeit
-                  </label>
-                  <select
-                    value={announcement.severity}
-                    onChange={(e) => setAnnouncement({ ...announcement, severity: e.target.value as any })}
-                    style={{
-                      width: '100%',
-                      padding: '11px 12px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.86rem',
-                      fontWeight: 700,
-                      color: '#0f172a',
-                      outline: 'none'
-                    }}
-                  >
-                    <option value="info">🔵 Information (Blau)</option>
-                    <option value="warning">🟡 Warnung / Hinweis (Gelb)</option>
-                    <option value="emergency">🔴 Dringende Störung (Rot)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Zielgruppe
-                  </label>
-                  <select
-                    value={announcement.targetAudience}
-                    onChange={(e) => setAnnouncement({ ...announcement, targetAudience: e.target.value as any })}
-                    style={{
-                      width: '100%',
-                      padding: '11px 12px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.86rem',
-                      fontWeight: 700,
-                      color: '#0f172a',
-                      outline: 'none'
-                    }}
-                  >
-                    <option value="all">👥 Alle Benutzer (Plattformweit)</option>
-                    <option value="teachers">🎓 Nur Lehrkräfte &amp; Schulleitung</option>
-                    <option value="students">🎸 Nur Schüler</option>
-                    <option value="admins">🛡️ Nur Administratoren</option>
-                  </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                  {[
+                    { id: 'info', label: 'Information', desc: 'Blau • Updates & Infos', icon: Info, color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' },
+                    { id: 'warning', label: 'Warnung', desc: 'Gelb • Wartung & Hinweise', icon: AlertTriangle, color: '#ca8a04', bg: '#fefce8', border: '#fef08a' },
+                    { id: 'emergency', label: 'Störung', desc: 'Rot • Wichtige Meldung', icon: AlertCircle, color: '#dc2626', bg: '#fef2f2', border: '#fecaca' }
+                  ].map((s) => {
+                    const SIcon = s.icon;
+                    const isSel = announcement.severity === s.id;
+                    return (
+                      <div
+                        key={s.id}
+                        onClick={() => setAnnouncement({ ...announcement, severity: s.id as any })}
+                        style={{
+                          borderRadius: '14px',
+                          padding: '12px',
+                          border: `2px solid ${isSel ? s.color : '#e2e8f0'}`,
+                          background: isSel ? s.bg : '#ffffff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: isSel ? s.color : '#334155', fontWeight: 850, fontSize: '0.84rem' }}>
+                          <SIcon size={16} color={s.color} />
+                          <span>{s.label}</span>
+                        </div>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                          {s.desc}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Title */}
+              {/* Target Audience Segmented Buttons */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Zielgruppe (Wer sieht dieses Banner?)
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {[
+                    { id: 'all', label: '👥 Alle Benutzer', desc: 'Plattformweit sichtbar' },
+                    { id: 'teachers', label: '🎓 Lehrkräfte & Verwaltung', desc: 'Nur Teacher & Secretary' },
+                    { id: 'students', label: '🎸 Nur Schüler', desc: 'Nur Schüler-Accounts' },
+                    { id: 'admins', label: '🛡️ Nur Administratoren', desc: 'Nur Schulleiter & Admins' }
+                  ].map((aud) => {
+                    const isSel = announcement.targetAudience === aud.id;
+                    return (
+                      <div
+                        key={aud.id}
+                        onClick={() => setAnnouncement({ ...announcement, targetAudience: aud.id as any })}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: '12px',
+                          border: `1.5px solid ${isSel ? '#0f172a' : '#cbd5e1'}`,
+                          background: isSel ? '#0f172a' : '#f8fafc',
+                          color: isSel ? '#ffffff' : '#334155',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ fontWeight: 850, fontSize: '0.80rem' }}>{aud.label}</span>
+                        <span style={{ fontSize: '0.66rem', opacity: isSel ? 0.8 : 0.65 }}>{aud.desc}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Title Input */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                   Banner-Titel
@@ -1934,7 +2542,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
-                    padding: '11px 14px',
+                    padding: '12px 14px',
                     borderRadius: '12px',
                     border: '1px solid #cbd5e1',
                     background: '#f8fafc',
@@ -1946,7 +2554,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 />
               </div>
 
-              {/* Message */}
+              {/* Message Textarea */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                   Nachrichtentext
@@ -1959,7 +2567,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
-                    padding: '11px 14px',
+                    padding: '12px 14px',
                     borderRadius: '12px',
                     border: '1px solid #cbd5e1',
                     background: '#f8fafc',
@@ -1972,30 +2580,68 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => persistState(maintenance, announcement)}
-                style={{
-                  padding: '13px',
-                  borderRadius: '14px',
-                  background: announcement.isActive ? '#0284c7' : '#0f172a',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '0.90rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.25)',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale-mini"
-              >
-                <Send size={16} />
-                <span>{announcement.isActive ? 'Banner live aktualisieren' : 'Banner-Entwurf speichern'}</span>
-              </button>
+              {/* Action Buttons Bar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...announcement, isActive: false };
+                    setAnnouncement(updated);
+                    persistState(maintenance, updated);
+                    setSaveSuccessToast('💾 Banner-Entwurf erfolgreich gespeichert (offline).');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '13px',
+                    borderRadius: '14px',
+                    background: '#f1f5f9',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.88rem',
+                    fontWeight: 850,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Copy size={15} />
+                  <span>Als Entwurf speichern</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...announcement, isActive: true };
+                    setAnnouncement(updated);
+                    persistState(maintenance, updated);
+                    setSaveSuccessToast('🚀 Broadcast-Banner erfolgreich live geschaltet & synchronisiert!');
+                  }}
+                  style={{
+                    flex: 1.3,
+                    padding: '13px',
+                    borderRadius: '14px',
+                    background: announcement.isActive ? '#0284c7' : '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.90rem',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: announcement.isActive ? '0 4px 14px rgba(2, 132, 199, 0.25)' : '0 4px 14px rgba(22, 163, 74, 0.25)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <Send size={16} />
+                  <span>{announcement.isActive ? 'Live-Banner synchronisieren' : 'Jetzt LIVE veröffentlichen'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Right Card: Multi-Device WYSIWYG Live Banner Preview */}
@@ -2009,7 +2655,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               flexDirection: 'column',
               gap: '16px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Eye size={16} color="#64748b" />
                   <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -2017,40 +2663,54 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   </span>
                 </div>
 
-                {/* Device Switcher Track */}
-                <div style={{
-                  display: 'inline-flex',
-                  background: '#f1f5f9',
-                  padding: '3px',
-                  borderRadius: '10px',
-                  gap: '2px'
-                }}>
-                  {[
-                    { id: 'desktop', icon: Laptop },
-                    { id: 'tablet', icon: Tablet },
-                    { id: 'mobile', icon: Smartphone }
-                  ].map((dev) => {
-                    const DevIcon = dev.icon;
-                    const isSel = previewDevice === dev.id;
-                    return (
-                      <button
-                        key={dev.id}
-                        type="button"
-                        onClick={() => setPreviewDevice(dev.id as any)}
-                        style={{
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: isSel ? '#ffffff' : 'transparent',
-                          color: isSel ? '#0f172a' : '#64748b',
-                          cursor: 'pointer',
-                          boxShadow: isSel ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                        }}
-                      >
-                        <DevIcon size={14} />
-                      </button>
-                    );
-                  })}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    fontSize: '0.70rem',
+                    fontWeight: 800,
+                    background: announcement.isActive ? '#dcfce7' : '#f1f5f9',
+                    color: announcement.isActive ? '#15803d' : '#64748b',
+                    padding: '3px 8px',
+                    borderRadius: '100px',
+                    border: announcement.isActive ? '1px solid #86efac' : '1px solid #e2e8f0'
+                  }}>
+                    {announcement.isActive ? '● LIVE IM SYSTEM' : '○ ENTWURF (VORSCHAU)'}
+                  </span>
+
+                  {/* Device Switcher Track */}
+                  <div style={{
+                    display: 'inline-flex',
+                    background: '#f1f5f9',
+                    padding: '3px',
+                    borderRadius: '10px',
+                    gap: '2px'
+                  }}>
+                    {[
+                      { id: 'desktop', icon: Laptop },
+                      { id: 'tablet', icon: Tablet },
+                      { id: 'mobile', icon: Smartphone }
+                    ].map((dev) => {
+                      const DevIcon = dev.icon;
+                      const isSel = previewDevice === dev.id;
+                      return (
+                        <button
+                          key={dev.id}
+                          type="button"
+                          onClick={() => setPreviewDevice(dev.id as any)}
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: isSel ? '#ffffff' : 'transparent',
+                            color: isSel ? '#0f172a' : '#64748b',
+                            cursor: 'pointer',
+                            boxShadow: isSel ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                          }}
+                        >
+                          <DevIcon size={14} />
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -2059,19 +2719,15 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 background: '#f8fafc',
                 borderRadius: '18px',
                 border: '1px solid #cbd5e1',
-                padding: previewDevice === 'mobile' ? '14px 10px' : '18px',
+                overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '12px'
+                minHeight: '320px',
+                boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.05)'
               }}>
-                <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>
-                  Simulierte Benutzeroberfläche ({previewDevice}):
-                </div>
-
                 {/* Banner Render */}
                 <div style={{
-                  borderRadius: '14px',
-                  padding: '14px 18px',
+                  padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'flex-start',
                   justifyContent: 'space-between',
@@ -2081,7 +2737,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                     : announcement.severity === 'warning'
                     ? '#fefce8'
                     : '#f0f9ff',
-                  border: `1px solid ${
+                  borderBottom: `1px solid ${
                     announcement.severity === 'emergency' 
                       ? '#fecaca' 
                       : announcement.severity === 'warning'
@@ -2102,16 +2758,35 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                     </div>
 
                     <div>
-                      <div style={{ fontWeight: 850, fontSize: '0.88rem' }}>
+                      <div style={{ fontWeight: 850, fontSize: '0.86rem' }}>
                         {announcement.title || 'Kein Titel angegeben'}
                       </div>
-                      <div style={{ fontSize: '0.80rem', marginTop: '3px', opacity: 0.9, lineHeight: '1.4' }}>
+                      <div style={{ fontSize: '0.78rem', marginTop: '2px', opacity: 0.9, lineHeight: '1.4' }}>
                         {announcement.message || 'Keine Nachricht verfasst.'}
                       </div>
                     </div>
                   </div>
 
-                  <span style={{ fontSize: '0.80rem', opacity: 0.5, cursor: 'pointer' }}>✕</span>
+                  <span style={{ fontSize: '0.80rem', opacity: 0.5, cursor: 'pointer', padding: '2px' }}>✕</span>
+                </div>
+
+                {/* Simulated Header Navigation & Content */}
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34a853' }} />
+                    <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a' }}>Campus-Groovelab</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, background: 'rgba(52, 168, 83, 0.1)', color: '#34a853', padding: '2px 6px', borderRadius: '4px' }}>Campus</span>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, background: 'rgba(234, 179, 8, 0.1)', color: '#ca8a04', padding: '2px 6px', borderRadius: '4px' }}>GrooveLab</span>
+                  </div>
+                </div>
+
+                <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, background: '#f8fafc' }}>
+                  <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                    <strong style={{ color: '#0f172a' }}>Stundenplan &amp; Hausaufgabenheft</strong>
+                    <div style={{ color: '#64748b', fontSize: '0.68rem', marginTop: '2px' }}>Regulärer Schulbetrieb aktiv</div>
+                  </div>
                 </div>
               </div>
             </div>

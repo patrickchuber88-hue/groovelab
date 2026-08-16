@@ -66,6 +66,13 @@ if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.medi
     navigator.mediaDevices.getUserMedia = async (constraints) => {
       const stream = await originalGetUserMedia(constraints);
       (window as any)._activeMediaStreams.push(stream);
+      stream.getTracks().forEach(track => {
+        track.addEventListener('ended', () => {
+          if ((window as any)._activeMediaStreams) {
+            (window as any)._activeMediaStreams = (window as any)._activeMediaStreams.filter((s: MediaStream) => s.active && s !== stream);
+          }
+        }, { once: true });
+      });
       return stream;
     };
     
@@ -2010,9 +2017,13 @@ function App() {
   const [searchParams] = useSearchParams();
   const [showStandardLogin, setShowStandardLogin] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
-    const stored = localStorage.getItem('groovelab_local_profiles');
-    const list = stored ? JSON.parse(stored) : [];
-    return list.length === 0;
+    try {
+      const stored = localStorage.getItem('groovelab_local_profiles');
+      const list = stored ? JSON.parse(stored) : [];
+      return !Array.isArray(list) || list.length === 0;
+    } catch {
+      return true;
+    }
   });
 
   const isSignup = location.pathname === '/signup';
@@ -2783,9 +2794,6 @@ function App() {
       localStorage.setItem('ensembles_active_tab', val);
     } else {
       localStorage.setItem('groovelab_active_tab', val);
-      if (val === 'live' && user?.id) {
-        fetchDashboardData(user.id);
-      }
     }
   }, [user?.id]);
 
@@ -3878,6 +3886,10 @@ function App() {
       }
 
       if (userData) {
+        const activeWorkspace = localStorage.getItem('groovelab_active_workspace');
+        if (activeWorkspace === 'teacher' && (userData.role === 'teacher' || (userData.roles && userData.roles.includes('teacher')) || userData.role === 'admin' || userData.role === 'secretary')) {
+          userData.role = 'teacher';
+        }
         if (!userData.photo_url && !userData.avatar_url) {
           const r = (userData.role || '').toLowerCase();
           const rolesArr = userData.roles || [];
@@ -3955,8 +3967,8 @@ function App() {
       const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
       const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
 
-      const isCampusActive = schoolHasCampus && userData.is_campus_active !== false;
-      const isGroovelabActive = schoolHasGroove && userData.is_groovelab_active !== false;
+      const isCampusActive = Boolean(schoolHasCampus && userData.is_campus_active);
+      const isGroovelabActive = Boolean(schoolHasGroove && userData.is_groovelab_active);
 
       let allowedPlatform: 'campus' | 'groovelab' = 'campus';
       let defaultTab = 'briefing';
@@ -6783,8 +6795,8 @@ function App() {
     const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
     const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
 
-    const isCampusActive = schoolHasCampus && userToLogin?.is_campus_active !== false;
-    const isGroovelabActive = schoolHasGroove && userToLogin?.is_groovelab_active !== false;
+    const isCampusActive = Boolean(schoolHasCampus && userToLogin?.is_campus_active);
+    const isGroovelabActive = Boolean(schoolHasGroove && userToLogin?.is_groovelab_active);
 
     if (isCampusActive) {
       // 1. Campus -> Briefing Board
@@ -6918,8 +6930,8 @@ function App() {
       } else {
         // Auto-correct if teacher/admin somehow has a student-only tab active
         const isTeacherOrAdmin = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
-        if (isTeacherOrAdmin) {
-          const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
+        if (isTeacherOrAdmin && activePlatform !== 'campus') {
+          const studentTabs = ['practice', 'library', 'repertoire', 'matching'];
           if (studentTabs.includes(activeStudentTab)) {
             const fallbackTab = 'live';
             console.log('[Tab Sync] Auto-correcting student-only tab for teacher/admin to fallback:', fallbackTab);
@@ -7074,12 +7086,16 @@ function App() {
 
     // Heartbeat: Update last_seen every 30 seconds
     const updateHeartbeat = async () => {
-      const now = new Date().toISOString();
-      if (user?.id) {
-        await supabase
-          .from('users')
-          .update({ last_seen: now })
-          .eq('id', user.id);
+      try {
+        const now = new Date().toISOString();
+        if (user?.id) {
+          await supabase
+            .from('users')
+            .update({ last_seen: now })
+            .eq('id', user.id);
+        }
+      } catch (err) {
+        console.warn('[Heartbeat] background update caught error:', err);
       }
     };
 
@@ -7668,18 +7684,20 @@ function App() {
       const userId = user?.id;
       if (!userId) return;
 
-      // 1. Synchronously update local React state & cached user
-      setUser((prevUser: any) => {
-        if (!prevUser) return prevUser;
-        const updated = { 
-          ...prevUser, 
-          role: newRole,
-          is_ghost_mode: prevUser.is_ghost_mode ?? isGhostParam
-        };
-        try {
-          localStorage.setItem('groovelab_cached_user', JSON.stringify(updated));
-        } catch (e) {}
-        return updated;
+      // 1. Transition local React state & cached user
+      React.startTransition(() => {
+        setUser((prevUser: any) => {
+          if (!prevUser) return prevUser;
+          const updated = { 
+            ...prevUser, 
+            role: newRole,
+            is_ghost_mode: prevUser.is_ghost_mode ?? isGhostParam
+          };
+          try {
+            localStorage.setItem('groovelab_cached_user', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
       });
 
       if (isGhostParam) {
@@ -7703,21 +7721,31 @@ function App() {
         const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
 
         let targetPlatform: 'campus' | 'groovelab' = 'campus';
-        if (!schoolHasCampus && schoolHasGroove) {
+        const savedPlat = localStorage.getItem('groovelab_active_platform');
+        if (savedPlat === 'groovelab' && schoolHasGroove) {
+          targetPlatform = 'groovelab';
+        } else if (!schoolHasCampus && schoolHasGroove) {
           targetPlatform = 'groovelab';
         }
 
         localStorage.setItem('groovelab_active_workspace', 'teacher');
         localStorage.setItem('groovelab_active_platform', targetPlatform);
-        setActivePlatform(targetPlatform);
-        setActiveStudentTab('live');
-        localStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', 'live');
+        const startTab = targetPlatform === 'campus' 
+          ? (localStorage.getItem('campus_active_tab') || 'briefing')
+          : (localStorage.getItem('groovelab_active_tab') || 'live');
+        localStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
+        React.startTransition(() => {
+          setActivePlatform(targetPlatform);
+          setActiveStudentTab(startTab);
+        });
       } else if (newRole === 'admin' || newRole === 'secretary') {
         localStorage.setItem('groovelab_active_workspace', 'secretary');
         localStorage.setItem('groovelab_active_platform', 'campus');
         localStorage.setItem('campus_active_tab', 'briefing');
-        setActivePlatform('campus');
-        setActiveStudentTab('briefing');
+        React.startTransition(() => {
+          setActivePlatform('campus');
+          setActiveStudentTab('briefing');
+        });
       }
     } catch (err: any) {
       console.warn('Fehler beim Rollenwechsel:', err);
@@ -7725,7 +7753,8 @@ function App() {
   };
 
   // 2.5b SECRETARY DASHBOARD BYPASS
-  if (user.role?.toLowerCase() === 'secretary' || user.role?.toLowerCase() === 'admin') {
+  const activeWorkspace = localStorage.getItem('groovelab_active_workspace');
+  if ((user.role?.toLowerCase() === 'secretary' || user.role?.toLowerCase() === 'admin') && activeWorkspace !== 'teacher') {
     return (
       <ErrorBoundary>
         {isGhostParam && (
@@ -8180,6 +8209,7 @@ function App() {
           onBypassUnlocked={() => setMaintenanceBypass(true)} 
           currentRole={user?.role}
           currentSchoolId={school?.id}
+          activePlatform={activePlatform}
         />
       )}
       <GlobalBroadcastBanner announcement={broadcastAnnouncement} currentRole={user?.role} />
@@ -9181,8 +9211,13 @@ function App() {
                     setShowCampusPinPrompt(true);
                     return;
                   }
+                  if (user?.role === 'teacher') {
+                    localStorage.setItem('groovelab_active_workspace', 'teacher');
+                  }
                   setActivePlatform('campus');
-                  const startTab = isStaff ? 'live' : 'briefing';
+                  const startTab = user?.role === 'teacher' 
+                    ? (localStorage.getItem('campus_active_tab') || 'briefing') 
+                    : (isStaff ? 'live' : 'briefing');
                   setActiveStudentTab(startTab);
                   localStorage.setItem('campus_active_tab', startTab);
                 }}
@@ -9225,12 +9260,17 @@ function App() {
             {school && (school.has_groovelab_subscription || !school.is_billing_booked) && user?.is_groovelab_active && (
               <div 
                 onClick={() => {
+                  if (user?.role === 'teacher') {
+                    localStorage.setItem('groovelab_active_workspace', 'teacher');
+                  }
                   setActivePlatform('groovelab');
                   const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
                   if (isStaff) {
                     setLocationMode('lab');
                     sessionStorage.setItem('groovelab_location_mode', 'lab');
                   }
+                  const startTab = localStorage.getItem('groovelab_active_tab') || 'live';
+                  setActiveStudentTab(startTab);
                 }}
                 style={{
                   display: 'flex',

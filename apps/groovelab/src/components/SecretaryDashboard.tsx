@@ -1410,17 +1410,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   useEffect(() => {
     if (!activeContextMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.student-context-menu')) {
+        setActiveContextMenu(null);
+      }
+    };
     const timer = setTimeout(() => {
-      const handleClickOutside = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (!target.closest('.student-context-menu')) {
-          setActiveContextMenu(null);
-        }
-      };
       window.addEventListener('click', handleClickOutside);
-      return () => window.removeEventListener('click', handleClickOutside);
     }, 50);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('click', handleClickOutside);
+    };
   }, [activeContextMenu]);
 
   // Sofortiges Laden des eigenen Profils – unabhängig vom langen fetchDashboardData
@@ -3832,9 +3834,57 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             status: resolvedStatus
           });
         }
+      });
 
+      // Merge pending students into student list (avoid duplicates)
+      if (pendingStudents) {
+        pendingStudents.forEach(ps => {
+          const userMatch = allUsers?.find(u => u.id === ps.id || (u.first_name && ps.first_name && u.first_name.toLowerCase().trim() === ps.first_name.toLowerCase().trim()));
+          const exists = studentsList.some(s => s.id === ps.id || (s.first_name && s.first_name === ps.first_name));
+          if (!exists) {
+            const fName = ps.first_name || 'Ausstehendes';
+            const lName = ps.last_name || 'Onboarding';
+            const fullName = `${fName} ${lName}`;
+            
+            map[ps.id] = fullName;
+            userInstrumentMap[ps.id] = ps.instrument || '';
+
+            const isCampusAct = userMatch ? !!userMatch.is_campus_active : ((ps as any).is_campus_active === true);
+            const isGrooveAct = userMatch ? !!userMatch.is_groovelab_active : ((ps as any).is_groovelab_active === true);
+
+            const effectiveTeacherId = ps.teacher_id || (userMatch ? userMatch.teacher_id : null);
+            let resolvedInstrument = ps.instrument || (userMatch ? userMatch.instrument : null);
+            if (!effectiveTeacherId) {
+              resolvedInstrument = 'Musiker';
+            } else if (!resolvedInstrument || resolvedInstrument === 'Musiker' || resolvedInstrument === 'Nicht festgelegt' || resolvedInstrument === 'Instrument') {
+              resolvedInstrument = teacherInstrumentMap[effectiveTeacherId] || 'Musiker';
+            }
+
+            studentsList.push({
+              id: ps.id,
+              school_id: ps.school_id,
+              teacher_id: effectiveTeacherId,
+              role: 'student',
+              first_name: fName,
+              last_name: lName,
+              email: '',
+              instrument: resolvedInstrument,
+              is_active: false,
+              is_campus_active: isCampusAct,
+              is_groovelab_active: isGrooveAct,
+              status: 'inactive',
+              isPendingOnboarding: true,
+              day_of_birth: ps.day_of_birth || null,
+              ausweis_nummer: 'Ausstehend (Onboarding)',
+              created_at: ps.created_at || new Date().toISOString()
+            });
+          }
+        });
+      }
+
+      allUsers?.forEach(u => {
         if (u.role === 'teacher' || u.role === 'admin' || (u.roles && (u.roles.includes('teacher') || u.roles.includes('admin')))) {
-          const currentStudentCount = allUsers?.filter(usr => usr.role === 'student' && usr.teacher_id === u.id).length || 0;
+          const currentStudentCount = studentsList.filter(s => s.teacher_id === u.id).length;
           if (!u.is_active) {
             bypassList.push({
               id: u.id,
@@ -3902,52 +3952,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           }
         }
       });
-
-      // Merge pending students into student list (avoid duplicates)
-      if (pendingStudents) {
-        pendingStudents.forEach(ps => {
-          const userMatch = allUsers?.find(u => u.id === ps.id || (u.first_name && ps.first_name && u.first_name.toLowerCase().trim() === ps.first_name.toLowerCase().trim()));
-          const exists = studentsList.some(s => s.id === ps.id || (s.first_name && s.first_name === ps.first_name));
-          if (!exists) {
-            const fName = ps.first_name || 'Ausstehendes';
-            const lName = ps.last_name || 'Onboarding';
-            const fullName = `${fName} ${lName}`;
-            
-            map[ps.id] = fullName;
-            userInstrumentMap[ps.id] = ps.instrument || '';
-
-            const isCampusAct = userMatch ? !!userMatch.is_campus_active : ((ps as any).is_campus_active === true);
-            const isGrooveAct = userMatch ? !!userMatch.is_groovelab_active : ((ps as any).is_groovelab_active === true);
-
-            const effectiveTeacherId = ps.teacher_id || (userMatch ? userMatch.teacher_id : null);
-            let resolvedInstrument = ps.instrument || (userMatch ? userMatch.instrument : null);
-            if (!effectiveTeacherId) {
-              resolvedInstrument = 'Musiker';
-            } else if (!resolvedInstrument || resolvedInstrument === 'Musiker' || resolvedInstrument === 'Nicht festgelegt' || resolvedInstrument === 'Instrument') {
-              resolvedInstrument = teacherInstrumentMap[effectiveTeacherId] || 'Musiker';
-            }
-
-            studentsList.push({
-              id: ps.id,
-              school_id: ps.school_id,
-              teacher_id: effectiveTeacherId,
-              role: 'student',
-              first_name: fName,
-              last_name: lName,
-              email: '',
-              instrument: resolvedInstrument,
-              is_active: false,
-              is_campus_active: isCampusAct,
-              is_groovelab_active: isGrooveAct,
-              status: 'inactive',
-              isPendingOnboarding: true,
-              day_of_birth: ps.day_of_birth || null,
-              ausweis_nummer: 'Ausstehend (Onboarding)',
-              created_at: ps.created_at || new Date().toISOString()
-            });
-          }
-        });
-      }
 
       setUserMap(map);
       setCoaches(coachesList);
@@ -14467,8 +14471,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               /* Campus Tab Button */
               <div 
                 onClick={() => {
+                  localStorage.setItem('groovelab_active_platform', 'campus');
+                  localStorage.setItem('campus_active_tab', 'briefing');
+                  localStorage.setItem('groovelab_active_workspace', 'teacher');
+                  if (onRoleSwitched) {
+                    React.startTransition(() => {
+                      onRoleSwitched('teacher');
+                    });
+                    return;
+                  }
                   setActiveTab('campus');
-                  localStorage.setItem('groovelab_active_workspace', 'campus');
                 }}
                 style={{
                   display: 'flex',
@@ -14503,8 +14515,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               /* GrooveLab Tab Button */
               <div 
                 onClick={() => {
+                  localStorage.setItem('groovelab_active_platform', 'groovelab');
+                  localStorage.setItem('groovelab_active_tab', 'live');
+                  localStorage.setItem('groovelab_active_workspace', 'teacher');
+                  if (onRoleSwitched) {
+                    React.startTransition(() => {
+                      onRoleSwitched('teacher');
+                    });
+                    return;
+                  }
                   setActiveTab('groovelab');
-                  localStorage.setItem('groovelab_active_workspace', 'groovelab');
                 }}
                 style={{
                   display: 'flex',
@@ -19346,7 +19366,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               {/* Pupil Count */}
                               <div style={{ flex: '1', minWidth: '100px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: '#3a3a3c' }}>
                                 <Users size={16} style={{ color: '#86868b' }} />
-                                <span>{t.studentCount || 0} Schüler</span>
+                                <span>{(students.filter((s: any) => s.teacher_id === t.id).length) || t.studentCount || 0} Schüler</span>
                               </div>
 
                               {/* Action Buttons */}
@@ -24379,7 +24399,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             {/* Pupil Count */}
                             <div style={{ flex: '1', minWidth: '100px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: '#3a3a3c' }}>
                               <Users size={16} style={{ color: '#86868b' }} />
-                              <span>{t.studentCount || 0} Schüler</span>
+                              <span>{(students.filter((s: any) => s.teacher_id === t.id).length) || t.studentCount || 0} Schüler</span>
                             </div>
 
                             {/* Action Buttons */}
@@ -31809,7 +31829,7 @@ status: status,
                   }}>
                     <div>
                       <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüleranzahl</span>
-                      <strong style={{ display: 'block', fontSize: '1.45rem', color: '#34a853', marginTop: '2px', fontWeight: 900 }}>{manageTeacher.studentCount || 0}</strong>
+                      <strong style={{ display: 'block', fontSize: '1.45rem', color: '#34a853', marginTop: '2px', fontWeight: 900 }}>{(students.filter((s: any) => s.teacher_id === manageTeacher.id).length) || manageTeacher.studentCount || 0}</strong>
                     </div>
                     <GraduationCap size={24} style={{ color: '#34a853', opacity: 0.8 }} />
                   </div>

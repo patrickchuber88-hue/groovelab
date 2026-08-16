@@ -166,8 +166,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
     const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
 
-    const isCampusActive = schoolHasCampus && userData.is_campus_active !== false;
-    const isGroovelabActive = schoolHasGroove && userData.is_groovelab_active !== false;
+    const isCampusActive = Boolean(schoolHasCampus && userData.is_campus_active);
+    const isGroovelabActive = Boolean(schoolHasGroove && userData.is_groovelab_active);
 
     if (isCampusActive) {
       // 1. Campus Modul -> Briefing Board
@@ -1983,6 +1983,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         osc.start(now + index * 0.15);
         osc.stop(now + index * 0.15 + 1.5);
       });
+      // Auto-close AudioContext after sound finishes to prevent context accumulation
+      setTimeout(() => {
+        try {
+          if (ctx.state !== 'closed') {
+            ctx.close().catch(() => {});
+          }
+        } catch {}
+      }, 2000);
     } catch (e) {
       console.warn("AudioContext success chime failed:", e);
     }

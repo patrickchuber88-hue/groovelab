@@ -55,19 +55,22 @@ export interface MasteringOptions {
   targetPeakDb?: number;           // Default: -1.0 dBTP
   isDrumPadMode?: boolean;         // Default: false (true for drums: -12 dB pad, 30 Hz HPF, 65ms attack)
   applyAutoGainStage?: boolean;    // Default: true (-18 dBFS RMS staging)
+  applyAmbientDenoise?: boolean;   // Default: true (Smart Room Noise Floor Cleaner)
   applyAdaptiveHpf?: boolean;      // Default: true (f0_min * 0.7, clamped [25 Hz, 75 Hz])
   applyTransientSoftener?: boolean;// Default: true (Crest Factor > 14 dB lookahead smoother)
   applyLowEndResonance?: boolean;  // Default: true (100-220 Hz dynamic low-end control, max -1.5 dB)
   applyMidResonance?: boolean;     // Default: true (180-420 Hz dynamic notch, Q = 2.4)
+  applyWarmthBody?: boolean;       // Default: true (Kaminfeuer-Wärme +1.2 dB at 260 Hz)
   applyTiltEq?: boolean;           // Default: true (Audiophile Tilt EQ at 1000 Hz: +1.0 dB Highs, -1.0 dB Lows)
   tiltPivotHz?: number;            // Default: 1000 Hz
+  applyChristmasSparkle?: boolean; // Default: true (Christmas Sparkle & Bell Air at 10.5 kHz)
   applyDeHarsh?: boolean;          // Default: true (5.5 - 8.5 kHz dynamic tablet/mobile mic de-sibilance)
   applyPultecAir?: boolean;        // Default: true (+1.2 dB High-Shelf at 14.5 kHz)
   applyParallelConsoleBus?: boolean;// Default: true (Andrew Scheps 80/20 bus)
-  applyStereoDimension?: boolean;  // Default: true (200 Hz Mono-Maker + >600 Hz 112% width)
+  applyStereoDimension?: boolean;  // Default: true (200 Hz Mono-Maker + >600 Hz 125% width)
   applyConvolutionReverb?: boolean;// Default: true (Grand Gala Concert Hall)
-  reverbWetMix?: number;           // Default: 0.145 (14.5%)
-  reverbPreDelayMs?: number;       // Default: 30 ms
+  reverbWetMix?: number;           // Default: 0.30 (30%)
+  reverbPreDelayMs?: number;       // Default: 25 ms
 }
 
 export const DEFAULT_ACOUSTIC_MASTERING_OPTIONS: MasteringOptions = {
@@ -76,12 +79,15 @@ export const DEFAULT_ACOUSTIC_MASTERING_OPTIONS: MasteringOptions = {
   targetPeakDb: -1.0,
   isDrumPadMode: false,
   applyAutoGainStage: true,
+  applyAmbientDenoise: true,
   applyAdaptiveHpf: true,
   applyTransientSoftener: true,
   applyLowEndResonance: true,
   applyMidResonance: true,
+  applyWarmthBody: true,
   applyTiltEq: true,
   tiltPivotHz: 1000,
+  applyChristmasSparkle: true,
   applyDeHarsh: true,
   applyPultecAir: true,
   applyParallelConsoleBus: true,
@@ -589,8 +595,74 @@ function analyzeMidRangeResonance(audioBuffer: AudioBuffer): {
 }
 
 /**
+ * Intelligent Adaptive Room Noise Floor Soft-Expander (Denoise)
+ * Smoothly attenuates stationary background noise (room hum, PC fans, room hiss)
+ * in quiet musical pauses by -4.0 dB to -6.0 dB without chopping natural instrument decays.
+ */
+function applySmartAmbientDenoise(audioBuffer: AudioBuffer): { noiseReduced: boolean; avgFloorDb: number } {
+  const sampleRate = audioBuffer.sampleRate;
+  const numChannels = audioBuffer.numberOfChannels;
+  const length = audioBuffer.length;
+  if (length === 0) return { noiseReduced: false, avgFloorDb: -70 };
+
+  const channelData0 = audioBuffer.getChannelData(0);
+  const frameSize = Math.floor(sampleRate * 0.05); // 50ms frames
+  const numFrames = Math.floor(length / frameSize);
+
+  if (numFrames < 4) return { noiseReduced: false, avgFloorDb: -70 };
+
+  // Measure minimum energy frames to estimate background room noise floor
+  const frameEnergies: number[] = [];
+  for (let f = 0; f < numFrames; f++) {
+    let energy = 0;
+    const offset = f * frameSize;
+    for (let i = 0; i < frameSize; i++) {
+      const s = channelData0[offset + i];
+      energy += s * s;
+    }
+    const rms = Math.sqrt(energy / frameSize);
+    frameEnergies.push(rms);
+  }
+
+  frameEnergies.sort((a, b) => a - b);
+  // Estimate noise floor from 10th percentile lowest frame
+  const noiseFloorRms = frameEnergies[Math.max(0, Math.floor(frameEnergies.length * 0.10))] || 1e-4;
+  const noiseFloorDb = 20 * Math.log10(Math.max(1e-5, noiseFloorRms));
+
+  // Only apply soft expansion if noise floor is between -65 dBFS and -30 dBFS
+  if (noiseFloorDb < -65 || noiseFloorDb > -30) {
+    return { noiseReduced: false, avgFloorDb: Math.round(noiseFloorDb) };
+  }
+
+  const thresholdLinear = noiseFloorRms * 2.8; // ~9 dB above noise floor
+  const maxAttenuation = Math.pow(10, -4.5 / 20); // -4.5 dB gentle reduction
+
+  for (let c = 0; c < numChannels; c++) {
+    const data = audioBuffer.getChannelData(c);
+    let currentGain = 1.0;
+    const attackCoeff = 0.92;  // Fast smooth opening on note strikes
+    const releaseCoeff = 0.9985; // Slow smooth decay to protect long musical reverb tails
+
+    for (let i = 0; i < length; i++) {
+      const absSample = Math.abs(data[i]);
+      const targetGain = absSample > thresholdLinear ? 1.0 : maxAttenuation;
+
+      if (targetGain > currentGain) {
+        currentGain = targetGain + (currentGain - targetGain) * attackCoeff;
+      } else {
+        currentGain = targetGain + (currentGain - targetGain) * releaseCoeff;
+      }
+
+      data[i] *= currentGain;
+    }
+  }
+
+  return { noiseReduced: true, avgFloorDb: Math.round(noiseFloorDb) };
+}
+
+/**
  * Step 7: Psychoacoustic Stereo Spreading & 200 Hz Mono-Maker
- * Keeps < 200 Hz strictly 100% mono; widens > 600 Hz by 112% for an immersive acoustic room feel.
+ * Keeps < 200 Hz strictly 100% mono; widens > 600 Hz by 125% for an expansive 3D concert hall depth.
  */
 function applyStereoDimensionAndMonoMaker(audioBuffer: AudioBuffer): AudioBuffer {
   const sampleRate = audioBuffer.sampleRate;
@@ -649,13 +721,13 @@ function applyStereoDimensionAndMonoMaker(audioBuffer: AudioBuffer): AudioBuffer
     xl2 = xl1; xl1 = side;
     yl2 = yl1; yl1 = ylSide;
 
-    // High-pass on Side signal for high-frequency expansion (> 600 Hz * 1.12)
+    // High-pass on Side signal for high-frequency expansion (> 600 Hz * 1.25)
     const yhSide = (b0H / a0H) * side + (b1H / a0H) * xh1 + (b2H / a0H) * xh2 - (a1H / a0H) * yh1 - (a2H / a0H) * yh2;
     xh2 = xh1; xh1 = side;
     yh2 = yh1; yh1 = yhSide;
 
-    // Side reconstruction: low-end removed (Mono-Maker), high-end widened to 112%
-    const processedSide = (side - ylSide) + yhSide * 0.12;
+    // Side reconstruction: low-end removed (Mono-Maker), high-end widened to 125%
+    const processedSide = (side - ylSide) + yhSide * 0.25;
 
     left[i] = mid + processedSide;
     right[i] = mid - processedSide;
@@ -814,6 +886,11 @@ export async function processStudioMastering(
     ? analyzeMidRangeResonance(decodedBuffer)
     : { peakMidFreqHz: 280, cutDb: 0, isPeakDetected: false };
 
+  // 4b. Smart Ambient Room Noise Floor Expander (Pre-Staging Soft-Denoise)
+  if (options.applyAmbientDenoise ?? true) {
+    applySmartAmbientDenoise(decodedBuffer);
+  }
+
   // 5. Pre-Gain Staging (-18.0 dBFS RMS Headroom)
   if (options.applyAutoGainStage ?? true) {
     const currentRmsDb = originalLufs;
@@ -873,6 +950,17 @@ export async function processStudioMastering(
     lastNode = midNotchNode;
   }
 
+  // 8a. 🕯️ Kaminfeuer-Wärme (Analog Tube Warmth Boost at 260 Hz, +1.2 dB, Q = 1.4)
+  if (options.applyWarmthBody ?? true) {
+    const warmthNode = offlineCtx.createBiquadFilter();
+    warmthNode.type = 'peaking';
+    warmthNode.frequency.value = 260;
+    warmthNode.gain.value = 1.2;
+    warmthNode.Q.value = 1.4;
+    lastNode.connect(warmthNode);
+    lastNode = warmthNode;
+  }
+
   // 8b. Voice & Instrument Presence Boost (peaking 3.2 kHz, +2.5 dB, Q: 1.2)
   if (options.applyPultecAir ?? true) {
     const presenceNode = offlineCtx.createBiquadFilter();
@@ -901,6 +989,17 @@ export async function processStudioMastering(
     tiltHighNode.gain.value = +1.0;
     lastNode.connect(tiltHighNode);
     lastNode = tiltHighNode;
+  }
+
+  // 8d. ✨ Christmas Sparkle & Bell Brilliance Stage (10.5 kHz, +1.6 dB, Q = 0.85)
+  if (options.applyChristmasSparkle ?? true) {
+    const sparkleNode = offlineCtx.createBiquadFilter();
+    sparkleNode.type = 'peaking';
+    sparkleNode.frequency.value = 10500;
+    sparkleNode.gain.value = 1.6;
+    sparkleNode.Q.value = 0.85;
+    lastNode.connect(sparkleNode);
+    lastNode = sparkleNode;
   }
 
   // 9. Subtle High-End "Air" Stage (Pultec EQP-1A Style: 14.5 kHz High-Shelf +1.5 dB)
@@ -1094,11 +1193,14 @@ export async function processDualMastering(
   // 1. Studio Audiophile Master with Full Gala Hall Reverb (-13.0 LUFS Target)
   const masterRes = await processStudioMastering(audioInput, {
     ...mergedOptions,
+    applyAmbientDenoise: mergedOptions.applyAmbientDenoise ?? true,
     applyAdaptiveHpf: true,
     applyTransientSoftener: true,
     applyLowEndResonance: true,
     applyMidResonance: true,
+    applyWarmthBody: mergedOptions.applyWarmthBody ?? true,
     applyTiltEq: true,
+    applyChristmasSparkle: mergedOptions.applyChristmasSparkle ?? true,
     applyPultecAir: true,
     applyDeHarsh: true,
     applyParallelConsoleBus: true,
@@ -1112,11 +1214,14 @@ export async function processDualMastering(
   // 2. Pure RAW (Dry 1:1, centered stereo, zero coloring/EQ/reverb, loudness-normalized to -13.0 LUFS)
   const rawRes = await processStudioMastering(audioInput, {
     applyAutoGainStage: true,
+    applyAmbientDenoise: false,
     applyAdaptiveHpf: false,
     applyTransientSoftener: false,
     applyLowEndResonance: false,
     applyMidResonance: false,
+    applyWarmthBody: false,
     applyTiltEq: false,
+    applyChristmasSparkle: false,
     applyPultecAir: false,
     applyDeHarsh: false,
     applyParallelConsoleBus: false,

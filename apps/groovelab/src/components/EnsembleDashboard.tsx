@@ -65,36 +65,23 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
   const fetchData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
-      // 1. Fetch Ensembles
-      const ensemblesQuery = supabase.from('ensembles').select('*').eq('school_id', schoolId);
+      // 1. Fetch Ensembles with Members and Songs in a single relational join
+      const { data: ensembleData, error: ensembleErr } = await supabase
+        .from('ensembles')
+        .select(`
+          *,
+          ensemble_members (*, profiles:users(*)),
+          ensemble_songs (*, songs(*))
+        `)
+        .eq('school_id', schoolId);
       
-      const { data: ensembleData, error: ensembleErr } = await ensemblesQuery;
       if (ensembleErr) throw ensembleErr;
 
-      const ensemblesList = ensembleData || [];
-
-      // 2. Fetch Members and Songs for each ensemble
-      const fullEnsembles = await Promise.all(
-        ensemblesList.map(async (ens: any) => {
-          // Fetch members (with user profiles)
-          const { data: members, error: memErr } = await supabase
-            .from('ensemble_members')
-            .select('*, profiles:users(*)')
-            .eq('ensemble_id', ens.id);
-          
-          // Fetch songs
-          const { data: songs, error: songErr } = await supabase
-            .from('ensemble_songs')
-            .select('*, songs(*)')
-            .eq('ensemble_id', ens.id);
-
-          return {
-            ...ens,
-            members: members || [],
-            songs: songs || []
-          };
-        })
-      );
+      const fullEnsembles = (ensembleData || []).map((ens: any) => ({
+        ...ens,
+        members: ens.ensemble_members || [],
+        songs: ens.ensemble_songs || []
+      }));
 
       // Filter for students: they only see ensembles they are members of
       if (!isTeacher) {

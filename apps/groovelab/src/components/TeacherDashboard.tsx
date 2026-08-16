@@ -6383,7 +6383,7 @@ export function TeacherDashboard({
                 className="hover-scale"
               >
                 <Check size={14} strokeWidth={3} />
-                ☀️ Wieder gesund melden
+                Wieder gesund melden
               </button>
             </div>
           )}

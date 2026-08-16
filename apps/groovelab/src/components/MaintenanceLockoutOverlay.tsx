@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wrench, ShieldAlert, RefreshCw, Key, Lock, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Wrench, ShieldAlert, RefreshCw, Key, Lock, CheckCircle2, AlertTriangle, ArrowRight, X } from 'lucide-react';
 
 export interface MaintenanceState {
   isActive: boolean;
@@ -24,6 +24,7 @@ interface MaintenanceLockoutOverlayProps {
   onBypassUnlocked?: () => void;
   currentRole?: string;
   currentSchoolId?: string;
+  activePlatform?: string;
 }
 
 export const MaintenanceLockoutOverlay: React.FC<MaintenanceLockoutOverlayProps> = ({
@@ -31,12 +32,16 @@ export const MaintenanceLockoutOverlay: React.FC<MaintenanceLockoutOverlayProps>
   onRefreshCheck,
   onBypassUnlocked,
   currentRole,
-  currentSchoolId
+  currentSchoolId,
+  activePlatform
 }) => {
   const [showBypassModal, setShowBypassModal] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [pinSuccess, setPinSuccess] = useState(false);
+  const [isMinimized, setIsMinimized] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && sessionStorage.getItem('cg_maintenance_banner_minimized') === 'true';
+  });
   const [secondsRemaining, setSecondsRemaining] = useState<number>(() => {
     return Math.max(60, (maintenanceState.estimatedDurationMinutes || 30) * 60);
   });
@@ -76,54 +81,225 @@ export const MaintenanceLockoutOverlay: React.FC<MaintenanceLockoutOverlayProps>
   };
 
   if (maintenanceState.readOnlyMode) {
+    const isStaffAdmin = currentRole === 'admin' || currentRole === 'secretary';
+    const isGroove = activePlatform === 'groovelab' || activePlatform === 'ensembles';
+    const isCampus = activePlatform === 'campus' || (!isStaffAdmin && !isGroove);
+
+    let bannerBg = 'linear-gradient(90deg, #f0fdf4 0%, #ecfdf5 100%)';
+    let bannerBorder = 'rgba(52, 168, 83, 0.28)';
+    let bannerText = '#14532d';
+    let iconColor = '#16a34a';
+    let badgeBg = 'rgba(52, 168, 83, 0.12)';
+    let badgeText = '#15803d';
+    let buttonBg = '#34a853';
+    let buttonText = '#ffffff';
+
+    if (isStaffAdmin) {
+      bannerBg = 'linear-gradient(90deg, #fef2f2 0%, #fff1f2 100%)';
+      bannerBorder = 'rgba(234, 67, 53, 0.25)';
+      bannerText = '#991b1b';
+      iconColor = '#dc2626';
+      badgeBg = 'rgba(234, 67, 53, 0.12)';
+      badgeText = '#b91c1c';
+      buttonBg = '#ea4335';
+      buttonText = '#ffffff';
+    } else if (isGroove) {
+      bannerBg = 'linear-gradient(90deg, #fefce8 0%, #fffbeb 100%)';
+      bannerBorder = 'rgba(234, 179, 8, 0.35)';
+      bannerText = '#78350f';
+      iconColor = '#ca8a04';
+      badgeBg = 'rgba(234, 179, 8, 0.18)';
+      badgeText = '#854d0e';
+      buttonBg = '#eab308';
+      buttonText = '#000000';
+    }
+
+    // Minimized Floating Widget in Corner
+    if (isMinimized) {
+      return (
+        <div
+          onClick={() => {
+            setIsMinimized(false);
+            sessionStorage.removeItem('cg_maintenance_banner_minimized');
+          }}
+          title="Wartung aktiv (Read-Only Lesemodus) – Klicken zum Ausklappen"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 999999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: isStaffAdmin ? 'rgba(254, 242, 242, 0.95)' : isGroove ? 'rgba(254, 252, 232, 0.95)' : 'rgba(240, 253, 244, 0.95)',
+            border: `1.5px solid ${bannerBorder}`,
+            borderRadius: '100px',
+            padding: '7px 13px 7px 9px',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.15)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            cursor: 'pointer',
+            color: bannerText,
+            transition: 'all 0.2s ease',
+            userSelect: 'none'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px) scale(1.03)';
+            e.currentTarget.style.boxShadow = '0 12px 35px rgba(0, 0, 0, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.15)';
+          }}
+        >
+          <div style={{
+            position: 'relative',
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            background: badgeBg,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: iconColor
+          }}>
+            <Lock size={14} />
+            <span style={{
+              position: 'absolute',
+              top: '-1px',
+              right: '-1px',
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: iconColor,
+              border: '2px solid white'
+            }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 900, lineHeight: 1.1 }}>
+              Wartung aktiv
+            </span>
+            <span style={{ fontSize: '0.64rem', fontWeight: 700, opacity: 0.85 }}>
+              Lesemodus
+            </span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
+        position: 'relative',
+        width: '100%',
         zIndex: 999999,
-        background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
-        color: '#ffffff',
-        padding: '10px 20px',
-        boxShadow: '0 4px 20px rgba(180, 83, 9, 0.35)',
+        background: bannerBg,
+        color: bannerText,
+        padding: '9px 18px',
+        boxSizing: 'border-box',
+        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        fontSize: '0.84rem',
-        fontWeight: 750,
+        fontSize: '0.82rem',
+        fontWeight: 700,
         gap: '12px',
-        backdropFilter: 'blur(8px)',
-        borderBottom: '1px solid rgba(255,255,255,0.2)'
+        borderBottom: `1px solid ${bannerBorder}`,
+        transition: 'all 0.2s ease'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '8px', padding: '4px', display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, flexWrap: 'wrap' }}>
+          <div style={{
+            background: badgeBg,
+            borderRadius: '8px',
+            padding: '5px 7px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: iconColor
+          }}>
             <Lock size={15} />
           </div>
-          <span>
-            <strong>⚠️ Read-Only Lesemodus:</strong> {maintenanceState.reason || 'Wartungsarbeiten aktiv'}. Stundenpläne &amp; Notizen einsehbar. Speicher-, Aufnahme- &amp; Bearbeitungsvorgänge sind vorübergehend pausiert.
+          <span style={{ fontWeight: 850, letterSpacing: '-0.01em' }}>
+            Read-Only Lesemodus:
+          </span>
+          <span style={{ fontWeight: 600, opacity: 0.95 }}>
+            {maintenanceState.reason || 'Planmäßige Datenbank-Wartung aktiv'}. Stundenpläne &amp; Notizen sind lesbar – Speichervorgänge vorübergehend pausiert.
           </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', whiteSpace: 'nowrap' }}>
-          <span style={{ fontSize: '0.74rem', background: 'rgba(0,0,0,0.25)', padding: '3px 8px', borderRadius: '6px' }}>
+          {secondsRemaining > 0 && (
+            <span style={{
+              fontSize: '0.74rem',
+              background: badgeBg,
+              color: badgeText,
+              padding: '3px 8px',
+              borderRadius: '6px',
+              fontWeight: 800,
+              fontFamily: 'monospace'
+            }}>
+              ~{formatTime(secondsRemaining)} min
+            </span>
+          )}
+          <span style={{
+            fontSize: '0.74rem',
+            background: badgeBg,
+            color: badgeText,
+            padding: '3px 8px',
+            borderRadius: '6px',
+            fontWeight: 800
+          }}>
             🔒 Schreibschutz aktiv
           </span>
           <button
             type="button"
-            onClick={onRefreshCheck}
+            onClick={() => {
+              if (onRefreshCheck) onRefreshCheck();
+              window.location.reload();
+            }}
             style={{
-              background: '#ffffff',
-              color: '#92400e',
+              background: buttonBg,
+              color: buttonText,
               border: 'none',
               borderRadius: '8px',
-              padding: '4px 10px',
-              fontSize: '0.74rem',
+              padding: '5px 12px',
+              fontSize: '0.75rem',
               fontWeight: 850,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+              transition: 'opacity 0.2s ease'
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
           >
-            Status prüfen
+            <RefreshCw size={12} /> Status prüfen
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsMinimized(true);
+              sessionStorage.setItem('cg_maintenance_banner_minimized', 'true');
+            }}
+            title="Banner ausblenden"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: bannerText,
+              padding: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: 0.65,
+              borderRadius: '6px',
+              transition: 'opacity 0.2s ease'
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.65')}
+          >
+            <X size={16} />
           </button>
         </div>
       </div>

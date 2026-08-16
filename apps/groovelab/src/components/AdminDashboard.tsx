@@ -459,9 +459,13 @@ export function AdminDashboard({
   };
 
   const [campusBookings, setCampusBookingsRaw] = useState<any[]>(() => {
-    const stored = localStorage.getItem('groovelab_campus_bookings');
-    const initial = stored ? JSON.parse(stored) : [];
-    return consolidateBookings(initial);
+    try {
+      const stored = localStorage.getItem('groovelab_campus_bookings');
+      const initial = stored ? JSON.parse(stored) : [];
+      return consolidateBookings(Array.isArray(initial) ? initial : []);
+    } catch {
+      return [];
+    }
   });
 
   const setCampusBookings = (val: any[] | ((prev: any[]) => any[])) => {
@@ -15009,9 +15013,13 @@ export function AdminDashboard({
                           window.removeEventListener('pointerup', handlePointerUp);
                           
                           // Save final coords
-                          const finalX = Math.round(latestX * 10) / 10;
-                          const finalY = Math.round(latestY * 10) / 10;
-                          await supabase.from('stations').update({ pos_x: finalX, pos_y: finalY }).eq('id', station.id);
+                          try {
+                            const finalX = Math.round(latestX * 10) / 10;
+                            const finalY = Math.round(latestY * 10) / 10;
+                            await supabase.from('stations').update({ pos_x: finalX, pos_y: finalY }).eq('id', station.id);
+                          } catch (err) {
+                            console.warn('[Station Drag] Failed to save pos:', err);
+                          }
                         };
 
                         window.addEventListener('pointermove', handlePointerMove);

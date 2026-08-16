@@ -989,7 +989,7 @@ function MobileBriefingView({
             <button 
               onClick={() => setActiveTab('practice_board')}
               style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: 'white', border: 'none', borderRadius: '12px', padding: '10px 14px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(79, 70, 229, 0.15)' }}>
-              🚀 Üben starten
+              <Play size={14} fill="currentColor" /> Üben starten
             </button>
           </div>
         )}
@@ -2401,7 +2401,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     handleCheck();
     window.addEventListener('resize', handleCheck);
     const observer = new MutationObserver(handleCheck);
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     return () => {
       window.removeEventListener('resize', handleCheck);
       observer.disconnect();

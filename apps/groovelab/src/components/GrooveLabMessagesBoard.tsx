@@ -660,7 +660,7 @@ export default function GrooveLabMessagesBoard({
                       const activeGrooveLabStudents = schoolUsers.filter(u => {
                         const isStudent = (u.role || '').toLowerCase() === 'student';
                         const isGrooveActive = Boolean(u.is_groovelab_active || u.isGroovelabActive);
-                        const isActive = u.is_active !== false;
+                        const isActive = u.is_active === true || u.isActive === true;
                         const matchesSearch = `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase().includes(recipientSearchText.toLowerCase());
                         return isStudent && isGrooveActive && isActive && matchesSearch && u.id !== user?.id;
                       });
