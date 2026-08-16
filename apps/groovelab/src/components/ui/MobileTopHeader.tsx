@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GraduationCap, Music, Bell, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { subscribePendingOfflineCount, flushOfflineSyncQueue } from '../../services/offlineSyncService';
+import { CampusLevelSwitcher, CampusUiLevel } from '../campus/CampusLevelSwitcher';
 
 interface MobileTopHeaderProps {
   user: any;
@@ -18,6 +19,20 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [campusStudentUiLevel, setCampusStudentUiLevel] = useState<CampusUiLevel>(() => {
+    if (typeof window === 'undefined') return 'junior';
+    const saved = localStorage.getItem('campus_student_ui_level');
+    if (saved === 'junior' || saved === 'teen' || saved === 'pro') return saved as CampusUiLevel;
+    return 'junior';
+  });
+
+  useEffect(() => {
+    const handleLevelChangeEvt = (e: any) => {
+      if (e?.detail) setCampusStudentUiLevel(e.detail);
+    };
+    window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+    return () => window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+  }, []);
 
   useEffect(() => {
     const unsub = subscribePendingOfflineCount(setPendingCount);
@@ -242,6 +257,29 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
           )}
         </div>
       </div>
+
+      {/* Sub-Bar for Mobile Students: 1-Click Campus Level Switcher */}
+      {activePlatform === 'campus' && user?.role === 'student' && (
+        <div style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingTop: '6px',
+          marginTop: '4px',
+          borderTop: '1px solid rgba(226, 232, 240, 0.5)'
+        }}>
+          <CampusLevelSwitcher
+            currentLevel={campusStudentUiLevel}
+            compact={true}
+            onChange={(newLevel) => {
+              setCampusStudentUiLevel(newLevel);
+              localStorage.setItem('campus_student_ui_level', newLevel);
+              window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
+            }}
+          />
+        </div>
+      )}
     </header>
   );
 };

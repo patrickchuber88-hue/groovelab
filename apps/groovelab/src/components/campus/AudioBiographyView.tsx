@@ -821,6 +821,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [editTempMasterUrl, setEditTempMasterUrl] = useState<string | null>(null);
   const [editPreviewRawUrl, setEditPreviewRawUrl] = useState<string | null>(null);
   const [recordingAutoStoppedInfo, setRecordingAutoStoppedInfo] = useState<boolean>(false);
+  const [saveProgress, setSaveProgress] = useState<{ percent: number; stage: string; detail: string } | null>(null);
+  const [editSaveProgress, setEditSaveProgress] = useState<{ percent: number; stage: string; detail: string } | null>(null);
 
   // 🗑️ Delete Confirmation Modal State (Double confirmation on delete)
   const [pendingDeleteModal, setPendingDeleteModal] = useState<{
@@ -859,6 +861,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [shareAllowApplause, setShareAllowApplause] = useState<boolean>(true);
   const [shareTargetPlaylistId, setShareTargetPlaylistId] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
+  const [showShareMessagePreview, setShowShareMessagePreview] = useState<boolean>(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -2032,6 +2035,12 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
     const chosenRoomType: ReverbRoomType = reverbWetSlider <= 18 ? 'small' : reverbWetSlider <= 38 ? 'medium' : 'large';
 
+    setSaveProgress({
+      percent: 15,
+      stage: 'Studio Mastering & DSP Feinschliff...',
+      detail: 'Rendere vollen Song mit 4-Band EQ, Glue-Kompression & 3D Raumakustik'
+    });
+
     // ⚡ 100% Full-Length Re-Mastering beim Speichern der Originalaufnahme
     if (lastRawInputFile) {
       try {
@@ -2064,39 +2073,46 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       }
     }
 
-    // 1. 💾 PERSIST TO LOCAL BINARY INDEXEDDB (both equal-loudness versions)
-    try {
-      await storeBlob(`campus_audio_${targetTrackId}_raw`, rawBlob);
-      await storeBlob(`campus_audio_${targetTrackId}_master`, masterBlob);
-    } catch (dbErr) {
-      console.warn('[IndexedDB] Local blob save note:', dbErr);
-    }
+    setSaveProgress({
+      percent: 50,
+      stage: 'WAV-Codierung & Lokale Sicherung...',
+      detail: 'Speichere verlustfreie 24-Bit PCM WAV Spuren in IndexedDB'
+    });
 
-    // 2. ☁️ PERSIST TO SUPABASE CLOUD STORAGE (Bucket: campus-assets)
+    // 1. 💾 PERSIST TO LOCAL BINARY INDEXEDDB (parallel)
+    await Promise.allSettled([
+      storeBlob(`campus_audio_${targetTrackId}_raw`, rawBlob),
+      storeBlob(`campus_audio_${targetTrackId}_master`, masterBlob)
+    ]);
+
+    setSaveProgress({
+      percent: 75,
+      stage: 'Audio-Tresor Cloud-Upload...',
+      detail: 'Synchronisiere Master & Pure RAW Spuren in Supabase'
+    });
+
+    // 2. ☁️ PERSIST TO SUPABASE CLOUD STORAGE (Bucket: campus-assets) (parallel)
     try {
       const sId = student?.id || studentId || 'student';
       const rawPath = `audio_biography/${sId}_${targetTrackId}_raw.wav`;
       const masterPath = `audio_biography/${sId}_${targetTrackId}_master.wav`;
 
-      const { error: rawErr } = await supabase.storage
-        .from('campus-assets')
-        .upload(rawPath, rawBlob, { contentType: 'audio/wav', upsert: true });
+      const [rawUploadRes, masterUploadRes] = await Promise.all([
+        supabase.storage.from('campus-assets').upload(rawPath, rawBlob, { contentType: 'audio/wav', upsert: true }),
+        supabase.storage.from('campus-assets').upload(masterPath, masterBlob, { contentType: 'audio/wav', upsert: true })
+      ]);
 
-      if (!rawErr) {
+      if (!rawUploadRes.error) {
         const { data: rawData } = supabase.storage.from('campus-assets').getPublicUrl(rawPath);
         if (rawData?.publicUrl) rawUrl = rawData.publicUrl;
       }
 
-      const { error: masterErr } = await supabase.storage
-        .from('campus-assets')
-        .upload(masterPath, masterBlob, { contentType: 'audio/wav', upsert: true });
-
-      if (!masterErr) {
+      if (!masterUploadRes.error) {
         const { data: masterData } = supabase.storage.from('campus-assets').getPublicUrl(masterPath);
         if (masterData?.publicUrl) masteredUrl = masterData.publicUrl;
       }
 
-      // 3. 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
+      // 3. 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Async non-blocking)
       let targetSchoolId = student?.school_id || (student as any)?.schoolId || (window as any).__groovelab_school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
 
       if (!targetSchoolId && studentId && studentId !== 'anonymous_student') {
@@ -2116,25 +2132,35 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
       if (targetSchoolId) {
         const addedBytes = (rawBlob?.size || 0) + (masterBlob?.size || 0);
-        const { data: schoolData } = await supabase
-          .from('schools')
-          .select('storage_used_bytes')
-          .eq('id', targetSchoolId)
-          .maybeSingle();
-
-        if (schoolData) {
-          const currentBytes = Number(schoolData.storage_used_bytes || 0);
-          const newBytes = currentBytes + addedBytes;
-          await supabase
-            .from('schools')
-            .update({ storage_used_bytes: newBytes })
-            .eq('id', targetSchoolId);
-        }
+        (async () => {
+          try {
+            const { data: schoolData } = await (supabase
+              .from('schools')
+              .select('storage_used_bytes')
+              .eq('id', targetSchoolId)
+              .maybeSingle() as any);
+            if (schoolData) {
+              const currentBytes = Number(schoolData.storage_used_bytes || 0);
+              const newBytes = currentBytes + addedBytes;
+              await (supabase
+                .from('schools')
+                .update({ storage_used_bytes: newBytes })
+                .eq('id', targetSchoolId) as any);
+            }
+          } catch (err: any) {
+            console.warn('[Storage] Async quota update note:', err);
+          }
+        })();
       }
     } catch (storageErr) {
       console.warn('[Storage] Cloud storage upload / quota note:', storageErr);
     }
 
+    setSaveProgress({
+      percent: 100,
+      stage: 'Erfolgreich gespeichert! ✨',
+      detail: 'Song steht ab sofort in deiner Audio-Biografie bereit'
+    });
 
     const versionLabel = selectedVersionChoice === 'master'
       ? 'Studio-Processing (-14 LUFS)'
@@ -2165,7 +2191,14 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       });
 
       saveMilestones(updated);
-      setActiveUploadModalMilestone(null);
+      setTimeout(() => {
+        setActiveUploadModalMilestone(null);
+        setPendingDualResult(null);
+        setRecordingMilestoneId(null);
+        setRecordSeconds(0);
+        setUploadFile(null);
+        setSaveProgress(null);
+      }, 500);
     } 
     // Case B: Saving into a Custom Playlist
     else if (recordingPlaylistId) {
@@ -2199,13 +2232,23 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       });
 
       savePlaylists(updatedPlaylists);
-      setRecordingPlaylistId(null);
+      setTimeout(() => {
+        setRecordingPlaylistId(null);
+        setPendingDualResult(null);
+        setRecordingMilestoneId(null);
+        setRecordSeconds(0);
+        setUploadFile(null);
+        setSaveProgress(null);
+      }, 500);
+    } else {
+      setTimeout(() => {
+        setPendingDualResult(null);
+        setRecordingMilestoneId(null);
+        setRecordSeconds(0);
+        setUploadFile(null);
+        setSaveProgress(null);
+      }, 500);
     }
-
-    setPendingDualResult(null);
-    setRecordingMilestoneId(null);
-    setRecordSeconds(0);
-    setUploadFile(null);
   };
 
   // 🎛️ Öffnet das Song-Bearbeitungs-Modal (Hall-Regler, Versionen & Songdetails)
@@ -2453,6 +2496,11 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const handleSaveEditedTrack = async () => {
     if (!editingTrackData) return;
     setIsSavingEditTrack(true);
+    setEditSaveProgress({
+      percent: 15,
+      stage: 'Mastering anwenden...',
+      detail: 'Rendere vollen Song mit gewählter Raumakustik & EQ-Eigenschaften'
+    });
 
     try {
       let finalMasteredUrl = editingTrackData.masteredAudioUrl;
@@ -2497,11 +2545,23 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           reverbWetMix: isDrum ? 0.12 : (editingTrackData.reverbWetMix / 100)
         });
 
+        setEditSaveProgress({
+          percent: 55,
+          stage: 'WAV-Sicherung & IndexedDB...',
+          detail: 'Speichere gemasterte Master-Spur lokal'
+        });
+
         try {
           await storeBlob(`campus_audio_${editingTrackData.trackId}_master`, fullMasterRes.masteredBlob);
         } catch (dbErr) {
           console.warn('Local blob update note:', dbErr);
         }
+
+        setEditSaveProgress({
+          percent: 80,
+          stage: 'Audio-Tresor Cloud-Upload...',
+          detail: 'Aktualisiere Master-Spur in Supabase Cloud Storage'
+        });
 
         try {
           const sId = student?.id || studentId || 'student';
@@ -2518,6 +2578,12 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           console.warn('Cloud storage update note:', stErr);
         }
       }
+
+      setEditSaveProgress({
+        percent: 100,
+        stage: 'Änderungen gespeichert! ✨',
+        detail: 'Song wurde erfolgreich aktualisiert'
+      });
 
       const versionLabel = editingTrackData.preferredVersion === 'master'
         ? 'Studio-Processing (-14 LUFS)'
@@ -2556,7 +2622,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         savePlaylists(updatedPlaylists);
       }
 
-      closeEditTrackModal();
+      setTimeout(() => {
+        closeEditTrackModal();
+        setEditSaveProgress(null);
+      }, 500);
     } finally {
       setIsSavingEditTrack(false);
     }
@@ -7613,8 +7682,84 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             )}
 
 
-            {/* Modal Body: Processing vs. Decision Preview vs. Capture Controls */}
-            {isProcessingMastering ? (
+            {/* Modal Body: Saving Progress vs. Processing vs. Decision Preview vs. Capture Controls */}
+            {saveProgress ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '36px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '20px'
+              }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '20px',
+                  background: saveProgress.percent === 100 
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                    : isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.15)',
+                  border: `2px solid ${saveProgress.percent === 100 ? '#10b981' : isLight ? '#a7f3d0' : 'rgba(16, 185, 129, 0.3)'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.8rem',
+                  boxShadow: '0 8px 24px rgba(16, 185, 129, 0.25)',
+                  transition: 'all 0.3s ease'
+                }}>
+                  {saveProgress.percent === 100 ? '✨' : '💾'}
+                </div>
+
+                <div style={{ width: '100%', maxWidth: '380px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 900, color: colors.textPrimary }}>
+                      {saveProgress.stage}
+                    </span>
+                    <span style={{
+                      fontSize: '0.84rem',
+                      fontWeight: 900,
+                      color: '#10b981',
+                      background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.2)',
+                      padding: '2px 8px',
+                      borderRadius: '8px',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}>
+                      {saveProgress.percent}%
+                    </span>
+                  </div>
+
+                  {/* 📊 Animated Progress Bar */}
+                  <div style={{
+                    width: '100%',
+                    height: '10px',
+                    background: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)',
+                    borderRadius: '999px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${saveProgress.percent}%`,
+                      background: 'linear-gradient(90deg, #10b981 0%, #059669 50%, #34d399 100%)',
+                      borderRadius: '999px',
+                      transition: 'width 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: '0 0 12px rgba(16, 185, 129, 0.6)'
+                    }} />
+                  </div>
+
+                  <span style={{
+                    fontSize: '0.76rem',
+                    color: colors.textSecondary,
+                    marginTop: '10px',
+                    display: 'block',
+                    lineHeight: 1.4
+                  }}>
+                    {saveProgress.detail}
+                  </span>
+                </div>
+              </div>
+            ) : isProcessingMastering ? (
 
               <div style={{ textAlign: 'center', padding: '36px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
                 <div style={{
@@ -8321,7 +8466,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         </div>
       )}
 
-      {/* 🌟 6. SHARE MODAL */}
+      {/* 🌟 6. SHARE MODAL (Apple Human Interface Guidelines Design) */}
       {showShareModal && (
         <div style={{
           position: 'fixed',
@@ -8329,9 +8474,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
+          background: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -8339,83 +8484,30 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           padding: '16px'
         }}>
           <div style={{
-            background: isLight ? '#ffffff' : '#1e293b',
-            border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+            background: isLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(24, 24, 27, 0.98)',
+            border: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)'}`,
             borderRadius: '24px',
-            padding: '28px',
-            maxWidth: '480px',
+            padding: '24px',
+            maxWidth: '460px',
             width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
             color: colors.textPrimary,
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px',
-            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7)'
+            gap: '16px',
+            boxShadow: isLight
+              ? '0 24px 48px -12px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04)'
+              : '0 24px 60px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08)',
+            boxSizing: 'border-box'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Share2 size={20} color="#10b981" />
-                <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900 }}>
-                  Audio-Biografie & Playlists sicher teilen
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowShareModal(false)}
-                style={{ background: 'none', border: 'none', color: colors.textSecondary, fontSize: '1.2rem', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <p style={{ margin: 0, fontSize: '0.84rem', color: colors.textSecondary, lineHeight: 1.45, fontWeight: 500 }}>
-              Erstelle einen DSGVO-geschützten Link für Eltern, Großeltern und Freunde. Keine Registrierung für Empfänger nötig.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Target Playlist Selector */}
-              {customPlaylists.length > 0 && (
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: colors.textPrimary, marginBottom: '6px', fontWeight: 800 }}>
-                    Was möchtest du teilen?
-                  </label>
-                  <select
-                    value={shareTargetPlaylistId || ''}
-                    onChange={(e) => setShareTargetPlaylistId(e.target.value || null)}
-                    style={{
-                      width: '100%',
-                      padding: '11px 14px',
-                      borderRadius: '12px',
-                      border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.25)'}`,
-                      background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.35)',
-                      color: colors.textPrimary,
-                      fontSize: '0.88rem',
-                      fontWeight: 800,
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <option value="">🌟 Komplette Audio-Biografie (Alle Meilensteine)</option>
-                    {customPlaylists.map(pl => (
-                      <option key={pl.id} value={pl.id}>
-                        💿 Playlist: {pl.title} ({pl.tracks.length} Songs)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* 🛡️ Urheberrechts- & GEMA-Schutz (§§ 16, 19a UrhG): Downloads für Dritte untersagt */}
-              <div style={{
-                background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)',
-                border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
-                borderRadius: '14px',
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
-              }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '12px',
                   background: isLight ? '#e6f4ea' : 'rgba(16, 185, 129, 0.15)',
                   display: 'flex',
                   alignItems: 'center',
@@ -8423,90 +8515,145 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   color: '#10b981',
                   flexShrink: 0
                 }}>
-                  <Shield size={16} />
+                  <Share2 size={20} strokeWidth={2.2} />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
-                    100% GEMA- & Urheberrechtsschutz (Listen-Only)
-                  </span>
-                  <span style={{ fontSize: '0.70rem', color: colors.textSecondary, lineHeight: 1.35 }}>
-                    Geteilte Links sind reine <b>Web-Streams ohne Download-Möglichkeit</b> für Dritte (§§ 16, 19a UrhG). Deine Originaldateien bleiben in deinem Account geschützt.
-                  </span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.12rem', fontWeight: 800, letterSpacing: '-0.02em', color: colors.textPrimary }}>
+                    Audio-Biografie sicher teilen
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: colors.textSecondary, fontWeight: 500, lineHeight: 1.35 }}>
+                    Geschützter Familien-Link ohne Empfänger-Registrierung
+                  </p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowShareModal(false)}
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  color: colors.textSecondary,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'background 0.15s ease'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
 
-              {/* Applause / Reactions Toggle */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', cursor: 'pointer', color: colors.textPrimary, fontWeight: 700 }}>
-                <input
-                  type="checkbox"
-                  checked={shareAllowApplause}
-                  onChange={(e) => setShareAllowApplause(e.target.checked)}
-                  style={{ accentColor: '#10b981', width: '17px', height: '17px' }}
-                />
-                <span>Icon-Applaus & Reaktionen erlauben (👏 Bravo, ❤️ Herz, 🔥 Feuer, ⭐ Stern)</span>
-              </label>
-
-              {/* Anonymize Toggle */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', cursor: 'pointer', color: colors.textPrimary, fontWeight: 700 }}>
-                <input
-                  type="checkbox"
-                  checked={shareAnonymously}
-                  onChange={(e) => setShareAnonymously(e.target.checked)}
-                  style={{ accentColor: '#10b981', width: '17px', height: '17px' }}
-                />
-                <span>Name anonymisieren (z. B. "Schülerin der Musikschule")</span>
-              </label>
-
-              {/* Mandatory 4-Digit PIN Security (§ 15 Abs. 3 UrhG) */}
-              <div style={{
-                background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.08)',
-                border: `1.5px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.25)'}`,
-                borderRadius: '16px',
-                padding: '14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '0.82rem', color: colors.textPrimary, fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Lock size={15} color="#10b981" />
-                    <span>Deine feste Familien-PIN (Gilt für alle deine Playlists):</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newPin = Math.floor(1000 + Math.random() * 9000).toString();
-                      setSharePin(newPin);
-                      try {
-                        localStorage.setItem(`campus_share_pin_${student?.id || studentId}`, newPin);
-                        if (shareTargetPlaylistId) {
-                          localStorage.setItem(`campus_share_pin_${student?.id || studentId}_${shareTargetPlaylistId}`, newPin);
-                        }
-                      } catch {}
-                    }}
+            {/* Target Content Selection (if custom playlists exist) */}
+            {customPlaylists.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.74rem', color: colors.textSecondary, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Inhalt auswählen
+                </label>
+                <div style={{
+                  position: 'relative',
+                  background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.05)',
+                  border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
+                  borderRadius: '14px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                  <select
+                    value={shareTargetPlaylistId || ''}
+                    onChange={(e) => setShareTargetPlaylistId(e.target.value || null)}
                     style={{
-                      background: 'none',
+                      width: '100%',
+                      padding: '10px 36px 10px 14px',
+                      borderRadius: '14px',
                       border: 'none',
-                      color: '#10b981',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
+                      background: 'transparent',
+                      color: colors.textPrimary,
+                      fontSize: '0.86rem',
+                      fontWeight: 700,
+                      outline: 'none',
                       cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
+                      appearance: 'none',
+                      WebkitAppearance: 'none'
                     }}
                   >
-                    <span>🎲 PIN neu würfeln</span>
-                  </button>
+                    <option value="" style={{ background: isLight ? '#ffffff' : '#1e293b', color: colors.textPrimary }}>
+                      Komplette Audio-Biografie (Alle Meilensteine)
+                    </option>
+                    {customPlaylists.map(pl => (
+                      <option key={pl.id} value={pl.id} style={{ background: isLight ? '#ffffff' : '#1e293b', color: colors.textPrimary }}>
+                        Playlist: {pl.title} ({pl.tracks.length} Songs)
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={16} color={colors.textSecondary} style={{ position: 'absolute', right: '14px', pointerEvents: 'none' }} />
                 </div>
+              </div>
+            )}
 
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {/* Apple PIN Passcode Widget */}
+            <div style={{
+              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
+              border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+              borderRadius: '18px',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Lock size={14} color="#10b981" />
+                  <span style={{ fontSize: '0.78rem', color: colors.textPrimary, fontWeight: 800 }}>
+                    Feste Familien-PIN
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newPin = Math.floor(1000 + Math.random() * 9000).toString();
+                    setSharePin(newPin);
+                    try {
+                      localStorage.setItem(`campus_share_pin_${student?.id || studentId}`, newPin);
+                      if (shareTargetPlaylistId) {
+                        localStorage.setItem(`campus_share_pin_${student?.id || studentId}_${shareTargetPlaylistId}`, newPin);
+                      }
+                    } catch {}
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#10b981',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 6px',
+                    borderRadius: '6px'
+                  }}
+                >
+                  <RotateCcw size={12} strokeWidth={2.4} />
+                  <span>PIN neu würfeln</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                {/* 4 Digit Interactive Passcode Input */}
+                <div style={{ position: 'relative', display: 'inline-flex' }}>
                   <input
                     type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     maxLength={4}
                     value={sharePin}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
                       setSharePin(val);
                       try {
                         localStorage.setItem(`campus_share_pin_${student?.id || studentId}`, val);
@@ -8516,140 +8663,283 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       } catch {}
                     }}
                     style={{
-                      width: '120px',
-                      padding: '10px 14px',
-                      borderRadius: '12px',
-                      border: `1.5px solid #10b981`,
-                      background: isLight ? '#ffffff' : 'rgba(0, 0, 0, 0.45)',
-                      color: colors.textPrimary,
-                      fontSize: '1.25rem',
-                      fontWeight: 900,
-                      letterSpacing: '6px',
-                      textAlign: 'center',
-                      boxSizing: 'border-box'
+                      position: 'absolute',
+                      inset: 0,
+                      opacity: 0,
+                      width: '100%',
+                      height: '100%',
+                      cursor: 'pointer',
+                      zIndex: 2
                     }}
                   />
-                  <span style={{ fontSize: '0.74rem', color: colors.textSecondary, lineHeight: 1.35 }}>
-                    Oma & Familie müssen sich nur diesen einen 4-stelligen Code merken, um alle deine Songs & Alben anzuhören.
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[0, 1, 2, 3].map((idx) => {
+                      const digit = sharePin[idx] || '';
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            width: '36px',
+                            height: '42px',
+                            borderRadius: '10px',
+                            border: `1.5px solid ${digit ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)')}`,
+                            background: isLight ? (digit ? '#f0fdf4' : '#ffffff') : (digit ? 'rgba(16, 185, 129, 0.12)' : 'rgba(0, 0, 0, 0.3)'),
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.25rem',
+                            fontWeight: 800,
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif',
+                            color: colors.textPrimary,
+                            boxShadow: digit ? '0 2px 6px rgba(16, 185, 129, 0.12)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {digit || <span style={{ opacity: 0.25, fontSize: '0.8rem' }}>-</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <span style={{ fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.35, flex: 1, paddingLeft: '4px' }}>
+                  Oma & Familie müssen sich nur diesen 4-stelligen Code merken.
+                </span>
+              </div>
+            </div>
+
+            {/* Apple Inset Grouped Settings Box (iOS Switches) */}
+            <div style={{
+              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
+              border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+              borderRadius: '18px',
+              overflow: 'hidden'
+            }}>
+              {/* Row 1: Reactions */}
+              <div style={{
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                borderBottom: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)'}`
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: colors.textPrimary }}>
+                    Reaktionen & Applaus erlauben
                   </span>
+                  <span style={{ fontSize: '0.70rem', color: colors.textSecondary }}>
+                    Familie kann mit Bravo, Herz, Feuer & Stern reagieren
+                  </span>
+                </div>
+                <div
+                  role="switch"
+                  aria-checked={shareAllowApplause}
+                  onClick={() => setShareAllowApplause(!shareAllowApplause)}
+                  style={{
+                    width: '42px',
+                    height: '24px',
+                    borderRadius: '999px',
+                    backgroundColor: shareAllowApplause ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'),
+                    padding: '2px',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    position: 'relative',
+                    flexShrink: 0
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: '#ffffff',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      transform: shareAllowApplause ? 'translateX(18px)' : 'translateX(0px)',
+                      transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Anonymize */}
+              <div style={{
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: colors.textPrimary }}>
+                    Name anonymisieren
+                  </span>
+                  <span style={{ fontSize: '0.70rem', color: colors.textSecondary }}>
+                    z. B. "Schülerin der Musikschule" statt Klarname
+                  </span>
+                </div>
+                <div
+                  role="switch"
+                  aria-checked={shareAnonymously}
+                  onClick={() => setShareAnonymously(!shareAnonymously)}
+                  style={{
+                    width: '42px',
+                    height: '24px',
+                    borderRadius: '999px',
+                    backgroundColor: shareAnonymously ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'),
+                    padding: '2px',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    position: 'relative',
+                    flexShrink: 0
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: '#ffffff',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      transform: shareAnonymously ? 'translateX(18px)' : 'translateX(0px)',
+                      transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Generated Share Message Box */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: colors.textPrimary, marginBottom: '6px', fontWeight: 800 }}>
-                Generierte Freigabe-Nachricht für WhatsApp / SMS / Mail:
-              </label>
-              <div style={{
-                padding: '12px 14px',
-                borderRadius: '14px',
-                border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
-                background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.45)',
-                color: colors.textPrimary,
-                fontSize: '0.78rem',
-                fontFamily: 'monospace',
-                whiteSpace: 'pre-wrap',
-                lineHeight: 1.45,
-                userSelect: 'all'
-              }}>
-                {fullShareText}
-              </div>
-            </div>
-
-            {/* Action Buttons: WhatsApp Direct, Native Share Sheet & Direct Preview */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* 🟢 1. Dedicated WhatsApp Share Button */}
+            {/* Sharing Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* 1. WhatsApp Button */}
               <button
                 type="button"
                 onClick={handleShareWhatsApp}
                 style={{
                   width: '100%',
-                  padding: '14px',
-                  borderRadius: '100px',
+                  padding: '12px 18px',
+                  borderRadius: '14px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
-                  color: 'white',
-                  fontWeight: 900,
-                  fontSize: '0.94rem',
+                  background: '#25D366',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.90rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 6px 20px rgba(37, 211, 102, 0.45)',
-                  transition: 'all 0.2s ease'
+                  boxShadow: '0 4px 14px rgba(37, 211, 102, 0.3)',
+                  transition: 'all 0.15s ease'
                 }}
                 className="hover-scale"
               >
-                <MessageCircle size={20} strokeWidth={2.5} />
-                <span>🟢 Direkt per WhatsApp an Familie senden</span>
+                <MessageCircle size={18} strokeWidth={2.4} />
+                <span>Per WhatsApp an Familie senden</span>
               </button>
 
-              {/* 📋 2. Universal Share / Copy Button */}
+              {/* 2. Universal Copy & Share Button */}
               <button
                 type="button"
                 onClick={handleShareLink}
                 style={{
                   width: '100%',
-                  padding: '12px',
-                  borderRadius: '100px',
-                  border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-                  background: copySuccess ? '#059669' : (isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)'),
-                  color: copySuccess ? 'white' : colors.textPrimary,
-                  fontWeight: 900,
-                  fontSize: '0.86rem',
+                  padding: '11px 18px',
+                  borderRadius: '14px',
+                  border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
+                  background: copySuccess ? '#10b981' : (isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)'),
+                  color: copySuccess ? '#ffffff' : colors.textPrimary,
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.15s ease'
                 }}
                 className="hover-scale"
               >
-                {copySuccess ? <Check size={17} strokeWidth={3} /> : <Share2 size={17} />}
-                <span>{copySuccess ? 'Nachricht in Zwischenablage kopiert! 🎉' : '📋 Nachricht kopieren & teilen'}</span>
+                {copySuccess ? <Check size={16} strokeWidth={3} /> : <Copy size={16} />}
+                <span>{copySuccess ? 'Nachricht in Zwischenablage kopiert!' : 'Nachricht & Link kopieren'}</span>
               </button>
 
-              {/* 🔗 3. Test Preview Button */}
-              <button
-                type="button"
-                onClick={() => window.open(effectiveShareUrl, '_blank')}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '100px',
-                  border: `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.12)'}`,
-                  background: isLight ? '#ffffff' : 'transparent',
-                  color: colors.textSecondary,
-                  fontWeight: 800,
-                  fontSize: '0.80rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}
-                className="hover-scale"
-              >
-                <ExternalLink size={14} color="#10b981" />
-                <span>PIN-Eingabeseite testen (neuer Tab)</span>
-              </button>
+              {/* 3. Auxiliary Actions: Test PIN Page & Text Preview Toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px' }}>
+                <button
+                  type="button"
+                  onClick={() => window.open(effectiveShareUrl, '_blank')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: colors.textSecondary,
+                    fontWeight: 600,
+                    fontSize: '0.74rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 4px'
+                  }}
+                >
+                  <ExternalLink size={12} color="#10b981" />
+                  <span>PIN-Seite testen</span>
+                </button>
 
-              {/* 🔒 Privater Familien-Zugang Hinweis nach § 15 Abs. 3 UrhG */}
-              <div style={{
-                background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.3)',
-                border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
-                borderRadius: '14px',
-                padding: '12px 14px',
-                marginTop: '4px'
-              }}>
-                <span style={{ display: 'block', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.45 }}>
-                  🔒 <strong>Privater Familien-Zugang:</strong><br />
-                  Diese Audio-Aufnahmen enthalten urheberrechtlich geschützte Musikstücke. Um die gesetzlichen Bestimmungen einzuhalten, darfst du diesen Link und die PIN ausschließlich an deine Familie und enge persönliche Freunde weitergeben (§ 15 Abs. 3 UrhG). Ein öffentliches Teilen (z. B. in sozialen Netzwerken oder auf öffentlichen Webseiten) ist nicht gestattet.
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowShareMessagePreview(!showShareMessagePreview)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: colors.textSecondary,
+                    fontWeight: 600,
+                    fontSize: '0.74rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 4px'
+                  }}
+                >
+                  <FileText size={12} />
+                  <span>{showShareMessagePreview ? 'Text ausblenden' : 'Text anzeigen'}</span>
+                </button>
               </div>
+            </div>
+
+            {/* Collapsible Text Preview */}
+            {showShareMessagePreview && (
+              <div style={{
+                padding: '10px 12px',
+                borderRadius: '12px',
+                border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+                background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.4)',
+                color: colors.textPrimary,
+                fontSize: '0.72rem',
+                fontFamily: 'monospace',
+                whiteSpace: 'pre-wrap',
+                lineHeight: 1.4,
+                userSelect: 'all'
+              }}>
+                {fullShareText}
+              </div>
+            )}
+
+            {/* Apple Trust & Legal Security Badge */}
+            <div style={{
+              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+              border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)'}`,
+              borderRadius: '14px',
+              padding: '10px 12px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px'
+            }}>
+              <Shield size={14} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <span style={{ fontSize: '0.69rem', color: colors.textSecondary, lineHeight: 1.35 }}>
+                <strong>100% GEMA- & Urheberrechtsschutz:</strong> Reiner Web-Stream ohne Download (§§ 16, 19a UrhG). Ausschließlich für den privaten Familienkreis bestimmt (§ 15 Abs. 3 UrhG).
+              </span>
             </div>
           </div>
         </div>
@@ -9179,6 +9469,55 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 />
               </div>
             </div>
+
+            {/* 📊 Edit Save Progress Bar */}
+            {editSaveProgress && (
+              <div style={{
+                background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.12)',
+                border: `1.5px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.3)'}`,
+                borderRadius: '16px',
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                marginTop: '4px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 900, color: isLight ? '#166534' : '#86efac' }}>
+                    {editSaveProgress.stage}
+                  </span>
+                  <span style={{
+                    fontSize: '0.78rem',
+                    fontWeight: 900,
+                    color: '#10b981',
+                    background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.2)',
+                    padding: '2px 8px',
+                    borderRadius: '6px'
+                  }}>
+                    {editSaveProgress.percent}%
+                  </span>
+                </div>
+                <div style={{
+                  width: '100%',
+                  height: '8px',
+                  background: isLight ? '#dcfce7' : 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: '999px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${editSaveProgress.percent}%`,
+                    background: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)',
+                    borderRadius: '999px',
+                    transition: 'width 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)'
+                  }} />
+                </div>
+                <span style={{ fontSize: '0.72rem', color: isLight ? '#15803d' : '#a7f3d0', lineHeight: 1.35 }}>
+                  {editSaveProgress.detail}
+                </span>
+              </div>
+            )}
 
             {/* Footer Buttons */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>

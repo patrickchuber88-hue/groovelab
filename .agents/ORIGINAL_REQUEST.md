@@ -476,3 +476,46 @@ Integrity mode: development
 - [ ] Ausführlicher Report in einer neuen oder aktualisierten Markdown-Datei (`simulation_stress_report.md`), die alle Teststufen (Schulen, User, Durchsatz req/s, Latenzen, CPU/RAM/Swap-Werte und Fehlerquote) übersichtlich alistet.
 - [ ] Detaillierte Angabe, welche spezifische Funktion (z.B. Loopstation-Spuren, Fokus-Timer, Raum-Engine) die meiste CPU-Last bzw. den meiste Speicher benötigt.
 - [ ] Vollständiger Clean-Up aller während des Tests angelegten Schulen, Benutzer und zugehöriger DB-Einträge.
+
+## 2026-08-16T17:27:24+02:00
+
+Führe ein vollumfängliches, unerbittliches Multi-Agenten-Qualitäts- und Sicherheitsaudit für das neu implementierte **3-Level Adaptive UI System** im Schüler-Dashboard des Campus-Moduls durch.
+
+Working directory: `/Users/patrickhuber/Documents/Antigravity Projects/Groovelab app/apps/groovelab`
+Integrity mode: development
+
+## Requirements
+
+### R1. UX- & Pädagogik-Audit (Level 1, Level 2, Level 3)
+- **Level 1 (Junior 6–10 J.)**: Prüfe, ob die 3-W-Regel (Start, Aufgaben, Sticker) strikt eingehalten wird, große Touch-Targets & Typografie vorhanden sind, und alle komplexen Menüs entfallen sind.
+- **Level 2 (Teen 11–15 J.)**: Prüfe, ob das moderne 2-Spalten-Cockpit (Spotify/Duolingo-Stil) mit Pomodoro-Timer und Checklisten flüssig und altersgerecht funktioniert.
+- **Level 3 (Pro ab 16 J.)**: Stelle sicher, dass die bestehende Pro-Ansicht (Loopstation, Meisterwerk-Dokumentation, Skill-Radar) zu 100% geschützt und unverändert geblieben ist.
+- **Design-DNA-Konsistenz**: Prüfe, ob Level 1 und Level 2 exakt die visuelle Identität (Hero-Card mit Instrumenten-Avatar, Glasmorphismus, abgerundete 30px-Karten, 4 farbige KPI-Kacheln, Campus-Grün `#34a853`) von Level 3 teilen.
+
+### R2. 1-Klick-Steuerung & State-Persistenz
+- Prüfe den Onboarding-Card-Flow (`CampusLevelSelectModal`), die 1-Klick-Umschaltung im Dashboard-Header (`CampusLevelSwitcher`) und die 1-Klick-Steuerung durch Lehrkräfte im Schüler-Detail-Modal (`StudentDetailModal.tsx`).
+- Stelle sicher, dass die Auswahl sowohl im lokalen Speicher (`localStorage`) als auch deterministisch mit der Supabase-Datenbank synchronisiert wird.
+
+### R3. Datenschutz, Kindersicherheit & Hardware-Sicherheit
+- **Hardware-Sicherheit**: Verifiziere, dass im `SimpleVoiceRecorder` bei Aufnahmeende oder Schließen der Komponente alle Audio-Tracks und Mikrofon-Streams physisch und unwiderruflich terminiert werden (`stream.getTracks().forEach(t => t.stop())`).
+- **Datenschutz**: Verifiziere, dass keine sensiblen Klardaten von Minderjährigen in ungesicherten Speichern abgelegt werden und alle Namensmaskierungen eingehalten werden.
+- **Read-Only Audit**: Das Audit selbst führt keinerlei schreibende DB-Mutationen durch.
+
+### R4. Plattform-Isolation & Build-Integrität
+- **Isolationsgarantie**: Stelle sicher, dass das **GrooveLab-Modul**, Live Lab, Band-Rooms sowie alle Desktop-Layouts und Header zu 100% unberührt geblieben sind.
+- **Build**: Verifiziere, dass `tsc` und `vite build` 0 Fehler aufweisen.
+
+## Acceptance Criteria
+
+### UX & Level Alignment
+- [ ] Level 1, 2 und 3 spiegeln exakt die geforderten Altersstufen (6–10 J., 11–15 J., ab 16 J.) wider.
+- [ ] Das Design von Level 1 & 2 basiert auf der visuellen DNA von Level 3.
+- [ ] 1-Klick-Level-Wechsler für Schüler, Eltern und Lehrer funktioniert verzögerungsfrei.
+
+### Hardware & Security
+- [ ] Mikrofon-Streams schließen sich bei Aufnahmeende ohne Rest-Prozesse.
+- [ ] DSGVO- & Datenminimierungs-Richtlinien sind zu 100% erfüllt.
+
+### Build & Platform Isolation
+- [ ] TypeScript (`tsc --noEmit`) und Vite (`npm run build`) kompilieren mit Exit Code 0.
+- [ ] GrooveLab-Modul und Desktop-Layouts weisen keinerlei Seiteneffekte auf.

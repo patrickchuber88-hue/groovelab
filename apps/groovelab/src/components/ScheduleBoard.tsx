@@ -627,17 +627,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const autoSaveDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Dynamic Theme calculations
-  const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-  const isGroovelab = localStorage.getItem('groovelab_active_platform') === 'groovelab';
-  const isAdminView = currentUserRole === 'admin' || currentUserRole === 'secretary';
+  const activePlatformStored = typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
+  const isGroovelab = activePlatformStored === 'groovelab';
+  const isTeacher = currentUserRole === 'teacher' || (!currentUserRole && typeof localStorage !== 'undefined' && localStorage.getItem('user_role') === 'teacher');
+  const isCampus = !isGroovelab;
+  const isAdminPlatform = (activePlatformStored === 'admin' || activePlatformStored === 'secretary') && !isTeacher;
 
-  let brandColor = '#34a853'; // Campus Green
+  let brandColor = '#34a853'; // Campus Green by default
   let lightBg = 'rgba(52, 168, 83, 0.06)';
   let hoverBg = 'rgba(52, 168, 83, 0.12)';
   let textAccentColor = '#34a853';
 
-  if (isAdminView) {
-    brandColor = '#ea4335'; // Admin Red
+  if (isAdminPlatform) {
+    brandColor = '#ea4335'; // Admin Red only in dedicated Admin/Secretariat cockpit
     lightBg = 'rgba(234, 67, 53, 0.06)';
     hoverBg = 'rgba(234, 67, 53, 0.12)';
     textAccentColor = '#ea4335';
@@ -4712,7 +4714,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   type="button"
                   onClick={() => toggleRealNames()}
                   className={`apple-btn ${showRealNames ? 'active' : ''}`}
-                  style={{ color: showRealNames ? '#ea4335' : undefined }}
+                  style={{ color: showRealNames ? brandColor : undefined }}
                   title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
                 >
                   {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
@@ -7135,9 +7137,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       {/* Fallback rendering of deleteBreakState modal */}
       {deleteBreakState && (() => {
-        const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
-        const primaryColor = isCampusTheme ? '#34a853' : '#ea4335';
-        const bgAccent = isCampusTheme ? '#e6f4ea' : '#fce8e6';
+        const primaryColor = brandColor;
+        const bgAccent = isCampus ? '#e6f4ea' : (isGroovelab ? '#fefce8' : '#fce8e6');
         
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -7180,7 +7181,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(52, 168, 83, 0.2)' : 'rgba(234, 67, 53, 0.2)'}`
+                    boxShadow: `0 4px 12px ${primaryColor}30`
                   }}
                   onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
                   onMouseOut={e => e.currentTarget.style.filter = 'none'}
@@ -7238,9 +7239,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       {/* Fallback rendering of deleteBreakState modal when dropDecisionState is not active */}
       {!dropDecisionState && deleteBreakState && (() => {
-        const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
-        const primaryColor = isCampusTheme ? '#34a853' : '#ea4335';
-        const bgAccent = isCampusTheme ? '#e6f4ea' : '#fce8e6';
+        const primaryColor = brandColor;
+        const bgAccent = isCampus ? '#e6f4ea' : (isGroovelab ? '#fefce8' : '#fce8e6');
         
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -7283,7 +7283,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(52, 168, 83, 0.2)' : 'rgba(234, 67, 53, 0.2)'}`
+                    boxShadow: `0 4px 12px ${primaryColor}30`
                   }}
                   onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
                   onMouseOut={e => e.currentTarget.style.filter = 'none'}
@@ -7340,8 +7340,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       })()}
 
       {instrumentSelectorState && (() => {
-        const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-        const primaryColor = isCampus ? '#34a853' : '#ea4335';
+        const primaryColor = brandColor;
         const studentObj = students.find(s => s.id === instrumentSelectorState.sourceId);
         const studentName = studentObj ? `${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : 'Schüler';
 
@@ -7454,7 +7453,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       )}
 
       {dialogConfig && (() => {
-        const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
         return (
           <div 
             style={{
@@ -7514,11 +7512,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   width: '40px',
                   height: '40px',
                   borderRadius: '50%',
-                  backgroundColor: isCampus ? '#e6f4ea' : '#fce8e6',
-                  color: isCampus ? '#34a853' : '#ea4335',
+                  backgroundColor: lightBg,
+                  color: brandColor,
                   flexShrink: 0
                 }}>
-                  <AlertCircle size={20} style={{ color: isCampus ? '#34a853' : '#ea4335' }} />
+                  <AlertCircle size={20} style={{ color: brandColor }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <h3 style={{
@@ -7576,12 +7574,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     padding: '10px 18px',
                     borderRadius: '10px',
                     border: 'none',
-                    backgroundColor: isCampus ? '#34a853' : '#ea4335',
+                    backgroundColor: brandColor,
                     color: '#ffffff',
                     fontSize: '0.85rem',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    boxShadow: isCampus ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(234, 67, 53, 0.2)',
+                    boxShadow: `0 4px 12px ${brandColor}30`,
                     transition: 'all 0.15s ease'
                   }}
                 >

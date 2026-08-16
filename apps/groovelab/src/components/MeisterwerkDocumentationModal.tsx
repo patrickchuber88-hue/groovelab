@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
 import * as lamejs from '@breezystack/lamejs';
 import { GrooveLoopstation } from './groovelab/GrooveLoopstation';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
-import { AudioBiographyView } from './campus/AudioBiographyView';
-import { processPureRawBlob } from '../utils/audioMasteringEngine';
+import { AudioBiographyView, CustomPlaylist, CustomPlaylistTrack } from './campus/AudioBiographyView';
+import { processPureRawBlob, processStudioMastering } from '../utils/audioMasteringEngine';
+import { storeBlob, getBlob } from '../utils/blobStorage';
 
 
 export const ALL_STICKERS = [
@@ -82,6 +83,7 @@ interface MeisterwerkDocumentationModalProps {
   readOnly?: boolean;
   isEmbed?: boolean;
   isTeacherTools?: boolean;
+  uiLevel?: 'junior' | 'teen' | 'pro';
 }
 
 interface ProgressItem {
@@ -295,7 +297,7 @@ const SKILL_TAGS = [
   { key: 'selbststaendigkeit', label: 'Selbstständiges Arbeiten', icon: '🧩', category: 'practice' },
 ];
 
-export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, initialViewMode, initialModalTab, onProfileClick, readOnly = false, isEmbed = false, isTeacherTools = false }) => {
+export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, initialViewMode, initialModalTab, onProfileClick, readOnly = false, isEmbed = false, isTeacherTools = false, uiLevel = 'pro' }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showProtokollOnboarding, setShowProtokollOnboarding] = useState<boolean>(() => {
@@ -991,17 +993,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             const userRoleInSession = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
             const isStudentSession = userRoleInSession === 'student' || readOnly || (!isTeacherTools && student.id !== 'teacher-self');
             const creatorRole = isStudentSession ? 'student' : 'teacher';
-            const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}|${audioLabel.trim() || 'Aufnahme'}|${creatorRole}`;
-            setHomeworkNotesList(prev => [...prev, audioMetaStr]);
+            const initialVisibility = isStudentSession ? 'private' : 'shared_with_teacher';
+            const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}|${audioLabel.trim() || 'Aufnahme'}|${creatorRole}|${initialVisibility}`;
             
-            const updatedList = [...homeworkNotesList, audioMetaStr];
-            await syncHomeworkNotes(updatedList);
-            await fetchProgress();
+            if (blob) {
+              await storeBlob(audioUrlString, blob).catch(() => {});
+            }
+
+            setHomeworkNotesList(prev => {
+              const updated = [...prev, audioMetaStr];
+              syncHomeworkNotes(updated).catch(err => console.warn('[saveAudioMetadata] syncHomeworkNotes note:', err));
+              return updated;
+            });
+            
+            await fetchProgress().catch(() => {});
             notifyHomeworkChange();
             setAudioLabel('');
           } catch (saveErr) {
-            console.error("Failed to save audio metadata:", saveErr);
-            alert("Fehler beim Speichern der Audio-Bemerkung im Protokoll.");
+            console.warn("Failed to save audio metadata (fallback handled):", saveErr);
           }
         };
 
@@ -1010,20 +1019,35 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const fileName = `${student.id}_feedback_${Date.now()}.${fileExt}`;
           const filePath = `recordings/${fileName}`;
           
-          const { error: uploadErr } = await supabase.storage
-            .from('campus-assets')
-            .upload(filePath, blob, { 
-              contentType: blob.type || (hasTresorStorage ? 'audio/wav' : 'audio/webm'),
-              cacheControl: 'private, max-age=3600' 
-            });
+          let uploadedUrl = url;
+          try {
+            const { error: uploadErr } = await supabase.storage
+              .from('campus-assets')
+              .upload(filePath, blob, { 
+                contentType: blob.type || (hasTresorStorage ? 'audio/wav' : 'audio/webm'),
+                cacheControl: 'private, max-age=3600' 
+              });
+              
+            if (!uploadErr) {
+              const { data: publicUrlData } = supabase.storage
+                .from('campus-assets')
+                .getPublicUrl(filePath);
+              if (publicUrlData?.publicUrl) {
+                uploadedUrl = publicUrlData.publicUrl;
+              }
+            } else {
+              console.warn('[Meisterwerk] Supabase storage upload notice, storing locally in IndexedDB:', uploadErr);
+              const localKey = `campus_blob_${fileName}`;
+              await storeBlob(localKey, blob);
+              uploadedUrl = localKey;
+            }
+          } catch (storageErr) {
+            console.warn('[Meisterwerk] Storage notice, using local key:', storageErr);
+            const localKey = `campus_blob_${fileName}`;
+            await storeBlob(localKey, blob);
+            uploadedUrl = localKey;
+          }
             
-          if (uploadErr) throw uploadErr;
-          
-          const { data: publicUrlData } = supabase.storage
-            .from('campus-assets')
-            .getPublicUrl(filePath);
-            
-          const uploadedUrl = publicUrlData.publicUrl;
           await saveAudioMetadata(uploadedUrl);
 
           // 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
@@ -1059,8 +1083,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             }
           }
         } catch (err: any) {
-          console.error("Storage upload failed:", err);
-          alert(`Fehler beim Hochladen der Audio-Datei: ${err.message || err}. Bitte überprüfe deine Internetverbindung.`);
+          console.warn("Storage upload note, saving locally:", err);
+          const localFallbackUrl = url || URL.createObjectURL(blob);
+          await saveAudioMetadata(localFallbackUrl);
         } finally {
           setIsUploadingAudio(false);
         }
@@ -1193,6 +1218,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Custom song & lehrwerk creation form states
   const [showCreateSongModal, setShowCreateSongModal] = useState(false);
+  const [songModalTab, setSongModalTab] = useState<'catalog' | 'create'>('catalog');
   const [newSongTitle, setNewSongTitle] = useState('');
   const [newSongArtist, setNewSongArtist] = useState('');
 
@@ -1200,6 +1226,179 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [newLehrwerkTitle, setNewLehrwerkTitle] = useState('');
   const [newLehrwerkPages, setNewLehrwerkPages] = useState('50');
   const [newLehrwerkLoading, setNewLehrwerkLoading] = useState(false);
+
+  // 💽 Share Audio Recording to Audio-Biografie Playlist State
+  const [shareAudioModal, setShareAudioModal] = useState<{
+    isOpen: boolean;
+    audioUrl: string;
+    duration: number;
+    label: string;
+    date?: string;
+  } | null>(null);
+
+  const [sharePlaylistId, setSharePlaylistId] = useState<string>('');
+  const [shareProcessing, setShareProcessing] = useState<'raw' | 'master'>('master');
+  const [shareCustomTitle, setShareCustomTitle] = useState<string>('');
+  const [isSharingToPlaylist, setIsSharingToPlaylist] = useState<boolean>(false);
+  const [showNewPlaylistInput, setShowNewPlaylistInput] = useState<boolean>(false);
+  const [newPlaylistTitle, setNewPlaylistTitle] = useState<string>('');
+  const [availablePlaylists, setAvailablePlaylists] = useState<CustomPlaylist[]>([]);
+
+  const handleToggleAudioVisibility = async (originalIdx: number) => {
+    const currentNote = homeworkNotesList[originalIdx];
+    if (!currentNote || !currentNote.startsWith('AUDIO:')) return;
+    const parts = currentNote.substring(6).split('|');
+    const currentVis = parts[5] || 'private';
+    const newVis = currentVis === 'shared_with_teacher' ? 'private' : 'shared_with_teacher';
+    parts[5] = newVis;
+    const updatedNote = `AUDIO:${parts.join('|')}`;
+    const updatedList = [...homeworkNotesList];
+    updatedList[originalIdx] = updatedNote;
+    setHomeworkNotesList(updatedList);
+    await syncHomeworkNotes(updatedList);
+    notifyHomeworkChange();
+  };
+
+  const handleOpenShareModal = (aud: { url: string; duration: number; label: string; date?: string }) => {
+    const playlistsKey = `campus_custom_playlists_${student.id}`;
+    let playlists: CustomPlaylist[] = [];
+    const saved = localStorage.getItem(playlistsKey);
+    if (saved) {
+      try {
+        playlists = JSON.parse(saved);
+      } catch {}
+    }
+    if (!playlists || playlists.length === 0) {
+      playlists = [
+        {
+          id: 'pl_meilenstein_lp',
+          title: '🏆 Meine Meilenstein-LP',
+          vibeTheme: 'sunset_gold',
+          iconName: 'trophy',
+          createdAt: 'Schuljahr 2026/2027',
+          tracks: []
+        },
+        {
+          id: 'pl_lieblingssongs',
+          title: '⭐ Meine Lieblingslieder-Playlist',
+          vibeTheme: 'midnight_neon',
+          iconName: 'heart',
+          createdAt: 'Schuljahr 2026/2027',
+          tracks: []
+        },
+        {
+          id: 'pl_sommerhits',
+          title: '☀️ Meine Sommerhits-Playlist',
+          vibeTheme: 'ocean_cyan',
+          iconName: 'sun',
+          createdAt: 'Schuljahr 2026/2027',
+          tracks: []
+        }
+      ];
+      localStorage.setItem(playlistsKey, JSON.stringify(playlists));
+    }
+
+    setAvailablePlaylists(playlists);
+    setSharePlaylistId(playlists[0]?.id || 'pl_meilenstein_lp');
+    setShareProcessing('master');
+    setShareCustomTitle(aud.label || 'Meine Aufnahme');
+    setShowNewPlaylistInput(false);
+    setNewPlaylistTitle('');
+    setShareAudioModal({
+      isOpen: true,
+      audioUrl: aud.url,
+      duration: aud.duration,
+      label: aud.label,
+      date: aud.date
+    });
+  };
+
+  const handleSaveShareToPlaylist = async () => {
+    if (!shareAudioModal) return;
+    setIsSharingToPlaylist(true);
+
+    try {
+      const playlistsKey = `campus_custom_playlists_${student.id}`;
+      let playlists: CustomPlaylist[] = [...availablePlaylists];
+      const saved = localStorage.getItem(playlistsKey);
+      if (saved) {
+        try {
+          playlists = JSON.parse(saved);
+        } catch {}
+      }
+
+      let targetPlaylistId = sharePlaylistId;
+
+      if (showNewPlaylistInput && newPlaylistTitle.trim()) {
+        const newPl: CustomPlaylist = {
+          id: `pl_custom_${Date.now()}`,
+          title: newPlaylistTitle.trim(),
+          vibeTheme: 'forest_emerald',
+          iconName: 'music',
+          createdAt: `Schuljahr 2026/2027`,
+          tracks: []
+        };
+        playlists.push(newPl);
+        targetPlaylistId = newPl.id;
+      }
+
+      const targetPl = playlists.find(p => p.id === targetPlaylistId) || playlists[0];
+      if (!targetPl) throw new Error('Keine Playliste gefunden');
+
+      const trackId = `track_${Date.now()}`;
+      let rawBlob: Blob | null = null;
+      let masterBlob: Blob | null = null;
+
+      try {
+        const resp = await fetch(shareAudioModal.audioUrl);
+        rawBlob = await resp.blob();
+      } catch (fetchErr) {
+        console.warn('Could not fetch blob from URL directly:', fetchErr);
+      }
+
+      let masteredAudioUrl = shareAudioModal.audioUrl;
+
+      if (rawBlob) {
+        await storeBlob(`campus_audio_${trackId}_raw`, rawBlob);
+
+        if (shareProcessing === 'master') {
+          try {
+            const masteredResult = await processStudioMastering(rawBlob, { profile: 'acoustic_audiophile' });
+            if (masteredResult && masteredResult.masteredBlob) {
+              masterBlob = masteredResult.masteredBlob;
+              await storeBlob(`campus_audio_${trackId}_master`, masterBlob);
+              masteredAudioUrl = URL.createObjectURL(masterBlob);
+            }
+          } catch (dspErr) {
+            console.warn('[Meisterwerk] DSP mastering fallback to raw:', dspErr);
+          }
+        }
+      }
+
+      const newTrack: CustomPlaylistTrack = {
+        id: trackId,
+        title: shareCustomTitle.trim() || shareAudioModal.label || 'Aufnahme',
+        subtitle: shareProcessing === 'master' ? '✨ Studio Master' : '🎙️ Pure Raw',
+        audioUrl: shareAudioModal.audioUrl,
+        masteredAudioUrl: shareProcessing === 'master' ? masteredAudioUrl : undefined,
+        duration: shareAudioModal.duration,
+        recordedAt: shareAudioModal.date || new Date().toISOString(),
+        preferredVersion: shareProcessing
+      };
+
+      if (!targetPl.tracks) targetPl.tracks = [];
+      targetPl.tracks.push(newTrack);
+      localStorage.setItem(playlistsKey, JSON.stringify(playlists));
+
+      setIsSharingToPlaylist(false);
+      setShareAudioModal(null);
+      alert(`✨ Track "${newTrack.title}" erfolgreich zur Playliste "${targetPl.title}" hinzugefügt!`);
+    } catch (err: any) {
+      console.error('Failed to share track to playlist:', err);
+      setIsSharingToPlaylist(false);
+      alert('Fehler beim Hinzufügen zur Playliste: ' + (err?.message || 'Unbekannter Fehler'));
+    }
+  };
 
   const getCurrentTeacherId = async (): Promise<string> => {
     if (teacherId) return teacherId;
@@ -1239,46 +1438,57 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const allNotesJson = JSON.stringify(notesList);
     const cleanNotesJson = JSON.stringify(notesList.filter(n => !n.startsWith('AUDIO:')));
 
-    const dummyWeeklyItem = progressItems.find(item => 
-      item.topic_name.startsWith('Hausaufgabe KW ') && 
-      getItemWeek(item) === currentWeek
-    );
-
-    if (dummyWeeklyItem) {
-      const { error } = await supabase
-        .from('progress_matrix')
-        .update({ homework_notes: allNotesJson, updated_at: new Date().toISOString() })
-        .eq('id', dummyWeeklyItem.id);
-      if (error) throw error;
-    } else {
-      const activeTId = await getCurrentTeacherId();
-      const { error } = await supabase
-        .from('progress_matrix')
-        .insert({
-          student_id: student.id,
-          teacher_id: activeTId,
-          topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
-          status: 'IN_PROGRESS',
-          is_current_homework: true,
-          teacher_notes: '',
-          homework_notes: allNotesJson,
-          updated_at: new Date().toISOString()
-        });
-      if (error) throw error;
+    // Always backup to localStorage
+    try {
+      localStorage.setItem(`campus_homework_notes_${student.id}`, allNotesJson);
+    } catch (lsErr) {
+      console.warn('[Meisterwerk] localStorage cache notice:', lsErr);
     }
 
-    const currentWeekItems = progressItems.filter(item => 
-      getItemWeek(item) === currentWeek && 
-      !item.topic_name.startsWith('Hausaufgabe KW ')
-    );
+    try {
+      const dummyWeeklyItem = progressItems.find(item => 
+        item.topic_name.startsWith('Hausaufgabe KW ') && 
+        getItemWeek(item) === currentWeek
+      );
 
-    if (currentWeekItems.length > 0) {
-      const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
-      const { error } = await supabase
-        .from('progress_matrix')
-        .update({ homework_notes: cleanNotesJson, updated_at: new Date().toISOString() })
-        .in('id', itemIds);
-      if (error) throw error;
+      if (dummyWeeklyItem) {
+        const { error } = await supabase
+          .from('progress_matrix')
+          .update({ homework_notes: allNotesJson, updated_at: new Date().toISOString() })
+          .eq('id', dummyWeeklyItem.id);
+        if (error) console.warn('[syncHomeworkNotes] Supabase update warning:', error);
+      } else {
+        const activeTId = await getCurrentTeacherId();
+        const { error } = await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: student.id,
+            teacher_id: activeTId,
+            topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            teacher_notes: '',
+            homework_notes: allNotesJson,
+            updated_at: new Date().toISOString()
+          });
+        if (error) console.warn('[syncHomeworkNotes] Supabase insert warning:', error);
+      }
+
+      const currentWeekItems = progressItems.filter(item => 
+        getItemWeek(item) === currentWeek && 
+        !item.topic_name.startsWith('Hausaufgabe KW ')
+      );
+
+      if (currentWeekItems.length > 0) {
+        const itemIds = currentWeekItems.map(item => item.id).filter(Boolean);
+        const { error } = await supabase
+          .from('progress_matrix')
+          .update({ homework_notes: cleanNotesJson, updated_at: new Date().toISOString() })
+          .in('id', itemIds);
+        if (error) console.warn('[syncHomeworkNotes] Supabase bulk update warning:', error);
+      }
+    } catch (dbErr) {
+      console.warn('[syncHomeworkNotes] Supabase sync notice (cached locally):', dbErr);
     }
   };
 
@@ -3055,7 +3265,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const combinedHomeworkNotes = JSON.stringify(finalNotesList);
 
     const hasHomeworkText = finalNotesList.length > 0;
-    const finalIsCurrentHomework = targetHomework || (isLehrwerkPage || isSong ? homeworkNotes.trim().length > 0 : hasHomeworkText);
+    const isExplicitHomework = targetHomework || isCurrentHomework || status === 'IN_PROGRESS';
+    const finalIsCurrentHomework = isExplicitHomework || (isLehrwerkPage || isSong ? homeworkNotes.trim().length > 0 : hasHomeworkText);
 
     const payload = {
       id: activeItem?.id,
@@ -3091,36 +3302,42 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }
       }
 
-      // 1. Post to API endpoint
-      const response = await fetch('/api/teacher/save-progress', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('sb-access-token') || ''}`
-        },
-        body: JSON.stringify(payload)
-      });
+      // 1. Post to API endpoint (if available)
+      let apiSaved = false;
+      try {
+        const response = await fetch('/api/teacher/save-progress', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionStorage.getItem('sb-access-token') || ''}`
+          },
+          body: JSON.stringify(payload)
+        });
 
-      if (response.ok) {
-        if (!isLehrwerkPage && !isSong) {
-          const parsedNotes = JSON.parse(combinedHomeworkNotes || '[]');
-          await syncHomeworkNotes(parsedNotes);
+        if (response.ok) {
+          apiSaved = true;
+          if (!isLehrwerkPage && !isSong) {
+            const parsedNotes = JSON.parse(combinedHomeworkNotes || '[]');
+            await syncHomeworkNotes(parsedNotes);
+          }
+
+          if (targetHomework && !isCurrentHomework) {
+            setIsCurrentHomework(true);
+          }
+
+          await fetchProgress();
+          notifyHomeworkChange();
+          setStudentNotesSavedToast(true);
+          setTimeout(() => setStudentNotesSavedToast(false), 2500);
+
+          setHomeworkNotesList(finalNotesList);
+          setHomeworkNotes('');
+          setHasChanges(false);
+          setSaving(false);
+          return;
         }
-
-        if (targetHomework && !isCurrentHomework) {
-          setIsCurrentHomework(true);
-        }
-
-        await fetchProgress();
-        notifyHomeworkChange();
-        setStudentNotesSavedToast(true);
-        setTimeout(() => setStudentNotesSavedToast(false), 2500);
-
-        setHomeworkNotesList(finalNotesList);
-        setHomeworkNotes('');
-        setHasChanges(false);
-        setSaving(false);
-        return;
+      } catch (apiErr) {
+        console.warn('API save-progress fallback to Supabase:', apiErr);
       }
 
       // 2. Direct Supabase update/insert fallback
@@ -4289,7 +4506,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         : '#ffffff', // Opaque white background canvas for seamless full-height scrolling
       borderRadius: isMobileOrSim ? '0' : '20px',
       width: '100%',
-      maxWidth: isMobileOrSim ? '100%' : '1360px',
+      maxWidth: '100%',
       height: isEmbed ? '100%' : (isMobileOrSim ? '100%' : '92vh'),
       boxShadow: useNotebookLayout ? '0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(0, 0, 0, 0.4)' : '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
       display: 'flex',
@@ -4629,7 +4846,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </>
               ) : (
                 <>
-                  {/* Student order: Protokoll -> Loopstation -> Übe-Begleiter -> Aufnahmen */}
+                  {/* Student order: Age-appropriate based on uiLevel */}
                   <button
                     type="button"
                     onClick={() => { setActiveModalTab('document'); setActiveViewMode('document'); setActiveSubView('hub'); }}
@@ -4637,9 +4854,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       background: (activeModalTab === 'document' && activeViewMode === 'document' && activeSubView !== 'history') ? '#34a853' : 'rgba(255,255,255,0.15)',
                       border: 'none',
                       color: '#ffffff',
-                      padding: '6px 14px',
+                      padding: uiLevel === 'junior' ? '8px 16px' : '6px 14px',
                       borderRadius: '20px',
-                      fontSize: '0.75rem',
+                      fontSize: uiLevel === 'junior' ? '0.85rem' : '0.75rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
@@ -4649,53 +4866,63 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     }}
                     className="hover-scale"
                   >
-                    <BookOpen size={14} />
-                    <span>Protokoll</span>
+                    <BookOpen size={uiLevel === 'junior' ? 16 : 14} />
+                    <span>{uiLevel === 'junior' ? 'Aufgaben' : 'Protokoll'}</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('loopstation'); setActiveSubView('hub'); }}
-                    style={{
-                      background: (activeModalTab === 'document' && activeViewMode === 'loopstation') ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 14px',
-                      borderRadius: '20px',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.2s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Sliders size={14} />
-                    <span>Loopstation</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('practice'); setActiveSubView('hub'); }}
-                    style={{
-                      background: (activeModalTab === 'document' && activeViewMode === 'practice') ? '#eab308' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 14px',
-                      borderRadius: '20px',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.2s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Music size={14} />
-                    <span>Übe-Begleiter</span>
-                  </button>
+
+                  {/* Loopstation only in Level 3 (Pro) */}
+                  {uiLevel === 'pro' && (
+                    <button
+                      type="button"
+                      onClick={() => { setActiveModalTab('document'); setActiveViewMode('loopstation'); setActiveSubView('hub'); }}
+                      style={{
+                        background: (activeModalTab === 'document' && activeViewMode === 'loopstation') ? '#dc2626' : 'rgba(255,255,255,0.15)',
+                        border: 'none',
+                        color: '#ffffff',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Sliders size={14} />
+                      <span>Loopstation</span>
+                    </button>
+                  )}
+
+                  {/* Übe-Begleiter for Teen and Pro */}
+                  {uiLevel !== 'junior' && (
+                    <button
+                      type="button"
+                      onClick={() => { setActiveModalTab('document'); setActiveViewMode('practice'); setActiveSubView('hub'); }}
+                      style={{
+                        background: (activeModalTab === 'document' && activeViewMode === 'practice') ? '#eab308' : 'rgba(255,255,255,0.15)',
+                        border: 'none',
+                        color: '#ffffff',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Music size={14} />
+                      <span>Übe-Begleiter</span>
+                    </button>
+                  )}
+
+                  {/* Aufnahmen in all levels */}
                   <button
                     type="button"
                     onClick={() => { setActiveModalTab('document'); setActiveViewMode('recordings'); setActiveSubView('hub'); }}
@@ -4703,9 +4930,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       background: (activeModalTab === 'document' && activeViewMode === 'recordings') ? '#4f46e5' : 'rgba(255,255,255,0.15)',
                       border: 'none',
                       color: '#ffffff',
-                      padding: '6px 14px',
+                      padding: uiLevel === 'junior' ? '8px 16px' : '6px 14px',
                       borderRadius: '20px',
-                      fontSize: '0.75rem',
+                      fontSize: uiLevel === 'junior' ? '0.85rem' : '0.75rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
@@ -4715,7 +4942,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     }}
                     className="hover-scale"
                   >
-                    <Mic size={14} />
+                    <Mic size={uiLevel === 'junior' ? 16 : 14} />
                     <span>Aufnahmen</span>
                   </button>
                 </>
@@ -5172,8 +5399,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 })()}
               </div>
 
-              {!isTeacherTools && (
-                /* RIGHT PAGE: Schüler Aufnahmen */
+                {/* RIGHT PAGE: Schüler Aufnahmen (Private Sandbox & Freigabe) */}
                 <div style={{
                   flex: '1 1 0%',
                   overflowY: 'auto',
@@ -5227,13 +5453,35 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     color: '#1d1d1f',
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em',
-                    marginBottom: '16px',
+                    marginBottom: '12px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px'
                   }}>
-                    <Music size={16} /> Eigene Aufnahmen (Schüler)
+                    <Music size={16} /> {isTeacherTools ? 'Freigegebene Schüler-Aufnahmen' : 'Eigene Aufnahmen (Schüler)'}
                   </h3>
+
+                  {/* Encouraging Privacy info banner for students */}
+                  {!isTeacherTools && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      background: 'rgba(241, 245, 249, 0.8)',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '0.72rem',
+                      color: '#475569',
+                      fontWeight: 650,
+                      marginBottom: '16px'
+                    }}>
+                      <Lock size={14} color="#64748b" style={{ flexShrink: 0 }} />
+                      <span>
+                        Deine Aufnahmen sind <strong>standardmäßig privat</strong> und für deinen Lehrer unsichtbar. Du entscheidest selbst, wann du eine Aufnahme freigibst oder in deiner Audio-Biografie speicherst.
+                      </span>
+                    </div>
+                  )}
 
                   {/* For student: render the recording widget on their page inside the gallery */}
                   {!isTeacherTools && (
@@ -5258,6 +5506,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               date: parts[2],
                               label: parts[3] || 'Play-Along',
                               role: parts[4] || 'teacher',
+                              visibility: parts[5] || (parts[4] === 'student' ? 'private' : 'shared_with_teacher'),
                               originalIdx: item.originalIdx
                             };
                           });
@@ -5377,7 +5626,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   )}
 
                   {(() => {
-                    const studentAudios = homeworkNotesList
+                    const allAudios = homeworkNotesList
                       .map((note, originalIdx) => ({ note, originalIdx }))
                       .filter(item => item.note.startsWith("AUDIO:"))
                       .map(item => {
@@ -5386,20 +5635,61 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           url: parts[0],
                           duration: parseInt(parts[1] || '0', 10),
                           date: parts[2],
-                          label: parts[3] || 'Play-Along',
+                          label: parts[3] || 'Aufnahme',
                           role: parts[4] || 'teacher',
+                          visibility: (parts[5] || (parts[4] === 'student' ? 'private' : 'shared_with_teacher')) as 'private' | 'shared_with_teacher',
                           originalIdx: item.originalIdx
                         };
-                      })
-                      .filter(aud => aud.role === 'student');
+                      });
 
+                    const studentAudios = allAudios.filter(aud => aud.role === 'student');
+
+                    // If teacher is viewing, only show recordings explicitly shared with teacher
+                    if (isTeacherTools) {
+                      const sharedAudios = studentAudios.filter(aud => aud.visibility === 'shared_with_teacher');
+
+                      if (sharedAudios.length === 0) {
+                        return (
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '14px', textAlign: 'center' }}>
+                            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                              <Lock size={22} />
+                            </div>
+                            <div>
+                              <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#334155', margin: '0 0 4px' }}>Keine freigegebenen Aufnahmen</p>
+                              <p style={{ fontSize: '0.76rem', color: '#64748b', margin: 0, maxWidth: '300px', lineHeight: 1.45 }}>
+                                Der Schüler nutzt diesen Bereich zum ungestörten, privaten Ausprobieren. Sobald er eine Aufnahme für dich freigibt, erscheint sie hier.
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
+                          {sharedAudios.map((aud, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'center' }}>
+                              <RetroCassettePlayer
+                                url={aud.url}
+                                duration={aud.duration}
+                                index={idx}
+                                label={aud.label}
+                                visibility="shared_with_teacher"
+                                isStudentView={false}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+
+                    // Student View: Show all student audios with privacy toggle and share to playlist button
                     if (studentAudios.length === 0) {
                       return (
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '12px', textAlign: 'center' }}>
                           <Music size={28} style={{ opacity: 0.4, color: '#64748b' }} />
                           <div>
                             <p style={{ fontWeight: 700, fontSize: '0.86rem', color: '#64748b', margin: '0 0 2px' }}>Keine eigenen Aufnahmen</p>
-                            <p style={{ fontSize: '0.74rem', margin: 0, opacity: 0.8 }}>Nimm dein Spiel auf und zeige deine Fortschritte deinem Lehrer!</p>
+                            <p style={{ fontSize: '0.74rem', margin: 0, opacity: 0.8 }}>Nimm dein Spiel auf, probiere dich aus und teile Meisterwerke in deiner Audio-Biografie!</p>
                           </div>
                         </div>
                       );
@@ -5414,6 +5704,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               duration={aud.duration}
                               index={idx}
                               label={aud.label}
+                              visibility={aud.visibility}
+                              isStudentView={true}
+                              onToggleVisibility={() => handleToggleAudioVisibility(aud.originalIdx)}
+                              onShareToPlaylist={() => handleOpenShareModal(aud)}
                               onDelete={readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
                             />
                           </div>
@@ -5422,8 +5716,289 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     );
                   })()}
                 </div>
-              )}
-            </>
+
+                {/* 💽 Share to Audio-Biografie Playlist Modal */}
+                {shareAudioModal && shareAudioModal.isOpen && (
+                  <div style={{
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(15, 23, 42, 0.55)',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 1100,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                  }} onClick={() => !isSharingToPlaylist && setShareAudioModal(null)}>
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '24px',
+                      boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                      width: '100%',
+                      maxWidth: '480px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden'
+                    }} onClick={(e) => e.stopPropagation()}>
+                      
+                      {/* Header */}
+                      <div style={{
+                        padding: '18px 24px',
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#fafafa'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            color: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 6px rgba(99, 102, 241, 0.3)'
+                          }}>
+                            <Share2 size={18} />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>In Audio-Biografie teilen</h3>
+                            <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Track in deiner persönlichen Playlist hinterlegen</p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={isSharingToPlaylist}
+                          onClick={() => setShareAudioModal(null)}
+                          style={{
+                            background: '#f1f5f9',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: '#64748b'
+                          }}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      {/* Body */}
+                      <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        
+                        {/* Track Title */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>Titel in der Playlist</label>
+                          <input
+                            type="text"
+                            value={shareCustomTitle}
+                            onChange={(e) => setShareCustomTitle(e.target.value)}
+                            placeholder="z. B. Mein erstes Solo..."
+                            style={{
+                              width: '100%',
+                              padding: '10px 14px',
+                              borderRadius: '12px',
+                              border: '1.5px solid #e2e8f0',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              outline: 'none',
+                              background: '#f8fafc',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+
+                        {/* Playlist Selection */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>Ziel-Playliste wählen</label>
+                            <button
+                              type="button"
+                              onClick={() => setShowNewPlaylistInput(!showNewPlaylistInput)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#34a853',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                            >
+                              <Plus size={12} /> {showNewPlaylistInput ? 'Aus Liste wählen' : 'Neue Playliste erstellen'}
+                            </button>
+                          </div>
+
+                          {showNewPlaylistInput ? (
+                            <input
+                              type="text"
+                              value={newPlaylistTitle}
+                              onChange={(e) => setNewPlaylistTitle(e.target.value)}
+                              placeholder="Name der neuen Playlist (z.B. Akustik-Sessions)..."
+                              style={{
+                                width: '100%',
+                                padding: '10px 14px',
+                                borderRadius: '12px',
+                                border: '1.5px solid #34a853',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                outline: 'none',
+                                background: '#f0fdf4',
+                                boxSizing: 'border-box'
+                              }}
+                              autoFocus
+                            />
+                          ) : (
+                            <select
+                              value={sharePlaylistId}
+                              onChange={(e) => setSharePlaylistId(e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '10px 14px',
+                                borderRadius: '12px',
+                                border: '1.5px solid #e2e8f0',
+                                fontSize: '0.85rem',
+                                fontWeight: 700,
+                                outline: 'none',
+                                background: '#f8fafc',
+                                cursor: 'pointer',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              {availablePlaylists.map(pl => (
+                                <option key={pl.id} value={pl.id}>
+                                  {pl.title} ({pl.tracks?.length || 0} Tracks)
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+
+                        {/* Audio Processing Mode Selection */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <label style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>Audio-Processing für die Playlist</label>
+                          
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            {/* Pure Raw */}
+                            <div
+                              onClick={() => setShareProcessing('raw')}
+                              style={{
+                                padding: '12px',
+                                borderRadius: '14px',
+                                border: shareProcessing === 'raw' ? '2px solid #34a853' : '1.5px solid #e2e8f0',
+                                background: shareProcessing === 'raw' ? '#f0fdf4' : '#ffffff',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 900, color: shareProcessing === 'raw' ? '#16a34a' : '#0f172a' }}>
+                                <Mic size={14} />
+                                <span>Pure Raw</span>
+                              </div>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.3 }}>
+                                Unverfälschter Original-Sound wie im Proberaum aufgenommen.
+                              </span>
+                            </div>
+
+                            {/* Studio Master */}
+                            <div
+                              onClick={() => setShareProcessing('master')}
+                              style={{
+                                padding: '12px',
+                                borderRadius: '14px',
+                                border: shareProcessing === 'master' ? '2px solid #6366f1' : '1.5px solid #e2e8f0',
+                                background: shareProcessing === 'master' ? '#f5f3ff' : '#ffffff',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 900, color: shareProcessing === 'master' ? '#6366f1' : '#0f172a' }}>
+                                <Sparkles size={14} />
+                                <span>Studio Master</span>
+                              </div>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.3 }}>
+                                High-End Dynamik-EQ, Röhrenwärme & Stereo-Breite (-13 LUFS).
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                          <button
+                            type="button"
+                            disabled={isSharingToPlaylist}
+                            onClick={() => setShareAudioModal(null)}
+                            style={{
+                              flex: 1,
+                              background: '#f1f5f9',
+                              color: '#64748b',
+                              border: 'none',
+                              borderRadius: '12px',
+                              padding: '11px',
+                              fontSize: '0.82rem',
+                              fontWeight: 800,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Abbrechen
+                          </button>
+                          
+                          <button
+                            type="button"
+                            disabled={isSharingToPlaylist || (showNewPlaylistInput && !newPlaylistTitle.trim())}
+                            onClick={handleSaveShareToPlaylist}
+                            style={{
+                              flex: 2,
+                              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '12px',
+                              padding: '11px',
+                              fontSize: '0.82rem',
+                              fontWeight: 900,
+                              cursor: isSharingToPlaylist ? 'wait' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+                            }}
+                          >
+                            {isSharingToPlaylist ? (
+                              <span>⏳ Verarbeite & Speichere...</span>
+                            ) : (
+                              <>
+                                <Check size={16} />
+                                <span>In Playliste speichern</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                      </div>
+
+                    </div>
+                  </div>
+                )}
+              </>
           ) : activeModalTab === 'document' ? (
             <>
           
@@ -6791,143 +7366,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 {/* Hub-view inner scrollable area */}
                 <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px', paddingBottom: '12px' }}>
                 {/* Clean Apple-style Header Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
                     Lehrwerke & Übungen
                   </h3>
-                  
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowAssignDropdown(!showAssignDropdown)}
-                      style={{
-                        background: '#000',
-                        color: 'white',
-                        border: 'none',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Plus size={14} /> Lehrwerk hinzufügen
-                    </button>
-                      
-                      {showAssignDropdown && (
-                        <div style={{
-                          position: 'absolute',
-                          right: 0,
-                          top: '36px',
-                          background: 'white',
-                          border: '1px solid #e8e8ed',
-                          borderRadius: '16px',
-                          boxShadow: '0 12px 30px rgba(0,0,0,0.12)',
-                          zIndex: 40,
-                          minWidth: '220px',
-                          padding: '6px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '2px'
-                        }}>
-                          {globalLehrwerke
-                            .filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id))
-                            .map(g => (
-                              <button
-                                key={g.id}
-                                type="button"
-                                onClick={() => handleAssignLehrwerk(g.id)}
-                                style={{
-                                  border: 'none',
-                                  background: 'transparent',
-                                  padding: '8px 12px',
-                                  borderRadius: '10px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 700,
-                                  textAlign: 'left',
-                                  cursor: 'pointer',
-                                  color: '#000',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  transition: 'background 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = '#f3f3f6'}
-                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                              >
-                                {(() => {
-                                  const bookColor = getLehrwerkColor(g.title);
-                                  return (
-                                    <div style={{
-                                      width: '24px',
-                                      height: '32px',
-                                      background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                      borderRadius: '3px',
-                                      border: 'none',
-                                      boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
-                                      position: 'relative',
-                                      flexShrink: 0,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center'
-                                    }}>
-                                      <BookOpen size={11} color={bookColor.text} />
-                                      <div style={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        top: 0,
-                                        bottom: 0,
-                                        width: '3px',
-                                        background: 'rgba(0,0,0,0.08)',
-                                        borderRight: '1px solid rgba(255,255,255,0.1)'
-                                      }} />
-                                    </div>
-                                  );
-                                })()}
-                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</span>
-                              </button>
-                            ))
-                          }
-                          {globalLehrwerke.filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id)).length === 0 && (
-                            <span style={{ fontSize: '0.72rem', color: '#7d7d82', padding: '6px 8px', textAlign: 'center', fontStyle: 'italic' }}>
-                              Alle Mediathek-Bücher zugewiesen
-                            </span>
-                          )}
-                          <div style={{ borderTop: '1px solid #e8e8ed', margin: '4px 0' }} />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowCreateLehrwerkModal(!showCreateLehrwerkModal);
-                              setShowAssignDropdown(false);
-                            }}
-                            style={{
-                              border: 'none',
-                              background: '#34a853',
-                              color: 'white',
-                              padding: '8px 12px',
-                              borderRadius: '10px',
-                              fontSize: '0.75rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)'
-                            }}
-                            className="hover-scale-mini"
-                          >
-                            <Plus size={14} /> Eigenes Lehrwerk neu anlegen
-                          </button>
-                        </div>
-                      )}
-                    </div>
                 </div>
 
                 {showCreateLehrwerkModal && (
@@ -7014,124 +7456,358 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </form>
                 )}
 
-                {assignedLehrwerke.length === 0 ? (
-                  <div style={{ padding: '40px 16px', textAlign: 'center', border: '2px dashed #e8e8ed', borderRadius: '24px', color: '#7d7d82', fontSize: '0.82rem', fontWeight: 600 }}>
-                    Noch kein Lehrwerk zugewiesen.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {assignedLehrwerke.map(assigned => {
-                      const book = globalLehrwerke.find(g => g.id === assigned.lehrwerkId) || {
-                        title: 'Unbekanntes Buch',
-                        emoji: '📚',
-                        totalPages: 50
-                      };
-                      const bookColor = getLehrwerkColor(book.title);
-                      const total = book.totalPages || 50;
-                      const worked = Object.values(assigned.pageStates || {}).filter((p: any) => p.status === 'mastered').length;
-                      const pct = Math.min(100, Math.round((worked / total) * 100));
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '14px' }}>
+                  {assignedLehrwerke.map(assigned => {
+                    const book = globalLehrwerke.find(g => g.id === assigned.lehrwerkId) || {
+                      title: 'Unbekanntes Buch',
+                      emoji: '📚',
+                      totalPages: 50
+                    };
+                    const bookColor = getLehrwerkColor(book.title);
+                    const total = book.totalPages || 50;
+                    const worked = Object.values(assigned.pageStates || {}).filter((p: any) => p.status === 'mastered').length;
+                    const pct = Math.min(100, Math.round((worked / total) * 100));
+                    const isSelected = activeLehrwerkId === assigned.lehrwerkId && activeSubView === 'lehrwerk';
 
-                      return (
-                        <div
-                          key={assigned.lehrwerkId}
-                          onClick={() => selectTextbookPage(assigned.lehrwerkId, activePageNumber || 1)}
-                          style={{
-                            padding: '14px 18px',
-                            background: 'white',
-                            borderRadius: '20px',
-                            border: '1.5px solid #e8e8ed',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            gap: '14px',
-                            alignItems: 'center',
-                            transition: 'all 0.2s'
-                          }}
-                          className="hover-scale"
-                        >
+                    return (
+                      <div
+                        key={assigned.lehrwerkId}
+                        onClick={() => selectTextbookPage(assigned.lehrwerkId, activePageNumber || 1)}
+                        style={{
+                          background: '#ffffff',
+                          borderRadius: '20px',
+                          border: isSelected ? '2px solid #34a853' : '1.5px solid #e8e8ed',
+                          boxShadow: isSelected ? '0 8px 25px rgba(52, 168, 83, 0.18)' : '0 4px 14px rgba(0,0,0,0.03)',
+                          padding: '12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: '10px',
+                          position: 'relative',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        className="hover-scale"
+                      >
+                        {/* Book Showcase Area with realistic 3D portrait book */}
+                        <div style={{
+                          width: '100%',
+                          height: '145px',
+                          background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+                          borderRadius: '14px',
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden'
+                        }}>
+                          {/* Realistic Portrait Book */}
                           <div style={{
-                            width: '42px',
-                            height: '56px',
-                            background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                            borderRadius: '4px',
-                            boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
-                            border: 'none',
+                            width: '92px',
+                            height: '124px',
+                            background: `linear-gradient(135deg, ${bookColor.from} 0%, ${bookColor.to} 100%)`,
+                            borderRadius: '4px 8px 8px 4px',
+                            boxShadow: '4px 6px 16px rgba(0,0,0,0.18), inset -2px 0 4px rgba(0,0,0,0.08)',
                             position: 'relative',
-                            flexShrink: 0,
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            gap: '8px',
+                            padding: '8px'
                           }}>
-                            <BookOpen size={18} color={bookColor.text} />
+                            {/* Spine groove on left */}
                             <div style={{
                               position: 'absolute',
                               left: 0,
                               top: 0,
                               bottom: 0,
-                              width: '5px',
-                              background: 'rgba(0,0,0,0.08)',
-                              borderRight: '1px solid rgba(255,255,255,0.1)'
+                              width: '6px',
+                              background: 'rgba(0,0,0,0.18)',
+                              borderRight: '1px solid rgba(255,255,255,0.25)',
+                              borderRadius: '4px 0 0 4px'
                             }} />
+
+                            {/* Realistic page edges on right */}
+                            <div style={{
+                              position: 'absolute',
+                              right: '-3px',
+                              top: '3px',
+                              bottom: '3px',
+                              width: '3px',
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '0 2px 2px 0'
+                            }} />
+
+                            {/* Book Icon Capsule */}
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: 'rgba(255, 255, 255, 0.25)',
+                              backdropFilter: 'blur(4px)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
+                            }}>
+                              <BookOpen size={18} color={bookColor.text || '#ffffff'} />
+                            </div>
+
+                            {/* Mini Book Title on Cover */}
+                            <span style={{
+                              fontSize: '0.62rem',
+                              fontWeight: 900,
+                              color: bookColor.text || '#ffffff',
+                              textAlign: 'center',
+                              lineHeight: 1.15,
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              textShadow: '0 1px 2px rgba(0,0,0,0.15)'
+                            }}>
+                              {book.title}
+                            </span>
                           </div>
 
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                              <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#000', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {book.title}
-                              </h4>
-                              {(!readOnly || assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.isStudentCreated) && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveLehrwerk(assigned.lehrwerkId, e);
-                                  }}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#ef4444',
-                                    cursor: 'pointer',
-                                    padding: '4px',
-                                    borderRadius: '50%',
+                          {/* Top-Right Pill: % gemeistert */}
+                          <div style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: pct > 0 ? '#34a853' : 'rgba(0,0,0,0.4)',
+                            backdropFilter: 'blur(6px)',
+                            color: '#ffffff',
+                            fontSize: '0.62rem',
+                            fontWeight: 900,
+                            padding: '2px 7px',
+                            borderRadius: '100px',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
+                            zIndex: 5
+                          }}>
+                            {pct}%
+                          </div>
+
+                          {/* Delete Button top left if removable */}
+                          {(!readOnly || assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.isStudentCreated) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveLehrwerk(assigned.lehrwerkId, e);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '6px',
+                                left: '6px',
+                                background: 'rgba(255, 255, 255, 0.9)',
+                                border: 'none',
+                                color: '#ef4444',
+                                cursor: 'pointer',
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
+                                transition: 'all 0.2s',
+                                zIndex: 10
+                              }}
+                              title="Lehrwerk entfernen"
+                            >
+                              <X size={12} strokeWidth={2.5} />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Card Info Below */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <h4 style={{
+                            margin: 0,
+                            fontSize: '0.85rem',
+                            fontWeight: 900,
+                            color: '#0f172a',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            fontFamily: "'Plus Jakarta Sans', sans-serif"
+                          }}>
+                            {book.title}
+                          </h4>
+
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
+                            <span>{total} Seiten</span>
+                            <span style={{ color: worked > 0 ? '#34a853' : '#94a3b8', fontWeight: 800 }}>{worked} gem.</span>
+                          </div>
+
+                          {/* Subtle Progress Bar */}
+                          <div style={{ width: '100%', height: '4px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden', marginTop: '3px' }}>
+                            <div style={{ width: `${pct}%`, height: '100%', background: '#34a853', transition: 'width 0.3s ease' }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* + Lehrwerk hinzufügen Placeholder Card */}
+                  <div style={{ position: 'relative' }}>
+                    <div
+                      onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+                      style={{
+                        background: 'rgba(248, 250, 252, 0.7)',
+                        borderRadius: '20px',
+                        border: '2px dashed #cbd5e1',
+                        padding: '16px 12px',
+                        minHeight: '205px',
+                        height: '100%',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '12px',
+                        textAlign: 'center',
+                        transition: 'all 0.2s',
+                        boxSizing: 'border-box'
+                      }}
+                      className="hover-scale"
+                    >
+                      <div style={{
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: '50%',
+                        background: '#ffffff',
+                        border: '1.5px solid #e2e8f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#34a853',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                      }}>
+                        <Plus size={22} strokeWidth={2.5} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a' }}>Lehrwerk</div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Hinzufügen</div>
+                      </div>
+                    </div>
+
+                    {showAssignDropdown && (
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: '10px',
+                        background: 'white',
+                        border: '1px solid #e8e8ed',
+                        borderRadius: '18px',
+                        boxShadow: '0 16px 36px rgba(0,0,0,0.16)',
+                        zIndex: 40,
+                        minWidth: '220px',
+                        padding: '8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Aus Mediathek wählen</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setShowAssignDropdown(false); }}
+                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                        {globalLehrwerke
+                          .filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id))
+                          .map(g => (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => {
+                                handleAssignLehrwerk(g.id);
+                                setShowAssignDropdown(false);
+                              }}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                padding: '8px 10px',
+                                borderRadius: '10px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                color: '#000',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                transition: 'background 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#f3f3f6'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                              {(() => {
+                                const bookColor = getLehrwerkColor(g.title);
+                                return (
+                                  <div style={{
+                                    width: '20px',
+                                    height: '28px',
+                                    background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                                    borderRadius: '3px',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    transition: 'background 0.2s'
-                                  }}
-                                  onMouseEnter={(el) => el.currentTarget.style.background = '#fef2f2'}
-                                  onMouseLeave={(el) => el.currentTarget.style.background = 'transparent'}
-                                  title="Lehrwerk entfernen"
-                                >
-                                  <X size={14} strokeWidth={2.5} />
-                                </button>
-                              )}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                              <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                {assigned.isStudentCreated || assigned.createdByRole === 'student' || book.created_by_role === 'student' ? (
-                                  <span style={{ color: '#d97706', fontWeight: 800 }}>🙋 Vom Schüler angelegt</span>
-                                ) : (assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.createdByRole === 'teacher' || book.created_by_teacher) ? (
-                                  <span style={{ color: '#0284c7', fontWeight: 800 }}>👨‍🏫 Vom Lehrer angelegt</span>
-                                ) : (
-                                  <span style={{ color: '#16a34a', fontWeight: 800 }}>🎓 Vom Lehrer zugewiesen</span>
-                                )}
-                                <span>•</span>
-                                <span>{total} Seiten</span>
-                                <span>•</span>
-                                <span>{worked} gemeistert</span>
-                              </p>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: pct > 0 ? '#34a853' : '#64748b' }}>
-                                ({pct}%)
-                              </span>
-                            </div>
-                            <div style={{ width: '100%', height: '6px', background: '#f3f3f6', borderRadius: '3px', overflow: 'hidden', marginTop: '6px' }}>
-                              <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #34a853, #34a853)', transition: 'width 0.3s ease' }} />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                                    flexShrink: 0
+                                  }}>
+                                    <BookOpen size={10} color={bookColor.text} />
+                                  </div>
+                                );
+                              })()}
+                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</span>
+                            </button>
+                          ))
+                        }
+                        {globalLehrwerke.filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id)).length === 0 && (
+                          <span style={{ fontSize: '0.72rem', color: '#7d7d82', padding: '6px 8px', textAlign: 'center', fontStyle: 'italic' }}>
+                            Alle Mediathek-Bücher zugewiesen
+                          </span>
+                        )}
+                        <div style={{ borderTop: '1px solid #e8e8ed', margin: '4px 0' }} />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCreateLehrwerkModal(true);
+                            setShowAssignDropdown(false);
+                          }}
+                          style={{
+                            border: 'none',
+                            background: '#34a853',
+                            color: 'white',
+                            padding: '8px 12px',
+                            borderRadius: '10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          <Plus size={14} /> Eigenes Lehrwerk neu anlegen
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 <div style={{ borderTop: '1px solid #e8e8ed', margin: '20px 0 10px 0' }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -7157,346 +7833,558 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     });
                     const activeSongs = Array.from(uniqueActiveMap.values());
 
-                    if (activeSongs.length === 0) return (
-                      <div style={{ padding: '40px 16px', textAlign: 'center', border: '2px dashed #e8e8ed', borderRadius: '24px', color: '#7d7d82', fontSize: '0.82rem', fontWeight: 600 }}>
-                        Keine aktiven Songs eingetragen.
-                      </div>
-                    );
                     return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '14px' }}>
                         {activeSongs.map(skill => {
-                      const progress = skill.is_stage_ready ? 100 : (skill.progress_percent || 0);
-                      const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Unbenannter Song';
-                      const songArtist = skill.songs?.artist || skill.artist || 'Song-Projekt';
-                      const songColor = getSongColor(songTitle);
+                          const progress = skill.is_stage_ready ? 100 : (skill.progress_percent || 0);
+                          const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Unbenannter Song';
+                          const songArtist = skill.songs?.artist || skill.artist || 'Song-Projekt';
+                          const songColor = getSongColor(songTitle);
+                          const isSelected = selectedActiveSongId === skill.id && activeSubView === 'song';
 
-                      return (
+                          return (
+                            <div
+                              key={skill.id}
+                              onClick={() => selectActiveSong(skill)}
+                              style={{
+                                background: '#ffffff',
+                                borderRadius: '20px',
+                                border: isSelected ? '2px solid #34a853' : '1.5px solid #e8e8ed',
+                                boxShadow: isSelected ? '0 8px 25px rgba(52, 168, 83, 0.18)' : '0 4px 14px rgba(0,0,0,0.03)',
+                                padding: '12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                gap: '10px',
+                                position: 'relative',
+                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              {/* Vinyl + Album Cover Art 1:1 */}
+                              <div style={{
+                                width: '100%',
+                                height: '112px',
+                                background: `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`,
+                                borderRadius: '14px',
+                                boxShadow: '0 6px 14px rgba(0,0,0,0.12)',
+                                position: 'relative',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden'
+                              }}>
+                                {/* Peeking Vinyl Disc */}
+                                <div style={{
+                                  position: 'absolute',
+                                  right: '-14px',
+                                  top: '12px',
+                                  width: '84px',
+                                  height: '84px',
+                                  borderRadius: '50%',
+                                  background: 'radial-gradient(circle, #27272a 35%, #09090b 36%, #18181b 45%, #09090b 60%)',
+                                  border: '1px solid #000',
+                                  boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  opacity: 0.85
+                                }}>
+                                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: songColor.to, border: '2px solid rgba(255,255,255,0.4)' }} />
+                                </div>
+
+                                {/* Music Note Icon Badge */}
+                                <div style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '12px',
+                                  background: 'rgba(255, 255, 255, 0.25)',
+                                  backdropFilter: 'blur(8px)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  zIndex: 2,
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                }}>
+                                  <Music size={22} color="#ffffff" />
+                                </div>
+
+                                {/* Top-Left Progress Pill */}
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '8px',
+                                  left: '8px',
+                                  background: progress >= 100 ? '#34a853' : 'rgba(0,0,0,0.45)',
+                                  backdropFilter: 'blur(6px)',
+                                  color: '#ffffff',
+                                  fontSize: '0.62rem',
+                                  fontWeight: 900,
+                                  padding: '2px 7px',
+                                  borderRadius: '100px',
+                                  boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
+                                  zIndex: 3
+                                }}>
+                                  {progress}%
+                                </div>
+
+                                {/* Delete Button if removable */}
+                                {!readOnly && (skill.songs?.teacher_id || skill.created_by_teacher) && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveSong(skill.id, e);
+                                    }}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '6px',
+                                      right: '6px',
+                                      background: 'rgba(255, 255, 255, 0.85)',
+                                      border: 'none',
+                                      color: '#ef4444',
+                                      cursor: 'pointer',
+                                      width: '22px',
+                                      height: '22px',
+                                      borderRadius: '50%',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
+                                      transition: 'all 0.2s',
+                                      zIndex: 10
+                                    }}
+                                    title="Song entfernen"
+                                  >
+                                    <X size={12} strokeWidth={2.5} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Card Info Below */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <h4 style={{
+                                  margin: 0,
+                                  fontSize: '0.85rem',
+                                  fontWeight: 900,
+                                  color: '#0f172a',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  fontFamily: "'Plus Jakarta Sans', sans-serif"
+                                }}>
+                                  {songTitle}
+                                </h4>
+
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
+                                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px' }}>{songArtist}</span>
+                                  <span style={{ color: skill.songs?.teacher_id || skill.created_by_teacher ? '#16a34a' : '#d97706', fontWeight: 800 }}>
+                                    {skill.songs?.teacher_id || skill.created_by_teacher ? '🎓 Lehrer' : '⭐ Wunsch'}
+                                  </span>
+                                </div>
+
+                                {/* Subtle Progress Bar */}
+                                <div style={{ width: '100%', height: '4px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden', marginTop: '3px' }}>
+                                  <div style={{
+                                    width: `${progress}%`,
+                                    height: '100%',
+                                    background: progress >= 100 ? '#34a853' : 'linear-gradient(90deg, #f59e0b, #eab308)',
+                                    transition: 'width 0.3s ease'
+                                  }} />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* + Song hinzufügen Card */}
                         <div
-                          key={skill.id}
-                          onClick={() => selectActiveSong(skill)}
+                          onClick={() => setShowCreateSongModal(!showCreateSongModal)}
                           style={{
-                            padding: '14px 18px',
-                            background: 'white',
+                            background: 'rgba(248, 250, 252, 0.7)',
                             borderRadius: '20px',
-                            border: '1.5px solid #e8e8ed',
+                            border: '2px dashed #cbd5e1',
+                            padding: '16px 12px',
+                            minHeight: '175px',
                             cursor: 'pointer',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '8px',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '10px',
+                            textAlign: 'center',
                             transition: 'all 0.2s'
                           }}
                           className="hover-scale"
                         >
-                          <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                            {/* CD + Vinyl peeking Cover */}
-                            <div style={{ position: 'relative', width: '52px', height: '44px', flexShrink: 0 }}>
-                              <div style={{
-                                position: 'absolute',
-                                right: '1px',
-                                top: '3px',
-                                width: '38px',
-                                height: '38px',
-                                borderRadius: '50%',
-                                background: 'radial-gradient(circle, #27272a 35%, #09090b 36%, #18181b 45%, #09090b 60%)',
-                                border: '1px solid #000',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                zIndex: 1
-                              }}>
-                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: songColor.to, border: '1px solid rgba(0,0,0,0.2)' }} />
-                              </div>
-                              <div style={{
-                                position: 'absolute',
-                                left: 0,
-                                top: 0,
-                                width: '44px',
-                                height: '44px',
-                                background: `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`,
-                                borderRadius: '5px',
-                                border: '1px solid rgba(0,0,0,0.1)',
-                                boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '1.2rem',
-                                zIndex: 2
-                              }}>
-                                🎵
-                              </div>
-                            </div>
-
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <div>
-                                  <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#000', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {songTitle}
-                                  </h4>
-                                  <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    {skill.songs?.teacher_id || skill.created_by_teacher ? (
-                                      <span style={{ color: '#16a34a', fontWeight: 800 }}>🎓 Vom Lehrer</span>
-                                    ) : (
-                                      <span style={{ color: '#d97706', fontWeight: 800 }}>⭐ Wunschsong</span>
-                                    )}
-                                    <span>•</span>
-                                    <span>{songArtist}</span>
-                                    <span>•</span>
-                                    <span style={{ color: '#000', fontWeight: 800 }}>{progress}%</span>
-                                  </p>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  {!readOnly && (skill.songs?.teacher_id || skill.created_by_teacher) && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemoveSong(skill.id, e);
-                                      }}
-                                      style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: '#ef4444',
-                                        cursor: 'pointer',
-                                        padding: '4px',
-                                        borderRadius: '50%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'background 0.2s',
-                                        zIndex: 10
-                                      }}
-                                      onMouseEnter={(el) => el.currentTarget.style.background = '#fef2f2'}
-                                      onMouseLeave={(el) => el.currentTarget.style.background = 'transparent'}
-                                    >
-                                      <X size={14} strokeWidth={2.5} />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div style={{ width: '100%', height: '6px', background: '#f3f3f6', borderRadius: '3px', overflow: 'hidden', marginTop: '6px' }}>
-                                <div style={{
-                                  width: `${progress}%`,
-                                  height: '100%',
-                                  background: (skill.is_stage_ready || progress === 100) ? 'hsl(130, 65%, 82%)' : 'hsl(47, 85%, 84%)',
-                                  transition: 'width 0.3s ease'
-                                }} />
-                              </div>
-                            </div>
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            background: '#ffffff',
+                            border: '1.5px solid #e2e8f0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#34a853',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                          }}>
+                            <Plus size={20} strokeWidth={2.5} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 900, color: '#0f172a' }}>Song</div>
+                            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Neu anlegen</div>
                           </div>
                         </div>
-                      );
-                    })}
-                    </div>
-                  );
-                })()}
+                      </div>
+                    );
+                  })()}
 
-                <div style={{ borderTop: '1px solid #e8e8ed', paddingTop: '20px', marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Plus size={16} style={{ color: '#000' }} />
-                      <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#000', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Song aus Katalog hinzufügen
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateSongModal(!showCreateSongModal)}
-                      style={{
-                        background: '#f3f3f6',
-                        color: '#000',
-                        border: '1.5px solid #e8e8ed',
-                        padding: '4px 10px',
-                        borderRadius: '12px',
-                        fontSize: '0.68rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                      className="hover-scale-mini"
-                    >
-                      <Plus size={12} /> Neu anlegen
-                    </button>
-                  </div>
-
-                  {showCreateSongModal && (
-                    <form onSubmit={handleCreateAndAssignSong} style={{
-                      background: '#fafbfd',
-                      border: '1.5px solid #e8e8ed',
-                      borderRadius: '16px',
-                      padding: '12px',
+                {/* SaaS Enterprise+ Song Selection & Creation Modal */}
+                {showCreateSongModal && (
+                  <div style={{
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(15, 23, 42, 0.55)',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 1000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                  }} onClick={() => setShowCreateSongModal(false)}>
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '24px',
+                      boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                      width: '100%',
+                      maxWidth: '480px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '8px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
-                    }} className="animation-slide-up">
-                      <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#000', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        🎵 Neuen Song erschaffen
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Titel (z.B. Wonderwall)..."
-                        value={newSongTitle}
-                        onChange={(e) => setNewSongTitle(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          borderRadius: '10px',
-                          border: '1.5px solid #e8e8ed',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          outline: 'none',
-                          background: 'white'
-                        }}
-                        required
-                      />
-                      <input
-                        type="text"
-                        placeholder="Künstler (z.B. Oasis)..."
-                        value={newSongArtist}
-                        onChange={(e) => setNewSongArtist(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          borderRadius: '10px',
-                          border: '1.5px solid #e8e8ed',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          outline: 'none',
-                          background: 'white'
-                        }}
-                        required
-                      />
-                      <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                      overflow: 'hidden'
+                    }} onClick={(e) => e.stopPropagation()}>
+                      
+                      {/* Modal Header */}
+                      <div style={{
+                        padding: '18px 24px',
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#fafafa'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            background: 'rgba(52, 168, 83, 0.1)',
+                            color: '#34a853',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Music size={18} />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>Song hinzufügen</h3>
+                            <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Aus Schulkatalog wählen oder eigenen Song anlegen</p>
+                          </div>
+                        </div>
+
                         <button
                           type="button"
                           onClick={() => setShowCreateSongModal(false)}
                           style={{
-                            flex: 1,
-                            background: 'white',
-                            color: '#7d7d82',
-                            border: '1.5px solid #cbd5e1',
-                            borderRadius: '10px',
-                            padding: '6px',
-                            fontSize: '0.72rem',
-                            fontWeight: 800,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Abbrechen
-                        </button>
-                        <button
-                          type="submit"
-                          style={{
-                            flex: 1,
-                            background: '#000',
-                            color: 'white',
+                            background: '#f1f5f9',
                             border: 'none',
-                            borderRadius: '10px',
-                            padding: '6px',
-                            fontSize: '0.72rem',
-                            fontWeight: 900,
-                            cursor: 'pointer'
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: '#64748b'
                           }}
                         >
-                          Erstellen & Zuweisen
+                          <X size={16} />
                         </button>
                       </div>
-                    </form>
-                  )}
 
-                  <input
-                    type="text"
-                    placeholder="Song oder Künstler suchen..."
-                    value={songSearch}
-                    onChange={(e) => setSongSearch(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      borderRadius: '12px',
-                      border: '1.5px solid #e8e8ed',
-                      fontSize: '0.82rem',
-                      fontWeight: 600,
-                      outline: 'none',
-                      background: '#f8f8fa',
-                      transition: 'border-color 0.2s'
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#000';
-                      setIsSongSearchFocused(true);
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#e8e8ed';
-                      setTimeout(() => setIsSongSearchFocused(false), 200);
-                    }}
-                  />
-
-                  {(songSearch.trim().length > 0 || isSongSearchFocused) && (
-                    <div style={{
-                      maxHeight: '180px',
-                      overflowY: 'auto',
-                      border: '1.5px solid #e8e8ed',
-                      borderRadius: '16px',
-                      padding: '6px',
-                      background: 'white',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.06)'
-                    }}>
-                      {(() => {
-                        const filtered = songs.filter(s => {
-                          const t = (s.title || '').toLowerCase().trim();
-                          if (t === 'test' || t === 'test - test' || t === 'test-test') return false;
-                          return s.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
-                                 s.artist?.toLowerCase().includes(songSearch.toLowerCase());
-                        });
-                        
-                        if (filtered.length === 0) {
-                          return (
-                            <div style={{ padding: '16px', fontSize: '0.78rem', color: '#7d7d82', textAlign: 'center', fontStyle: 'italic' }}>
-                              Keine Treffer gefunden.
-                            </div>
-                          );
-                        }
-
-                        return filtered.map((song) => (
+                      {/* Segmented Control / Tabs */}
+                      <div style={{ padding: '16px 24px 8px 24px' }}>
+                        <div style={{
+                          background: '#f1f5f9',
+                          borderRadius: '14px',
+                          padding: '4px',
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: '4px'
+                        }}>
                           <button
-                            key={song.id}
                             type="button"
-                            onClick={() => handleAssignSongFromCatalog(song.id)}
+                            onClick={() => setSongModalTab('catalog')}
                             style={{
-                              textAlign: 'left',
+                              border: 'none',
                               padding: '8px 12px',
                               borderRadius: '10px',
-                              border: 'none',
-                              background: 'white',
-                              color: '#000',
+                              fontSize: '0.78rem',
+                              fontWeight: 850,
                               cursor: 'pointer',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              transition: 'background 0.2s'
+                              background: songModalTab === 'catalog' ? '#ffffff' : 'transparent',
+                              color: songModalTab === 'catalog' ? '#0f172a' : '#64748b',
+                              boxShadow: songModalTab === 'catalog' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.15s ease'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#f3f3f6'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                           >
-                            <div>
-                              <div style={{ fontWeight: 800, fontSize: '0.82rem' }}>{song.title}</div>
-                              <div style={{ fontSize: '0.7rem', color: '#7d7d82', fontWeight: 600 }}>{song.artist}</div>
-                            </div>
-                            <span style={{ fontSize: '0.72rem', background: '#000', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 800 }}>
-                              Hinzufügen
-                            </span>
+                            📚 Schulkatalog
                           </button>
-                        ));
-                  })()}
-                </div>
-              )}
-            </div>
+                          <button
+                            type="button"
+                            onClick={() => setSongModalTab('create')}
+                            style={{
+                              border: 'none',
+                              padding: '8px 12px',
+                              borderRadius: '10px',
+                              fontSize: '0.78rem',
+                              fontWeight: 850,
+                              cursor: 'pointer',
+                              background: songModalTab === 'create' ? '#ffffff' : 'transparent',
+                              color: songModalTab === 'create' ? '#0f172a' : '#64748b',
+                              boxShadow: songModalTab === 'create' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            ✨ Neu erstellen
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Modal Body */}
+                      <div style={{ padding: '12px 24px 24px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {songModalTab === 'catalog' ? (
+                          <>
+                            <div style={{ position: 'relative' }}>
+                              <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+                              <input
+                                type="text"
+                                placeholder="Song oder Künstler suchen..."
+                                value={songSearch}
+                                onChange={(e) => setSongSearch(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 14px 10px 36px',
+                                  borderRadius: '12px',
+                                  border: '1.5px solid #e2e8f0',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  background: '#f8fafc',
+                                  boxSizing: 'border-box'
+                                }}
+                                autoFocus
+                              />
+                            </div>
+
+                            <div style={{
+                              maxHeight: '260px',
+                              overflowY: 'auto',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              paddingRight: '4px'
+                            }}>
+                              {(() => {
+                                const filtered = songs.filter(s => {
+                                  const t = (s.title || '').toLowerCase().trim();
+                                  if (t === 'test' || t === 'test - test' || t === 'test-test') return false;
+                                  if (!songSearch.trim()) return true;
+                                  return (s.title || '').toLowerCase().includes(songSearch.toLowerCase()) || 
+                                         (s.artist || '').toLowerCase().includes(songSearch.toLowerCase());
+                                });
+
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div style={{ padding: '30px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                      <span>Kein passender Song im Katalog gefunden.</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setNewSongTitle(songSearch);
+                                          setSongModalTab('create');
+                                        }}
+                                        style={{
+                                          background: '#e6f4ea',
+                                          color: '#34a853',
+                                          border: 'none',
+                                          padding: '6px 14px',
+                                          borderRadius: '10px',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 850,
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        ✨ "{songSearch}" als neuen Song anlegen
+                                      </button>
+                                    </div>
+                                  );
+                                }
+
+                                return filtered.map((song) => (
+                                  <div
+                                    key={song.id}
+                                    onClick={() => {
+                                      handleAssignSongFromCatalog(song.id);
+                                      setShowCreateSongModal(false);
+                                      setSongSearch('');
+                                    }}
+                                    style={{
+                                      padding: '10px 14px',
+                                      borderRadius: '14px',
+                                      border: '1.5px solid #f1f5f9',
+                                      background: '#ffffff',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      <div style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '8px',
+                                        background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0
+                                      }}>
+                                        <Music size={14} color="#475569" />
+                                      </div>
+                                      <div>
+                                        <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#0f172a' }}>{song.title}</div>
+                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650 }}>{song.artist || 'Unbekannter Künstler'}</div>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      style={{
+                                        background: '#34a853',
+                                        color: 'white',
+                                        border: 'none',
+                                        padding: '6px 12px',
+                                        borderRadius: '10px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 900,
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      + Hinzufügen
+                                    </button>
+                                  </div>
+                                ));
+                              })()}
+                            </div>
+                          </>
+                        ) : (
+                          <form onSubmit={(e) => {
+                            handleCreateAndAssignSong(e);
+                            setShowCreateSongModal(false);
+                          }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>Songtitel</label>
+                              <input
+                                type="text"
+                                placeholder="z. B. Wonderwall..."
+                                value={newSongTitle}
+                                onChange={(e) => setNewSongTitle(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 14px',
+                                  borderRadius: '12px',
+                                  border: '1.5px solid #e2e8f0',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  background: '#f8fafc',
+                                  boxSizing: 'border-box'
+                                }}
+                                required
+                                autoFocus
+                              />
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>Künstler / Band</label>
+                              <input
+                                type="text"
+                                placeholder="z. B. Oasis..."
+                                value={newSongArtist}
+                                onChange={(e) => setNewSongArtist(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 14px',
+                                  borderRadius: '12px',
+                                  border: '1.5px solid #e2e8f0',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 600,
+                                  outline: 'none',
+                                  background: '#f8fafc',
+                                  boxSizing: 'border-box'
+                                }}
+                                required
+                              />
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                              <button
+                                type="button"
+                                onClick={() => setShowCreateSongModal(false)}
+                                style={{
+                                  flex: 1,
+                                  background: '#f1f5f9',
+                                  color: '#64748b',
+                                  border: 'none',
+                                  borderRadius: '12px',
+                                  padding: '10px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Abbrechen
+                              </button>
+                              <button
+                                type="submit"
+                                style={{
+                                  flex: 2,
+                                  background: '#34a853',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '12px',
+                                  padding: '10px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 900,
+                                  cursor: 'pointer',
+                                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                                }}
+                              >
+                                ✨ Song erstellen & zuweisen
+                              </button>
+                            </div>
+                          </form>
+                        )}
+                      </div>
+
+                    </div>
+                  </div>
+                )}
                 </div>{/* close inner scrollable div */}
 
                 {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom */}
@@ -8667,18 +9555,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       {/* Combined Hausaufgaben-Fahrplan Widget */}
                       <div style={{
                         background: '#fffbeb',
-                        border: isNotesExpanded ? 'none' : '1px solid #fef08a',
+                        border: '1px solid #fef08a',
                         borderRadius: '16px',
-                        padding: isNotesExpanded ? '0px' : '14px 16px',
+                        padding: '14px 16px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: isNotesExpanded ? '0px' : '12px',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
-                        maxHeight: isNotesExpanded ? '0px' : '1200px',
-                        opacity: isNotesExpanded ? 0 : 1,
-                        overflow: 'hidden',
-                        marginTop: isNotesExpanded ? '-16px' : '0px',
-                        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
+                        gap: '12px',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f4f4f5', paddingBottom: '8px' }}>
                           <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#18181b', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -8730,7 +9613,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 if (book) {
                                   const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
                                   const pageState = assignment?.pageStates?.[pageNum];
-                                  return pageState?.status === 'homework';
+                                  return pageState?.status === 'homework' || pageState?.isCurrentHomework;
                                 }
                               }
                               return item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW ');
@@ -8752,21 +9635,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                      getISOWeek(item.updated_at) === currentWeek &&
                                      !item.topic_name.startsWith('Hausaufgabe KW ');
                             });
-                            const hasActive = activeHWs.length > 0 || activeTheories.length > 0;
-                            const hasNotes = homeworkNotesList.length > 0;
-                            
-                            if (!hasActive && !hasNotes) {
-                              return (
-                                <span style={{ fontSize: '0.72rem', color: '#71717a', fontWeight: 550, fontStyle: 'italic', lineHeight: '1.4' }}>
-                                  ✨ Keine aktiven Hausaufgaben erfasst. Markiere Lehrwerke oder Songs.
-                                </span>
-                              );
-                            }
-                            
+
                             // Group page numbers by book title
                             const groupedLehrwerke: Record<string, { pages: number[] }> = {};
                             const otherHWs: any[] = [];
                             
+                            // 1. Primary Source: Collect all active homework pages directly from assignedLehrwerke state
+                            (assignedLehrwerke || []).forEach(assignment => {
+                              const book = globalLehrwerke.find(g => g.id === assignment.lehrwerkId);
+                              if (!book || !assignment.pageStates) return;
+                              
+                              Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
+                                if (pState?.status === 'homework' || pState?.isCurrentHomework) {
+                                  const pageNum = parseInt(pNumStr, 10);
+                                  if (!isNaN(pageNum)) {
+                                    if (!groupedLehrwerke[book.title]) {
+                                      groupedLehrwerke[book.title] = { pages: [] };
+                                    }
+                                    if (!groupedLehrwerke[book.title].pages.includes(pageNum)) {
+                                      groupedLehrwerke[book.title].pages.push(pageNum);
+                                    }
+                                  }
+                                }
+                              });
+                            });
+
+                            // 2. Secondary Source: Collect from progress_matrix items (songs, theory, etc.)
                             const allActive = [...activeHWs, ...activeTheories];
                             
                             allActive.forEach(item => {
@@ -8799,6 +9693,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               info.pages.sort((a: number, b: number) => a - b);
                               return { title, pages: info.pages };
                             });
+
+                            const hasActive = lehrwerkeList.length > 0 || otherHWs.length > 0;
+                            const hasNotes = homeworkNotesList.length > 0;
+                            
+                            if (!hasActive && !hasNotes) {
+                              return (
+                                <span style={{ fontSize: '0.72rem', color: '#71717a', fontWeight: 550, fontStyle: 'italic', lineHeight: '1.4' }}>
+                                  ✨ Keine aktiven Hausaufgaben erfasst. Markiere Lehrwerke oder Songs.
+                                </span>
+                              );
+                            }
                             
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -9326,16 +10231,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             pointerEvents: 'none'
                           } : {
                             width: '100%',
-                            height: isNotesExpanded ? '280px' : '90px',
+                            height: '110px',
                             padding: '12px 14px',
                             borderRadius: '16px',
                             border: '1px solid #cbd5e1',
-                            fontSize: '0.8rem',
+                            fontSize: '0.82rem',
                             fontWeight: 600,
                             outline: 'none',
                             resize: 'none',
                             background: 'white',
-                            transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
+                            transition: 'border-color 0.2s ease'
                           }}
                         />
                         <style dangerouslySetInnerHTML={{__html: `
@@ -12132,12 +13037,35 @@ const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlay
   );
 };
 
-const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () => void }> = ({ url, label, onDelete }) => {
+const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () => void; duration?: number }> = ({ url, label, onDelete, duration: initialDuration }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(initialDuration || 0);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [resolvedUrl, setResolvedUrl] = useState<string>(url);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let createdBlobUrl: string | null = null;
+
+    if (url.startsWith('campus_blob_') || url.startsWith('campus_audio_')) {
+      getBlob(url).then(raw => {
+        if (active && raw) {
+          const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
+          createdBlobUrl = URL.createObjectURL(finalBlob);
+          setResolvedUrl(createdBlobUrl);
+        }
+      }).catch(err => console.warn('[InlineAudioPlayer] Blob load note:', err));
+    } else {
+      setResolvedUrl(url);
+    }
+
+    return () => {
+      active = false;
+      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
+    };
+  }, [url]);
 
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -12179,7 +13107,7 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [url]);
+  }, [resolvedUrl]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = playbackRate;
@@ -12203,7 +13131,7 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
       position: 'relative',
       userSelect: 'none'
     }}>
-      <audio ref={audioRef} src={url} />
+      <audio ref={audioRef} src={resolvedUrl} />
       
       {/* 4 Screws in corners */}
       <div style={{ position: 'absolute', top: '4px', left: '4px', width: '3px', height: '3px', borderRadius: '50%', background: '#64748b', opacity: 0.8 }} />
@@ -12424,12 +13352,127 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
   );
 };
 
-const RetroCassettePlayer: React.FC<{ url: string; duration: number; index: number; label?: string; onDelete?: () => void }> = ({ url, duration, index, label, onDelete }) => {
+const RetroCassettePlayer: React.FC<{ 
+  url: string; 
+  duration: number; 
+  index: number; 
+  label?: string; 
+  onDelete?: () => void;
+  visibility?: 'private' | 'shared_with_teacher';
+  onToggleVisibility?: () => void;
+  onShareToPlaylist?: () => void;
+  isStudentView?: boolean;
+}> = ({ url, duration, index, label, onDelete, visibility, onToggleVisibility, onShareToPlaylist, isStudentView }) => {
   return (
-    <InlineAudioPlayer 
-      url={url} 
-      label={label || `Play-Along #${index + 1}`} 
-      onDelete={onDelete}
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '320px', gap: '8px' }}>
+      <InlineAudioPlayer 
+        url={url} 
+        label={label || `Play-Along #${index + 1}`} 
+        onDelete={onDelete}
+        duration={duration}
+      />
+
+      {/* Student Action Toolbar: Privacy Toggle & Audio-Biografie Share */}
+      {isStudentView && (
+        <div style={{
+          display: 'flex',
+          gap: '6px',
+          padding: '6px 8px',
+          background: '#ffffff',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          {/* Privacy Toggle Button */}
+          {onToggleVisibility && (
+            <button
+              type="button"
+              onClick={onToggleVisibility}
+              title={visibility === 'shared_with_teacher' 
+                ? 'Für Lehrer freigegeben (Klicken zum Privatschalten)' 
+                : 'Privat (Klicken, um für Lehrer freizugeben)'}
+              style={{
+                background: visibility === 'shared_with_teacher' ? '#e6f4ea' : '#f1f5f9',
+                color: visibility === 'shared_with_teacher' ? '#16a34a' : '#475569',
+                border: visibility === 'shared_with_teacher' ? '1px solid #bbf7d0' : '1px solid #cbd5e1',
+                borderRadius: '8px',
+                padding: '5px 8px',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                flex: 1,
+                justifyContent: 'center',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {visibility === 'shared_with_teacher' ? (
+                <>
+                  <Unlock size={12} />
+                  <span>🎓 Für Lehrer sichtbar</span>
+                </>
+              ) : (
+                <>
+                  <Lock size={12} />
+                  <span>🔒 Privat (Nur für dich)</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Share to Audio-Biografie Button */}
+          {onShareToPlaylist && (
+            <button
+              type="button"
+              onClick={onShareToPlaylist}
+              title="Zu einer Playlist in der Audio-Biografie hinzufügen"
+              style={{
+                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '5px 8px',
+                fontSize: '0.68rem',
+                fontWeight: 850,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: '0 2px 5px rgba(99, 102, 241, 0.25)',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale-mini"
+            >
+              <Share2 size={12} />
+              <span>💽 Playlist</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Teacher View: Indicator that this is a shared student recording */}
+      {!isStudentView && visibility === 'shared_with_teacher' && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '5px',
+          fontSize: '0.68rem',
+          fontWeight: 800,
+          color: '#16a34a',
+          background: '#e6f4ea',
+          padding: '4px 8px',
+          borderRadius: '8px',
+          border: '1px solid #bbf7d0'
+        }}>
+          <Check size={12} />
+          <span>Vom Schüler für dich freigegeben</span>
+        </div>
+      )}
+    </div>
   );
 };

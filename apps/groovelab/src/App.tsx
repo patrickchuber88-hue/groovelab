@@ -48,6 +48,7 @@ import { ProfileSelector } from './components/ProfileSelector';
 import { flushOfflineSyncQueue } from './services/offlineSyncService';
 import { DeviceSimulator } from './components/ui/DeviceSimulator';
 import { MobileTopHeader } from './components/ui/MobileTopHeader';
+import { CampusLevelSwitcher, CampusUiLevel } from './components/campus/CampusLevelSwitcher';
 import { useMasterPricing } from './context/MasterPricingContext';
 import { MaintenanceLockoutOverlay } from './components/MaintenanceLockoutOverlay';
 import { GlobalBroadcastBanner } from './components/GlobalBroadcastBanner';
@@ -2330,6 +2331,21 @@ function App() {
     }
     return null;
   });
+
+  const [campusStudentUiLevel, setCampusStudentUiLevel] = useState<CampusUiLevel>(() => {
+    if (typeof window === 'undefined') return 'junior';
+    const saved = localStorage.getItem('campus_student_ui_level');
+    if (saved === 'junior' || saved === 'teen' || saved === 'pro') return saved as CampusUiLevel;
+    return 'junior';
+  });
+
+  useEffect(() => {
+    const handleLevelChangeEvt = (e: any) => {
+      if (e?.detail) setCampusStudentUiLevel(e.detail);
+    };
+    window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+    return () => window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+  }, []);
 
   // Effect to resolve the kiosk token on mount
   useEffect(() => {
@@ -9399,6 +9415,21 @@ function App() {
                     </div>
                   )}
 
+                  {/* Campus Student UI Level Switcher (Placed directly to the left of School / Teacher / Student info) */}
+                  {activePlatform === 'campus' && user?.role === 'student' && (
+                    <div style={{ display: 'flex', alignItems: 'center', marginRight: '8px', flexShrink: 0 }}>
+                      <CampusLevelSwitcher
+                        currentLevel={campusStudentUiLevel}
+                        compact={windowWidth <= 1024}
+                        onChange={(newLevel) => {
+                          setCampusStudentUiLevel(newLevel);
+                          localStorage.setItem('campus_student_ui_level', newLevel);
+                          window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
+                        }}
+                      />
+                    </div>
+                  )}
+
                   {/* Unified School, Teacher, Student, Admin & Secretary Pill */}
                   {(() => {
                     const badgeBaseStyle: React.CSSProperties = {
@@ -11647,13 +11678,13 @@ function App() {
       )}
 
         {/* Admin/Teacher Section Tabs (Unified) */}
-        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher')) && activePlatform !== 'ensembles' && ['live', 'schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) && (
+        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'secretary')) && activePlatform !== 'ensembles' && activeStudentTab !== 'profile' && activeStudentTab !== 'messages' && (
           <ErrorBoundary key={`${activePlatform}-${activeStudentTab}`}>
             <AdminDashboard 
               key={activePlatform}
               userId={user.id} 
               onLogout={handleLogout} 
-              forceTab={activeStudentTab}
+              forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? activeStudentTab : 'live'}
               activePlatform={activePlatform as any}
               onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
               onSwitchPlatform={(platform) => setActivePlatform(platform)}

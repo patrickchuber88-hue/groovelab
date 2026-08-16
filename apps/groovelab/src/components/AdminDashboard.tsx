@@ -2281,7 +2281,9 @@ export function AdminDashboard({
       if (activeTab === 'live' || activeTab === 'schedule') {
         // Fetch live / schedule resources
       } else if (activeTab === 'students') {
-        const canSeeAllStudents = adminData.role === 'admin' || adminData.role === 'secretary';
+        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
+        const canSeeAllStudents = (adminData.role === 'admin' || adminData.role === 'secretary') && !isTeacherMode;
         let studentsData: any[] = [];
 
         if (canSeeAllStudents) {
@@ -2294,15 +2296,6 @@ export function AdminDashboard({
         }
 
         if (studentsData) {
-          // Auto-sync missing users.teacher_id in background for DB consistency
-          if (adminData.role === 'teacher' && studentsData.length > 0) {
-            const unlinkedStudents = studentsData.filter((s: any) => !s.teacher_id).map((s: any) => s.id);
-            if (unlinkedStudents.length > 0) {
-              supabase.from('users').update({ teacher_id: adminData.id }).in('id', unlinkedStudents).then(() => {
-                console.log(`[Teacher Board] Auto-synced teacher_id for ${unlinkedStudents.length} students.`);
-              });
-            }
-          }
           // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS ---
           const expiredStudents = studentsData.filter((s: any) => s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now());
           const expiredIds = expiredStudents.map((s: any) => s.id);
@@ -2477,7 +2470,9 @@ export function AdminDashboard({
         //  • Teacher in GrooveLab:           ALL groovelab-active students school-wide
         //                                    (no teacher_id filter — GrooveLab is a shared platform)
         // ──────────────────────────────────────────────────────────────────────
-        const canSeeAllStudents = adminData.role === 'admin' || adminData.role === 'secretary';
+        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
+        const canSeeAllStudents = (adminData.role === 'admin' || adminData.role === 'secretary') && !isTeacherMode;
         let studentsData: any[] = [];
 
         if (canSeeAllStudents) {
@@ -2490,15 +2485,6 @@ export function AdminDashboard({
         }
 
         if (studentsData) {
-          // Auto-sync missing users.teacher_id in background for DB consistency
-          if (adminData.role === 'teacher' && studentsData.length > 0) {
-            const unlinkedStudents = studentsData.filter((s: any) => !s.teacher_id).map((s: any) => s.id);
-            if (unlinkedStudents.length > 0) {
-              supabase.from('users').update({ teacher_id: adminData.id }).in('id', unlinkedStudents).then(() => {
-                console.log(`[Teacher Board] Auto-synced teacher_id for ${unlinkedStudents.length} students.`);
-              });
-            }
-          }
           // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS ---
           const expiredStudents = studentsData.filter((s: any) => s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now());
           const expiredIds = expiredStudents.map((s: any) => s.id);
@@ -2771,8 +2757,11 @@ export function AdminDashboard({
           .eq('school_id', adminData.school_id);
         if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
         else sq = sq.eq('is_groovelab_active', true);
+        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
+
         // REGEL: Lehrer sehen nur ihre eigenen Songs (teacher_id-Filter)
-        if (adminData.role === 'teacher') sq = sq.eq('teacher_id', adminData.id);
+        if (isTeacherMode) sq = sq.eq('teacher_id', adminData.id);
         const { data: songsData } = await sq.order('title');
         if (songsData) setSongs(songsData);
 
@@ -2781,7 +2770,7 @@ export function AdminDashboard({
           .from('lehrwerke')
           .select('*')
           .eq('school_id', adminData.school_id);
-        if (adminData.role === 'teacher') lwSq = lwSq.eq('teacher_id', adminData.id);
+        if (isTeacherMode) lwSq = lwSq.eq('teacher_id', adminData.id);
         const { data: lehrwerkeData } = await lwSq.order('title');
         if (lehrwerkeData) {
           const mappedLw = lehrwerkeData.map((item: any) => ({
@@ -2793,7 +2782,7 @@ export function AdminDashboard({
 
         // Fetch students for assignments in songs/lehrwerke detail modal
         let studentsData: any[] = [];
-        if (adminData.role === 'teacher') {
+        if (isTeacherMode) {
           studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
         } else {
           let studSq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
@@ -2829,8 +2818,11 @@ export function AdminDashboard({
           }
         }
         // Also fetch students for the search function in band edit
+        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
         let bsq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
         if (activePlatform !== 'campus') bsq = bsq.eq('is_groovelab_active', true);
+        if (isTeacherMode) bsq = bsq.eq('teacher_id', adminData.id);
         const { data: studentsData } = await bsq.order('first_name');
         if (studentsData) setStudents(studentsData);
         
@@ -2860,7 +2852,13 @@ export function AdminDashboard({
         if (activePlatform !== 'campus') usq = usq.eq('is_groovelab_active', true);
         const { data: allUsers } = await usq.order('first_name');
         if (allUsers) {
-          setStudents(allUsers.filter(u => u.role === 'student'));
+          const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+          const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
+          if (isTeacherMode) {
+            setStudents(allUsers.filter(u => u.role === 'student' && u.teacher_id === adminData.id));
+          } else {
+            setStudents(allUsers.filter(u => u.role === 'student'));
+          }
           setTeachers(allUsers.filter(u => u.role === 'teacher' || u.role === 'admin'));
         }
       } else if (activeTab === 'setup') {
@@ -2881,6 +2879,9 @@ export function AdminDashboard({
         // Fetch students roster for manual check-in
         let ssq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
         if (activePlatform !== 'campus') ssq = ssq.eq('is_groovelab_active', true);
+        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
+        if (isTeacherMode) ssq = ssq.eq('teacher_id', adminData.id);
         const { data: studentsData } = await ssq.order('first_name');
         if (studentsData) setStudents(studentsData);
       } else if (activeTab === 'missions') {
@@ -2923,7 +2924,9 @@ export function AdminDashboard({
         }
 
         let studentsData: any[] = [];
-        if (adminData.role === 'teacher') {
+        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
+        if (isTeacherMode) {
           studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
         } else {
           let ssq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
@@ -2944,7 +2947,7 @@ export function AdminDashboard({
         const filteredSubs = (subData || []).filter((s: any) => {
           const u = Array.isArray(s.users) ? s.users[0] : s.users;
           const matchesSchool = u?.school_id === adminData.school_id;
-          const matchesTeacher = adminData.role !== 'teacher' || u?.teacher_id === adminData.id;
+          const matchesTeacher = !isTeacherMode || u?.teacher_id === adminData.id;
           return matchesSchool && matchesTeacher;
         });
 
@@ -3050,7 +3053,9 @@ export function AdminDashboard({
     const sessionStartDate = new Date(queryStartDate.getTime() - 24 * 60 * 60 * 1000); // 1 day buffer for session overlap
 
     let schoolStudents: any[] = [];
-    if (admin?.role === 'teacher') {
+    const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+    const isTeacherMode = admin?.role === 'teacher' || activeWorkspace === 'teacher';
+    if (isTeacherMode && admin?.id) {
       schoolStudents = await fetchTeacherStudentsHelper(admin.id, schoolId, activePlatform);
     } else {
       let studentListSq = supabase.from('users').select('id, first_name, last_name, photo_url, teacher_id').eq('school_id', schoolId).eq('role', 'student');
@@ -4655,6 +4660,7 @@ export function AdminDashboard({
         hideHeader={activePlatform === 'campus' ? false : true} 
         hideSidebar={true}
         viewMode="admin" 
+        activePlatform={activePlatform as any}
         initialTab={activePlatform === 'campus' ? 'briefing' : 'live'}
         onTabChange={(id) => onTabChange?.(id)}
         isSidebarCollapsed={isSidebarCollapsed}
@@ -6261,7 +6267,7 @@ export function AdminDashboard({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
           {teachers.map(t => {
             const isObserver = !!t.is_observer;
-            const accentColor = isObserver ? '#94a3b8' : (t.role === 'admin' ? '#ea4335' : brandColor);
+            const accentColor = isObserver ? '#94a3b8' : (activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : (t.role === 'admin' ? '#ea4335' : brandColor)));
             return (
               <div 
                 key={t.id} 
@@ -15289,9 +15295,9 @@ export function AdminDashboard({
         </header>
       )}
 
-      {activeTab === 'live' && renderLiveTab()}
-      {activeTab === 'schedule' && admin && <ScheduleBoard schoolId={admin.school_id} userId={userId} />}
-      {activeTab === 'events' && (
+      {activeTab === 'schedule' ? (
+        admin && <ScheduleBoard schoolId={admin.school_id} userId={userId} />
+      ) : activeTab === 'events' ? (
         <CampusEventsBoard 
           userId={userId}
           role={admin?.role || 'teacher'}
@@ -15299,16 +15305,27 @@ export function AdminDashboard({
           supabase={supabase}
           brandColor={brandColor}
         />
+      ) : activeTab === 'bands' ? (
+        renderBandsTab()
+      ) : activeTab === 'students' ? (
+        renderStudentsTab()
+      ) : activeTab === 'team' ? (
+        renderTeachersTab()
+      ) : activeTab === 'rooms' ? (
+        renderRoomsTab()
+      ) : activeTab === 'songs' ? (
+        renderSongsTab()
+      ) : activeTab === 'stats' ? (
+        renderStatsTab()
+      ) : activeTab === 'gallery' ? (
+        renderIDGalleryTab()
+      ) : activeTab === 'setup' ? (
+        renderSetupTab()
+      ) : activeTab === 'missions' ? (
+        renderMissionsTab()
+      ) : (
+        renderLiveTab()
       )}
-      {activeTab === 'bands' && renderBandsTab()}
-      {activeTab === 'students' && renderStudentsTab()}
-      {activeTab === 'team' && renderTeachersTab()}
-      {activeTab === 'rooms' && renderRoomsTab()}
-      {activeTab === 'songs' && renderSongsTab()}
-      {activeTab === 'stats' && renderStatsTab()}
-      {activeTab === 'gallery' && renderIDGalleryTab()}
-      {activeTab === 'setup' && renderSetupTab()}
-      {activeTab === 'missions' && renderMissionsTab()}
 
       {renderStudentDetailModal()}
       <ConfirmDeleteStudentModal

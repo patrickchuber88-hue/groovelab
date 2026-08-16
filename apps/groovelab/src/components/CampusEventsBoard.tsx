@@ -133,16 +133,28 @@ const formatToLocalDatetime = (isoString: string | null | undefined): string => 
 
 export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor: passedBrandColor }: CampusEventsBoardProps) {
   // Dynamic Theme calculations
-  const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-  const isGroovelab = localStorage.getItem('groovelab_active_platform') === 'groovelab';
-  const isAdminView = role === 'admin' || role === 'secretary';
+  const activePlatformStored = typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
+  const isGroovelab = passedBrandColor === '#eab308' || activePlatformStored === 'groovelab';
+  const isAdminPlatform = passedBrandColor === '#ea4335' || activePlatformStored === 'admin';
+  const isCampus = !isGroovelab && !isAdminPlatform; // Default to Campus
 
-  let brandColor = '#34a853'; // Campus Green
+  let brandColor = '#34a853'; // Campus Green by default
   let lightBg = 'rgba(52, 168, 83, 0.06)';
   let hoverBg = 'rgba(52, 168, 83, 0.12)';
   let textAccentColor = '#34a853';
 
-  if (isAdminView) {
+  if (passedBrandColor) {
+    brandColor = passedBrandColor;
+    if (passedBrandColor === '#ea4335') {
+      lightBg = 'rgba(234, 67, 53, 0.06)';
+      hoverBg = 'rgba(234, 67, 53, 0.12)';
+      textAccentColor = '#ea4335';
+    } else if (passedBrandColor === '#eab308') {
+      lightBg = 'rgba(234, 179, 8, 0.06)';
+      hoverBg = 'rgba(234, 179, 8, 0.12)';
+      textAccentColor = '#ca8a04';
+    }
+  } else if (isAdminPlatform) {
     brandColor = '#ea4335'; // Admin Red
     lightBg = 'rgba(234, 67, 53, 0.06)';
     hoverBg = 'rgba(234, 67, 53, 0.12)';
@@ -234,7 +246,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const { TourComponent, startTour } = usePremiumOnboardingTour({
     tourKey: `campus_groovelab_events_tour_completed_${role}_${userId}`,
     steps: activeTourSteps,
-    platformTheme: isAdminView ? 'admin' : (isGroovelab ? 'groovelab' : 'campus')
+    platformTheme: isCampus ? 'campus' : (isGroovelab ? 'groovelab' : (isAdminPlatform ? 'admin' : 'campus'))
   });
 
   // Tabs for Column 1 (My Lessons)
@@ -452,7 +464,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
 
   // --- M3 Coordinator Panel & Teacher Submission States ---
-  const showLessons = role === 'student' || role === 'teacher';
+  const showLessons = role !== 'secretary';
   const isAdminOrSecretary = role === 'admin' || role === 'secretary';
 
   // Toggle tab in Column 3 when no event is selected (Admins/Secretaries only)
@@ -2751,7 +2763,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (role === 'student') {
         scheduleQuery = scheduleQuery.eq('student_id', userId);
-      } else if (role === 'teacher') {
+      } else if (role === 'teacher' || (role === 'admin' && userId)) {
         scheduleQuery = scheduleQuery.eq('teacher_id', userId);
       } else if (effectiveSchoolId) {
         scheduleQuery = scheduleQuery.eq('school_id', effectiveSchoolId);
@@ -2786,7 +2798,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (role === 'student') {
         occurrenceQuery = occurrenceQuery.eq('student_id', userId);
-      } else if (role === 'teacher') {
+      } else if (role === 'teacher' || (role === 'admin' && userId)) {
         occurrenceQuery = occurrenceQuery.eq('teacher_id', userId);
       }
 
@@ -4800,7 +4812,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               <CalendarDays size={18} color={brandColor} style={{ flexShrink: 0 }} />
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Unterrichtstermine</span>
-              <TourStartButton onClick={startTour} platformTheme={isAdminView ? 'admin' : (isGroovelab ? 'groovelab' : 'campus')} />
+              <TourStartButton onClick={startTour} platformTheme={isCampus ? 'campus' : (isGroovelab ? 'groovelab' : (isAdminPlatform ? 'admin' : 'campus'))} />
             </h3>
             <p style={{ color: '#64748b', fontSize: '0.74rem', margin: '2px 0 0 0', fontWeight: 550, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               Deine persönlichen Stundenplandaten
@@ -5595,7 +5607,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Calendar size={18} color={brandColor} /> Campus &amp; Schultermine
             {isAdminOrSecretary && (
-              <TourStartButton onClick={startTour} platformTheme="admin" />
+              <TourStartButton onClick={startTour} platformTheme={isCampus ? 'campus' : (isGroovelab ? 'groovelab' : (isAdminPlatform ? 'admin' : 'campus'))} />
             )}
           </h3>
           <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
@@ -11795,14 +11807,36 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     return panelContent;
   };
 
+  // Define 3 dedicated tabs for mobile view based on user role
+  const mobileTabs = useMemo(() => {
+    if (role === 'teacher') {
+      return [
+        { id: 0, label: 'Termine', icon: Calendar, render: renderLessonsColumn },
+        { id: 1, label: 'Schultermine', icon: Landmark, render: renderTimelineColumn },
+        { id: 2, label: 'Planung', icon: Star, render: renderTeacherEventPlanningColumn }
+      ];
+    }
+    if (role === 'student') {
+      return [
+        { id: 0, label: 'Termine', icon: Calendar, render: renderLessonsColumn },
+        { id: 1, label: 'Schultermine', icon: Landmark, render: renderTimelineColumn },
+        { id: 2, label: 'Auftritte', icon: Star, render: renderStudentEventsColumn }
+      ];
+    }
+    // admin / secretary
+    return [
+      { id: 0, label: 'Schultermine', icon: Landmark, render: renderTimelineColumn },
+      { id: 1, label: 'Planung', icon: Star, render: renderTeacherEventPlanningColumn },
+      { id: 2, label: 'Infos & News', icon: Info, render: renderAnnouncementsColumn }
+    ];
+  }, [role, renderLessonsColumn, renderTimelineColumn, renderTeacherEventPlanningColumn, renderStudentEventsColumn, renderAnnouncementsColumn]);
+
   return (
     <div style={{
       display: 'grid',
       gridTemplateColumns: isMobilePortrait
         ? '1fr'
-        : (showLessons 
-            ? 'repeat(3, minmax(0, 1fr))' 
-            : 'repeat(2, minmax(0, 1fr))'),
+        : 'repeat(3, minmax(0, 1fr))',
       gap: isMobilePortrait ? '16px' : '10px',
       alignItems: 'start',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
@@ -12025,7 +12059,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           onTouchEnd={(e) => {
             if (touchStartX === null) return;
             const deltaX = e.changedTouches[0].clientX - touchStartX;
-            if (deltaX < -50 && eventsCardIndex < 2) {
+            if (deltaX < -50 && eventsCardIndex < mobileTabs.length - 1) {
               setEventsCardIndex(prev => prev + 1);
             } else if (deltaX > 50 && eventsCardIndex > 0) {
               setEventsCardIndex(prev => prev - 1);
@@ -12046,7 +12080,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           {/* Segmented Top Pill Switcher */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
+            gridTemplateColumns: `repeat(${mobileTabs.length}, 1fr)`,
             gap: '4px',
             background: '#f1f5f9',
             padding: '4px',
@@ -12056,136 +12090,60 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             margin: '0 auto',
             boxSizing: 'border-box'
           }}>
-            <button
-              type="button"
-              onClick={() => setEventsCardIndex(0)}
-              style={{
-                padding: '9px 4px',
-                borderRadius: '12px',
-                border: 'none',
-                background: eventsCardIndex === 0 ? brandColor : 'transparent',
-                color: eventsCardIndex === 0 ? '#ffffff' : '#64748b',
-                fontWeight: eventsCardIndex === 0 ? 800 : 700,
-                fontSize: '0.78rem',
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '5px',
-                transition: 'all 0.2s',
-                boxShadow: eventsCardIndex === 0 ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                flexShrink: 0
-              }}
-            >
-              <Calendar size={14} /> Termine
-            </button>
-            <button
-              type="button"
-              onClick={() => setEventsCardIndex(1)}
-              style={{
-                padding: '9px 4px',
-                borderRadius: '12px',
-                border: 'none',
-                background: eventsCardIndex === 1 ? brandColor : 'transparent',
-                color: eventsCardIndex === 1 ? '#ffffff' : '#64748b',
-                fontWeight: eventsCardIndex === 1 ? 800 : 700,
-                fontSize: '0.78rem',
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '5px',
-                transition: 'all 0.2s',
-                boxShadow: eventsCardIndex === 1 ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                flexShrink: 0
-              }}
-            >
-              <Landmark size={14} /> Events & News
-            </button>
-            <button
-              type="button"
-              onClick={() => setEventsCardIndex(2)}
-              style={{
-                padding: '9px 4px',
-                borderRadius: '12px',
-                border: 'none',
-                background: eventsCardIndex === 2 ? brandColor : 'transparent',
-                color: eventsCardIndex === 2 ? '#ffffff' : '#64748b',
-                fontWeight: eventsCardIndex === 2 ? 800 : 700,
-                fontSize: '0.78rem',
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '5px',
-                transition: 'all 0.2s',
-                boxShadow: eventsCardIndex === 2 ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                flexShrink: 0
-              }}
-            >
-              <Star size={14} /> {role === 'teacher' ? 'Planung' : 'Auftritte'}
-            </button>
+            {mobileTabs.map((tab, idx) => {
+              const TabIcon = tab.icon;
+              const isActive = eventsCardIndex === idx;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setEventsCardIndex(idx)}
+                  style={{
+                    padding: '9px 4px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: isActive ? brandColor : 'transparent',
+                    color: isActive ? '#ffffff' : '#64748b',
+                    fontWeight: isActive ? 800 : 700,
+                    fontSize: '0.78rem',
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    transition: 'all 0.2s',
+                    boxShadow: isActive ? `0 2px 8px ${brandColor}40` : 'none',
+                    flexShrink: 0
+                  }}
+                >
+                  <TabIcon size={14} /> {tab.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Active Card Body */}
-          {eventsCardIndex === 0 && (
-            <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
-              {renderLessonsColumn()}
-            </div>
-          )}
-          {eventsCardIndex === 1 && (
-            <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
-              {renderTimelineColumn()}
-            </div>
-          )}
-          {eventsCardIndex === 2 && (
-            <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
-              {role === 'teacher'
-                ? renderTeacherEventPlanningColumn()
-                : role === 'student'
-                  ? renderStudentEventsColumn()
-                  : renderAnnouncementsColumn()}
-            </div>
-          )}
+          <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
+            {mobileTabs[eventsCardIndex]?.render()}
+          </div>
 
           {/* Instagram Page Indicator Dots */}
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px 0' }}>
-            <div
-              onClick={() => setEventsCardIndex(0)}
-              style={{
-                width: eventsCardIndex === 0 ? '18px' : '6px',
-                height: '6px',
-                borderRadius: '4px',
-                background: eventsCardIndex === 0 ? brandColor : '#cbd5e1',
-                cursor: 'pointer',
-                transition: 'all 0.25s'
-              }}
-            />
-            <div
-              onClick={() => setEventsCardIndex(1)}
-              style={{
-                width: eventsCardIndex === 1 ? '18px' : '6px',
-                height: '6px',
-                borderRadius: '4px',
-                background: eventsCardIndex === 1 ? brandColor : '#cbd5e1',
-                cursor: 'pointer',
-                transition: 'all 0.25s'
-              }}
-            />
-            <div
-              onClick={() => setEventsCardIndex(2)}
-              style={{
-                width: eventsCardIndex === 2 ? '18px' : '6px',
-                height: '6px',
-                borderRadius: '4px',
-                background: eventsCardIndex === 2 ? brandColor : '#cbd5e1',
-                cursor: 'pointer',
-                transition: 'all 0.25s'
-              }}
-            />
+            {mobileTabs.map((_, idx) => (
+              <div
+                key={idx}
+                onClick={() => setEventsCardIndex(idx)}
+                style={{
+                  width: eventsCardIndex === idx ? '18px' : '6px',
+                  height: '6px',
+                  borderRadius: '4px',
+                  background: eventsCardIndex === idx ? brandColor : '#cbd5e1',
+                  cursor: 'pointer',
+                  transition: 'all 0.25s'
+                }}
+              />
+            ))}
           </div>
         </div>
       ) : (
@@ -12197,11 +12155,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           {showLessons ? renderTimelineColumn() : renderTeacherEventPlanningColumn()}
 
           {/* COLUMN 3 */}
-          {role === 'teacher' 
-            ? renderTeacherEventPlanningColumn() 
-            : role === 'student'
-              ? renderStudentEventsColumn()
-              : renderAnnouncementsColumn()}
+          {role === 'student' 
+            ? renderStudentEventsColumn() 
+            : role === 'secretary'
+              ? renderAnnouncementsColumn()
+              : renderTeacherEventPlanningColumn()}
         </>
       )}
 

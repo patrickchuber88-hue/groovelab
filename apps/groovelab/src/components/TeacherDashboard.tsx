@@ -4755,7 +4755,7 @@ export function TeacherDashboard({
         });
         // Prepare Student Query: fetch assigned students in the school
         let studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student');
-        if (tData.role === 'teacher') {
+        if (viewMode !== 'student') {
           studentQuery = studentQuery.eq('teacher_id', userId);
         }
 
@@ -4768,7 +4768,7 @@ export function TeacherDashboard({
           )
         `).eq('school_id', tData.school_id).eq('is_groovelab_active', true);
 
-        if (tData.role === 'teacher') {
+        if (viewMode !== 'student') {
           wallSongsQuery = wallSongsQuery.eq('teacher_id', userId);
         }
 
@@ -9023,7 +9023,7 @@ export function TeacherDashboard({
             border: '1px solid #e2e8f0'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-              <Sparkles size={18} color="#eab308" />
+              <Sparkles size={18} color={activePlatform === 'campus' ? '#34a853' : '#eab308'} />
               <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mitteilungen</h3>
             </div>
 
@@ -12994,7 +12994,7 @@ export function TeacherDashboard({
                 border: '1px solid #e2e8f0'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <Sparkles size={18} color="#eab308" />
+                  <Sparkles size={18} color={activePlatform === 'campus' ? '#34a853' : '#eab308'} />
                   <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mitteilungen</h3>
                 </div>
 

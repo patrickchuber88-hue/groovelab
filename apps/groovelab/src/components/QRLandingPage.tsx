@@ -2353,7 +2353,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         last_practice_date: todayStr,
         current_xp: newXp,
         updated_at: new Date().toISOString()
-      });
+      }, { onConflict: 'student_id' });
 
       // 3. Avatar-Tabelle updaten
       const { data: avatarRecord } = await supabase

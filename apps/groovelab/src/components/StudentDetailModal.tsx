@@ -117,6 +117,19 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? student.isCampusActive ?? false);
+  const [studentUiLevel, setStudentUiLevel] = useState<'junior' | 'teen' | 'pro'>(() => {
+    return student.campus_ui_level || 'junior';
+  });
+
+  const handleLevelChange = async (newLevel: 'junior' | 'teen' | 'pro') => {
+    setStudentUiLevel(newLevel);
+    student.campus_ui_level = newLevel;
+    try {
+      await supabase.from('users').update({ campus_ui_level: newLevel }).eq('id', student.id);
+    } catch (err: any) {
+      console.error('Error updating student campus_ui_level:', err);
+    }
+  };
   const [localTab, setLocalTab] = useState<'campus' | 'groovelab'>(() => {
     const isCampusAct = student.is_campus_active ?? student.isCampusActive ?? false;
     const isGrooveAct = student.is_groovelab_active ?? student.isGroovelabActive ?? false;
@@ -1078,7 +1091,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       // 1. Fetch latest user details (including group_id and school_id)
       const { data: latestUser } = await supabase
         .from('users')
-        .select('first_name, last_name, is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, custom_student_price, locked_student_price, group_id, school_id, parent_pin')
+        .select('first_name, last_name, is_campus_active, is_groovelab_active, campus_ui_level, lesson_duration, app_usage_mode, exempt_from_direct_billing, custom_student_price, locked_student_price, group_id, school_id, parent_pin')
         .eq('id', student.id)
         .maybeSingle();
 
@@ -1097,6 +1110,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         setLastName(latestUser.last_name || '');
         setIsCampusActive(latestUser.is_campus_active ?? false);
         setIsGroovelabActive(latestUser.is_groovelab_active ?? false);
+        if (latestUser.campus_ui_level) setStudentUiLevel(latestUser.campus_ui_level);
         setExemptFromDirectBilling(latestUser.exempt_from_direct_billing ?? false);
         setCustomStudentPrice(latestUser.custom_student_price !== null && latestUser.custom_student_price !== undefined ? String(latestUser.custom_student_price) : '');
         setLockedStudentPrice(latestUser.locked_student_price ?? null);
@@ -3326,6 +3340,83 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       {isCampusActive ? 'Aktiv' : 'Inaktiv'}
                     </span>
                   )}
+                </div>
+
+                <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+                {/* Campus UI Level Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Campus-Ansicht (Level)</span>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Altersgerechte Bedienung für den Schüler</div>
+                  </div>
+                  
+                  <div style={{ 
+                    background: '#f1f5f9', 
+                    padding: '3px', 
+                    borderRadius: '12px', 
+                    display: 'inline-flex', 
+                    gap: '4px',
+                    alignItems: 'center'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => handleLevelChange('junior')}
+                      style={{
+                        background: studentUiLevel === 'junior' ? '#34a853' : 'transparent',
+                        color: studentUiLevel === 'junior' ? '#ffffff' : '#64748b',
+                        border: 'none',
+                        borderRadius: '9px',
+                        padding: '4px 8px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: studentUiLevel === 'junior' ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
+                      }}
+                      title="Level 1: 6–10 Jahre (Große Kacheln, 3-W-Regel, Sticker-Album)"
+                    >
+                      🐣 6–10 J.
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLevelChange('teen')}
+                      style={{
+                        background: studentUiLevel === 'teen' ? '#34a853' : 'transparent',
+                        color: studentUiLevel === 'teen' ? '#ffffff' : '#64748b',
+                        border: 'none',
+                        borderRadius: '9px',
+                        padding: '4px 8px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: studentUiLevel === 'teen' ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
+                      }}
+                      title="Level 2: 11–15 Jahre (2-Spalten Cockpit, Pomodoro-Timer, Checkliste)"
+                    >
+                      🚀 11–15 J.
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLevelChange('pro')}
+                      style={{
+                        background: studentUiLevel === 'pro' ? '#34a853' : 'transparent',
+                        color: studentUiLevel === 'pro' ? '#ffffff' : '#64748b',
+                        border: 'none',
+                        borderRadius: '9px',
+                        padding: '4px 8px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: studentUiLevel === 'pro' ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
+                      }}
+                      title="Level 3: Ab 16 Jahre (Vollständige Pro-Ansicht mit Loopstation & Meisterwerk)"
+                    >
+                      👑 16+ J.
+                    </button>
+                  </div>
                 </div>
 
                 <div style={{ height: '1px', background: '#f1f5f9' }} />
