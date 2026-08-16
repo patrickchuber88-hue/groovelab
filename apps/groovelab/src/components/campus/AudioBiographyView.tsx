@@ -790,11 +790,13 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [pendingDurationSec, setPendingDurationSec] = useState<number>(0);
   const [selectedVersionChoice, setSelectedVersionChoice] = useState<'master' | 'raw'>('master');
   const [modalPreviewPlaying, setModalPreviewPlaying] = useState<'master' | 'raw' | null>(null);
-  const [reverbWetSlider, setReverbWetSlider] = useState<number>(22); // 22% Default Gala Hall
+  const [selectedUploadRoomType, setSelectedUploadRoomType] = useState<ReverbRoomType>('medium');
+  const [reverbWetSlider, setReverbWetSlider] = useState<number>(8.0); // 8.0% Default Concert Hall
   const [lastRawInputFile, setLastRawInputFile] = useState<Blob | File | null>(null);
   const [isReMasteringReverb, setIsReMasteringReverb] = useState<boolean>(false);
   const reverbDebounceTimerRef = useRef<any>(null);
   const modalPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const modalDualAudioRef = useRef<{ master: HTMLAudioElement | null; raw: HTMLAudioElement | null }>({ master: null, raw: null });
 
   // Download Menu Popover State for both versions
   const [activeDownloadMenuTrack, setActiveDownloadMenuTrack] = useState<{ rawUrl?: string; masteredUrl?: string; title: string; trackId?: string } | null>(null);
@@ -817,6 +819,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [isSavingEditTrack, setIsSavingEditTrack] = useState<boolean>(false);
   const [editModalPreviewPlaying, setEditModalPreviewPlaying] = useState<'master' | 'raw' | null>(null);
   const editModalAudioRef = useRef<HTMLAudioElement | null>(null);
+  const editDualAudioRef = useRef<{ master: HTMLAudioElement | null; raw: HTMLAudioElement | null }>({ master: null, raw: null });
   const [editTempMasterBlob, setEditTempMasterBlob] = useState<Blob | null>(null);
   const [editTempMasterUrl, setEditTempMasterUrl] = useState<string | null>(null);
   const [editPreviewRawUrl, setEditPreviewRawUrl] = useState<string | null>(null);
@@ -1920,10 +1923,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   };
 
   /**
-   * 🏛️ Interaktiver Gala-Hall Schieberegler beim Vorhören
+   * 🏛️ Interaktiver Raumakustik- & Wet/Dry Schieberegler beim Vorhören
    */
-  const handleReverbSliderChange = (newPercent: number) => {
-    setReverbWetSlider(newPercent);
+  const triggerUploadRemasterPreview = (roomType: ReverbRoomType, wetPercent: number) => {
     if (!lastRawInputFile) return;
 
     if (reverbDebounceTimerRef.current) {
@@ -1938,7 +1940,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
         const effectiveProfile: MasteringProfile = selectedProfile;
         const isDrum = effectiveProfile === 'drums_percussion';
-        const roomType = newPercent <= 18 ? 'small' : newPercent <= 38 ? 'medium' : 'large';
         const newMasterRes = await processStudioMastering(previewSliceBlob, {
           profile: effectiveProfile,
           targetLufs: -14.0,
@@ -1957,7 +1958,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           applyStereoDimension: true,
           applyConvolutionReverb: true,
           reverbRoomType: roomType,
-          reverbWetMix: isDrum ? 0.12 : (newPercent / 100)
+          reverbWetMix: isDrum ? 0.12 : (wetPercent / 100)
         });
 
         setPendingDualResult(prev => {
@@ -1969,15 +1970,19 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           };
         });
 
-        // Wenn die Studio-Version gerade im Loop abgespielt wird, Audio nahtlos aktualisieren
-        if (modalPreviewPlaying === 'master' && modalPreviewAudioRef.current) {
-          const currentPos = modalPreviewAudioRef.current.currentTime;
-          modalPreviewAudioRef.current.pause();
-          const newAudio = new Audio(newMasterRes.masteredUrl);
-          newAudio.loop = true;
-          newAudio.currentTime = Math.min(currentPos, 19.5);
-          modalPreviewAudioRef.current = newAudio;
-          newAudio.play().catch(console.warn);
+        // Wenn die Studio-Version gerade im Loop abgespielt wird, Audio nahtlos synchron aktualisieren
+        if (modalDualAudioRef.current.master) {
+          const currentPos = modalDualAudioRef.current.master.currentTime;
+          const wasMasterPlaying = modalPreviewPlaying === 'master';
+          modalDualAudioRef.current.master.pause();
+
+          const newMasterAudio = new Audio(newMasterRes.masteredUrl);
+          newMasterAudio.loop = true;
+          newMasterAudio.currentTime = currentPos;
+          newMasterAudio.volume = wasMasterPlaying ? 1.0 : 0.0;
+          modalDualAudioRef.current.master = newMasterAudio;
+          modalPreviewAudioRef.current = newMasterAudio;
+          newMasterAudio.play().catch(console.warn);
         }
       } catch (err) {
         console.warn('Re-master with new reverb wet mix note:', err);
@@ -1987,32 +1992,100 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     }, 120);
   };
 
+  const handleUploadRoomTypeChange = (newRoomType: ReverbRoomType) => {
+    setSelectedUploadRoomType(newRoomType);
+    const newWet = ROOM_ACOUSTIC_PROFILES[newRoomType]?.defaultWet ?? 8.0;
+    setReverbWetSlider(newWet);
+    triggerUploadRemasterPreview(newRoomType, newWet);
+  };
+
+  const handleReverbSliderChange = (newPercent: number) => {
+    setReverbWetSlider(newPercent);
+    triggerUploadRemasterPreview(selectedUploadRoomType, newPercent);
+  };
+
   /**
-   * Vorhören im Aufnahme-Modal (A/B Test im Endlos-Loop – nahtlos ohne Zeitsprung!)
+   * Stoppt die synchronen Vorhör-Spuren im Aufnahme-/Upload-Modal
+   */
+  const stopModalDualPreview = () => {
+    if (modalDualAudioRef.current.master) {
+      modalDualAudioRef.current.master.pause();
+      modalDualAudioRef.current.master = null;
+    }
+    if (modalDualAudioRef.current.raw) {
+      modalDualAudioRef.current.raw.pause();
+      modalDualAudioRef.current.raw = null;
+    }
+    if (modalPreviewAudioRef.current) {
+      modalPreviewAudioRef.current.pause();
+      modalPreviewAudioRef.current = null;
+    }
+    setModalPreviewPlaying(null);
+  };
+
+  /**
+   * Vorhören im Aufnahme-Modal (Echtzeit-Synchronisations-Player: Studio & RAW laufen simultan, Umschalten ohne 1ms Verzögerung!)
    */
   const toggleModalPreview = (version: 'master' | 'raw') => {
     if (!pendingDualResult) return;
 
     if (modalPreviewPlaying === version) {
-      if (modalPreviewAudioRef.current) {
-        modalPreviewAudioRef.current.pause();
-      }
-      setModalPreviewPlaying(null);
-    } else {
-      // ⚡ Nahtlose Zeitübernahme: Lese aktuelle Position des laufenden Loops aus
-      let currentPos = 0;
-      if (modalPreviewAudioRef.current) {
-        currentPos = modalPreviewAudioRef.current.currentTime;
-        modalPreviewAudioRef.current.pause();
-      }
-      const targetUrl = version === 'master' ? pendingDualResult.masteredUrl : pendingDualResult.rawNormalizedUrl;
-      const audio = new Audio(targetUrl);
-      audio.loop = true; // 🔁 Endlos-Looping für unterbrechungsfreies Klang-Tuning
-      audio.currentTime = currentPos; // ⚡ Nahtloses A/B Switching ohne Zeitsprung!
-      modalPreviewAudioRef.current = audio;
-      audio.play().catch(console.warn);
-      setModalPreviewPlaying(version);
+      stopModalDualPreview();
+      return;
     }
+
+    // Wenn bereits synchron im Hintergrund laufend: Sofortiger Lautstärken-Crossfade / Instant A/B Switch
+    if (modalDualAudioRef.current.master && modalDualAudioRef.current.raw && modalPreviewPlaying) {
+      const activeEl = modalDualAudioRef.current[modalPreviewPlaying];
+      const currentPos = activeEl ? activeEl.currentTime : 0;
+      
+      // Resynchronisiere Positionen
+      if (modalDualAudioRef.current.master && Math.abs(modalDualAudioRef.current.master.currentTime - currentPos) > 0.04) {
+        modalDualAudioRef.current.master.currentTime = currentPos;
+      }
+      if (modalDualAudioRef.current.raw && Math.abs(modalDualAudioRef.current.raw.currentTime - currentPos) > 0.04) {
+        modalDualAudioRef.current.raw.currentTime = currentPos;
+      }
+
+      if (version === 'master') {
+        modalDualAudioRef.current.raw.volume = 0.0;
+        modalDualAudioRef.current.master.volume = 1.0;
+      } else {
+        modalDualAudioRef.current.master.volume = 0.0;
+        modalDualAudioRef.current.raw.volume = 1.0;
+      }
+      setModalPreviewPlaying(version);
+      return;
+    }
+
+    // Neu initialisieren: Beide Spuren gleichzeitig und synchron im Endlos-Loop starten
+    stopModalDualPreview();
+
+    const masterUrl = pendingDualResult.masteredUrl;
+    const rawUrl = pendingDualResult.rawNormalizedUrl;
+
+    const masterAudio = new Audio(masterUrl);
+    const rawAudio = new Audio(rawUrl);
+    masterAudio.loop = true;
+    rawAudio.loop = true;
+
+    if (version === 'master') {
+      masterAudio.volume = 1.0;
+      rawAudio.volume = 0.0;
+    } else {
+      masterAudio.volume = 0.0;
+      rawAudio.volume = 1.0;
+    }
+
+    modalDualAudioRef.current = { master: masterAudio, raw: rawAudio };
+    modalPreviewAudioRef.current = masterAudio;
+
+    Promise.all([
+      masterAudio.play().catch(console.warn),
+      rawAudio.play().catch(console.warn)
+    ]);
+
+    setModalPreviewPlaying(version);
   };
 
   /**
@@ -2021,11 +2094,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const confirmAndSaveTrackDecision = async () => {
     if (!pendingDualResult) return;
 
-    if (modalPreviewAudioRef.current) {
-      modalPreviewAudioRef.current.pause();
-      modalPreviewAudioRef.current = null;
-    }
-    setModalPreviewPlaying(null);
+    stopModalDualPreview();
 
     const targetTrackId = activeUploadModalMilestone?.id || `plt_${Date.now()}`;
     let rawBlob = pendingDualResult.rawNormalizedBlob;
@@ -2033,7 +2102,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     let rawUrl = pendingDualResult.rawNormalizedUrl;
     let masteredUrl = pendingDualResult.masteredUrl;
 
-    const chosenRoomType: ReverbRoomType = reverbWetSlider <= 18 ? 'small' : reverbWetSlider <= 38 ? 'medium' : 'large';
+    const chosenRoomType: ReverbRoomType = selectedUploadRoomType;
 
     setSaveProgress({
       percent: 15,
@@ -2257,14 +2326,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       audioRef.current.pause();
       setActivePlayingId(null);
     }
-    if (modalPreviewAudioRef.current) {
-      modalPreviewAudioRef.current.pause();
-      setModalPreviewPlaying(null);
-    }
-    if (editModalAudioRef.current) {
-      editModalAudioRef.current.pause();
-      setEditModalPreviewPlaying(null);
-    }
+    stopModalDualPreview();
+    stopEditDualPreview();
 
     let initialArtist = '';
     if (track.subtitle && track.subtitle.includes(' • ')) {
@@ -2350,11 +2413,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   };
 
   const closeEditTrackModal = () => {
-    if (editModalAudioRef.current) {
-      editModalAudioRef.current.pause();
-      editModalAudioRef.current = null;
-    }
-    setEditModalPreviewPlaying(null);
+    stopEditDualPreview();
     setEditingTrackData(null);
     setEditTempMasterBlob(null);
     setEditTempMasterUrl(null);
@@ -2418,14 +2477,18 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           setEditTempMasterUrl(newMasterRes.masteredUrl);
 
           // Nahtlose Audio-Aktualisierung bei laufender Wiedergabe im Endlos-Loop
-          if (editModalPreviewPlaying === 'master' && editModalAudioRef.current) {
-            const currentPos = editModalAudioRef.current.currentTime;
-            editModalAudioRef.current.pause();
-            const newAudio = new Audio(newMasterRes.masteredUrl);
-            newAudio.loop = true; // 🔁 Endlos-Looping
-            newAudio.currentTime = Math.min(currentPos, 19.5);
-            editModalAudioRef.current = newAudio;
-            newAudio.play().catch(console.warn);
+          if (editDualAudioRef.current.master) {
+            const currentPos = editDualAudioRef.current.master.currentTime;
+            const wasMasterPlaying = editModalPreviewPlaying === 'master';
+            editDualAudioRef.current.master.pause();
+
+            const newMasterAudio = new Audio(newMasterRes.masteredUrl);
+            newMasterAudio.loop = true;
+            newMasterAudio.currentTime = currentPos;
+            newMasterAudio.volume = wasMasterPlaying ? 1.0 : 0.0;
+            editDualAudioRef.current.master = newMasterAudio;
+            editModalAudioRef.current = newMasterAudio;
+            newMasterAudio.play().catch(console.warn);
           }
         }
       } catch (err) {
@@ -2451,44 +2514,102 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     triggerEditRemasterPreview(editingTrackData.reverbRoomType, newPercent);
   };
 
-  // 🎧 Vorhören im Bearbeitungs-Modal (Endlos-Looping mit synchroner A/B-Umschaltung)
+  /**
+   * Stoppt die synchronen Vorhör-Spuren im Bearbeitungs-Modal
+   */
+  const stopEditDualPreview = () => {
+    if (editDualAudioRef.current.master) {
+      editDualAudioRef.current.master.pause();
+      editDualAudioRef.current.master = null;
+    }
+    if (editDualAudioRef.current.raw) {
+      editDualAudioRef.current.raw.pause();
+      editDualAudioRef.current.raw = null;
+    }
+    if (editModalAudioRef.current) {
+      editModalAudioRef.current.pause();
+      editModalAudioRef.current = null;
+    }
+    setEditModalPreviewPlaying(null);
+  };
+
+  // 🎧 Vorhören im Bearbeitungs-Modal (Echtzeit-Synchronisations-Player: Studio & RAW laufen simultan)
   const toggleEditModalPreview = async (version: 'master' | 'raw') => {
     if (!editingTrackData) return;
 
     if (editModalPreviewPlaying === version) {
-      if (editModalAudioRef.current) {
-        editModalAudioRef.current.pause();
+      stopEditDualPreview();
+      return;
+    }
+
+    // Wenn bereits synchron im Hintergrund laufend: Instant A/B Volume Swap ohne Zeitsprung
+    if (editDualAudioRef.current.master && editDualAudioRef.current.raw && editModalPreviewPlaying) {
+      const activeEl = editDualAudioRef.current[editModalPreviewPlaying];
+      const currentPos = activeEl ? activeEl.currentTime : 0;
+
+      if (editDualAudioRef.current.master && Math.abs(editDualAudioRef.current.master.currentTime - currentPos) > 0.04) {
+        editDualAudioRef.current.master.currentTime = currentPos;
       }
-      setEditModalPreviewPlaying(null);
-    } else {
-      // ⚡ Nahtlose Zeitübernahme: Lese aktuelle Position des laufenden Loops aus
-      let currentPos = 0;
-      if (editModalAudioRef.current) {
-        currentPos = editModalAudioRef.current.currentTime;
-        editModalAudioRef.current.pause();
+      if (editDualAudioRef.current.raw && Math.abs(editDualAudioRef.current.raw.currentTime - currentPos) > 0.04) {
+        editDualAudioRef.current.raw.currentTime = currentPos;
       }
 
-      let targetUrl: string | null = null;
       if (version === 'master') {
-        targetUrl = editTempMasterUrl || editingTrackData.masteredAudioUrl || null;
-        if (!targetUrl) {
-          targetUrl = await resolvePlayableUrl(editingTrackData.audioUrl, editingTrackData.masteredAudioUrl, editingTrackData.trackId, 'master');
-        }
+        editDualAudioRef.current.raw.volume = 0.0;
+        editDualAudioRef.current.master.volume = 1.0;
       } else {
-        targetUrl = editPreviewRawUrl || editingTrackData.audioUrl || null;
-        if (!targetUrl) {
-          targetUrl = await resolvePlayableUrl(editingTrackData.audioUrl, editingTrackData.masteredAudioUrl, editingTrackData.trackId, 'raw');
-        }
+        editDualAudioRef.current.master.volume = 0.0;
+        editDualAudioRef.current.raw.volume = 1.0;
+      }
+      setEditModalPreviewPlaying(version);
+      return;
+    }
+
+    stopEditDualPreview();
+
+    let masterUrl = editTempMasterUrl || editingTrackData.masteredAudioUrl || null;
+    if (!masterUrl) {
+      targetMasterUrlCheck: try {
+        masterUrl = await resolvePlayableUrl(editingTrackData.audioUrl, editingTrackData.masteredAudioUrl, editingTrackData.trackId, 'master');
+      } catch (e) {}
+    }
+
+    let rawUrl = editPreviewRawUrl || editingTrackData.audioUrl || null;
+    if (!rawUrl) {
+      try {
+        rawUrl = await resolvePlayableUrl(editingTrackData.audioUrl, editingTrackData.masteredAudioUrl, editingTrackData.trackId, 'raw');
+      } catch (e) {}
+    }
+
+    if (masterUrl && rawUrl) {
+      const masterAudio = new Audio(masterUrl);
+      const rawAudio = new Audio(rawUrl);
+      masterAudio.loop = true;
+      rawAudio.loop = true;
+
+      if (version === 'master') {
+        masterAudio.volume = 1.0;
+        rawAudio.volume = 0.0;
+      } else {
+        masterAudio.volume = 0.0;
+        rawAudio.volume = 1.0;
       }
 
-      if (targetUrl) {
-        const audio = new Audio(targetUrl);
-        audio.loop = true; // 🔁 Endlos-Looping für unterbrechungsfreies Feintuning
-        audio.currentTime = currentPos; // ⚡ Nahtloser A/B Wechsel ohne Zeitsprung!
-        editModalAudioRef.current = audio;
-        audio.play().catch(console.warn);
-        setEditModalPreviewPlaying(version);
-      }
+      editDualAudioRef.current = { master: masterAudio, raw: rawAudio };
+      editModalAudioRef.current = masterAudio;
+
+      Promise.all([
+        masterAudio.play().catch(console.warn),
+        rawAudio.play().catch(console.warn)
+      ]);
+
+      setEditModalPreviewPlaying(version);
+    } else if (masterUrl || rawUrl) {
+      const singleAudio = new Audio(masterUrl || rawUrl || '');
+      singleAudio.loop = true;
+      editModalAudioRef.current = singleAudio;
+      singleAudio.play().catch(console.warn);
+      setEditModalPreviewPlaying(version);
     }
   };
 
@@ -7969,19 +8090,19 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       padding: '2px 9px',
                       borderRadius: '100px'
                     }}>
-                      {reverbWetSlider <= 18 ? '🏠 Klein (Zimmer & Studio)' : reverbWetSlider <= 38 ? '🏛️ Mittel (Konzertsaal)' : '⛪ Groß (Riesen-Halle)'} • {reverbWetSlider}%
+                      {ROOM_ACOUSTIC_PROFILES[selectedUploadRoomType]?.emoji || '🏛️'} {ROOM_ACOUSTIC_PROFILES[selectedUploadRoomType]?.name || 'Mittel'} ({ROOM_ACOUSTIC_PROFILES[selectedUploadRoomType]?.sub || 'Konzertsaal'}) • {reverbWetSlider}% Wet
                     </span>
                   </div>
 
                   {/* 3 Child-Friendly Room Size Preset Buttons */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                     {[ROOM_ACOUSTIC_PROFILES.small, ROOM_ACOUSTIC_PROFILES.medium, ROOM_ACOUSTIC_PROFILES.large].map(room => {
-                      const isActive = (room.id === 'small' && reverbWetSlider <= 18) || (room.id === 'medium' && reverbWetSlider > 18 && reverbWetSlider <= 38) || (room.id === 'large' && reverbWetSlider > 38);
+                      const isActive = selectedUploadRoomType === room.id;
                       return (
                         <button
                           key={room.id}
                           type="button"
-                          onClick={() => handleReverbSliderChange(room.defaultWet)}
+                          onClick={() => handleUploadRoomTypeChange(room.id as any)}
                           style={{
                             padding: '12px 6px',
                             borderRadius: '14px',
@@ -8026,14 +8147,14 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   {/* Apple Fine-Tuning Slider Bar */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '2px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: colors.textSecondary, fontWeight: 700 }}>
-                      <span>Feinabstimmung (Raumtiefe & Nachhall):</span>
+                      <span>Feinabstimmung (Raumtiefe & Wet/Dry Mix):</span>
                       <span style={{ color: '#10b981', fontWeight: 900 }}>{reverbWetSlider}% Wet</span>
                     </div>
                     <input
                       type="range"
                       min="0"
-                      max="65"
-                      step="1"
+                      max="35"
+                      step="0.5"
                       value={reverbWetSlider}
                       onChange={(e) => handleReverbSliderChange(Number(e.target.value))}
                       style={{
@@ -8126,8 +8247,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (modalPreviewAudioRef.current) modalPreviewAudioRef.current.pause();
-                      setModalPreviewPlaying(null);
+                      stopModalDualPreview();
                       setPendingDualResult(null);
                     }}
                     style={{
@@ -9400,14 +9520,14 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               {/* Apple Fine-Tuning Slider Bar */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '2px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: colors.textSecondary, fontWeight: 700 }}>
-                  <span>Feinabstimmung (Raumtiefe & Nachhall):</span>
+                  <span>Feinabstimmung (Raumtiefe & Wet/Dry Mix):</span>
                   <span style={{ color: '#10b981', fontWeight: 900 }}>{editingTrackData.reverbWetMix}% Wet</span>
                 </div>
                 <input
                   type="range"
                   min="0"
-                  max="65"
-                  step="1"
+                  max="35"
+                  step="0.5"
                   value={editingTrackData.reverbWetMix}
                   onChange={(e) => handleEditReverbSliderChange(Number(e.target.value))}
                   style={{

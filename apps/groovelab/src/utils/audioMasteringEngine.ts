@@ -94,33 +94,33 @@ export const ROOM_ACOUSTIC_PROFILES: Record<string, RoomAcousticProfile> = {
     name: 'Klein',
     emoji: '🏠',
     sub: 'Zimmer & Studio',
-    defaultWet: 10,
-    durationSec: 0.85,
-    decayRate: 3.4,
-    preDelayMs: 15,
-    hfDampFactor: 6.8
+    defaultWet: 4.5,
+    durationSec: 0.65,
+    decayRate: 4.2,
+    preDelayMs: 16,
+    hfDampFactor: 7.5
   },
   medium: {
     id: 'medium',
     name: 'Mittel',
     emoji: '🏛️',
     sub: 'Konzertsaal',
-    defaultWet: 17.5,
-    durationSec: 1.45,
-    decayRate: 2.1,
-    preDelayMs: 32,
-    hfDampFactor: 5.0
+    defaultWet: 8.0,
+    durationSec: 1.15,
+    decayRate: 2.6,
+    preDelayMs: 28,
+    hfDampFactor: 5.5
   },
   large: {
     id: 'large',
     name: 'Groß',
     emoji: '⛪',
     sub: 'Riesen-Halle',
-    defaultWet: 32,
-    durationSec: 2.8,
-    decayRate: 1.2,
-    preDelayMs: 32,
-    hfDampFactor: 3.8
+    defaultWet: 14.0,
+    durationSec: 1.9,
+    decayRate: 1.8,
+    preDelayMs: 38,
+    hfDampFactor: 4.2
   },
   // Backwards compatibility aliases
   studio: {
@@ -128,44 +128,44 @@ export const ROOM_ACOUSTIC_PROFILES: Record<string, RoomAcousticProfile> = {
     name: 'Klein',
     emoji: '🏠',
     sub: 'Zimmer & Studio',
-    defaultWet: 10,
-    durationSec: 0.85,
-    decayRate: 3.4,
-    preDelayMs: 15,
-    hfDampFactor: 6.8
+    defaultWet: 4.5,
+    durationSec: 0.65,
+    decayRate: 4.2,
+    preDelayMs: 16,
+    hfDampFactor: 7.5
   },
   chamber: {
     id: 'medium',
     name: 'Mittel',
     emoji: '🏛️',
     sub: 'Konzertsaal',
-    defaultWet: 17.5,
-    durationSec: 1.45,
-    decayRate: 2.1,
-    preDelayMs: 32,
-    hfDampFactor: 5.0
+    defaultWet: 8.0,
+    durationSec: 1.15,
+    decayRate: 2.6,
+    preDelayMs: 28,
+    hfDampFactor: 5.5
   },
   hall: {
     id: 'medium',
     name: 'Mittel',
     emoji: '🏛️',
     sub: 'Konzertsaal',
-    defaultWet: 17.5,
-    durationSec: 1.45,
-    decayRate: 2.1,
-    preDelayMs: 32,
-    hfDampFactor: 5.0
+    defaultWet: 8.0,
+    durationSec: 1.15,
+    decayRate: 2.6,
+    preDelayMs: 28,
+    hfDampFactor: 5.5
   },
   cathedral: {
     id: 'large',
     name: 'Groß',
     emoji: '⛪',
     sub: 'Riesen-Halle',
-    defaultWet: 32,
-    durationSec: 2.8,
-    decayRate: 1.2,
-    preDelayMs: 32,
-    hfDampFactor: 3.8
+    defaultWet: 14.0,
+    durationSec: 1.9,
+    decayRate: 1.8,
+    preDelayMs: 38,
+    hfDampFactor: 4.2
   }
 };
 
@@ -997,95 +997,181 @@ export async function processStudioMasteringAudioBuffer(
   sourceNode.buffer = decodedBuffer;
 
   // =========================================================================
+  // =========================================================================
   // 0. INPUT GAIN PADDING (-3.0 dB Headroom Shield)
   // =========================================================================
-  // Creates +3.0 dB of clean headroom to prevent EQ boosts & reverb summation from clipping
+  // Creates clean headroom to prevent EQ boosts & reverb summation from clipping
   const preGainNode = offlineCtx.createGain();
-  preGainNode.gain.value = 0.707; // -3.0 dBFS
+  preGainNode.gain.value = 0.70; // -3.1 dBFS
   sourceNode.connect(preGainNode);
   let lastNode: AudioNode = preGainNode;
 
   // =========================================================================
-  // 1. MASTER FREQUENCY CORRECTION (4-BAND AUDIOPHILE EQ)
+  // 1. WARMTH & TONE BALANCING (6-BAND AUDIOPHILE MASTER EQ)
   // =========================================================================
-  // 1a. Highpass-Filter: 85 Hz, Q: 0.707 (entfernt Rumpeln und Trittschall ohne Bassverlust)
+  // 1a. High-Pass Filter: 75 Hz, Q: 0.707 (Rumpel- & Trittschallfilter, lässt Instrumenten-Fundamente atmen)
   const hpfNode = offlineCtx.createBiquadFilter();
   hpfNode.type = 'highpass';
-  hpfNode.frequency.value = 85;
+  hpfNode.frequency.value = 75;
   hpfNode.Q.value = 0.707;
   lastNode.connect(hpfNode);
   lastNode = hpfNode;
 
-  // 1b. Low-Mid Cleanup: Peaking bei 320 Hz, Gain: -1.8 dB, Q: 1.6 (beseitigt Raum-Mumpf & Boxiness)
-  const boxNotchNode = offlineCtx.createBiquadFilter();
-  boxNotchNode.type = 'peaking';
-  boxNotchNode.frequency.value = 320;
-  boxNotchNode.gain.value = -1.8;
-  boxNotchNode.Q.value = 1.6;
-  lastNode.connect(boxNotchNode);
-  lastNode = boxNotchNode;
+  // 1b. Sub-Warmth & Foundation: Peaking bei 140 Hz, Gain: +0.95 dB, Q: 0.8 (sanfter Tiefmitten-Körper, -5% Safety Margin)
+  const subWarmthNode = offlineCtx.createBiquadFilter();
+  subWarmthNode.type = 'peaking';
+  subWarmthNode.frequency.value = 140;
+  subWarmthNode.gain.value = 0.95;
+  subWarmthNode.Q.value = 0.8;
+  lastNode.connect(subWarmthNode);
+  lastNode = subWarmthNode;
 
-  // 1c. Smooth Presence: Peaking bei 3.0 kHz, Gain: +1.8 dB, Q: 1.0 (Intimität & Präsenz)
-  const presenceNode = offlineCtx.createBiquadFilter();
-  presenceNode.type = 'peaking';
-  presenceNode.frequency.value = 3000;
-  presenceNode.gain.value = 1.8;
-  presenceNode.Q.value = 1.0;
-  lastNode.connect(presenceNode);
-  lastNode = presenceNode;
+  // 1c. Acoustic Body & Warmth: Peaking bei 220 Hz, Gain: +2.1 dB, Q: 0.75 (angenehme, unaufdringliche Holz-Wärme, -5%)
+  const bodyWarmthNode = offlineCtx.createBiquadFilter();
+  bodyWarmthNode.type = 'peaking';
+  bodyWarmthNode.frequency.value = 220;
+  bodyWarmthNode.gain.value = 2.1;
+  bodyWarmthNode.Q.value = 0.75;
+  lastNode.connect(bodyWarmthNode);
+  lastNode = bodyWarmthNode;
 
-  // 1d. Air Sheen: Highshelf bei 11.0 kHz, Gain: +2.2 dB (seidenweicher Glanz)
+  // 1d. Mud Cleanup: Peaking bei 420 Hz, Gain: -1.42 dB, Q: 1.5 (entfernt Papp- & Hohlraum-Resonanzen, -5%)
+  const mudCleanupNode = offlineCtx.createBiquadFilter();
+  mudCleanupNode.type = 'peaking';
+  mudCleanupNode.frequency.value = 420;
+  mudCleanupNode.gain.value = -1.42;
+  mudCleanupNode.Q.value = 1.5;
+  lastNode.connect(mudCleanupNode);
+  lastNode = mudCleanupNode;
+
+  // 1e. De-Harsh: Peaking bei 3.5 kHz, Gain: -1.71 dB, Q: 1.6 (Zähmung spitzer Plektrum- & Vokal-Harschheiten, -5%)
+  const deHarshNode = offlineCtx.createBiquadFilter();
+  deHarshNode.type = 'peaking';
+  deHarshNode.frequency.value = 3500;
+  deHarshNode.gain.value = -1.71;
+  deHarshNode.Q.value = 1.6;
+  lastNode.connect(deHarshNode);
+  lastNode = deHarshNode;
+
+  // 1f. Smooth Air-Band: Highshelf bei 10.5 kHz, Gain: +0.76 dB, Q: 0.707 (feiner, unaufdringlicher Seidenglanz, -5%)
   const airNode = offlineCtx.createBiquadFilter();
   airNode.type = 'highshelf';
-  airNode.frequency.value = 11000;
-  airNode.gain.value = 2.2;
+  airNode.frequency.value = 10500;
+  airNode.gain.value = 0.76;
   airNode.Q.value = 0.707;
   lastNode.connect(airNode);
   lastNode = airNode;
 
   // =========================================================================
-  // 2. ANALOG TUBE WARMTH & TAPE SATURATION (Phase-Coherent Parallel Saturation)
+  // 2. ULTRA-TRANSPARENT TAPE WARMTH (Sehr dezent, unhörbar transparent, THD < 0.02%)
   // =========================================================================
   const warmthShaper = offlineCtx.createWaveShaper();
-  warmthShaper.curve = createTubeWarmthCurve(2.0, 0.25, 44100) as any;
+  warmthShaper.curve = createTubeWarmthCurve(1.18, 0.18, 44100) as any;
   warmthShaper.oversample = '4x';
   lastNode.connect(warmthShaper);
   lastNode = warmthShaper;
 
   // =========================================================================
-  // 3. MASTER BUS COMPRESSOR (Glue & Punch: Attack 30ms, Release 100ms, Ratio 2.8:1)
+  // 3. MASTER SUMMING MATRIX WITH PARALLEL SENDS (Direct, NY Comp, Haas Delay & Reverb)
   // =========================================================================
-  const masterCompressor = offlineCtx.createDynamicsCompressor();
-  masterCompressor.threshold.value = -15.0;
-  masterCompressor.knee.value = 6.0;
-  masterCompressor.ratio.value = 2.8;
-  masterCompressor.attack.value = 0.030; // 30ms (0.03s) erhält natürliche Anschlagstransienten
-  masterCompressor.release.value = 0.100; // 100ms (0.1s) glättet musikalisch ohne Pumping
-  lastNode.connect(masterCompressor);
-  lastNode = masterCompressor;
+  const postSaturationNode = warmthShaper;
+  const masterSummingBus = offlineCtx.createGain();
 
-  // =========================================================================
-  // 4. 3D ACOUSTIC CONVOLVER REVERB STAGE (Abbey Road HPF 350 Hz / LPF 6.5 kHz + 32ms Pre-Delay)
-  // =========================================================================
+  // 3a. Direct Dry Path (100% Unkomprimiert, volle Spieldynamik & Transienten-Präzision)
+  const directGain = offlineCtx.createGain();
+  directGain.gain.value = 1.0;
+  postSaturationNode.connect(directGain);
+  directGain.connect(masterSummingBus);
+
+  // 3b. Parallel New York Compression & Warmth Body Send (15% Blend)
+  // Hebt leise Ausklänge & Intimität nach oben, ohne Transienten zu beschneiden
+  const parallelComp = offlineCtx.createDynamicsCompressor();
+  parallelComp.threshold.value = -28.0; // -28 dB
+  parallelComp.knee.value = 6.0;
+  parallelComp.ratio.value = 6.0; // 6:1
+  parallelComp.attack.value = 0.005; // 5ms (fängt Lautstärkesprünge sofort ab)
+  parallelComp.release.value = 0.080; // 80ms (zieht leise Notenenden & Sustain sanft nach oben)
+
+  // Post-Comp Warmth & Body Shaping EQ (Motown/NY Secret Trick: Schützt vor harschem Kompressor-Zischeln)
+  const parallelHpf = offlineCtx.createBiquadFilter();
+  parallelHpf.type = 'highpass';
+  parallelHpf.frequency.value = 90;
+  parallelHpf.Q.value = 0.707;
+
+  const parallelWarmthPeaking = offlineCtx.createBiquadFilter();
+  parallelWarmthPeaking.type = 'peaking';
+  parallelWarmthPeaking.frequency.value = 240; // Warm Acoustic Body
+  parallelWarmthPeaking.gain.value = 2.5; // +2.5 dB
+  parallelWarmthPeaking.Q.value = 0.9;
+
+  const parallelDeHarshShelf = offlineCtx.createBiquadFilter();
+  parallelDeHarshShelf.type = 'highshelf';
+  parallelDeHarshShelf.frequency.value = 4500;
+  parallelDeHarshShelf.gain.value = -2.5; // -2.5 dB
+  parallelDeHarshShelf.Q.value = 0.707;
+
+  const parallelSendGain = offlineCtx.createGain();
+  parallelSendGain.gain.value = 0.15; // 15% Blend-Anteil
+
+  postSaturationNode.connect(parallelComp);
+  parallelComp.connect(parallelHpf);
+  parallelHpf.connect(parallelWarmthPeaking);
+  parallelWarmthPeaking.connect(parallelDeHarshShelf);
+  parallelDeHarshShelf.connect(parallelSendGain);
+  parallelSendGain.connect(masterSummingBus);
+
+  // 3c. Stereo Haas-Dimension Delay Send (20ms Left / 40ms Right @ 11.4% Wet)
+  // Creates organic 3D acoustic width without clouding the center or phase cancellation
+  const haasSplitter = offlineCtx.createChannelSplitter(2);
+  const haasMerger = offlineCtx.createChannelMerger(2);
+  
+  const delayLeft = offlineCtx.createDelay(0.1);
+  delayLeft.delayTime.value = 0.020; // 20 ms
+  const delayRight = offlineCtx.createDelay(0.1);
+  delayRight.delayTime.value = 0.040; // 40 ms
+
+  const haasHpNode = offlineCtx.createBiquadFilter();
+  haasHpNode.type = 'highpass';
+  haasHpNode.frequency.value = 250;
+  haasHpNode.Q.value = 0.707;
+
+  const haasLpNode = offlineCtx.createBiquadFilter();
+  haasLpNode.type = 'lowpass';
+  haasLpNode.frequency.value = 5000;
+  haasLpNode.Q.value = 0.707;
+
+  const haasWetGain = offlineCtx.createGain();
+  haasWetGain.gain.value = 0.114; // 11.4% Wet
+
+  postSaturationNode.connect(haasHpNode);
+  haasHpNode.connect(haasLpNode);
+  haasLpNode.connect(haasSplitter);
+
+  haasSplitter.connect(delayLeft, 0);
+  haasSplitter.connect(delayRight, 1);
+
+  delayLeft.connect(haasMerger, 0, 0);
+  delayRight.connect(haasMerger, 0, 1);
+
+  haasMerger.connect(haasWetGain);
+  haasWetGain.connect(masterSummingBus);
+
+  // 3d. 3D Acoustic Convolver Reverb Send
   if (options.applyConvolutionReverb ?? true) {
     const wetGain = offlineCtx.createGain();
-    const dryGain = offlineCtx.createGain();
-    const reverbMixBus = offlineCtx.createGain();
-
     const roomType: string = options.reverbRoomType || 'medium';
     const roomProfile = ROOM_ACOUSTIC_PROFILES[roomType] || ROOM_ACOUSTIC_PROFILES.medium;
 
     const wetMix = typeof options.reverbWetMix === 'number' 
       ? options.reverbWetMix 
       : (roomProfile.defaultWet / 100);
-    wetGain.gain.value = wetMix; // Default: 0.175 (-20% Wet Mix)
-    dryGain.gain.value = 1.0;
+    wetGain.gain.value = wetMix;
 
-    const preDelaySec = (options.reverbPreDelayMs ?? roomProfile.preDelayMs ?? 32) / 1000;
+    const preDelaySec = (options.reverbPreDelayMs ?? roomProfile.preDelayMs ?? 28) / 1000;
     const delayNode = offlineCtx.createDelay(1.0);
-    delayNode.delayTime.value = preDelaySec; // 32 ms Pre-Delay
+    delayNode.delayTime.value = preDelaySec;
 
-    // Tailored Acoustic Room Impulse Response (1.45s Decay)
+    // Tailored Acoustic Room Impulse Response
     const convolver = offlineCtx.createConvolver();
     convolver.buffer = createAcousticRoomImpulseResponse(
       offlineCtx, 
@@ -1106,21 +1192,16 @@ export async function processStudioMasteringAudioBuffer(
     reverbLpNode.frequency.value = 6500;
     reverbLpNode.Q.value = 0.707;
 
-    lastNode.connect(delayNode);
+    postSaturationNode.connect(delayNode);
     delayNode.connect(reverbHpNode);
     reverbHpNode.connect(reverbLpNode);
     reverbLpNode.connect(convolver);
     convolver.connect(wetGain);
-    wetGain.connect(reverbMixBus);
-
-    lastNode.connect(dryGain);
-    dryGain.connect(reverbMixBus);
-
-    lastNode = reverbMixBus;
+    wetGain.connect(masterSummingBus);
   }
 
   // =========================================================================
-  // 5. MASTER PEAK LIMITER & DYNAMICS CATCHER
+  // 4. MASTER PEAK LIMITER & DYNAMICS CATCHER
   // =========================================================================
   const masterLimiter = offlineCtx.createDynamicsCompressor();
   masterLimiter.threshold.value = -3.5;
@@ -1128,18 +1209,44 @@ export async function processStudioMasteringAudioBuffer(
   masterLimiter.ratio.value = 8.0;
   masterLimiter.attack.value = 0.003;
   masterLimiter.release.value = 0.06;
-  lastNode.connect(masterLimiter);
-  lastNode = masterLimiter;
+  masterSummingBus.connect(masterLimiter);
 
   // Destination
-  lastNode.connect(offlineCtx.destination);
+  masterLimiter.connect(offlineCtx.destination);
 
   // Render through full OfflineAudioContext DSP Chain
   sourceNode.start(0);
   const renderedBuffer = await offlineCtx.startRendering();
 
   // =========================================================================
-  // 5. TRUE-PEAK NORMALIZATION & OUTPUT (-14.0 LUFS & -1.0 dBTP)
+  // 5. MICRO-FADES (15ms In / 250ms Out Smooth Musical Tail Protection)
+  // =========================================================================
+  const sampleRate = renderedBuffer.sampleRate;
+  const fadeInSamples = Math.min(Math.floor(sampleRate * 0.015), Math.floor(renderedBuffer.length * 0.05));
+  const fadeOutSamples = Math.min(Math.floor(sampleRate * 0.250), Math.floor(renderedBuffer.length * 0.15));
+
+  if (fadeInSamples > 0 || fadeOutSamples > 0) {
+    for (let c = 0; c < renderedBuffer.numberOfChannels; c++) {
+      const data = renderedBuffer.getChannelData(c);
+      const len = data.length;
+      // 15ms Smooth Equal-Power Fade-In
+      for (let i = 0; i < fadeInSamples; i++) {
+        const factor = Math.sin((i / fadeInSamples) * (Math.PI / 2));
+        data[i] *= factor;
+      }
+      // 250ms Smooth Cosine Fade-Out
+      for (let i = 0; i < fadeOutSamples; i++) {
+        const factor = Math.cos((i / fadeOutSamples) * (Math.PI / 2));
+        const idx = len - 1 - (fadeOutSamples - 1 - i);
+        if (idx >= 0 && idx < len) {
+          data[idx] *= factor;
+        }
+      }
+    }
+  }
+
+  // =========================================================================
+  // 7. TRUE-PEAK NORMALIZATION & OUTPUT (-14.0 LUFS & -1.0 dBTP)
   // =========================================================================
   if (options.applyStereoDimension ?? true) {
     applyStereoDimensionAndMonoMaker(renderedBuffer);
