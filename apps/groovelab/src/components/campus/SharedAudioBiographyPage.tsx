@@ -19,6 +19,7 @@ import {
   Shuffle, 
   School, 
   Shield, 
+  ShieldAlert,
   Heart, 
   Flame, 
   Star, 
@@ -122,13 +123,73 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
   const urlPin = searchParams.get('pin')?.trim() || '';
   const isAnonymized = searchParams.get('anon') === 'true' || searchParams.get('anon') === '1';
   const targetPlaylistId = searchParams.get('pl') || null;
-  const allowDownload = searchParams.get('dl') !== '0';
   const allowApplause = searchParams.get('appl') !== '0' && searchParams.get('appl') !== 'false';
+  // Deterministic PIN hash helper for cross-device family verification
+  const computePinHash = (pin: string): string => {
+    if (!pin) return '';
+    const clean = pin.trim();
+    let h = 0x811c9dc5;
+    const str = `campus_groovelab_salt_${clean}`;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(36);
+  };
+
+  const urlPinHash = searchParams.get('pinh')?.trim() || '';
+
+  // 🚨 Enterprise Trust & Safety: Check if this Link / Student was taken down (Notice-and-Takedown)
+  const targetKey = studentId || token || 'demo_student';
+  const plKey = targetPlaylistId || 'all';
+
+  const [takedownInfo] = useState<{ isBlocked: boolean; reason?: string; timestamp?: string }>(() => {
+    try {
+      const specificTakedown = localStorage.getItem(`campus_takedown_${targetKey}`);
+      if (specificTakedown) {
+        const parsed = JSON.parse(specificTakedown);
+        if (parsed && parsed.active) {
+          return { isBlocked: true, reason: parsed.reason, timestamp: parsed.timestamp };
+        }
+      }
+      const registryStr = localStorage.getItem('campus_takedowns_registry');
+      if (registryStr) {
+        const registry = JSON.parse(registryStr);
+        if (Array.isArray(registry)) {
+          const found = registry.find((entry: any) => 
+            entry.studentId === targetKey && 
+            entry.active && 
+            (!entry.playlistId || entry.playlistId === plKey || entry.playlistId === 'all')
+          );
+          if (found) {
+            return { isBlocked: true, reason: found.reason, timestamp: found.timestamp };
+          }
+        }
+      }
+    } catch {}
+    return { isBlocked: false };
+  });
+
   const [rememberDevice, setRememberDevice] = useState<boolean>(true);
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
     try {
       const targetKey = studentId || token || 'demo_student';
       const plKey = targetPlaylistId || 'all';
+
+      // 0. Auto-unlock if valid PIN was provided in URL
+      if (urlPin) {
+        let currentPin = '4829';
+        if (targetPlaylistId) {
+          const pPin = localStorage.getItem(`campus_share_pin_${targetKey}_${targetPlaylistId}`);
+          if (pPin && /^\d{4}$/.test(pPin)) currentPin = pPin;
+        }
+        if (currentPin === '4829') {
+          const sPin = localStorage.getItem(`campus_share_pin_${targetKey}`);
+          if (sPin && /^\d{4}$/.test(sPin)) currentPin = sPin;
+        }
+        const isUrlPinMatch = (urlPinHash && computePinHash(urlPin) === urlPinHash) || urlPin === currentPin || urlPin === '4829' || urlPin === '1234';
+        if (isUrlPinMatch) return true;
+      }
 
       // 1. Check persistent device token (365 days / 1 school year)
       const persistentKey = `campus_bio_unlocked_${targetKey}_${plKey}`;
@@ -150,7 +211,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       }
 
       if (isPersistent && expiry > Date.now()) {
-        if (!storedPin || storedPin === currentPin || storedPin === '4829' || storedPin === '1234') {
+        if (!storedPin || storedPin === currentPin || (urlPinHash && computePinHash(storedPin) === urlPinHash) || storedPin === '4829' || storedPin === '1234') {
           return true;
         }
       }
@@ -632,51 +693,6 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     setPlaybackProgress(percentage * 100);
   };
 
-  const handleDownloadTrack = async (track: PlaylistTrackItem) => {
-    if (!allowDownload) return;
-    const isMaster = track.preferredVersion !== 'raw';
-    const url = isMaster ? (track.masteredAudioUrl || track.audioUrl) : (track.audioUrl || track.masteredAudioUrl);
-    if (!url) return;
-
-    showToast('Download gestartet! 🎵 Original-Audio im verlustfreien WAV-Format für private Erinnerungen.');
-
-    const safeStudent = (studentDisplayName || 'Campus').replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, '_');
-    const safeTitle = (track.title || 'Track').replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, '_');
-    const versionLabel = isMaster ? 'Studio_Master' : 'Pure_RAW';
-    const filename = `${safeStudent}_${safeTitle}_${versionLabel}.wav`;
-
-    try {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-    } catch {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.target = '_blank';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
-  };
-
-  const handleDownloadEntireAlbum = () => {
-    if (!allowDownload || tracks.length === 0) return;
-    showToast(`Download gestartet! 🎵 Alle ${tracks.length} Songs werden im Original-WAV-Format gespeichert.`);
-    tracks.forEach((t, i) => {
-      setTimeout(() => {
-        handleDownloadTrack(t);
-      }, i * 400);
-    });
-  };
-
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
@@ -691,15 +707,17 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
 
   const handleShareToApp = (platform: 'whatsapp' | 'copy') => {
     const url = window.location.href;
+    const pin = getExpectedPin();
+    const fullText = `🎵 Höre dir meine neuesten Songs aus der Musikschule an!\n\n1. Link öffnen: ${url}\n2. Familien-PIN eingeben: ${pin}\n\n🔒 WICHTIGER RECHTSHINWEIS (§ 15 Abs. 3 UrhG):\nDieser Link & PIN sind ausschließlich für den privaten Familienkreis bestimmt. Ein öffentliches Teilen (z. B. auf Social Media, Instagram, TikTok oder Websites) ist urheberrechtlich strengstens untersagt.`;
+
     if (platform === 'whatsapp') {
-      const text = `Hör dir meine Playlist „${activePlaylistMeta?.title || 'Sommerkonzert'}“ an der ${schoolName} an! 🎶✨ ${url}`;
-      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(fullText)}`, '_blank');
     } else {
       if (navigator.clipboard) {
-        navigator.clipboard.writeText(url);
+        navigator.clipboard.writeText(fullText);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2500);
-        showToast('📋 Freigabe-Link in Zwischenablage kopiert!');
+        showToast('📋 Vollständige Einladung mit PIN in Zwischenablage kopiert!');
       }
     }
   };
@@ -725,7 +743,8 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
 
     setTimeout(() => {
       setIsVerifying(false);
-      if (fullPin === expected || fullPin === '4829' || fullPin === '1234') {
+      const isHashMatch = Boolean(urlPinHash && computePinHash(fullPin) === urlPinHash);
+      if (fullPin === expected || isHashMatch || fullPin === '4829' || fullPin === '1234') {
         try {
           const plKey = targetPlaylistId || 'all';
           const sessionKey = `campus_bio_session_${targetId}_${plKey}`;
@@ -804,6 +823,105 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       setPinError(false);
     }
   };
+
+  // 🚨 Enterprise Trust & Safety: Render DSA Notice-and-Takedown Compliance Screen
+  if (takedownInfo.isBlocked) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        width: '100%',
+        background: 'radial-gradient(circle at 50% 20%, #1e1b4b 0%, #090d16 100%)',
+        color: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+        boxSizing: 'border-box'
+      }}>
+        <div style={{
+          maxWidth: '520px',
+          width: '100%',
+          background: 'rgba(15, 23, 42, 0.88)',
+          backdropFilter: 'blur(28px)',
+          WebkitBackdropFilter: 'blur(28px)',
+          border: '1.5px solid rgba(239, 68, 68, 0.4)',
+          borderRadius: '32px',
+          padding: '36px 30px',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(239, 68, 68, 0.15)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          gap: '20px',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{
+            width: '68px',
+            height: '68px',
+            borderRadius: '50%',
+            background: 'rgba(239, 68, 68, 0.15)',
+            border: '2px solid #ef4444',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ef4444',
+            boxShadow: '0 8px 24px rgba(239, 68, 68, 0.25)'
+          }}>
+            <ShieldAlert size={34} />
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'rgba(239, 68, 68, 0.12)', padding: '3px 10px', borderRadius: '100px' }}>
+              Notice-and-Takedown Compliance
+            </span>
+            <h2 style={{ margin: '10px 0 0 0', fontSize: '1.4rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em' }}>
+              Freigabelink deaktiviert
+            </h2>
+          </div>
+
+          <p style={{ margin: 0, fontSize: '0.86rem', color: '#94a3b8', lineHeight: 1.55 }}>
+            Der Zugriff auf diesen Audio-Stream wurde durch den Plattformbetreiber aus Sicherheits- und Urheberrechtsgründen vorübergehend gesperrt.
+          </p>
+
+          <div style={{
+            width: '100%',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '16px',
+            padding: '14px 16px',
+            fontSize: '0.75rem',
+            color: '#cbd5e1',
+            textAlign: 'left',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#64748b' }}>Rechtsgrundlage:</span>
+              <span style={{ fontWeight: 800, color: '#f8fafc' }}>Art. 6 DSA / § 10 TMG / UrhDaG</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#64748b' }}>Status:</span>
+              <span style={{ color: '#ef4444', fontWeight: 900 }}>HTTP 410 (Resource Suspended)</span>
+            </div>
+            {takedownInfo.timestamp && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#64748b' }}>Sperr-Zeitstempel:</span>
+                <span style={{ fontWeight: 700, color: '#f8fafc' }}>{takedownInfo.timestamp}</span>
+              </div>
+            )}
+          </div>
+
+          <span style={{ fontSize: '0.70rem', color: '#64748b', lineHeight: 1.4 }}>
+            Bei Fragen wende dich bitte an deine Musikschulleitung oder den zuständigen Fachlehrer.
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (!isUnlocked) {
     const instrumentIcon = studentInstrument.toLowerCase().includes('gitarre') ? '🎸'
@@ -1440,33 +1558,6 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
                   <span>{activePlayingId ? 'Pausieren' : 'Abspielen'}</span>
                 </button>
 
-                {allowDownload && tracks.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleDownloadEntireAlbum}
-                    style={{
-                      padding: '10px 16px',
-                      borderRadius: '100px',
-                      border: '1.5px solid rgba(255, 255, 255, 0.2)',
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      color: '#ffffff',
-                      fontSize: '0.82rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      backdropFilter: 'blur(12px)',
-                      transition: 'all 0.2s ease'
-                    }}
-                    className="hover-scale"
-                    title="Alle Songs in verlustfreier Studio-Qualität herunterladen"
-                  >
-                    <Download size={15} color={currentTheme.accent} />
-                    <span>Laden</span>
-                  </button>
-                )}
-
                 <button
                   type="button"
                   onClick={() => setShowShareDrawer(!showShareDrawer)}
@@ -1805,33 +1896,6 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
                     <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                       {formatTime(t.duration || 45)}
                     </span>
-
-                    {allowDownload && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDownloadTrack(t);
-                        }}
-                        title="Diesen Song als WAV herunterladen"
-                        style={{
-                          width: '38px',
-                          height: '38px',
-                          borderRadius: '50%',
-                          border: '1px solid rgba(255, 255, 255, 0.15)',
-                          background: 'rgba(255, 255, 255, 0.08)',
-                          color: '#ffffff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Download size={16} color={currentTheme.accent} />
-                      </button>
-                    )}
                   </div>
                 </div>
               );
@@ -2059,28 +2123,6 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
               >
                 {isMuted ? <VolumeX size={18} color="#ef4444" /> : <Volume2 size={18} />}
               </button>
-
-              {allowDownload && (
-                <button
-                  type="button"
-                  onClick={() => handleDownloadTrack(activeTrackObj)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '50%',
-                    width: '34px',
-                    height: '34px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: '#ffffff'
-                  }}
-                  title="Diesen Song als WAV herunterladen"
-                >
-                  <Download size={14} color={currentTheme.accent} />
-                </button>
-              )}
             </div>
           </div>
         </div>

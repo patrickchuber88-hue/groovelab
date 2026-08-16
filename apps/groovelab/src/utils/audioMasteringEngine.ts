@@ -87,8 +87,8 @@ export const DEFAULT_ACOUSTIC_MASTERING_OPTIONS: MasteringOptions = {
   applyParallelConsoleBus: true,
   applyStereoDimension: true,
   applyConvolutionReverb: true,
-  reverbWetMix: 0.145,
-  reverbPreDelayMs: 30
+  reverbWetMix: 0.30,
+  reverbPreDelayMs: 25
 };
 
 export interface DualMasteringResult {
@@ -665,7 +665,98 @@ function applyStereoDimensionAndMonoMaker(audioBuffer: AudioBuffer): AudioBuffer
 }
 
 /**
- * 🌟 Primary Pipeline: Renders Audio through the Universal High-End DSP Chain
+ * Ultra-resilient AudioBuffer decoder supporting all Safari WebKit, Chrome, Firefox edge cases
+ * with Promise + Callback dual signature and timeout watchdog
+ */
+export async function safeDecodeAudioData(audioContext: BaseAudioContext, arrayBuffer: ArrayBuffer): Promise<AudioBuffer> {
+  return new Promise<AudioBuffer>((resolve, reject) => {
+    let settled = false;
+
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('Audio decoding timed out in browser engine'));
+      }
+    }, 6000);
+
+    const onSuccess = (buffer: AudioBuffer) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+        resolve(buffer);
+      }
+    };
+
+    const onError = (error: any) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+        reject(error || new Error('Audio decoding failed'));
+      }
+    };
+
+    try {
+      const res = audioContext.decodeAudioData(arrayBuffer.slice(0), onSuccess, onError);
+      if (res && typeof res.then === 'function') {
+        res.then(onSuccess).catch(onError);
+      }
+    } catch (err) {
+      onError(err);
+    }
+  });
+}
+
+/**
+ * 🌟 Ensure Perfect Stereo Centering & Eliminate Left-Channel Bias (Links-Drall)
+ * Handles mono microphone upmix, dead-channel recovery (macOS/iOS USB interface bug), and phase alignment.
+ */
+export function ensureCenteredStereoAudioBuffer(ctx: BaseAudioContext, inputBuffer: AudioBuffer): AudioBuffer {
+  const numChannels = inputBuffer.numberOfChannels;
+  const length = inputBuffer.length;
+  const sampleRate = inputBuffer.sampleRate;
+
+  const stereoBuffer = ctx.createBuffer(2, length, sampleRate);
+  const outL = stereoBuffer.getChannelData(0);
+  const outR = stereoBuffer.getChannelData(1);
+
+  if (numChannels === 1) {
+    // True Mono input -> 1:1 duplicate to Left and Right
+    const monoData = inputBuffer.getChannelData(0);
+    outL.set(monoData);
+    outR.set(monoData);
+    return stereoBuffer;
+  }
+
+  // 2+ Channels: Check for asymmetric signal / dead channel (Links-Drall bug)
+  const inL = inputBuffer.getChannelData(0);
+  const inR = inputBuffer.getChannelData(1);
+
+  let rmsL = 0;
+  let rmsR = 0;
+  const step = Math.max(1, Math.floor(length / 2000));
+  for (let i = 0; i < length; i += step) {
+    rmsL += inL[i] * inL[i];
+    rmsR += inR[i] * inR[i];
+  }
+
+  // If Right channel is dead/silent (< 2% of Left energy) or vice-versa, duplicate the active channel to both!
+  if (rmsL > 1e-6 && rmsR < rmsL * 0.02) {
+    outL.set(inL);
+    outR.set(inL);
+  } else if (rmsR > 1e-6 && rmsL < rmsR * 0.02) {
+    outL.set(inR);
+    outR.set(inR);
+  } else {
+    // Normal stereo signal
+    outL.set(inL);
+    outR.set(inR);
+  }
+
+  return stereoBuffer;
+}
+
+/**
+ * 🎙️ Studio Audiophile Mastering Chain (ITU-R BS.1770-4 / EBU R128 Compliant)
  */
 export async function processStudioMastering(
   audioBlobOrFile: Blob | File,
@@ -692,9 +783,13 @@ export async function processStudioMastering(
   const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   let decodedBuffer: AudioBuffer;
   try {
-    decodedBuffer = await tempCtx.decodeAudioData(arrayBuffer.slice(0));
+    const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
+    // 🌟 Stereo-Zentrierung & Mono-to-Stereo Normalization (Behebt Links-Drall)
+    decodedBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
   } finally {
-    tempCtx.close();
+    try {
+      tempCtx.close();
+    } catch (e) {}
   }
 
   const originalLufs = calculateIntegratedRms(decodedBuffer);
@@ -702,7 +797,7 @@ export async function processStudioMastering(
   // 1. Adaptive HPF Frequency Determination (f0_min analysis)
   const hpfInfo = (options.applyAdaptiveHpf ?? true)
     ? detectAdaptiveHpfFrequency(decodedBuffer, options.isDrumPadMode)
-    : { f0MinHz: 80, hpfFreqHz: options.isDrumPadMode ? 30 : 55 };
+    : { f0MinHz: 80, hpfFreqHz: options.isDrumPadMode ? 35 : 80 };
 
   // 2. Intelligent Crest-Factor Transient Softener
   const transientInfo = (options.applyTransientSoftener ?? true)
@@ -734,9 +829,9 @@ export async function processStudioMastering(
     }
   }
 
-  // Set up OfflineAudioContext for deterministic rendering
+  // Set up OfflineAudioContext for deterministic rendering (Always 2-Channel Centered Stereo)
   const offlineCtx = new OfflineAudioContext(
-    Math.max(2, decodedBuffer.numberOfChannels),
+    2,
     decodedBuffer.length,
     decodedBuffer.sampleRate
   );
@@ -746,15 +841,17 @@ export async function processStudioMastering(
 
   let lastNode: AudioNode = sourceNode;
 
-  // 6. Adaptive Sub-Bass High-Pass Filter (12 dB/Oct Butterworth, clamp(f0*0.7, 25Hz, 75Hz))
-  const hpfNode = offlineCtx.createBiquadFilter();
-  hpfNode.type = 'highpass';
-  hpfNode.frequency.value = hpfInfo.hpfFreqHz;
-  hpfNode.Q.value = 0.707;
-  lastNode.connect(hpfNode);
-  lastNode = hpfNode;
+  // 6. Low-Cut Filter (highpass 80 Hz, Q: 0.707) zur Entfernung von Trittschall & Rumpeln
+  if (options.applyAdaptiveHpf ?? true) {
+    const hpfNode = offlineCtx.createBiquadFilter();
+    hpfNode.type = 'highpass';
+    hpfNode.frequency.value = Math.max(80, hpfInfo.hpfFreqHz);
+    hpfNode.Q.value = 0.707;
+    lastNode.connect(hpfNode);
+    lastNode = hpfNode;
+  }
 
-  // 7. Dynamic Low-End Resonance Notch (100 Hz - 220 Hz, max -1.5 dB)
+  // 7. Dynamic Low-End Resonance Notch (100 Hz - 220 Hz)
   if (lowResInfo.isPeakDetected && Math.abs(lowResInfo.cutDb) > 0.05) {
     const lowNotchNode = offlineCtx.createBiquadFilter();
     lowNotchNode.type = 'peaking';
@@ -765,7 +862,7 @@ export async function processStudioMastering(
     lastNode = lowNotchNode;
   }
 
-  // 8. Adaptive Mid-Range Resonance Notch (180 - 420 Hz, Q = 2.4, max -2.0 dB)
+  // 8. Adaptive Mid-Range Resonance Notch (180 - 420 Hz, Q = 2.4)
   if (midResInfo.isPeakDetected && Math.abs(midResInfo.cutDb) > 0.05) {
     const midNotchNode = offlineCtx.createBiquadFilter();
     midNotchNode.type = 'peaking';
@@ -776,11 +873,21 @@ export async function processStudioMastering(
     lastNode = midNotchNode;
   }
 
-  // 8b. Audiophile Tilt-EQ Tonwaage (Pivot: 1000 Hz: +1.0 dB Highs, -1.0 dB Lows)
+  // 8b. Voice & Instrument Presence Boost (peaking 3.2 kHz, +2.5 dB, Q: 1.2)
+  if (options.applyPultecAir ?? true) {
+    const presenceNode = offlineCtx.createBiquadFilter();
+    presenceNode.type = 'peaking';
+    presenceNode.frequency.value = 3200;
+    presenceNode.gain.value = 2.5;
+    presenceNode.Q.value = 1.2;
+    lastNode.connect(presenceNode);
+    lastNode = presenceNode;
+  }
+
+  // 8c. Audiophile Tilt-EQ Tonwaage (Pivot 1000 Hz: +1.0 dB Highs, -1.0 dB Lows)
   if (options.applyTiltEq ?? true) {
     const pivotHz = options.tiltPivotHz || 1000;
 
-    // Low-Shelf side (-1.0 dB below 1000 Hz)
     const tiltLowNode = offlineCtx.createBiquadFilter();
     tiltLowNode.type = 'lowshelf';
     tiltLowNode.frequency.value = pivotHz;
@@ -788,7 +895,6 @@ export async function processStudioMastering(
     lastNode.connect(tiltLowNode);
     lastNode = tiltLowNode;
 
-    // High-Shelf side (+1.0 dB above 1000 Hz)
     const tiltHighNode = offlineCtx.createBiquadFilter();
     tiltHighNode.type = 'highshelf';
     tiltHighNode.frequency.value = pivotHz;
@@ -797,13 +903,13 @@ export async function processStudioMastering(
     lastNode = tiltHighNode;
   }
 
-  // 9. Subtle High-End "Air" Stage (Pultec EQP-1A Style: 14.5 kHz High-Shelf +1.2 dB)
+  // 9. Subtle High-End "Air" Stage (Pultec EQP-1A Style: 14.5 kHz High-Shelf +1.5 dB)
   if (options.applyPultecAir ?? true) {
     const airNode = offlineCtx.createBiquadFilter();
     airNode.type = 'highshelf';
     airNode.frequency.value = 14500;
-    airNode.gain.value = effectiveProfile === 'brass_vocals' ? 1.5 : 1.2;
-    airNode.Q.value = 0.6; // Gentle slope
+    airNode.gain.value = 1.5;
+    airNode.Q.value = 0.6;
     lastNode.connect(airNode);
     lastNode = airNode;
   }
@@ -822,83 +928,67 @@ export async function processStudioMastering(
     }
   }
 
-  // 9c. Instrument Specific Presence Staging (Piano / Brass / Vocals)
-  if (effectiveProfile === 'brass_vocals') {
-    const presenceNode = offlineCtx.createBiquadFilter();
-    presenceNode.type = 'peaking';
-    presenceNode.frequency.value = 3200;
-    presenceNode.gain.value = 1.4;
-    presenceNode.Q.value = 1.2;
-    lastNode.connect(presenceNode);
-    lastNode = presenceNode;
-  }
-
-  // 10. Andrew Scheps Parallel Console Bus (80% DRY / 20% WET)
+  // 10. 🎛️ NEW YORK PARALLEL COMPRESSION & SATURATION BUS (Transient-Taming & Long Sustain Boost)
   if (options.applyParallelConsoleBus ?? true) {
     const preBusNode = lastNode;
     const mixBus = offlineCtx.createGain();
 
-    // 10a. DRY Path (80% 1:1 Pure Original)
+    // 10a. DRY Path (75% Pure Dynamic Articulation)
     const dryGain = offlineCtx.createGain();
-    dryGain.gain.value = 0.80;
+    dryGain.gain.value = 0.75;
     preBusNode.connect(dryGain);
     dryGain.connect(mixBus);
 
-    // 10b. WET Path (20% 2nd-Order Saturation + Opto Leveler)
-    const wetGain = offlineCtx.createGain();
-    wetGain.gain.value = 0.20;
+    // 10b. WET Path (25% Parallel Crush: Fast Attack catches transient, Slow Release pulls up and stabilizes long singing sustain)
+    const parallelCompressor = offlineCtx.createDynamicsCompressor();
+    parallelCompressor.threshold.value = options.isDrumPadMode ? -24.0 : -22.0;
+    parallelCompressor.knee.value = 18.0;
+    parallelCompressor.ratio.value = 8.0; // High compression ratio for intense density
+    parallelCompressor.attack.value = 0.005; // 5ms ultra-fast attack: catches & tames hard transient clicks
+    parallelCompressor.release.value = 0.280; // 280ms smooth release: sustains & carries the decaying musical tone
 
-    // Analog Console Saturation (THD = 0.35%)
     const consoleShaper = offlineCtx.createWaveShaper();
     consoleShaper.curve = createTapeWarmthCurve(4096) as any;
     consoleShaper.oversample = '4x';
 
-    // Opto Leveler (Ratio 1.6:1, Attack 40ms, Release 200ms, max 1.5 dB GR)
-    const optoLeveler = offlineCtx.createDynamicsCompressor();
-    optoLeveler.threshold.value = options.isDrumPadMode ? -22.0 : -19.0;
-    optoLeveler.knee.value = 12;
-    optoLeveler.ratio.value = 1.6;
-    optoLeveler.attack.value = options.isDrumPadMode ? 0.065 : 0.040;
-    optoLeveler.release.value = 0.200;
+    const wetGain = offlineCtx.createGain();
+    wetGain.gain.value = 0.25;
 
-    preBusNode.connect(consoleShaper);
-    consoleShaper.connect(optoLeveler);
-    optoLeveler.connect(wetGain);
+    preBusNode.connect(parallelCompressor);
+    parallelCompressor.connect(consoleShaper);
+    consoleShaper.connect(wetGain);
     wetGain.connect(mixBus);
 
     lastNode = mixBus;
   }
 
-  // 11. Audiophile Convolution Reverb (Grand Gala Concert Hall & Philharmonic Master)
+  // 11. 🏛️ VOLLE GALA CONCERT HALL REVERB SEND (Customizable 0% - 60% Wet Mix, Standard 30%)
   if (options.applyConvolutionReverb ?? true) {
     const wetGain = offlineCtx.createGain();
     const dryGain = offlineCtx.createGain();
     const reverbMixBus = offlineCtx.createGain();
 
-    const wetMix = options.reverbWetMix ?? (options.isDrumPadMode ? 0.085 : 0.145);
+    const wetMix = typeof options.reverbWetMix === 'number' ? options.reverbWetMix : 0.30;
     wetGain.gain.value = wetMix;
     dryGain.gain.value = 1.0;
 
-    // 30 ms Pre-Delay Node (Preserves crisp transient attack & intimacy before the Gala Hall blooms)
-    const preDelaySec = (options.reverbPreDelayMs ?? 30) / 1000;
+    const preDelaySec = (options.reverbPreDelayMs ?? 25) / 1000;
     const delayNode = offlineCtx.createDelay(1.0);
     delayNode.delayTime.value = preDelaySec;
 
-    // Grand Gala Concert Hall Impulse Response (2.1s RT60, dual-slope decay)
+    // Grand Gala Concert Hall Impulse Response (2.2s RT60)
     const convolver = offlineCtx.createConvolver();
-    convolver.buffer = createAcousticRoomImpulseResponse(offlineCtx, 2.1, 1.65);
+    convolver.buffer = createAcousticRoomImpulseResponse(offlineCtx, 2.2, 1.55);
 
-    // Gala Send Low-Cut (160 Hz Butterworth HPF - Warmer body, zero boomy sub buildup)
     const reverbHpNode = offlineCtx.createBiquadFilter();
     reverbHpNode.type = 'highpass';
-    reverbHpNode.frequency.value = 160;
+    reverbHpNode.frequency.value = 140;
     reverbHpNode.Q.value = 0.707;
 
-    // Gala Send High-Cut Damping (6.5 kHz - Sparkling, open concert hall brilliance)
     const reverbLpNode = offlineCtx.createBiquadFilter();
     reverbLpNode.type = 'lowpass';
-    reverbLpNode.frequency.value = 6500;
-    reverbLpNode.Q.value = 0.55;
+    reverbLpNode.frequency.value = 7500;
+    reverbLpNode.Q.value = 0.6;
 
     lastNode.connect(delayNode);
     delayNode.connect(reverbHpNode);
@@ -913,19 +1003,32 @@ export async function processStudioMastering(
     lastNode = reverbMixBus;
   }
 
+  // 12. Master Limiter / Dynamics Compressor (Threshold: -6 dB, Ratio: 4:1, Attack: 0.01s, Release: 0.1s)
+  if (options.applyParallelConsoleBus ?? true) {
+    const masterCompressor = offlineCtx.createDynamicsCompressor();
+    masterCompressor.threshold.value = -6.0;
+    masterCompressor.ratio.value = 4.0;
+    masterCompressor.attack.value = 0.01;
+    masterCompressor.release.value = 0.10;
+    masterCompressor.knee.value = 6.0;
+
+    lastNode.connect(masterCompressor);
+    lastNode = masterCompressor;
+  }
+
   // Destination
   lastNode.connect(offlineCtx.destination);
 
-  // Render
+  // Render through full OfflineAudioContext DSP Chain
   sourceNode.start(0);
   const renderedBuffer = await offlineCtx.startRendering();
 
-  // 12. Psychoacoustic Dimension & 200 Hz Mono-Maker
+  // 13. Psychoacoustic Dimension & 200 Hz Mono-Maker
   if (options.applyStereoDimension ?? true) {
     applyStereoDimensionAndMonoMaker(renderedBuffer);
   }
 
-  // 13. Mastering Output: -13.0 LUFS Target (EBU R128) & -1.0 dBTP Ceiling (4x Oversampled Guard)
+  // 14. Loudness Normalization to -13.0 LUFS (-1.0 dBTP Ceiling)
   const targetLufs = options.targetLufs ?? -13.0;
   const currentRenderedLufs = calculateIntegratedRms(renderedBuffer);
   const lufsDeltaDb = targetLufs - currentRenderedLufs;
@@ -940,7 +1043,7 @@ export async function processStudioMastering(
 
   // True Peak Guard (-1.0 dBTP with 4x inter-sample protection)
   const maxPeak4x = calculateBufferPeak4x(renderedBuffer);
-  const targetPeakLinear = Math.pow(10, (options.targetPeakDb ?? -1.0) / 20); // ~0.89125
+  const targetPeakLinear = Math.pow(10, (options.targetPeakDb ?? -1.0) / 20);
 
   if (maxPeak4x > targetPeakLinear) {
     const peakTrimGain = targetPeakLinear / maxPeak4x;
@@ -952,7 +1055,7 @@ export async function processStudioMastering(
     }
   }
 
-  // Encode to WAV
+  // 24-Bit PCM Lossless WAV Export with Broadcast Metadata
   const wavBlob = audioBufferToWavBlob(renderedBuffer);
   const masteredUrl = URL.createObjectURL(wavBlob);
 
@@ -976,7 +1079,8 @@ export async function processStudioMastering(
 
 /**
  * 🌟 Dual-Mastering Engine for Loudness-Matched A/B Comparison:
- * Renders both Studio Master and Pure RAW at the exact same -13.0 LUFS target.
+ * 1. Studio Master: Full Gala Sound (80Hz HPF + 3.2kHz Presence + Tilt EQ + Pultec Air + Gala Hall Reverb + 4:1 Compressor)
+ * 2. Pure RAW: 100% Unaltered Dry Recording (Centered Stereo, -13.0 LUFS matched, 0% Reverb, 0% EQ, 0% Compression)
  */
 export async function processDualMastering(
   audioInput: Blob | File,
@@ -987,30 +1091,34 @@ export async function processDualMastering(
     ...options
   };
 
-  // 1. Studio Audiophile Master (-13.0 LUFS Target)
+  // 1. Studio Audiophile Master with Full Gala Hall Reverb (-13.0 LUFS Target)
   const masterRes = await processStudioMastering(audioInput, {
     ...mergedOptions,
     applyAdaptiveHpf: true,
     applyTransientSoftener: true,
     applyLowEndResonance: true,
     applyMidResonance: true,
+    applyTiltEq: true,
     applyPultecAir: true,
+    applyDeHarsh: true,
     applyParallelConsoleBus: true,
     applyStereoDimension: true,
     applyConvolutionReverb: true,
+    reverbWetMix: typeof mergedOptions.reverbWetMix === 'number' ? mergedOptions.reverbWetMix : 0.30,
     targetLufs: mergedOptions.targetLufs ?? -13.0,
     targetPeakDb: mergedOptions.targetPeakDb ?? -1.0
   });
 
-  // 2. Pure RAW (Loudness-Matched to EXACT -13.0 LUFS with -1.0 dBTP ceiling)
-  // Transparent 1:1 level match with zero coloring, EQ, or reverb
+  // 2. Pure RAW (Dry 1:1, centered stereo, zero coloring/EQ/reverb, loudness-normalized to -13.0 LUFS)
   const rawRes = await processStudioMastering(audioInput, {
     applyAutoGainStage: true,
     applyAdaptiveHpf: false,
     applyTransientSoftener: false,
     applyLowEndResonance: false,
     applyMidResonance: false,
+    applyTiltEq: false,
     applyPultecAir: false,
+    applyDeHarsh: false,
     applyParallelConsoleBus: false,
     applyStereoDimension: false,
     applyConvolutionReverb: false,

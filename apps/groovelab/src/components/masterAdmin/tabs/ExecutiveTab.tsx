@@ -65,15 +65,26 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
 
     const priceTeacher = s.custom_price_teacher ?? s.grandfathered_teacher_price ?? masterPricing.priceTeacher;
     const priceStudent = s.custom_price_student ?? s.grandfathered_student_price ?? masterPricing.priceStudent;
+    const pricePassive = s.custom_price_passive_student ?? s.grandfathered_passive_student_price ?? (masterPricing as any).pricePassiveStudent ?? 0.09;
 
     const stats: any = schoolStats[s.id] || {};
     const teachers = stats.teachers ?? stats.totalTeachers ?? s.teachers_count ?? 0;
-    const students = stats.activeStudents ?? stats.students ?? s.active_students_count ?? 0;
+    const campusStudents = stats.studentsCampus ?? 0;
+    const groovelabStudents = stats.studentsGroovelab ?? 0;
+    const totalStudents = stats.students ?? s.active_students_count ?? (campusStudents + groovelabStudents);
+    const activeStudentsMax = stats.activeStudents ?? Math.max(campusStudents, groovelabStudents);
+    const passiveStudents = stats.passiveStudents ?? Math.max(0, totalStudents - activeStudentsMax);
 
     totalB2bTeachers += teachers;
-    totalB2bStudents += students;
+    totalB2bStudents += (campusStudents + groovelabStudents);
 
-    return acc + (teachers * priceTeacher) + (students * priceStudent);
+    // Calculate exact seat & usage fees
+    const teacherFee = teachers * priceTeacher;
+    const campusStudentFee = s.has_campus_subscription ? campusStudents * priceStudent : 0;
+    const groovelabStudentFee = s.has_groovelab_subscription ? groovelabStudents * priceStudent : 0;
+    const passiveStudentFee = passiveStudents * pricePassive;
+
+    return acc + teacherFee + campusStudentFee + groovelabStudentFee + passiveStudentFee;
   }, 0);
 
   const b2cSeatMrr = pendingUsers.reduce((acc, u) => {
@@ -101,10 +112,13 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
     const isPaused = s.is_paused || s.status === 'suspended';
     if (isBypass || isTrial || isPaused) return acc;
 
-    if (s.storage_addon_status === 'active' && s.storage_addon_monthly_fee) {
+    const addonGb = Number(s.storage_addon_gb || 0);
+    const addonFee = Number(s.storage_addon_monthly_fee || (addonGb === 20 ? 5.49 : addonGb === 10 ? 2.99 : addonGb === 5 ? 1.49 : addonGb === 50 ? 9.99 : 0));
+
+    if (addonGb > 0 && (s.storage_addon_status === 'active' || !s.storage_addon_status || s.storage_addon_status === 'approved')) {
       activeStorageAddonCount++;
-      activeStorageAddonGb += Number(s.storage_addon_gb || 0);
-      return acc + Number(s.storage_addon_monthly_fee || 0);
+      activeStorageAddonGb += addonGb;
+      return acc + addonFee;
     }
     return acc;
   }, 0);

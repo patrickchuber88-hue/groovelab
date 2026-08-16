@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
-  Shield, Plus, Copy, Check, Trash2, Users, Monitor, 
+  Shield, ShieldAlert, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap, BookOpen,
   Edit2, Settings, Sliders, Search, Tag, Percent,
   Activity, Cpu, Database, AlertTriangle, HardDrive, Server, Zap, Link, Key, History as HistoryIcon,
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { MaintenanceTab } from './masterAdmin/tabs/MaintenanceTab';
 import { SchoolsTab } from './masterAdmin/tabs/SchoolsTab';
+import { TrustSafetyTab } from './masterAdmin/tabs/TrustSafetyTab';
 import { SchoolDetailDrawer } from './masterAdmin/drawers/SchoolDetailDrawer';
 import { ClientErrorTelemetryPanel } from './masterAdmin/components/ClientErrorTelemetryPanel';
 
@@ -182,7 +183,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
   const [schoolSortOption, setSchoolSortOption] = useState<'students' | 'name' | 'newest'>('students');
   const [schoolModuleFilter, setSchoolModuleFilter] = useState<'all' | 'kombi' | 'campus' | 'groovelab'>('all');
-  const [activePortalTab, setActivePortalTab] = useState<'executive' | 'schools' | 'briefing' | 'billing' | 'telemetry' | 'pricing' | 'operator' | 'maintenance' | 'backup'>('executive');
+  const [activePortalTab, setActivePortalTab] = useState<'executive' | 'schools' | 'briefing' | 'billing' | 'telemetry' | 'pricing' | 'trust_safety' | 'operator' | 'maintenance' | 'backup'>('executive');
   const [saveSuccessToast, setSaveSuccessToast] = useState<string | null>(null);
   
   // Cmd+K Palette & Slide-Over Drawer States
@@ -1866,8 +1867,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           const userMatch = schoolUsers.find(u => u.id === ps.id || (u.first_name && ps.first_name && u.first_name.toLowerCase().trim() === ps.first_name.toLowerCase().trim()));
           const exists = studentsList.some(s => s.id === ps.id || (s.first_name && ps.first_name && s.first_name.toLowerCase().trim() === ps.first_name.toLowerCase().trim()));
           if (!exists) {
-            const isCampusAct = userMatch ? Boolean(userMatch.is_campus_active) : true;
-            const isGrooveAct = userMatch ? Boolean(userMatch.is_groovelab_active) : false;
+            const isCampusAct = userMatch ? Boolean(userMatch.is_campus_active) : Boolean((ps as any).is_campus_active);
+            const isGrooveAct = userMatch ? Boolean(userMatch.is_groovelab_active) : Boolean((ps as any).is_groovelab_active);
             studentsList.push({
               id: ps.id,
               first_name: ps.first_name,
@@ -1878,9 +1879,62 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           }
         });
 
-        const totalStudents = studentsList.length || schoolStatsRow.students || 0;
-        const studentsCampus = studentsList.filter(s => s.is_campus_active).length || schoolStatsRow.students_campus || 0;
-        const studentsGroovelab = studentsList.filter(s => s.is_groovelab_active).length || schoolStatsRow.students_groovelab || 0;
+        const isTestUser = (s: any): boolean => {
+          if (!s) return false;
+          const fn = (s.first_name || '').trim().toLowerCase();
+          const ln = (s.last_name || '').trim().toLowerCase();
+          const email = (s.email || '').trim().toLowerCase();
+          return (
+            fn.startsWith('test') ||
+            fn.startsWith('jane') ||
+            fn.startsWith('bob') ||
+            ln === 't.' ||
+            ln === 'test' ||
+            email.includes('test')
+          );
+        };
+
+        const deduplicateStudents = (items: any[]): any[] => {
+          if (!Array.isArray(items)) return [];
+          const seenIds = new Set<string>();
+          const studentMap = new Map<string, any>();
+
+          for (const student of items) {
+            if (!student) continue;
+            if (student.id && seenIds.has(student.id)) continue;
+
+            const fn = (student.first_name || '').trim().toLowerCase();
+            const ln = (student.last_name || '').trim().toLowerCase();
+            const nameKey = `${fn}_${ln}`;
+
+            if (nameKey !== '_') {
+              if (studentMap.has(nameKey)) {
+                const existing = studentMap.get(nameKey);
+                if (existing.isPendingOnboarding && !student.isPendingOnboarding) {
+                  if (existing.id) seenIds.delete(existing.id);
+                  studentMap.set(nameKey, student);
+                  if (student.id) seenIds.add(student.id);
+                }
+                continue;
+              }
+              studentMap.set(nameKey, student);
+            } else {
+              const fallbackKey = student.id || `anon_${Math.random()}`;
+              studentMap.set(fallbackKey, student);
+            }
+
+            if (student.id) seenIds.add(student.id);
+          }
+
+          return Array.from(studentMap.values());
+        };
+
+        const cleanStudentsList = deduplicateStudents(studentsList.filter(s => !isTestUser(s)));
+        const totalStudents = cleanStudentsList.length || schoolStatsRow.students || 0;
+        const studentsCampus = cleanStudentsList.filter(s => s.is_campus_active).length || schoolStatsRow.students_campus || 0;
+        const studentsGroovelab = cleanStudentsList.filter(s => s.is_groovelab_active).length || schoolStatsRow.students_groovelab || 0;
+        const activeStudentsMax = Math.max(studentsCampus, studentsGroovelab);
+        const passiveStudentsCount = Math.max(0, totalStudents - activeStudentsMax);
 
         let freeDoubleRoleCount = 0;
         let billableTeacherCount = 0;
@@ -1899,13 +1953,20 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           }
         });
 
+        const storageAddonGbVal = Number(school.storage_addon_gb || 0);
+        const storageAddonFeeVal = Number(school.storage_addon_monthly_fee || (storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 9.99 : 0));
+
         sStats[schId] = {
           teachers: billableTeacherCount || schoolStatsRow.teachers || 0,
           students: totalStudents,
+          activeStudents: activeStudentsMax,
+          passiveStudents: passiveStudentsCount,
           teachersCampus: billableTeacherCount || schoolStatsRow.teachers_campus || 0,
           teachersGroovelab: billableTeacherCount || schoolStatsRow.teachers_groovelab || 0,
           studentsCampus: studentsCampus,
           studentsGroovelab: studentsGroovelab,
+          storageAddonGb: storageAddonGbVal,
+          storageAddonMonthlyFee: storageAddonFeeVal,
           songs: songs?.filter(s => s.school_id === schId).length || 0,
           bands: bands?.filter(b => b.school_id === schId && b.name !== '__SYSTEM_ANNOUNCEMENTS__').length || 0,
           adminUsers: schoolUsers.filter(u => u.role === 'secretary' || u.role === 'admin')
@@ -2269,6 +2330,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     const priceStudent = isCustomModeActive && editCustomStudent !== '' ? Math.max(0, Number(editCustomStudent) || 0) : effective.priceStudent;
     const pricePassiveStudent = effective.pricePassiveStudent ?? 0.09;
 
+    const storageAddonMonthlyFee = Number((school as any).storage_addon_monthly_fee || 0);
+
     const billingResult = calculateCampusGroovelabBilling({
       hasCampusModule: editHasCampus,
       hasGroovelabModule: editHasGroovelab,
@@ -2277,6 +2340,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       campusStudentCount: campusStudents,
       groovelabStudentCount: groovelabStudents,
       passiveStudentCount: passiveStudents,
+      storageAddonMonthlyFee,
       billingDiscountType: (school as any).billing_discount_type || 'monthly',
       exemptStudentCount: (school as any).exempt_student_count || 0,
       directBillingMode: (school as any).billing_payer === 'student' ? ((school as any).student_billing_option === 'student_partial' ? 'partial' : 'full') : 'none',
@@ -2298,6 +2362,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       campusStudentFee: billingResult.campusStudentActivationFeeTotal,
       groovelabStudentFee: billingResult.groovelabStudentActivationFeeTotal,
       passiveStudentFee: billingResult.passiveStudentFeeTotal,
+      storageAddonFee: billingResult.storageAddonFeeTotal,
       activeTeachers,
       activeStudents,
       campusStudents,
@@ -2436,6 +2501,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 { id: 'billing', label: 'Financial Control', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.08)' },
                 { id: 'telemetry', label: 'Telemetrie & Health', icon: <Cpu size={18} />, color: '#4f46e5', bg: 'rgba(79, 70, 229, 0.08)' },
                 { id: 'pricing', label: 'Preise & Kampagnen', icon: <Tag size={18} />, color: '#d97706', bg: 'rgba(217, 119, 6, 0.08)' },
+                { id: 'trust_safety', label: 'Trust & Safety (Takedowns)', icon: <ShieldAlert size={18} />, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.08)' },
                 { id: 'maintenance', label: 'Wartung & Betrieb', icon: <Wrench size={18} />, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.08)' },
                 { id: 'backup', label: 'Backup & Reset', icon: <Database size={18} />, color: '#0d9488', bg: 'rgba(13, 148, 136, 0.08)' },
                 { id: 'operator', label: 'Betreiber & Zugang', icon: <Building2 size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.08)' }
@@ -5527,6 +5593,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* 🛡️ BOARD: TRUST & SAFETY / LEGAL TAKEDOWN SUITE (activePortalTab === 'trust_safety') */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {activePortalTab === 'trust_safety' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+              <TrustSafetyTab />
             </div>
           )}
 

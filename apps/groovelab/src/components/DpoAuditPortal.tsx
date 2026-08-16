@@ -15,7 +15,7 @@ interface WormLogEntry {
   actorRole: string;
   actorName: string;
   action: string;
-  category: 'SECURITY' | 'DATA_PRIVACY' | 'RLS_POLICY' | 'USER_LIFECYCLE';
+  category: 'SECURITY' | 'DATA_PRIVACY' | 'RLS_POLICY' | 'USER_LIFECYCLE' | 'LEGAL_TAKEDOWN';
   target: string;
   status: 'VERIFIED_WORM' | 'AUDITED';
   hash: string;
@@ -46,6 +46,17 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
 
   // WORM Logs (Write Once Read Many) formatted in German Local Time
   const logs: WormLogEntry[] = [
+    {
+      id: 'WORM-LOG-10492',
+      timestamp: '15.08.2026, 14:22:08 MESZ',
+      actorRole: 'MASTER_ADMIN',
+      actorName: 'Platform Trust & Safety Engine',
+      action: 'Notice-and-Takedown Sofortsperrung: Freigabelink blockiert nach Art. 6 DSA / § 10 TMG (HTTP 410)',
+      category: 'LEGAL_TAKEDOWN',
+      target: 'Playlist pl_sommer_2026 (Schüler ID #4B87)',
+      status: 'VERIFIED_WORM',
+      hash: 'a8f5b4923e811c9dc521098ef763190ab420404a011733cfb7b190d62c65bf0b'
+    },
     {
       id: 'WORM-LOG-10491',
       timestamp: '11.08.2026, 09:15:22 MESZ',

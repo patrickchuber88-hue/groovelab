@@ -26,6 +26,7 @@ export interface BillingCalculationInput {
     locked_student_price?: number | null;
     exempt_from_direct_billing?: boolean;
   }>;
+  storageAddonMonthlyFee?: number;
   rates?: {
     priceCampus?: number;
     priceGroovelab?: number;
@@ -33,6 +34,7 @@ export interface BillingCalculationInput {
     priceTeacher?: number;
     priceStudent?: number;
     pricePassiveStudent?: number;
+    priceStorageAddon?: number;
   };
 }
 
@@ -44,6 +46,7 @@ export interface BillingCalculationResult {
   campusStudentActivationFeeTotal: number;
   groovelabStudentActivationFeeTotal: number;
   passiveStudentFeeTotal: number;
+  storageAddonFeeTotal: number;
   schoolContributionTotal: number;
   parentContributionTotal: number;
   totalMonthlySchoolInvoice: number;
@@ -139,8 +142,11 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
     schoolContributionTotal = studentActivationFeeTotal + (exemptStudentCount * effectiveStudentRate);
   }
 
+  // 6. Audio-Tresor Storage Add-on Fee
+  const storageAddonFeeTotal = Math.max(0, input.storageAddonMonthlyFee ?? input.rates?.priceStorageAddon ?? 0);
+
   // Total invoice amount billed to the music school
-  const totalMonthlySchoolInvoice = baseServerFlatRate + teacherServiceFeeTotal + passiveStudentFeeTotal + schoolContributionTotal;
+  const totalMonthlySchoolInvoice = baseServerFlatRate + teacherServiceFeeTotal + passiveStudentFeeTotal + schoolContributionTotal + storageAddonFeeTotal;
 
   return {
     baseServerFlatRate,
@@ -150,6 +156,7 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
     campusStudentActivationFeeTotal,
     groovelabStudentActivationFeeTotal,
     passiveStudentFeeTotal,
+    storageAddonFeeTotal,
     schoolContributionTotal,
     parentContributionTotal,
     totalMonthlySchoolInvoice: Number(totalMonthlySchoolInvoice.toFixed(2)),

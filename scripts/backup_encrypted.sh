@@ -6,9 +6,14 @@ set -e
 
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-ENC_PASSPHRASE="${ENCRYPTION_PASSPHRASE:-CampusGroovelabSecureKey2026!}"
+ENC_PASSPHRASE="${ENCRYPTION_PASSPHRASE:-}"
 DUMP_FILE="${BACKUP_DIR}/groovelab_dump_${TIMESTAMP}.sql"
 ENC_FILE="${DUMP_FILE}.enc"
+
+if [ -z "$ENC_PASSPHRASE" ]; then
+    echo "⚠️  ENCRYPTION_PASSPHRASE environment variable is not set. Aborting backup encryption."
+    exit 1
+fi
 
 mkdir -p "${BACKUP_DIR}"
 

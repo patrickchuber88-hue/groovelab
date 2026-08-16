@@ -9,7 +9,7 @@ set -e
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/groovelab}"
 LATEST_BACKUP=$(ls -t "${BACKUP_DIR}"/*.sql.gz.enc 2>/dev/null | head -n 1 || true)
 TEST_DB="groovelab_dr_test_db"
-PASSPHRASE_FILE="${PASSPHRASE_FILE:-/etc/groovelab/backup_key.asc}"
+GPG_KEY_FILE="${GPG_KEY_FILE:-/etc/groovelab/backup_key.asc}"
 
 echo "======================================================================"
 echo "🛡️  Campus-Groovelab Disaster Recovery & Backup Integrity Check"
@@ -25,7 +25,7 @@ echo "🔓 Decrypting AES-256 archive for test restoration..."
 
 # Decrypt and test restore into temporary test database
 TEMP_RESTORE=$(mktemp)
-gpg --batch --quiet --decrypt --passphrase-file "$PASSPHRASE_FILE" "$LATEST_BACKUP" | gunzip > "$TEMP_RESTORE"
+gpg --batch --quiet --decrypt --passphrase-file "$GPG_KEY_FILE" "$LATEST_BACKUP" | gunzip > "$TEMP_RESTORE"
 
 echo "✅ Decryption successful. Creating temporary staging database: $TEST_DB..."
 dropdb --if-exists "$TEST_DB" || true

@@ -103,6 +103,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
       };
 
+      const storageAddonGbVal = Number(s.storage_addon_gb || 0);
+      const storageAddonFeeVal = Number(s.storage_addon_monthly_fee || (storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 9.99 : 0));
+
       const billing = calculateCampusGroovelabBilling({
         hasCampusModule: !!s.has_campus_subscription,
         hasGroovelabModule: !!s.has_groovelab_subscription,
@@ -111,6 +114,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         campusStudentCount: campusActive,
         groovelabStudentCount: groovelabActive,
         passiveStudentCount: passiveStudents,
+        storageAddonMonthlyFee: storageAddonFeeVal,
         rates: {
           priceCampus: rates.priceCampus,
           priceGroovelab: rates.priceGroovelab,
@@ -205,6 +209,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
       };
 
+      const storageAddonGbVal = Number(s.storage_addon_gb || 0);
+      const storageAddonFeeVal = Number(s.storage_addon_monthly_fee || (storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 9.99 : 0));
+
       const billingCalc = calculateCampusGroovelabBilling({
         hasCampusModule: !!s.has_campus_subscription,
         hasGroovelabModule: !!s.has_groovelab_subscription,
@@ -213,6 +220,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         campusStudentCount: campusActive,
         groovelabStudentCount: groovelabActive,
         passiveStudentCount: passiveStudents,
+        storageAddonMonthlyFee: storageAddonFeeVal,
         rates: {
           priceCampus: rates.priceCampus,
           priceGroovelab: rates.priceGroovelab,
@@ -723,6 +731,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                   pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
                 };
 
+                const storageAddonGbVal = Number(school.storage_addon_gb || 0);
+                const storageAddonFeeVal = Number(school.storage_addon_monthly_fee || (storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 9.99 : 0));
+
                 const billingCalc = calculateCampusGroovelabBilling({
                   hasCampusModule: !!school.has_campus_subscription,
                   hasGroovelabModule: !!school.has_groovelab_subscription,
@@ -731,6 +742,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                   campusStudentCount: campusActive,
                   groovelabStudentCount: groovelabActive,
                   passiveStudentCount: passiveStudents,
+                  storageAddonMonthlyFee: storageAddonFeeVal,
                   rates: {
                     priceCampus: rates.priceCampus,
                     priceGroovelab: rates.priceGroovelab,
@@ -825,7 +837,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               padding: '12px 16px',
                               borderRadius: '14px',
                               fontSize: '0.72rem',
-                              width: '260px',
+                              width: '280px',
                               zIndex: 9999,
                               boxShadow: '0 12px 36px rgba(15, 23, 42, 0.12)',
                               lineHeight: '1.55'
@@ -833,15 +845,25 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               <div style={{ fontWeight: 850, borderBottom: '1px solid #f1f5f9', paddingBottom: '5px', marginBottom: '6px', color: '#0f172a' }}>
                                 Kanonische MRR-Kalkulation
                               </div>
-                              <div style={{ color: '#64748b' }}>• Software-Lizenz: 0,00 €</div>
-                              {school.has_campus_subscription && <div style={{ color: '#475569' }}>• Cloud Campus: {rates.priceCampus.toFixed(2)} €</div>}
-                              {school.has_groovelab_subscription && <div style={{ color: '#475569' }}>• Cloud GrooveLab: {rates.priceGroovelab.toFixed(2)} €</div>}
-                              <div style={{ color: '#475569' }}>• Service ({teachers} Lehrkräfte): {(teachers * rates.priceTeacher).toFixed(2)} €</div>
-                              <div style={{ color: '#475569' }}>• Basis ({totalStudents} Schüler): {(totalStudents * rates.pricePassiveStudent).toFixed(2)} €</div>
-                              {campusActive > 0 && <div style={{ color: '#047857' }}>• Aktiv Campus ({campusActive}): {(campusActive * rates.priceStudent).toFixed(2)} €</div>}
-                              {groovelabActive > 0 && <div style={{ color: '#ca8a04' }}>• Aktiv GrooveLab ({groovelabActive}): {(groovelabActive * rates.priceStudent).toFixed(2)} €</div>}
+                              <div style={{ color: '#16a34a', fontWeight: 600 }}>1. Software-Nutzungslizenz: 0,00 € (100% kostenlos)</div>
+                              {school.has_campus_subscription && school.has_groovelab_subscription ? (
+                                <>
+                                  <div style={{ color: '#475569' }}>2. Cloud Campus: {rates.priceCampus.toFixed(2)} €</div>
+                                  <div style={{ color: '#475569' }}>3. Cloud GrooveLab: {rates.priceGroovelab.toFixed(2)} €</div>
+                                  <div style={{ color: '#15803d', fontWeight: 600 }}>4. Kombi-Vorteil: -{(rates.priceCampus + rates.priceGroovelab - rates.priceKombi).toFixed(2)} €</div>
+                                </>
+                              ) : school.has_campus_subscription ? (
+                                <div style={{ color: '#475569' }}>2. Cloud Campus: {rates.priceCampus.toFixed(2)} €</div>
+                              ) : school.has_groovelab_subscription ? (
+                                <div style={{ color: '#475569' }}>3. Cloud GrooveLab: {rates.priceGroovelab.toFixed(2)} €</div>
+                              ) : null}
+                              <div style={{ color: '#475569' }}>5. Service ({teachers} Lehrkräfte): {(teachers * rates.priceTeacher).toFixed(2)} €</div>
+                              <div style={{ color: '#475569' }}>6. Basis ({passiveStudents} passive Schüler): {(passiveStudents * rates.pricePassiveStudent).toFixed(2)} €</div>
+                              {campusActive > 0 && <div style={{ color: '#047857' }}>7. Cloud Campus ({campusActive} Schüler): {(campusActive * rates.priceStudent).toFixed(2)} €</div>}
+                              {groovelabActive > 0 && <div style={{ color: '#ca8a04' }}>8. Cloud GrooveLab ({groovelabActive} Schüler): {(groovelabActive * rates.priceStudent).toFixed(2)} €</div>}
+                              {storageAddonGbVal > 0 && <div style={{ color: '#0284c7' }}>9. Audio-Tresor (+{storageAddonGbVal} GB): {storageAddonFeeVal.toFixed(2)} €</div>}
                               <div style={{ fontWeight: 900, borderTop: '1px solid #f1f5f9', paddingTop: '5px', marginTop: '6px', color: '#059669' }}>
-                                = Gesamt: {mrr.toFixed(2)} € / Mo.
+                                = Gesamtrate: {mrr.toFixed(2)} € / Mo.
                               </div>
                             </div>
                           )}

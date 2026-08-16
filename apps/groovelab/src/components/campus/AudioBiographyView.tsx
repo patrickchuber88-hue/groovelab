@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Play, Pause, Mic, Square, Shield, Lock, Unlock, Share2, Check, Star, Award, 
   Sparkles, Volume2, RotateCcw, Copy, ExternalLink, Calendar, Disc, Clock, 
-  Info, Sliders, Music, Zap, Flame, Heart, Upload, MessageSquare, ChevronRight,
+  Info, Sliders, Music, Zap, Flame, Heart, Upload, MessageSquare, MessageCircle, ChevronRight,
   FileText, X, AlertCircle, ChevronDown, ListMusic, SkipForward, Gift, Bell, Lightbulb,
   Sun, Moon, CheckCircle2, History, Plus, Trash2, Edit3, SlidersHorizontal, Radio, Layers, Download
 } from 'lucide-react';
@@ -42,6 +42,7 @@ export interface CustomPlaylistTrack {
   recordedAt?: string;
   personalNote?: string;
   preferredVersion?: 'master' | 'raw';
+  reverbWetMix?: number;
 }
 
 
@@ -384,15 +385,39 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [tempNote, setTempNote] = useState<string>('');
   const [tempVisibility, setTempVisibility] = useState<'private' | 'teacher_allowed'>('private');
   
-  // Dual-Version Decision States (Equal Loudness -14 LUFS)
+  // Dual-Version Decision States (Equal Loudness -13 LUFS)
   const [pendingDualResult, setPendingDualResult] = useState<DualMasteringResult | null>(null);
   const [pendingDurationSec, setPendingDurationSec] = useState<number>(0);
   const [selectedVersionChoice, setSelectedVersionChoice] = useState<'master' | 'raw'>('master');
   const [modalPreviewPlaying, setModalPreviewPlaying] = useState<'master' | 'raw' | null>(null);
+  const [reverbWetSlider, setReverbWetSlider] = useState<number>(30); // 30% Default Gala Hall
+  const [lastRawInputFile, setLastRawInputFile] = useState<Blob | File | null>(null);
+  const [isReMasteringReverb, setIsReMasteringReverb] = useState<boolean>(false);
+  const reverbDebounceTimerRef = useRef<any>(null);
   const modalPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Download Menu Popover State for both versions
   const [activeDownloadMenuTrack, setActiveDownloadMenuTrack] = useState<{ rawUrl?: string; masteredUrl?: string; title: string; trackId?: string } | null>(null);
+
+  // 🎛️ Song Edit & Remastering Modal State (Edit Hall / Wet-Dry & Master vs. RAW Choice)
+  const [editingTrackData, setEditingTrackData] = useState<{
+    playlistId?: string;
+    trackId: string;
+    title: string;
+    subtitle?: string;
+    artist?: string;
+    personalNote?: string;
+    audioUrl: string;
+    masteredAudioUrl?: string;
+    preferredVersion: 'master' | 'raw';
+    reverbWetMix: number;
+  } | null>(null);
+  const [isRemasteringEditTrack, setIsRemasteringEditTrack] = useState<boolean>(false);
+  const [isSavingEditTrack, setIsSavingEditTrack] = useState<boolean>(false);
+  const [editModalPreviewPlaying, setEditModalPreviewPlaying] = useState<'master' | 'raw' | null>(null);
+  const editModalAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [editTempMasterBlob, setEditTempMasterBlob] = useState<Blob | null>(null);
+  const [editTempMasterUrl, setEditTempMasterUrl] = useState<string | null>(null);
 
   // 🗑️ Delete Confirmation Modal State (Double confirmation on delete)
   const [pendingDeleteModal, setPendingDeleteModal] = useState<{
@@ -426,7 +451,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     return Math.floor(1000 + Math.random() * 9000).toString();
   });
   const [shareAnonymously, setShareAnonymously] = useState<boolean>(false);
-  const [shareAllowDownload, setShareAllowDownload] = useState<boolean>(true);
   const [shareAllowApplause, setShareAllowApplause] = useState<boolean>(true);
   const [shareTargetPlaylistId, setShareTargetPlaylistId] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
@@ -798,6 +822,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
+      }
+      if (editModalAudioRef.current) {
+        editModalAudioRef.current.pause();
+        editModalAudioRef.current = null;
       }
       if (activeMicStreamRef.current) {
         activeMicStreamRef.current.getTracks().forEach(track => track.stop());
@@ -1171,7 +1199,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         }
 
         if (audioBlob.size > 0) {
-          await processDualMasteringForModal(audioBlob, recordSeconds);
+          setReverbWetSlider(30);
+          await processDualMasteringForModal(audioBlob, recordSeconds, selectedProfile, 30);
         } else {
           alert('Keine Audiodaten aufgezeichnet. Bitte versuche es erneut.');
           setIsProcessingMastering(false);
@@ -1220,11 +1249,18 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       clearInterval(timerIntervalRef.current);
     }
 
+    setRecordingMilestoneId(null);
+    setIsProcessingMastering(true);
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try {
         mediaRecorderRef.current.requestData();
       } catch (e) {}
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        console.warn('Recorder stop note:', e);
+      }
     }
     // HINWEIS: activeMicStreamRef.current wird sicher in recorder.onstop gestoppt!
   };
@@ -1243,21 +1279,29 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   const commitFileUpload = async () => {
     if (!uploadFile) return;
-    await processDualMasteringForModal(uploadFile, 0, selectedProfile);
+    setReverbWetSlider(30);
+    await processDualMasteringForModal(uploadFile, 0, selectedProfile, 30);
   };
 
   /**
    * 🎛️ DUAL MASTERING PIPELINE (Loudness-Matched -13.0 LUFS Classical & Jazz Reference):
    * Erzeugt simultan:
-   * 1. Studio Audio-Processing (-13.0 LUFS, natürliche analoge Klangpolitur)
+   * 1. Studio Audio-Processing (-13.0 LUFS, New York Parallel-Kompression & Gala Hall)
    * 2. Pure RAW (-13.0 LUFS Lautheits-Match, 100% unverfälschter Originalklang)
    */
-  const processDualMasteringForModal = async (fileOrBlob: Blob | File, durationSec: number, profileOverride?: MasteringProfile) => {
+  const processDualMasteringForModal = async (
+    fileOrBlob: Blob | File, 
+    durationSec: number, 
+    profileOverride?: MasteringProfile,
+    initialWetMixPercent: number = 30
+  ) => {
     setIsProcessingMastering(true);
     setPendingDualResult(null);
+    setLastRawInputFile(fileOrBlob);
 
     const effectiveProfile: MasteringProfile = profileOverride || selectedProfile;
     const isDrum = effectiveProfile === 'drums_percussion';
+    const effectiveWetMix = isDrum ? 0.12 : (initialWetMixPercent / 100);
 
     try {
       const dualRes = await processDualMastering(fileOrBlob, {
@@ -1277,7 +1321,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         applyParallelConsoleBus: true,
         applyStereoDimension: true,
         applyConvolutionReverb: true,
-        reverbWetMix: isDrum ? 0.075 : (effectiveProfile === 'grand_piano' ? 0.160 : 0.145),
+        reverbWetMix: effectiveWetMix,
         reverbPreDelayMs: effectiveProfile === 'grand_piano' ? 25 : 30
       });
       setPendingDualResult(dualRes);
@@ -1298,6 +1342,70 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     } finally {
       setIsProcessingMastering(false);
     }
+  };
+
+  /**
+   * 🏛️ Interaktiver Gala-Hall Schieberegler beim Vorhören
+   */
+  const handleReverbSliderChange = (newPercent: number) => {
+    setReverbWetSlider(newPercent);
+    if (!lastRawInputFile) return;
+
+    if (reverbDebounceTimerRef.current) {
+      clearTimeout(reverbDebounceTimerRef.current);
+    }
+
+    reverbDebounceTimerRef.current = setTimeout(async () => {
+      setIsReMasteringReverb(true);
+      try {
+        const effectiveProfile: MasteringProfile = selectedProfile;
+        const isDrum = effectiveProfile === 'drums_percussion';
+        const newMasterRes = await processStudioMastering(lastRawInputFile, {
+          profile: effectiveProfile,
+          targetLufs: -13.0,
+          targetPeakDb: -1.0,
+          isDrumPadMode: isDrum,
+          applyAutoGainStage: true,
+          applyAdaptiveHpf: true,
+          applyTransientSoftener: true,
+          applyLowEndResonance: true,
+          applyMidResonance: true,
+          applyTiltEq: true,
+          tiltPivotHz: 1000,
+          applyDeHarsh: true,
+          applyPultecAir: true,
+          applyParallelConsoleBus: true,
+          applyStereoDimension: true,
+          applyConvolutionReverb: true,
+          reverbWetMix: isDrum ? 0.12 : (newPercent / 100),
+          reverbPreDelayMs: effectiveProfile === 'grand_piano' ? 25 : 30
+        });
+
+        setPendingDualResult(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            masteredBlob: newMasterRes.masteredBlob,
+            masteredUrl: newMasterRes.masteredUrl
+          };
+        });
+
+        // Wenn die Studio-Version gerade abgespielt wird, Audio nahtlos aktualisieren
+        if (modalPreviewPlaying === 'master' && modalPreviewAudioRef.current) {
+          const currentPos = modalPreviewAudioRef.current.currentTime;
+          modalPreviewAudioRef.current.pause();
+          const newAudio = new Audio(newMasterRes.masteredUrl);
+          newAudio.currentTime = currentPos;
+          modalPreviewAudioRef.current = newAudio;
+          newAudio.play().catch(console.warn);
+          newAudio.onended = () => setModalPreviewPlaying(null);
+        }
+      } catch (err) {
+        console.warn('Re-master with new reverb wet mix note:', err);
+      } finally {
+        setIsReMasteringReverb(false);
+      }
+    }, 180);
   };
 
   /**
@@ -1484,7 +1592,244 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     setUploadFile(null);
   };
 
+  // 🎛️ Öffnet das Song-Bearbeitungs-Modal (Hall-Regler, Versionen & Songdetails)
+  const openEditTrackModal = (playlistId: string, track: CustomPlaylistTrack) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setActivePlayingId(null);
+    }
+    if (modalPreviewAudioRef.current) {
+      modalPreviewAudioRef.current.pause();
+      setModalPreviewPlaying(null);
+    }
+    if (editModalAudioRef.current) {
+      editModalAudioRef.current.pause();
+      setEditModalPreviewPlaying(null);
+    }
 
+    let initialArtist = '';
+    if (track.subtitle && track.subtitle.includes(' • ')) {
+      const parts = track.subtitle.split(' • ');
+      if (parts[0] && !parts[0].includes('Studio-Processing') && !parts[0].includes('Pure RAW')) {
+        initialArtist = parts[0];
+      }
+    }
+
+    setEditingTrackData({
+      playlistId,
+      trackId: track.id,
+      title: track.title,
+      subtitle: track.subtitle || '',
+      artist: initialArtist,
+      personalNote: track.personalNote || '',
+      audioUrl: track.audioUrl,
+      masteredAudioUrl: track.masteredAudioUrl,
+      preferredVersion: track.preferredVersion || 'master',
+      reverbWetMix: typeof track.reverbWetMix === 'number' ? track.reverbWetMix : 30
+    });
+    setEditTempMasterBlob(null);
+    setEditTempMasterUrl(null);
+  };
+
+  const closeEditTrackModal = () => {
+    if (editModalAudioRef.current) {
+      editModalAudioRef.current.pause();
+      editModalAudioRef.current = null;
+    }
+    setEditModalPreviewPlaying(null);
+    setEditingTrackData(null);
+    setEditTempMasterBlob(null);
+    setEditTempMasterUrl(null);
+  };
+
+  // 🏛️ Interaktive Hall-Regler-Anpassung im Bearbeitungs-Modal
+  const handleEditReverbSliderChange = (newPercent: number) => {
+    if (!editingTrackData) return;
+
+    setEditingTrackData(prev => prev ? { ...prev, reverbWetMix: newPercent } : null);
+
+    if (reverbDebounceTimerRef.current) {
+      clearTimeout(reverbDebounceTimerRef.current);
+    }
+
+    reverbDebounceTimerRef.current = setTimeout(async () => {
+      if (!editingTrackData) return;
+      setIsRemasteringEditTrack(true);
+      try {
+        // 1. Hole Roh-Audiodatei aus IndexedDB oder Cloud URL
+        let rawBlobData = await getBlob(`campus_audio_${editingTrackData.trackId}_raw`);
+        let rawBlob: Blob | null = null;
+        if (rawBlobData instanceof Blob) {
+          rawBlob = rawBlobData;
+        } else if (rawBlobData) {
+          rawBlob = new Blob([rawBlobData as any], { type: 'audio/wav' });
+        } else if (editingTrackData.audioUrl) {
+          try {
+            const resp = await fetch(editingTrackData.audioUrl);
+            if (resp.ok) rawBlob = await resp.blob();
+          } catch (fetchErr) {
+            console.warn('Could not fetch raw audio url:', fetchErr);
+          }
+        }
+
+        if (rawBlob) {
+          const effectiveProfile: MasteringProfile = selectedProfile;
+          const isDrum = effectiveProfile === 'drums_percussion';
+          const newMasterRes = await processStudioMastering(rawBlob, {
+            profile: effectiveProfile,
+            targetLufs: -13.0,
+            targetPeakDb: -1.0,
+            isDrumPadMode: isDrum,
+            applyAutoGainStage: true,
+            applyAdaptiveHpf: true,
+            applyTransientSoftener: true,
+            applyLowEndResonance: true,
+            applyMidResonance: true,
+            applyTiltEq: true,
+            tiltPivotHz: 1000,
+            applyDeHarsh: true,
+            applyPultecAir: true,
+            applyParallelConsoleBus: true,
+            applyStereoDimension: true,
+            applyConvolutionReverb: true,
+            reverbWetMix: isDrum ? 0.12 : (newPercent / 100),
+            reverbPreDelayMs: effectiveProfile === 'grand_piano' ? 25 : 30
+          });
+
+          setEditTempMasterBlob(newMasterRes.masteredBlob);
+          setEditTempMasterUrl(newMasterRes.masteredUrl);
+
+          // Nahtlose Audio-Aktualisierung bei laufender Wiedergabe
+          if (editModalPreviewPlaying === 'master' && editModalAudioRef.current) {
+            const currentPos = editModalAudioRef.current.currentTime;
+            editModalAudioRef.current.pause();
+            const newAudio = new Audio(newMasterRes.masteredUrl);
+            newAudio.currentTime = currentPos;
+            editModalAudioRef.current = newAudio;
+            newAudio.play().catch(console.warn);
+            newAudio.onended = () => setEditModalPreviewPlaying(null);
+          }
+        }
+      } catch (err) {
+        console.warn('Re-master in edit modal failed:', err);
+      } finally {
+        setIsRemasteringEditTrack(false);
+      }
+    }, 180);
+  };
+
+  // 🎧 Vorhören im Bearbeitungs-Modal
+  const toggleEditModalPreview = async (version: 'master' | 'raw') => {
+    if (!editingTrackData) return;
+
+    if (editModalPreviewPlaying === version) {
+      if (editModalAudioRef.current) {
+        editModalAudioRef.current.pause();
+      }
+      setEditModalPreviewPlaying(null);
+    } else {
+      if (editModalAudioRef.current) {
+        editModalAudioRef.current.pause();
+      }
+
+      let targetUrl: string | null = null;
+      if (version === 'master') {
+        targetUrl = editTempMasterUrl || editingTrackData.masteredAudioUrl || null;
+        if (!targetUrl) {
+          targetUrl = await resolvePlayableUrl(editingTrackData.audioUrl, editingTrackData.masteredAudioUrl, editingTrackData.trackId, 'master');
+        }
+      } else {
+        targetUrl = editingTrackData.audioUrl || null;
+        if (!targetUrl) {
+          targetUrl = await resolvePlayableUrl(editingTrackData.audioUrl, editingTrackData.masteredAudioUrl, editingTrackData.trackId, 'raw');
+        }
+      }
+
+      if (targetUrl) {
+        const audio = new Audio(targetUrl);
+        editModalAudioRef.current = audio;
+        audio.play().catch(console.warn);
+        setEditModalPreviewPlaying(version);
+        audio.onended = () => {
+          setEditModalPreviewPlaying(null);
+        };
+      }
+    }
+  };
+
+  // 💾 Speichern der Song-Bearbeitungen
+  const handleSaveEditedTrack = async () => {
+    if (!editingTrackData) return;
+    setIsSavingEditTrack(true);
+
+    try {
+      let finalMasteredUrl = editingTrackData.masteredAudioUrl;
+
+      // 1. Wenn ein neuer Master gerendert wurde, in IndexedDB & Cloud speichern
+      if (editTempMasterBlob) {
+        try {
+          await storeBlob(`campus_audio_${editingTrackData.trackId}_master`, editTempMasterBlob);
+        } catch (dbErr) {
+          console.warn('Local blob update note:', dbErr);
+        }
+
+        try {
+          const sId = student?.id || studentId || 'student';
+          const masterPath = `audio_biography/${sId}_${editingTrackData.trackId}_master.wav`;
+          const { error: masterErr } = await supabase.storage
+            .from('campus-assets')
+            .upload(masterPath, editTempMasterBlob, { contentType: 'audio/wav', upsert: true });
+
+          if (!masterErr) {
+            const { data: masterData } = supabase.storage.from('campus-assets').getPublicUrl(masterPath);
+            if (masterData?.publicUrl) finalMasteredUrl = masterData.publicUrl;
+          }
+        } catch (stErr) {
+          console.warn('Cloud storage update note:', stErr);
+        }
+      }
+
+      const versionLabel = editingTrackData.preferredVersion === 'master'
+        ? 'Studio-Processing (-13 LUFS)'
+        : 'Pure RAW (-13 LUFS Lautheits-Match)';
+
+      const artistSubtitle = editingTrackData.artist?.trim()
+        ? `${editingTrackData.artist.trim()} • ${versionLabel}`
+        : versionLabel;
+
+      // 2. Playlists State aktualisieren
+      if (editingTrackData.playlistId) {
+        const updatedPlaylists = customPlaylists.map(pl => {
+          if (pl.id === editingTrackData.playlistId) {
+            return {
+              ...pl,
+              tracks: pl.tracks.map(t => {
+                if (t.id === editingTrackData.trackId) {
+                  return {
+                    ...t,
+                    title: editingTrackData.title.trim() || t.title,
+                    subtitle: artistSubtitle,
+                    personalNote: editingTrackData.personalNote?.trim(),
+                    preferredVersion: editingTrackData.preferredVersion,
+                    reverbWetMix: editingTrackData.reverbWetMix,
+                    masteredAudioUrl: finalMasteredUrl || t.masteredAudioUrl
+                  };
+                }
+                return t;
+              })
+            };
+          }
+          return pl;
+        });
+
+        savePlaylists(updatedPlaylists);
+      }
+
+      closeEditTrackModal();
+    } finally {
+      setIsSavingEditTrack(false);
+    }
+  };
 
   // 🌟 PLAYLIST WIZARD: STEP FINALIZE & CREATION
   const completePlaylistWizard = () => {
@@ -1716,18 +2061,31 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     }
   };
 
+  // Deterministic PIN hash helper for cross-device family verification
+  const computePinHash = (pin: string): string => {
+    if (!pin) return '';
+    const clean = pin.trim();
+    let h = 0x811c9dc5;
+    const str = `campus_groovelab_salt_${clean}`;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(36);
+  };
+
   const effectiveShareUrl = useMemo(() => {
     const params = new URLSearchParams();
     if (shareTargetPlaylistId) params.set('pl', shareTargetPlaylistId);
     if (shareAnonymously) params.set('anon', '1');
-    if (!shareAllowDownload) params.set('dl', '0');
     if (!shareAllowApplause) params.set('appl', '0');
+    if (sharePin) params.set('pinh', computePinHash(sharePin));
     const qs = params.toString();
     return `${window.location.origin}/bio/${studentId || 'talent'}${qs ? `?${qs}` : ''}`;
-  }, [studentId, shareTargetPlaylistId, shareAnonymously, shareAllowDownload, shareAllowApplause]);
+  }, [studentId, shareTargetPlaylistId, shareAnonymously, shareAllowApplause, sharePin]);
 
   const fullShareText = useMemo(() => {
-    return `🎵 Höre dir meine neuesten Songs aus der Musikschule an!\n\n1. Link öffnen: ${effectiveShareUrl}\n2. Familien-PIN eingeben: ${sharePin || '4829'}\n\n(Hinweis: Aus Urheberrechtsgründen nur für den privaten Familienkreis bestimmt.)`;
+    return `🎵 Höre dir meine neuesten Songs aus der Musikschule an!\n\n1. Link öffnen: ${effectiveShareUrl}\n2. Familien-PIN eingeben: ${sharePin || '4829'}\n\n🔒 WICHTIGER RECHTSHINWEIS (§ 15 Abs. 3 UrhG):\nDieser Link & PIN sind ausschließlich für den privaten Familienkreis bestimmt. Ein öffentliches Teilen (z. B. auf Social Media, Instagram, TikTok oder Websites) ist urheberrechtlich strengstens untersagt.`;
   }, [effectiveShareUrl, sharePin]);
 
   const handleShareLink = async () => {
@@ -1745,8 +2103,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       try {
         await navigator.share({
           title: `🎵 Audio-Biografie & Songs`,
-          text: fullShareText,
-          url: effectiveShareUrl
+          text: fullShareText
         });
         return;
       } catch (err) {
@@ -1754,6 +2111,20 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       }
     }
     copyToClipboard(fullShareText);
+  };
+
+  const handleShareWhatsApp = () => {
+    try {
+      if (studentId && sharePin) {
+        localStorage.setItem(`campus_share_pin_${studentId}`, sharePin);
+        if (shareTargetPlaylistId) {
+          localStorage.setItem(`campus_share_pin_${studentId}_${shareTargetPlaylistId}`, sharePin);
+        }
+      }
+    } catch {}
+
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullShareText)}`;
+    window.open(waUrl, '_blank');
   };
 
   const isLight = theme === 'light';
@@ -2406,6 +2777,30 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                           <Play size={13} color="#10b981" />
                         ) : (
                           <Clock size={13} color={isLight ? '#94a3b8' : '#64748b'} />
+                        )}
+
+                        {isRecorded && shelfMode === 'playlists' && selectedCustomPlaylistId && 'audioUrl' in t && t.audioUrl && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (selectedCustomPlaylistId) {
+                                openEditTrackModal(selectedCustomPlaylistId, t as CustomPlaylistTrack);
+                              }
+                            }}
+                            title="Song bearbeiten"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            className="hover-scale"
+                          >
+                            <Edit3 size={12} color="#0ea5e9" />
+                          </button>
                         )}
 
                         {isRecorded && (
@@ -3717,6 +4112,28 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <button
                                 type="button"
+                                onClick={() => openEditTrackModal(pl.id, t)}
+                                title="Song bearbeiten (Hall, Master/RAW & Notizen)"
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
+                                  border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.15)'}`,
+                                  background: isLight ? '#f0f9ff' : 'rgba(14, 165, 233, 0.12)',
+                                  color: '#0284c7',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                className="hover-scale"
+                              >
+                                <Edit3 size={14} color="#0284c7" />
+                              </button>
+
+                              <button
+                                type="button"
                                 onClick={() => downloadAudioTrack(t.audioUrl, t.masteredAudioUrl, t.title, t.id)}
                                 title="Song herunterladen"
                                 style={{
@@ -4485,7 +4902,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     🎵 Aufnahme fertig! Welche Version möchtest du speichern?
                   </span>
                   <span style={{ fontSize: '0.76rem', color: colors.textSecondary, marginTop: '2px', display: 'block', lineHeight: 1.35 }}>
-                    Beide Spuren haben <b>exakt dieselbe Lautheit (-13.0 LUFS)</b>. Du kannst beide vorhören und deine Standard-Version wählen (jederzeit im Player umschaltbar & downloadbar).
+                    Beide Spuren haben <b>exakt dieselbe Lautheit (-13.0 LUFS)</b>. Du kannst beide vorhören und deine Standard-Version wählen (jederzeit im Player umschaltbar).
                   </span>
                 </div>
 
@@ -4616,6 +5033,119 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       {modalPreviewPlaying === 'raw' ? <Pause size={13} /> : <Play size={13} />}
                       <span>{modalPreviewPlaying === 'raw' ? 'Stoppen' : 'RAW vorhören'}</span>
                     </button>
+                  </div>
+                </div>
+
+                {/* 🏛️ Apple-Style Spatial Audio Raumakustik (4 Presets + Fein-Tuning Slider) */}
+                <div style={{
+                  background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)',
+                  borderRadius: '18px',
+                  padding: '14px 16px',
+                  border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 900, color: colors.textPrimary, letterSpacing: '-0.01em' }}>
+                        🏛️ Raumakustik & Raumgröße
+                      </span>
+                      {isReMasteringReverb && (
+                        <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 800, animation: 'pulse 1s infinite' }}>
+                          ⏳ Remastering...
+                        </span>
+                      )}
+                    </div>
+                    <span style={{
+                      fontSize: '0.74rem',
+                      fontWeight: 900,
+                      color: '#10b981',
+                      background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.18)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      padding: '2px 9px',
+                      borderRadius: '100px'
+                    }}>
+                      {reverbWetSlider <= 12 ? '🎙️ Studio' : reverbWetSlider <= 25 ? '🎻 Kammermusik' : reverbWetSlider <= 42 ? '🏛️ Konzertsaal' : '⛪ Kathedrale'} • {reverbWetSlider}%
+                    </span>
+                  </div>
+
+                  {/* 4 Apple-Style Curated Room Preset Buttons */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                    {[
+                      { id: 'studio', name: 'Studio', emoji: '🎙️', wet: 10, sub: 'Trocken' },
+                      { id: 'chamber', name: 'Kammermusik', emoji: '🎻', wet: 20, sub: 'Warm' },
+                      { id: 'hall', name: 'Konzertsaal', emoji: '🏛️', wet: 35, sub: 'Gala-Saal' },
+                      { id: 'cathedral', name: 'Kathedrale', emoji: '⛪', wet: 55, sub: 'Monumental' },
+                    ].map(room => {
+                      const isActive = Math.abs(reverbWetSlider - room.wet) <= 6;
+                      return (
+                        <button
+                          key={room.id}
+                          type="button"
+                          onClick={() => handleReverbSliderChange(room.wet)}
+                          style={{
+                            padding: '10px 6px',
+                            borderRadius: '14px',
+                            border: isActive 
+                              ? '1.5px solid #10b981' 
+                              : `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+                            background: isActive 
+                              ? (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.2)') 
+                              : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)'),
+                            boxShadow: isActive ? '0 4px 12px rgba(16, 185, 129, 0.22)' : 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '3px',
+                            transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}
+                          className="hover-scale"
+                        >
+                          <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{room.emoji}</span>
+                          <span style={{
+                            fontSize: '0.74rem',
+                            fontWeight: 900,
+                            color: isActive ? (isLight ? '#059669' : '#34d399') : colors.textPrimary,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {room.name}
+                          </span>
+                          <span style={{
+                            fontSize: '0.62rem',
+                            fontWeight: 600,
+                            color: isActive ? (isLight ? '#15803d' : '#86efac') : colors.textSecondary
+                          }}>
+                            {room.sub}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Apple Fine-Tuning Slider Bar */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '2px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: colors.textSecondary, fontWeight: 700 }}>
+                      <span>Feinabstimmung (Raumtiefe & Nachhall):</span>
+                      <span style={{ color: '#10b981', fontWeight: 900 }}>{reverbWetSlider}% Wet</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="65"
+                      step="1"
+                      value={reverbWetSlider}
+                      onChange={(e) => handleReverbSliderChange(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        accentColor: '#10b981',
+                        cursor: 'pointer',
+                        height: '6px',
+                        borderRadius: '4px'
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -5110,16 +5640,38 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 </div>
               )}
 
-              {/* Download Permission Toggle */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', cursor: 'pointer', color: colors.textPrimary, fontWeight: 700 }}>
-                <input
-                  type="checkbox"
-                  checked={shareAllowDownload}
-                  onChange={(e) => setShareAllowDownload(e.target.checked)}
-                  style={{ accentColor: '#10b981', width: '17px', height: '17px' }}
-                />
-                <span>Hörern Download der Songs erlauben (WAV)</span>
-              </label>
+              {/* 🛡️ Urheberrechts- & GEMA-Schutz (§§ 16, 19a UrhG): Downloads für Dritte untersagt */}
+              <div style={{
+                background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)',
+                border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
+                borderRadius: '14px',
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: isLight ? '#e6f4ea' : 'rgba(16, 185, 129, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#10b981',
+                  flexShrink: 0
+                }}>
+                  <Shield size={16} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: colors.textPrimary }}>
+                    100% GEMA- & Urheberrechtsschutz (Listen-Only)
+                  </span>
+                  <span style={{ fontSize: '0.70rem', color: colors.textSecondary, lineHeight: 1.35 }}>
+                    Geteilte Links sind reine <b>Web-Streams ohne Download-Möglichkeit</b> für Dritte (§§ 16, 19a UrhG). Deine Originaldateien bleiben in deinem Account geschützt.
+                  </span>
+                </div>
+              </div>
 
               {/* Applause / Reactions Toggle */}
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', cursor: 'pointer', color: colors.textPrimary, fontWeight: 700 }}>
@@ -5243,46 +5795,74 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               </div>
             </div>
 
-            {/* Action Buttons: Native Share Sheet & Direct Preview */}
+            {/* Action Buttons: WhatsApp Direct, Native Share Sheet & Direct Preview */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* 🟢 1. Dedicated WhatsApp Share Button */}
               <button
                 type="button"
-                onClick={handleShareLink}
+                onClick={handleShareWhatsApp}
                 style={{
                   width: '100%',
                   padding: '14px',
                   borderRadius: '100px',
                   border: 'none',
-                  background: copySuccess ? '#059669' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
                   color: 'white',
                   fontWeight: 900,
-                  fontSize: '0.92rem',
+                  fontSize: '0.94rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
+                  boxShadow: '0 6px 20px rgba(37, 211, 102, 0.45)',
                   transition: 'all 0.2s ease'
                 }}
                 className="hover-scale"
               >
-                {copySuccess ? <Check size={18} strokeWidth={3} /> : <Share2 size={18} />}
-                <span>{copySuccess ? 'In Zwischenablage kopiert! 🎉' : '🎵 Playlist mit Familie teilen'}</span>
+                <MessageCircle size={20} strokeWidth={2.5} />
+                <span>🟢 Direkt per WhatsApp an Familie senden</span>
               </button>
 
+              {/* 📋 2. Universal Share / Copy Button */}
+              <button
+                type="button"
+                onClick={handleShareLink}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '100px',
+                  border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                  background: copySuccess ? '#059669' : (isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)'),
+                  color: copySuccess ? 'white' : colors.textPrimary,
+                  fontWeight: 900,
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s ease'
+                }}
+                className="hover-scale"
+              >
+                {copySuccess ? <Check size={17} strokeWidth={3} /> : <Share2 size={17} />}
+                <span>{copySuccess ? 'Nachricht in Zwischenablage kopiert! 🎉' : '📋 Nachricht kopieren & teilen'}</span>
+              </button>
+
+              {/* 🔗 3. Test Preview Button */}
               <button
                 type="button"
                 onClick={() => window.open(effectiveShareUrl, '_blank')}
                 style={{
                   width: '100%',
-                  padding: '11px',
+                  padding: '10px',
                   borderRadius: '100px',
-                  border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-                  background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
-                  color: colors.textPrimary,
+                  border: `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.12)'}`,
+                  background: isLight ? '#ffffff' : 'transparent',
+                  color: colors.textSecondary,
                   fontWeight: 800,
-                  fontSize: '0.82rem',
+                  fontSize: '0.80rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -5291,7 +5871,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 }}
                 className="hover-scale"
               >
-                <ExternalLink size={15} color="#10b981" />
+                <ExternalLink size={14} color="#10b981" />
                 <span>PIN-Eingabeseite testen (neuer Tab)</span>
               </button>
 
@@ -5478,6 +6058,418 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               >
                 <Download size={14} color="#f59e0b" />
                 <span>Beide Versionen herunterladen (Master + RAW)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🎛️ 7. SONG EDITIEREN & RAUMKLANG MODAL (Edit Hall, Version & Details) */}
+      {editingTrackData && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.82)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: isLight ? '#ffffff' : '#1e293b',
+            border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+            borderRadius: '24px',
+            padding: '26px',
+            maxWidth: '520px',
+            width: '100%',
+            color: colors.textPrimary,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.75)'
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '12px',
+                  background: isLight ? '#e0f2fe' : 'rgba(14, 165, 233, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#0284c7'
+                }}>
+                  <SlidersHorizontal size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.14rem', fontWeight: 900 }}>
+                    Song bearbeiten & Raumklang
+                  </h3>
+                  <span style={{ fontSize: '0.76rem', color: colors.textSecondary, fontWeight: 600 }}>
+                    Standard-Version festlegen & Gala-Konzertsaal Hall verfeinern
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeEditTrackModal}
+                style={{ background: 'none', border: 'none', color: colors.textSecondary, fontSize: '1.2rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Version Selection Cards (Studio Master vs. Pure RAW) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.76rem', fontWeight: 800, color: colors.textPrimary }}>
+                Standard-Wiedergabeversion:
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {/* Option 1: Studio Master */}
+                <div
+                  onClick={() => setEditingTrackData(prev => prev ? { ...prev, preferredVersion: 'master' } : null)}
+                  style={{
+                    border: `2px solid ${editingTrackData.preferredVersion === 'master' ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)')}`,
+                    borderRadius: '16px',
+                    padding: '12px',
+                    background: editingTrackData.preferredVersion === 'master' 
+                      ? (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.12)') 
+                      : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)'),
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    boxShadow: editingTrackData.preferredVersion === 'master' ? '0 4px 14px rgba(16, 185, 129, 0.2)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '0.64rem', fontWeight: 900, padding: '2px 7px', borderRadius: '100px', background: '#10b981', color: 'white' }}>
+                        ✨ STUDIO MASTER
+                      </span>
+                      {editingTrackData.preferredVersion === 'master' && (
+                        <CheckCircle2 size={15} color="#10b981" />
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 900, color: colors.textPrimary }}>
+                      Studio Audio-Processing
+                    </div>
+                    <p style={{ margin: '3px 0 0 0', fontSize: '0.70rem', color: colors.textSecondary, lineHeight: 1.25 }}>
+                      Gala-Konzertsaal Raumklang & Druck (-13 LUFS).
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleEditModalPreview('master');
+                    }}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '100px',
+                      border: 'none',
+                      background: editModalPreviewPlaying === 'master' ? '#ef4444' : '#10b981',
+                      color: 'white',
+                      fontWeight: 800,
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    {editModalPreviewPlaying === 'master' ? <Pause size={12} /> : <Play size={12} />}
+                    <span>{editModalPreviewPlaying === 'master' ? 'Stoppen' : 'Studio vorhören'}</span>
+                  </button>
+                </div>
+
+                {/* Option 2: Pure RAW */}
+                <div
+                  onClick={() => setEditingTrackData(prev => prev ? { ...prev, preferredVersion: 'raw' } : null)}
+                  style={{
+                    border: `2px solid ${editingTrackData.preferredVersion === 'raw' ? '#3b82f6' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)')}`,
+                    borderRadius: '16px',
+                    padding: '12px',
+                    background: editingTrackData.preferredVersion === 'raw' 
+                      ? (isLight ? '#eff6ff' : 'rgba(59, 130, 246, 0.12)') 
+                      : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)'),
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    boxShadow: editingTrackData.preferredVersion === 'raw' ? '0 4px 14px rgba(59, 130, 246, 0.2)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '0.64rem', fontWeight: 900, padding: '2px 7px', borderRadius: '100px', background: '#3b82f6', color: 'white' }}>
+                        🎙️ PURE RAW
+                      </span>
+                      {editingTrackData.preferredVersion === 'raw' && (
+                        <CheckCircle2 size={15} color="#3b82f6" />
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 900, color: colors.textPrimary }}>
+                      Originalklang
+                    </div>
+                    <p style={{ margin: '3px 0 0 0', fontSize: '0.70rem', color: colors.textSecondary, lineHeight: 1.25 }}>
+                      100% unverfälschte Mikrofon-Aufnahme (-13 LUFS).
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleEditModalPreview('raw');
+                    }}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '100px',
+                      border: 'none',
+                      background: editModalPreviewPlaying === 'raw' ? '#ef4444' : '#3b82f6',
+                      color: 'white',
+                      fontWeight: 800,
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    {editModalPreviewPlaying === 'raw' ? <Pause size={12} /> : <Play size={12} />}
+                    <span>{editModalPreviewPlaying === 'raw' ? 'Stoppen' : 'RAW vorhören'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 🏛️ Apple-Style Spatial Audio Raumakustik (4 Presets + Fein-Tuning Slider) */}
+            <div style={{
+              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)',
+              borderRadius: '18px',
+              padding: '14px 16px',
+              border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 900, color: colors.textPrimary, letterSpacing: '-0.01em' }}>
+                    🏛️ Raumakustik & Raumgröße
+                  </span>
+                  {isRemasteringEditTrack && (
+                    <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 800, animation: 'pulse 1s infinite' }}>
+                      ⏳ Remastering...
+                    </span>
+                  )}
+                </div>
+                <span style={{
+                  fontSize: '0.74rem',
+                  fontWeight: 900,
+                  color: '#10b981',
+                  background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.18)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  padding: '2px 9px',
+                  borderRadius: '100px'
+                }}>
+                  {editingTrackData.reverbWetMix <= 12 ? '🎙️ Studio' : editingTrackData.reverbWetMix <= 25 ? '🎻 Kammermusik' : editingTrackData.reverbWetMix <= 42 ? '🏛️ Konzertsaal' : '⛪ Kathedrale'} • {editingTrackData.reverbWetMix}%
+                </span>
+              </div>
+
+              {/* 4 Apple-Style Curated Room Preset Buttons */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                {[
+                  { id: 'studio', name: 'Studio', emoji: '🎙️', wet: 10, sub: 'Trocken' },
+                  { id: 'chamber', name: 'Kammermusik', emoji: '🎻', wet: 20, sub: 'Warm' },
+                  { id: 'hall', name: 'Konzertsaal', emoji: '🏛️', wet: 35, sub: 'Gala-Saal' },
+                  { id: 'cathedral', name: 'Kathedrale', emoji: '⛪', wet: 55, sub: 'Monumental' },
+                ].map(room => {
+                  const isActive = Math.abs(editingTrackData.reverbWetMix - room.wet) <= 6;
+                  return (
+                    <button
+                      key={room.id}
+                      type="button"
+                      onClick={() => handleEditReverbSliderChange(room.wet)}
+                      style={{
+                        padding: '10px 6px',
+                        borderRadius: '14px',
+                        border: isActive 
+                          ? '1.5px solid #10b981' 
+                          : `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+                        background: isActive 
+                          ? (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.2)') 
+                          : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)'),
+                        boxShadow: isActive ? '0 4px 12px rgba(16, 185, 129, 0.22)' : 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '3px',
+                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                      }}
+                      className="hover-scale"
+                    >
+                      <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{room.emoji}</span>
+                      <span style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 900,
+                        color: isActive ? (isLight ? '#059669' : '#34d399') : colors.textPrimary,
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {room.name}
+                      </span>
+                      <span style={{
+                        fontSize: '0.62rem',
+                        fontWeight: 600,
+                        color: isActive ? (isLight ? '#15803d' : '#86efac') : colors.textSecondary
+                      }}>
+                        {room.sub}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Apple Fine-Tuning Slider Bar */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '2px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: colors.textSecondary, fontWeight: 700 }}>
+                  <span>Feinabstimmung (Raumtiefe & Nachhall):</span>
+                  <span style={{ color: '#10b981', fontWeight: 900 }}>{editingTrackData.reverbWetMix}% Wet</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="65"
+                  step="1"
+                  value={editingTrackData.reverbWetMix}
+                  onChange={(e) => handleEditReverbSliderChange(Number(e.target.value))}
+                  style={{
+                    width: '100%',
+                    accentColor: '#10b981',
+                    cursor: 'pointer',
+                    height: '6px',
+                    borderRadius: '4px'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Song Meta Inputs: Titel & Notiz */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: colors.textPrimary, fontWeight: 800, marginBottom: '4px' }}>
+                  Songtitel:
+                </label>
+                <input
+                  type="text"
+                  value={editingTrackData.title}
+                  onChange={(e) => setEditingTrackData(prev => prev ? { ...prev, title: e.target.value } : null)}
+                  placeholder="z. B. Für Elise..."
+                  style={{
+                    width: '100%',
+                    padding: '9px 11px',
+                    borderRadius: '12px',
+                    border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                    background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.35)',
+                    color: colors.textPrimary,
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: colors.textPrimary, fontWeight: 800, marginBottom: '4px' }}>
+                  Interpret / Notiz:
+                </label>
+                <input
+                  type="text"
+                  value={editingTrackData.artist || ''}
+                  onChange={(e) => setEditingTrackData(prev => prev ? { ...prev, artist: e.target.value } : null)}
+                  placeholder="z. B. Amelia..."
+                  style={{
+                    width: '100%',
+                    padding: '9px 11px',
+                    borderRadius: '12px',
+                    border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                    background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.35)',
+                    color: colors.textPrimary,
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={closeEditTrackModal}
+                disabled={isSavingEditTrack}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  borderRadius: '100px',
+                  border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                  background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.05)',
+                  color: colors.textPrimary,
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer'
+                }}
+                className="hover-scale"
+              >
+                Abbrechen
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveEditedTrack}
+                disabled={isSavingEditTrack}
+                style={{
+                  flex: 1.3,
+                  padding: '11px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  background: '#10b981',
+                  color: 'white',
+                  fontWeight: 900,
+                  fontSize: '0.82rem',
+                  cursor: isSavingEditTrack ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                  opacity: isSavingEditTrack ? 0.7 : 1
+                }}
+                className="hover-scale"
+              >
+                <Check size={16} />
+                <span>{isSavingEditTrack ? 'Wird gespeichert...' : 'Änderungen speichern'}</span>
               </button>
             </div>
           </div>
