@@ -20,6 +20,7 @@ import {
 import { supabase } from '../../lib/supabase';
 // @ts-ignore
 import * as lamejs from '@breezystack/lamejs';
+import { processPureRawAudioBuffer, audioBufferToWavBlob } from '../../utils/audioMasteringEngine';
 
 export interface Track {
   id: number;
@@ -2170,8 +2171,42 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           autoGainControl: false
         }
       });
+      // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
+      let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+      let hasTresorStorage = false;
+      if (targetSchoolId) {
+        try {
+          const { data: sch } = await supabase
+            .from('schools')
+            .select('storage_addon_gb, storage_addon_status')
+            .eq('id', targetSchoolId)
+            .maybeSingle();
+          if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
+            hasTresorStorage = true;
+          }
+        } catch (e) {}
+      }
+
+      const targetBitrate = hasTresorStorage ? 256000 : 96000;
+      let mimeType = 'audio/webm;codecs=opus';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
+          else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+          else if (MediaRecorder.isTypeSupported('audio/aac')) mimeType = 'audio/aac';
+          else mimeType = '';
+        }
+      }
+
       mediaStreamRef.current = stream;
-      const mediaRecorder = new MediaRecorder(stream);
+      let mediaRecorder: MediaRecorder;
+      try {
+        mediaRecorder = mimeType 
+          ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: targetBitrate }) 
+          : new MediaRecorder(stream, { audioBitsPerSecond: targetBitrate });
+      } catch (recInitErr) {
+        mediaRecorder = new MediaRecorder(stream);
+      }
       const chunks: Blob[] = [];
 
       mediaRecorder.ondataavailable = (e: any) => {
@@ -2189,7 +2224,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           const arrayBuffer = await blob.arrayBuffer();
           if (audioContextRef.current) {
             const decoded = await audioContextRef.current.decodeAudioData(arrayBuffer);
-            const normalized = normalizeAudioBuffer(decoded, 0.95);
+            // 🎛️ PURE RAW DSP: EBU R128 (-13 LUFS) + DC-Blocker + Loop Seam Crossfade
+            const normalized = processPureRawAudioBuffer(decoded, { targetLufs: -13.0, targetPeakDb: -1.0, isLoop: true });
             audioBuffersRef.current[trackId] = normalized;
           }
         } catch (decodeErr) {
@@ -2588,18 +2624,57 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       });
 
       const renderedBuffer = await offlineCtx.startRendering();
-      normalizeAudioBuffer(renderedBuffer, 0.95);
+      // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-13 LUFS)
+      processPureRawAudioBuffer(renderedBuffer, { targetLufs: -13.0, targetPeakDb: -1.0, isLoop: false });
+
+      // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
+      let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+      if (!targetSchoolId && student?.id) {
+        try {
+          const { data: stRec } = await supabase
+            .from('students')
+            .select('school_id')
+            .eq('id', student.id)
+            .maybeSingle();
+          if (stRec?.school_id) targetSchoolId = stRec.school_id;
+        } catch (stErr) {
+          console.warn('[Loopstation] School lookup note:', stErr);
+        }
+      }
+
+      let hasTresorStorage = false;
+      if (targetSchoolId) {
+        try {
+          const { data: sch } = await supabase
+            .from('schools')
+            .select('storage_addon_gb, storage_addon_status')
+            .eq('id', targetSchoolId)
+            .maybeSingle();
+          if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
+            hasTresorStorage = true;
+          }
+        } catch (e) {}
+      }
 
       let mixBlob: Blob;
       let contentType = 'audio/mp3';
       let fileExt = 'mp3';
-      try {
-        mixBlob = bufferToMp3(renderedBuffer);
-      } catch (mp3Err) {
-        console.warn("MP3 conversion failed, falling back to WAV format:", mp3Err);
-        mixBlob = bufferToWav(renderedBuffer);
+
+      if (hasTresorStorage) {
+        // 💎 High-End Audiophile Lossless 24-Bit / 48 kHz Studio-WAV Master (Audio-Tresor Active)
+        mixBlob = audioBufferToWavBlob(renderedBuffer, { title: sanitizedLabel, artist: student?.first_name || 'Campus Artist' });
         contentType = 'audio/wav';
         fileExt = 'wav';
+      } else {
+        // 📦 Standard Voice & Space-Saving MP3/WebM Compression
+        try {
+          mixBlob = bufferToMp3(renderedBuffer);
+        } catch (mp3Err) {
+          console.warn("MP3 conversion failed, falling back to WAV format:", mp3Err);
+          mixBlob = bufferToWav(renderedBuffer);
+          contentType = 'audio/wav';
+          fileExt = 'wav';
+        }
       }
 
       const fileName = `${student.id}_loopmix_${Date.now()}.${fileExt}`;
@@ -2616,19 +2691,6 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       const audioMetaStr = `LOOP:${publicUrl}|${Math.round(masterLoopDuration / 1000)}|${new Date().toISOString()}|${sanitizedLabel}|${creatorRole}`;
 
       // 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
-      let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
-      if (!targetSchoolId && student?.id) {
-        try {
-          const { data: stRec } = await supabase
-            .from('students')
-            .select('school_id')
-            .eq('id', student.id)
-            .maybeSingle();
-          if (stRec?.school_id) targetSchoolId = stRec.school_id;
-        } catch (stErr) {
-          console.warn('[Loopstation] School lookup note:', stErr);
-        }
-      }
       if (targetSchoolId && mixBlob?.size) {
         try {
           const { data: schoolData } = await supabase
@@ -2733,7 +2795,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       });
 
       const renderedBuffer = await offlineCtx.startRendering();
-      normalizeAudioBuffer(renderedBuffer, 0.95);
+      // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-13 LUFS)
+      processPureRawAudioBuffer(renderedBuffer, { targetLufs: -13.0, targetPeakDb: -1.0, isLoop: false });
 
       let mixBlob: Blob;
       let fileExt = 'mp3';
@@ -3936,7 +3999,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     source.start(0);
 
                     const renderedBuffer = await offlineCtx.startRendering();
-                    normalizeAudioBuffer(renderedBuffer, 0.95);
+                    // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-13 LUFS)
+                    processPureRawAudioBuffer(renderedBuffer, { targetLufs: -13.0, targetPeakDb: -1.0, isLoop: false });
 
                     btn.innerText = "KONVERTIERE...";
                     let mixBlob: Blob;

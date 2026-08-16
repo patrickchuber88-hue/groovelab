@@ -22,6 +22,14 @@ import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStude
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { AVVModal } from './AVVModal';
 import { PricingTransparencyWidget } from './PricingTransparencyWidget';
+import { 
+  fetchSchoolRoster, 
+  getTeacherRoster, 
+  getTeacherStudentCount, 
+  normalizeStudentKey, 
+  isTestOrGenericStudent, 
+  deduplicateRoster 
+} from '../services/studentRosterService';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -2114,6 +2122,27 @@ export function AdminDashboard({
     }
   }, [activeTab, selectedCampusRoomId, isDateFilterActive, bookingStartTime]);
 
+  const normalizeStudentKey = (firstName: string, lastName: string) => {
+    const fn = (firstName || '').toLowerCase().replace(/[^a-z0-9äöüß]/g, '');
+    const ln = (lastName || '').toLowerCase().replace(/[^a-z0-9äöüß]/g, '');
+    return `${fn}_${ln}`;
+  };
+
+  const isTestOrGenericStudent = (firstName: string, lastName: string) => {
+    const fn = (firstName || '').toLowerCase().trim();
+    const full = `${firstName || ''} ${lastName || ''}`.toLowerCase().trim();
+    return (
+      !fn ||
+      fn.startsWith('test') ||
+      fn.includes('testvorname') ||
+      full.includes('ausstehend') ||
+      full.includes('onboarding') ||
+      full.includes('unbekannt') ||
+      full === 'schüler' ||
+      full === 'musiker'
+    );
+  };
+
   const deduplicateStudents = (students: any[]): any[] => {
     if (!Array.isArray(students)) return [];
     const seenIds = new Set<string>();
@@ -2122,11 +2151,15 @@ export function AdminDashboard({
     for (const student of students) {
       if (!student) continue;
 
+      const fn = (student.first_name || '').trim();
+      const ln = (student.last_name || '').trim();
+
+      // Skip test / generic dummy profiles
+      if (isTestOrGenericStudent(fn, ln) && student.isPendingOnboarding) continue;
+
       if (student.id && seenIds.has(student.id)) continue;
 
-      const fn = (student.first_name || '').trim().toLowerCase();
-      const ln = (student.last_name || '').trim().toLowerCase();
-      const nameKey = `${fn}_${ln}`;
+      const nameKey = normalizeStudentKey(fn, ln);
 
       if (nameKey !== '_') {
         if (studentMap.has(nameKey)) {
@@ -2151,7 +2184,6 @@ export function AdminDashboard({
   };
 
   const fetchTeacherStudentsHelper = async (teacherId: string, schoolId: string, platform: string) => {
-    let sq = supabase.from('users').select('*').eq('school_id', schoolId).eq('role', 'student');
     let assignedStudentIds: string[] = [];
 
     if (platform === 'campus') {
@@ -2172,21 +2204,17 @@ export function AdminDashboard({
       }
 
       assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]));
-      if (assignedStudentIds.length > 0) {
-        sq = sq.or(`teacher_id.eq.${teacherId},id.in.(${assignedStudentIds.join(',')})`);
-      } else {
-        sq = sq.eq('teacher_id', teacherId);
-      }
-    } else {
-      sq = sq.eq('is_groovelab_active', true);
     }
 
-    // 1. Fetch registered students from users table
-    const { data: registeredStudentsData } = await sq.order('first_name');
-    const registeredStudents = registeredStudentsData || [];
+    const schoolRoster = await fetchSchoolRoster(schoolId, supabase);
+    let teacherStudents = getTeacherRoster(teacherId, schoolRoster, assignedStudentIds);
 
-    if (registeredStudents.length > 0 && platform === 'campus') {
-      const unlinkedStudents = registeredStudents.filter((s: any) => !s.teacher_id).map((s: any) => s.id);
+    if (platform !== 'campus') {
+      teacherStudents = teacherStudents.filter(s => s.is_groovelab_active);
+    }
+
+    if (teacherStudents.length > 0 && platform === 'campus') {
+      const unlinkedStudents = teacherStudents.filter((s: any) => !s.teacher_id && !s.isPendingOnboarding).map((s: any) => s.id);
       if (unlinkedStudents.length > 0) {
         supabase.from('users').update({ teacher_id: teacherId }).in('id', unlinkedStudents).then(() => {
           console.log(`[Teacher Board] Auto-synced teacher_id for ${unlinkedStudents.length} students.`);
@@ -2194,62 +2222,7 @@ export function AdminDashboard({
       }
     }
 
-    // 2. Fetch pending onboarding students from pending_students_decrypted view (Campus only)
-    let mappedPending: any[] = [];
-    if (platform === 'campus') {
-      try {
-        const { data: pendingData } = await supabase
-          .from('pending_students_decrypted')
-          .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
-          .eq('school_id', schoolId);
-
-        if (pendingData && pendingData.length > 0) {
-          const registeredIds = new Set(registeredStudents.map((s: any) => s.id));
-          const registeredNameKeys = new Set(
-            registeredStudents.map((s: any) => `${(s.first_name || '').trim().toLowerCase()}_${(s.last_name || '').trim().toLowerCase()}`)
-          );
-          const seenPendingNames = new Set<string>();
-
-          mappedPending = pendingData
-            .filter((ps: any) => {
-              if (!ps) return false;
-              if (registeredIds.has(ps.id)) return false;
-              const nameKey = `${(ps.first_name || '').trim().toLowerCase()}_${(ps.last_name || '').trim().toLowerCase()}`;
-              if (nameKey !== '_' && registeredNameKeys.has(nameKey)) return false;
-              if (nameKey !== '_') {
-                if (seenPendingNames.has(nameKey)) return false;
-                seenPendingNames.add(nameKey);
-              }
-              return ps.teacher_id === teacherId || assignedStudentIds.includes(ps.id);
-            })
-            .map((ps: any) => ({
-              id: ps.id,
-              school_id: ps.school_id,
-              teacher_id: ps.teacher_id,
-              role: 'student',
-              first_name: ps.first_name || 'Ausstehender Schüler',
-              last_name: ps.last_name || '',
-              email: '',
-              instrument: ps.instrument || 'Gitarre',
-              is_active: false,
-              is_campus_active: false,
-              is_groovelab_active: false,
-              status: 'inactive',
-              isPendingOnboarding: true,
-              day_of_birth: ps.day_of_birth || null,
-              ausweis_nummer: 'Ausstehend (Onboarding)',
-              created_at: ps.created_at || new Date().toISOString()
-            }));
-        }
-      } catch (err) {
-        console.warn('[Teacher Board] Pending students fetch warning:', err);
-      }
-    }
-
-    // Combine registered + pending onboarding students
-    const combined = deduplicateStudents([...registeredStudents, ...mappedPending]);
-    combined.sort((a, b) => (a.first_name || '').localeCompare(b.first_name || '', 'de'));
-    return combined;
+    return teacherStudents;
   };
 
   const fetchData = async (force = false) => {
@@ -2312,60 +2285,10 @@ export function AdminDashboard({
         let studentsData: any[] = [];
 
         if (canSeeAllStudents) {
-          let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-          if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
-          else sq = sq.eq('is_groovelab_active', true);
-          const { data: regData } = await sq.order('first_name');
-          const registered = regData || [];
-          const regIds = new Set(registered.map((s: any) => s.id));
-          const registeredNameKeys = new Set(
-            registered.map((s: any) => `${(s.first_name || '').trim().toLowerCase()}_${(s.last_name || '').trim().toLowerCase()}`)
-          );
-          const seenPendingNames = new Set<string>();
-
-          let pendingMapped: any[] = [];
-          try {
-            const { data: pendingData } = await supabase
-              .from('pending_students_decrypted')
-              .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
-              .eq('school_id', adminData.school_id);
-            if (pendingData) {
-              pendingMapped = pendingData
-                .filter((ps: any) => {
-                  if (!ps) return false;
-                  if (regIds.has(ps.id)) return false;
-                  const nameKey = `${(ps.first_name || '').trim().toLowerCase()}_${(ps.last_name || '').trim().toLowerCase()}`;
-                  if (nameKey !== '_' && registeredNameKeys.has(nameKey)) return false;
-                  if (nameKey !== '_') {
-                    if (seenPendingNames.has(nameKey)) return false;
-                    seenPendingNames.add(nameKey);
-                  }
-                  return true;
-                })
-                .map((ps: any) => ({
-                  id: ps.id,
-                  school_id: ps.school_id,
-                  teacher_id: ps.teacher_id,
-                  role: 'student',
-                  first_name: ps.first_name || 'Ausstehender Schüler',
-                  last_name: ps.last_name || '',
-                  email: '',
-                  instrument: ps.instrument || 'Gitarre',
-                  is_active: false,
-                  is_campus_active: false,
-                  is_groovelab_active: false,
-                  status: 'inactive',
-                  isPendingOnboarding: true,
-                  day_of_birth: ps.day_of_birth || null,
-                  ausweis_nummer: 'Ausstehend (Onboarding)',
-                  created_at: ps.created_at || new Date().toISOString()
-                }));
-            }
-          } catch (e) {
-            console.warn('Pending fetch warning in canSeeAllStudents:', e);
-          }
-          studentsData = deduplicateStudents([...registered, ...pendingMapped]);
-          studentsData.sort((a, b) => (a.first_name || '').localeCompare(b.first_name || '', 'de'));
+          const schoolRoster = await fetchSchoolRoster(adminData.school_id, supabase);
+          studentsData = activePlatform === 'groovelab' 
+            ? schoolRoster.filter(s => s.is_groovelab_active) 
+            : schoolRoster;
         } else {
           studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
         }
@@ -2558,46 +2481,10 @@ export function AdminDashboard({
         let studentsData: any[] = [];
 
         if (canSeeAllStudents) {
-          let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-          if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
-          else sq = sq.eq('is_groovelab_active', true);
-          const { data: regData } = await sq.order('first_name');
-          const registered = regData || [];
-          const regIds = new Set(registered.map((s: any) => s.id));
-
-          let pendingMapped: any[] = [];
-          try {
-            const { data: pendingData } = await supabase
-              .from('pending_students_decrypted')
-              .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
-              .eq('school_id', adminData.school_id);
-            if (pendingData) {
-              pendingMapped = pendingData
-                .filter((ps: any) => !regIds.has(ps.id))
-                .map((ps: any) => ({
-                  id: ps.id,
-                  school_id: ps.school_id,
-                  teacher_id: ps.teacher_id,
-                  role: 'student',
-                  first_name: ps.first_name || 'Ausstehender Schüler',
-                  last_name: ps.last_name || '',
-                  email: '',
-                  instrument: ps.instrument || 'Gitarre',
-                  is_active: false,
-                  is_campus_active: false,
-                  is_groovelab_active: false,
-                  status: 'inactive',
-                  isPendingOnboarding: true,
-                  day_of_birth: ps.day_of_birth || null,
-                  ausweis_nummer: 'Ausstehend (Onboarding)',
-                  created_at: ps.created_at || new Date().toISOString()
-                }));
-            }
-          } catch (e) {
-            console.warn('Pending fetch warning in canSeeAllStudents:', e);
-          }
-          studentsData = [...registered, ...pendingMapped];
-          studentsData.sort((a, b) => (a.first_name || '').localeCompare(b.first_name || '', 'de'));
+          const schoolRoster = await fetchSchoolRoster(adminData.school_id, supabase);
+          studentsData = activePlatform === 'groovelab' 
+            ? schoolRoster.filter(s => s.is_groovelab_active) 
+            : schoolRoster;
         } else {
           studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
         }
@@ -2910,8 +2797,7 @@ export function AdminDashboard({
           studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
         } else {
           let studSq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-          if (activePlatform === 'campus') studSq = studSq.eq('is_campus_active', true);
-          else studSq = studSq.eq('is_groovelab_active', true);
+          if (activePlatform !== 'campus') studSq = studSq.eq('is_groovelab_active', true);
           const { data } = await studSq.order('first_name');
           studentsData = data || [];
         }
@@ -2944,8 +2830,7 @@ export function AdminDashboard({
         }
         // Also fetch students for the search function in band edit
         let bsq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-        if (activePlatform === 'campus' && adminData.role !== 'teacher') bsq = bsq.eq('is_campus_active', true);
-        else if (activePlatform !== 'campus') bsq = bsq.eq('is_groovelab_active', true);
+        if (activePlatform !== 'campus') bsq = bsq.eq('is_groovelab_active', true);
         const { data: studentsData } = await bsq.order('first_name');
         if (studentsData) setStudents(studentsData);
         
@@ -2972,8 +2857,7 @@ export function AdminDashboard({
         if (teachersData) setTeachers(teachersData);
       } else if (activeTab === 'gallery') {
         let usq = supabase.from('users').select('*').eq('school_id', adminData.school_id);
-        if (activePlatform === 'campus' && adminData.role !== 'teacher') usq = usq.eq('is_campus_active', true);
-        else if (activePlatform !== 'campus') usq = usq.eq('is_groovelab_active', true);
+        if (activePlatform !== 'campus') usq = usq.eq('is_groovelab_active', true);
         const { data: allUsers } = await usq.order('first_name');
         if (allUsers) {
           setStudents(allUsers.filter(u => u.role === 'student'));
@@ -2996,8 +2880,7 @@ export function AdminDashboard({
         
         // Fetch students roster for manual check-in
         let ssq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-        if (activePlatform === 'campus') ssq = ssq.eq('is_campus_active', true);
-        else ssq = ssq.eq('is_groovelab_active', true);
+        if (activePlatform !== 'campus') ssq = ssq.eq('is_groovelab_active', true);
         const { data: studentsData } = await ssq.order('first_name');
         if (studentsData) setStudents(studentsData);
       } else if (activeTab === 'missions') {
@@ -3044,8 +2927,7 @@ export function AdminDashboard({
           studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
         } else {
           let ssq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-          if (activePlatform === 'campus') ssq = ssq.eq('is_campus_active', true);
-          else ssq = ssq.eq('is_groovelab_active', true);
+          if (activePlatform !== 'campus') ssq = ssq.eq('is_groovelab_active', true);
           const { data } = await ssq.order('first_name');
           studentsData = data || [];
         }
@@ -3172,8 +3054,7 @@ export function AdminDashboard({
       schoolStudents = await fetchTeacherStudentsHelper(admin.id, schoolId, activePlatform);
     } else {
       let studentListSq = supabase.from('users').select('id, first_name, last_name, photo_url, teacher_id').eq('school_id', schoolId).eq('role', 'student');
-      if (activePlatform === 'campus') studentListSq = studentListSq.eq('is_campus_active', true);
-      else studentListSq = studentListSq.eq('is_groovelab_active', true);
+      if (activePlatform !== 'campus') studentListSq = studentListSq.eq('is_groovelab_active', true);
       const { data } = await studentListSq;
       schoolStudents = data || [];
     }

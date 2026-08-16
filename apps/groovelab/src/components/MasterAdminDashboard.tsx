@@ -116,6 +116,7 @@ import { ExecutiveTab } from './masterAdmin/tabs/ExecutiveTab';
 import { ReconciliationTab } from './masterAdmin/tabs/ReconciliationTab';
 import { BackupResetTab } from './masterAdmin/tabs/BackupResetTab';
 import { calculateCampusGroovelabBilling } from '../domain/billingCalculator';
+import { aggregateSchoolMetrics, getSchoolCanonicalBilling } from '../domain/schoolMetricsAggregator';
 
 import { School } from './masterAdmin/MasterAdminTypes';
 
@@ -1920,130 +1921,28 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       schoolData?.forEach(school => {
         const schId = school.id;
         const schoolStatsRow = statsData?.find(s => s.school_id === schId) || {};
-        const schoolUsers = (allUsersDb || []).filter(u => u.school_id === schId);
-        const schoolPending = (pendingStudentsDb || []).filter(p => p.school_id === schId);
-
-        const studentsList: any[] = [];
-        schoolUsers.forEach(u => {
-          const isStudent = u.role === 'student' || (Array.isArray(u.roles) && u.roles.includes('student'));
-          if (isStudent) {
-            studentsList.push({
-              id: u.id,
-              first_name: u.first_name,
-              last_name: u.last_name,
-              is_campus_active: Boolean(u.is_campus_active || (u as any).isCampusActive),
-              is_groovelab_active: Boolean(u.is_groovelab_active || (u as any).isGroovelabActive)
-            });
-          }
-        });
-
-        schoolPending.forEach(ps => {
-          const userMatch = schoolUsers.find(u => u.id === ps.id || (u.first_name && ps.first_name && u.first_name.toLowerCase().trim() === ps.first_name.toLowerCase().trim()));
-          const exists = studentsList.some(s => s.id === ps.id || (s.first_name && ps.first_name && s.first_name.toLowerCase().trim() === ps.first_name.toLowerCase().trim()));
-          if (!exists) {
-            const isCampusAct = userMatch ? Boolean(userMatch.is_campus_active) : Boolean((ps as any).is_campus_active);
-            const isGrooveAct = userMatch ? Boolean(userMatch.is_groovelab_active) : Boolean((ps as any).is_groovelab_active);
-            studentsList.push({
-              id: ps.id,
-              first_name: ps.first_name,
-              last_name: ps.last_name,
-              is_campus_active: isCampusAct,
-              is_groovelab_active: isGrooveAct
-            });
-          }
-        });
-
-        const isTestUser = (s: any): boolean => {
-          if (!s) return false;
-          const fn = (s.first_name || '').trim().toLowerCase();
-          const ln = (s.last_name || '').trim().toLowerCase();
-          const email = (s.email || '').trim().toLowerCase();
-          return (
-            fn.startsWith('test') ||
-            fn.startsWith('jane') ||
-            fn.startsWith('bob') ||
-            ln === 't.' ||
-            ln === 'test' ||
-            email.includes('test')
-          );
-        };
-
-        const deduplicateStudents = (items: any[]): any[] => {
-          if (!Array.isArray(items)) return [];
-          const seenIds = new Set<string>();
-          const studentMap = new Map<string, any>();
-
-          for (const student of items) {
-            if (!student) continue;
-            if (student.id && seenIds.has(student.id)) continue;
-
-            const fn = (student.first_name || '').trim().toLowerCase();
-            const ln = (student.last_name || '').trim().toLowerCase();
-            const nameKey = `${fn}_${ln}`;
-
-            if (nameKey !== '_') {
-              if (studentMap.has(nameKey)) {
-                const existing = studentMap.get(nameKey);
-                if (existing.isPendingOnboarding && !student.isPendingOnboarding) {
-                  if (existing.id) seenIds.delete(existing.id);
-                  studentMap.set(nameKey, student);
-                  if (student.id) seenIds.add(student.id);
-                }
-                continue;
-              }
-              studentMap.set(nameKey, student);
-            } else {
-              const fallbackKey = student.id || `anon_${Math.random()}`;
-              studentMap.set(fallbackKey, student);
-            }
-
-            if (student.id) seenIds.add(student.id);
-          }
-
-          return Array.from(studentMap.values());
-        };
-
-        const cleanStudentsList = deduplicateStudents(studentsList.filter(s => !isTestUser(s)));
-        const totalStudents = cleanStudentsList.length || schoolStatsRow.students || 0;
-        const studentsCampus = cleanStudentsList.filter(s => s.is_campus_active).length || schoolStatsRow.students_campus || 0;
-        const studentsGroovelab = cleanStudentsList.filter(s => s.is_groovelab_active).length || schoolStatsRow.students_groovelab || 0;
-        const activeStudentsMax = Math.max(studentsCampus, studentsGroovelab);
-        const passiveStudentsCount = Math.max(0, totalStudents - activeStudentsMax);
-
-        let freeDoubleRoleCount = 0;
-        let billableTeacherCount = 0;
-        schoolUsers.forEach(u => {
-          const isMgmt = u.role === 'admin' || u.role === 'secretary' || (Array.isArray(u.roles) && (u.roles.includes('admin') || u.roles.includes('secretary')));
-          const isTch = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
-
-          if (isMgmt && isTch) {
-            if (freeDoubleRoleCount < 2) {
-              freeDoubleRoleCount++;
-            } else {
-              billableTeacherCount++;
-            }
-          } else if (!isMgmt && isTch) {
-            billableTeacherCount++;
-          }
-        });
-
-        const storageAddonGbVal = Number(school.storage_addon_gb || 0);
-        const storageAddonFeeVal = Number(school.storage_addon_monthly_fee || (storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 9.99 : 0));
+        const stats = aggregateSchoolMetrics(
+          school,
+          allUsersDb || [],
+          pendingStudentsDb || [],
+          songs || [],
+          bands || []
+        );
 
         sStats[schId] = {
-          teachers: billableTeacherCount || schoolStatsRow.teachers || 0,
-          students: totalStudents,
-          activeStudents: activeStudentsMax,
-          passiveStudents: passiveStudentsCount,
-          teachersCampus: billableTeacherCount || schoolStatsRow.teachers_campus || 0,
-          teachersGroovelab: billableTeacherCount || schoolStatsRow.teachers_groovelab || 0,
-          studentsCampus: studentsCampus,
-          studentsGroovelab: studentsGroovelab,
-          storageAddonGb: storageAddonGbVal,
-          storageAddonMonthlyFee: storageAddonFeeVal,
-          songs: songs?.filter(s => s.school_id === schId).length || 0,
-          bands: bands?.filter(b => b.school_id === schId && b.name !== '__SYSTEM_ANNOUNCEMENTS__').length || 0,
-          adminUsers: schoolUsers.filter(u => u.role === 'secretary' || u.role === 'admin')
+          teachers: stats.activeTeachers || schoolStatsRow.teachers || 0,
+          students: stats.totalStudents || schoolStatsRow.students || 0,
+          activeStudents: stats.activeStudents,
+          passiveStudents: stats.passiveStudents,
+          teachersCampus: stats.activeTeachers || schoolStatsRow.teachers_campus || 0,
+          teachersGroovelab: stats.activeTeachers || schoolStatsRow.teachers_groovelab || 0,
+          studentsCampus: stats.campusStudents || schoolStatsRow.students_campus || 0,
+          studentsGroovelab: stats.groovelabStudents || schoolStatsRow.students_groovelab || 0,
+          storageAddonGb: stats.storageAddonGb,
+          storageAddonMonthlyFee: stats.storageAddonMonthlyFee,
+          songs: stats.songsCount,
+          bands: stats.bandsCount,
+          adminUsers: stats.adminUsers
         };
       });
       setSchoolStats(sStats);

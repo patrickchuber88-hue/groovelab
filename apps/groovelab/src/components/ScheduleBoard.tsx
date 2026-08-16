@@ -1260,10 +1260,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }
         const pendingMatch = pendingData?.find((p: any) => p.id === studentId);
         const userMatch = allSchoolStudentUsers?.find((u: any) => u.id === studentId || u.id === (s as any).user_id);
-        const userFname = userMatch ? resolveFirstName(userMatch) : 'Schüler';
-        const pendingFname = pendingMatch ? resolveFirstName(pendingMatch) : 'Schüler';
+        const userFname = userMatch ? resolveFirstName(userMatch) : '';
+        const pendingFname = pendingMatch ? resolveFirstName(pendingMatch) : '';
         const rawFname = resolveFirstName(s);
-        const fname = userFname !== 'Schüler' ? userFname : (pendingFname !== 'Schüler' ? pendingFname : (rawFname !== 'Schüler' ? rawFname : 'Schüler'));
+        const candidateFname = (userFname && userFname !== 'Schüler') ? userFname : ((pendingFname && pendingFname !== 'Schüler') ? pendingFname : ((rawFname && rawFname !== 'Schüler') ? rawFname : ''));
+        
+        // Skip orphan stubs with no user match and no valid name
+        if (!userMatch && (!candidateFname || ['ausstehender schüler', 'ausstehendes', 'unbekannt', 'onboarding', 'test'].includes(candidateFname.toLowerCase()))) {
+          return;
+        }
+
+        const fname = candidateFname || 'Schüler';
         const lname = (userMatch ? resolveLastName(userMatch) : '') || (pendingMatch ? resolveLastName(pendingMatch) : '') || resolveLastName(s);
         
         studentMap.set(studentId, {
@@ -1322,9 +1329,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // C) Add pending onboarding students
       (pendingData || []).forEach((p: any) => {
         if (!matchesTeacher(p.teacher_id, p.id)) return;
+        const pFname = resolveFirstName(p);
+        if (!pFname || pFname === 'Schüler' || ['ausstehender schüler', 'ausstehendes', 'unbekannt', 'onboarding', 'test'].includes(pFname.toLowerCase())) return;
+
         const existingId = userToStudentIdMap.get(p.id) || p.id;
         const existing = studentMap.get(existingId) || studentMap.get(p.id);
-        const pFname = resolveFirstName(p);
         const pLname = resolveLastName(p);
 
         if (existing) {

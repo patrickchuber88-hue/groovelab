@@ -1552,7 +1552,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const roomMap = new Map<string, string>();
       (roomsRes?.data || []).forEach((r: any) => roomMap.set(r.id, r.name));
 
-      const schData: any[] = [...(schRes.data || [])];
+      const rawSchData = schRes.data || [];
+      const seenSchKeys = new Set<string>();
+      const schData: any[] = [];
+      rawSchData.forEach((s: any) => {
+        const key = `${s.day_of_week}_${s.time_slot}_${s.teacher_id || ''}_${s.room_id || ''}`;
+        if (!seenSchKeys.has(key)) {
+          seenSchKeys.add(key);
+          schData.push(s);
+        }
+      });
       
       // Enrich any existing schData with room names from roomMap if room object is missing
       schData.forEach((sch: any) => {

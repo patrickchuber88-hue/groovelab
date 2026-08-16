@@ -8,6 +8,7 @@ import * as lamejs from '@breezystack/lamejs';
 import { GrooveLoopstation } from './groovelab/GrooveLoopstation';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
 import { AudioBiographyView } from './campus/AudioBiographyView';
+import { processPureRawBlob } from '../utils/audioMasteringEngine';
 
 
 export const ALL_STICKERS = [
@@ -918,7 +919,42 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           autoGainControl: false
         }
       });
-      const recorder = new MediaRecorder(stream);
+      // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
+      let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+      let hasTresorStorage = false;
+      if (targetSchoolId) {
+        try {
+          const { data: sch } = await supabase
+            .from('schools')
+            .select('storage_addon_gb, storage_addon_status')
+            .eq('id', targetSchoolId)
+            .maybeSingle();
+          if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
+            hasTresorStorage = true;
+          }
+        } catch (e) {}
+      }
+
+      // 256 kbps Crystal-Clear Studio Audio when Audio-Tresor is booked, else 64 kbps Space-Saving Compression
+      const targetBitrate = hasTresorStorage ? 256000 : 64000;
+      let mimeType = 'audio/webm;codecs=opus';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
+          else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+          else if (MediaRecorder.isTypeSupported('audio/aac')) mimeType = 'audio/aac';
+          else mimeType = '';
+        }
+      }
+
+      let recorder: MediaRecorder;
+      try {
+        recorder = mimeType 
+          ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: targetBitrate }) 
+          : new MediaRecorder(stream, { audioBitsPerSecond: targetBitrate });
+      } catch (recErr) {
+        recorder = new MediaRecorder(stream);
+      }
       const chunks: BlobPart[] = [];
       
       recorder.ondataavailable = (e) => {
@@ -930,9 +966,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           stream.getTracks().forEach(track => track.stop());
         } catch (e) {}
 
-        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        const rawBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        let blob = rawBlob;
+        let url = URL.createObjectURL(rawBlob);
+
+        // 🎛️ PURE RAW DSP: If Audio-Tresor is active, render Lossless 24-Bit / 48 kHz Broadcast WAV
+        if (hasTresorStorage) {
+          try {
+            const pureRawResult = await processPureRawBlob(rawBlob, { targetLufs: -13.0, targetPeakDb: -1.0 });
+            blob = pureRawResult.processedBlob;
+            url = pureRawResult.processedUrl;
+          } catch (dspErr) {
+            console.warn('[Meisterwerk] Pure RAW DSP fallback to original blob:', dspErr);
+          }
+        }
+
         setAudioBlob(blob);
-        const url = URL.createObjectURL(blob);
         setAudioUrl(url);
         
         setIsUploadingAudio(true);
@@ -957,14 +1006,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         };
 
         try {
-          const fileExt = blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : blob.type.includes('wav') ? 'wav' : 'mp3';
+          const fileExt = blob.type.includes('wav') ? 'wav' : blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'mp3';
           const fileName = `${student.id}_feedback_${Date.now()}.${fileExt}`;
           const filePath = `recordings/${fileName}`;
           
           const { error: uploadErr } = await supabase.storage
             .from('campus-assets')
             .upload(filePath, blob, { 
-              contentType: blob.type || 'audio/webm',
+              contentType: blob.type || (hasTresorStorage ? 'audio/wav' : 'audio/webm'),
               cacheControl: 'private, max-age=3600' 
             });
             

@@ -31,6 +31,14 @@ import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStude
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { BulkImportModal } from './common/BulkImportModal';
 import { generateTeacherQuickstartPDF, generateParentQuickstartPDF } from '../utils/pdfGenerator';
+import { 
+  fetchSchoolRoster, 
+  getTeacherRoster, 
+  getTeacherStudentCount, 
+  normalizeStudentKey, 
+  isTestOrGenericStudent, 
+  deduplicateRoster 
+} from '../services/studentRosterService';
 function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
   let prefix = 'C';
   if (role === 'admin' || role === 'secretary') {
@@ -3836,15 +3844,29 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         }
       });
 
-      // Merge pending students into student list (avoid duplicates)
+      // Helper for normalized key matching
+      const normKey = (f: string, l: string) => `${(f || '').toLowerCase().replace(/[^a-z0-9äöüß]/g, '')}_${(l || '').toLowerCase().replace(/[^a-z0-9äöüß]/g, '')}`;
+      const isTestName = (f: string, l: string) => {
+        const fn = (f || '').toLowerCase().trim();
+        const full = `${f || ''} ${l || ''}`.toLowerCase().trim();
+        return !fn || fn.startsWith('test') || fn.includes('testvorname') || full.includes('ausstehend') || full.includes('onboarding') || full.includes('unbekannt') || full === 'schüler' || full === 'musiker';
+      };
+
+      // Merge pending students into student list (avoid duplicates and orphan stubs)
       if (pendingStudents) {
         pendingStudents.forEach(ps => {
-          const userMatch = allUsers?.find(u => u.id === ps.id || (u.first_name && ps.first_name && u.first_name.toLowerCase().trim() === ps.first_name.toLowerCase().trim()));
-          const exists = studentsList.some(s => s.id === ps.id || (s.first_name && s.first_name === ps.first_name));
+          if (!ps) return;
+          const rawFName = (ps.first_name || '').trim();
+          const rawLName = (ps.last_name || '').trim();
+          if (isTestName(rawFName, rawLName)) return;
+
+          const psNormKey = normKey(rawFName, rawLName);
+          const userMatch = allUsers?.find(u => u.id === ps.id || (psNormKey !== '_' && normKey(u.first_name, u.last_name) === psNormKey));
+          const exists = studentsList.some(s => s.id === ps.id || (psNormKey !== '_' && normKey(s.first_name, s.last_name) === psNormKey));
           if (!exists) {
-            const fName = ps.first_name || 'Ausstehendes';
-            const lName = ps.last_name || 'Onboarding';
-            const fullName = `${fName} ${lName}`;
+            const fName = rawFName;
+            const lName = rawLName;
+            const fullName = `${fName} ${lName}`.trim();
             
             map[ps.id] = fullName;
             userInstrumentMap[ps.id] = ps.instrument || '';
@@ -14471,16 +14493,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               /* Campus Tab Button */
               <div 
                 onClick={() => {
-                  localStorage.setItem('groovelab_active_platform', 'campus');
-                  localStorage.setItem('campus_active_tab', 'briefing');
-                  localStorage.setItem('groovelab_active_workspace', 'teacher');
-                  if (onRoleSwitched) {
-                    React.startTransition(() => {
-                      onRoleSwitched('teacher');
-                    });
-                    return;
-                  }
                   setActiveTab('campus');
+                  localStorage.setItem('groovelab_active_workspace', 'campus');
                 }}
                 style={{
                   display: 'flex',
@@ -14515,16 +14529,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               /* GrooveLab Tab Button */
               <div 
                 onClick={() => {
-                  localStorage.setItem('groovelab_active_platform', 'groovelab');
-                  localStorage.setItem('groovelab_active_tab', 'live');
-                  localStorage.setItem('groovelab_active_workspace', 'teacher');
-                  if (onRoleSwitched) {
-                    React.startTransition(() => {
-                      onRoleSwitched('teacher');
-                    });
-                    return;
-                  }
                   setActiveTab('groovelab');
+                  localStorage.setItem('groovelab_active_workspace', 'groovelab');
                 }}
                 style={{
                   display: 'flex',
@@ -25533,7 +25539,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 const currentTotalCapGb = baseGb + activeAddonGb;
                                 const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
                                 const usedGb = usedBytes / (1024 * 1024 * 1024);
+                                const usedMb = usedBytes / (1024 * 1024);
                                 const usagePct = Math.min(100, Math.round((usedGb / currentTotalCapGb) * 100));
+                                const formattedUsed = usedBytes > 0 && usedGb < 0.10 
+                                  ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+                                  : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+                                const formattedPct = usedBytes > 0 && usagePct < 1 ? '< 1%' : `${usagePct}%`;
 
                                 return (
                                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -25542,13 +25553,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         <HardDrive size={15} color="#34a853" /> Aktuelle Speicherbelegung:
                                       </span>
                                       <span style={{ fontWeight: 700, color: usagePct > 80 ? '#dc2626' : '#16a34a' }}>
-                                        {usedGb.toFixed(2).replace('.', ',')} GB von {currentTotalCapGb} GB belegt ({usagePct}%)
+                                        {formattedUsed} von {currentTotalCapGb} GB belegt ({formattedPct})
                                       </span>
                                     </div>
                                     <div style={{ background: '#e2e8f0', borderRadius: '6px', height: '6px', overflow: 'hidden', width: '100%' }}>
                                       <div style={{
                                         height: '100%',
-                                        width: `${Math.max(4, usagePct)}%`,
+                                        width: `${usedBytes > 0 ? Math.max(5, (usedGb / currentTotalCapGb) * 100) : 0}%`,
                                         background: usagePct > 80 ? '#ef4444' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
                                         borderRadius: '6px',
                                         transition: 'width 0.3s ease'
@@ -26373,8 +26384,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   const totalCapGb = baseGb + addonGb;
                                   const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
                                   const usedGb = usedBytes / (1024 * 1024 * 1024);
+                                  const usedMb = usedBytes / (1024 * 1024);
                                   const freeGb = Math.max(0, totalCapGb - usedGb);
                                   const usagePct = Math.min(100, Math.round((usedGb / totalCapGb) * 100));
+                                  const formattedUsed = usedBytes > 0 && usedGb < 0.10 
+                                    ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+                                    : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+                                  const formattedPct = usedBytes > 0 && usagePct < 1 ? '< 1%' : `${usagePct}%`;
 
                                   return (
                                     <div style={{ borderTop: '1.5px dashed #e2e8f0', paddingTop: '10px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -26392,7 +26408,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       <div style={{ background: '#f1f5f9', borderRadius: '6px', height: '6px', overflow: 'hidden', width: '100%', marginTop: '2px' }}>
                                         <div style={{
                                           height: '100%',
-                                          width: `${Math.max(5, usagePct)}%`,
+                                          width: `${usedBytes > 0 ? Math.max(5, (usedGb / totalCapGb) * 100) : 0}%`,
                                           background: usagePct > 80 ? '#ef4444' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
                                           borderRadius: '6px',
                                           transition: 'width 0.3s ease'
@@ -26400,8 +26416,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       </div>
 
                                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>
-                                        <span>{usedGb.toFixed(2).replace('.', ',')} GB von {totalCapGb} GB belegt</span>
-                                        <span style={{ color: usagePct > 80 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>{freeGb.toFixed(2).replace('.', ',')} GB frei ({100 - usagePct}%)</span>
+                                        <span>{formattedUsed} von {totalCapGb} GB belegt ({formattedPct})</span>
+                                        <span style={{ color: usagePct > 80 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>{freeGb.toFixed(2).replace('.', ',')} GB frei</span>
                                       </div>
                                     </div>
                                   );
@@ -26769,6 +26785,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             const totalCapGb = 1.0 + addonGb;
                                             const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
                                             const usedGb = usedBytes / (1024 * 1024 * 1024);
+                                            const usedMb = usedBytes / (1024 * 1024);
+                                            const formattedUsed = usedBytes > 0 && usedGb < 0.10 
+                                              ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+                                              : `${usedGb.toFixed(2).replace('.', ',')} GB`;
 
                                             return (
                                               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '8px' }}>
@@ -26783,7 +26803,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
                                                   <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                                                    {usedGb.toFixed(2).replace('.', ',')} von {totalCapGb} GB {addonGb > 0 ? `• ${addonFee.toFixed(2).replace('.', ',')} € / Mo.` : '• Inklusive'}
+                                                    {formattedUsed} von {totalCapGb} GB {addonGb > 0 ? `• ${addonFee.toFixed(2).replace('.', ',')} € / Mo.` : '• Inklusive'}
                                                   </div>
                                                   <button
                                                     type="button"
@@ -26962,8 +26982,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                 const totalCapGb = baseGb + addonGb;
                                                 const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
                                                 const usedGb = usedBytes / (1024 * 1024 * 1024);
+                                                const usedMb = usedBytes / (1024 * 1024);
                                                 const freeGb = Math.max(0, totalCapGb - usedGb);
                                                 const usagePct = Math.min(100, Math.round((usedGb / totalCapGb) * 100));
+                                                const formattedUsed = usedBytes > 0 && usedGb < 0.10 
+                                                  ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+                                                  : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+                                                const formattedPct = usedBytes > 0 && usagePct < 1 ? '< 1%' : `${usagePct}%`;
 
                                                 return (
                                                   <div style={{ borderTop: '1.5px dashed #e2e8f0', paddingTop: '10px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -32756,9 +32781,14 @@ status: status,
         const activeBookedGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
         const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
         const usedGb = usedBytes / (1024 * 1024 * 1024);
+        const usedMb = usedBytes / (1024 * 1024);
         const baseGb = 1.0;
         const currentTotalCap = baseGb + activeBookedGb;
         const usagePct = Math.min(100, Math.round((usedGb / currentTotalCap) * 100));
+        const formattedUsed = usedBytes > 0 && usedGb < 0.10 
+          ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+          : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+        const formattedPct = usedBytes > 0 && usagePct < 1 ? '< 1%' : `${usagePct}%`;
 
         return (
           <div
@@ -32821,13 +32851,13 @@ status: status,
                     <HardDrive size={15} color="#34a853" /> Aktuelle Speicherbelegung:
                   </span>
                   <span style={{ fontWeight: 700, color: usagePct > 80 ? '#dc2626' : '#16a34a' }}>
-                    {usedGb.toFixed(2).replace('.', ',')} GB von {currentTotalCap} GB belegt ({usagePct}%)
+                    {formattedUsed} von {currentTotalCap} GB belegt ({formattedPct})
                   </span>
                 </div>
                 <div style={{ background: '#e2e8f0', borderRadius: '6px', height: '6px', overflow: 'hidden', width: '100%' }}>
                   <div style={{
                     height: '100%',
-                    width: `${Math.max(4, usagePct)}%`,
+                    width: `${usedBytes > 0 ? Math.max(5, (usedGb / currentTotalCap) * 100) : 0}%`,
                     background: usagePct > 80 ? '#ef4444' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
                     borderRadius: '6px',
                     transition: 'width 0.3s ease'

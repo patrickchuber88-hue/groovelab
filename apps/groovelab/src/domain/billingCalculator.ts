@@ -86,11 +86,11 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
   }
 
   // 2. Teacher & Staff Service Fee (Admin & Secretary included 100% free)
-  const teacherServiceFeeTotal = Math.max(0, activeTeacherCount) * rateTeacher;
+  const teacherServiceFeeTotal = Number((Math.max(0, activeTeacherCount) * rateTeacher).toFixed(2));
 
   // 3. Passive Student Database Profile Fee (0,09 € / Mo. per passive profile)
   const ratePassiveStudent = rates.pricePassiveStudent ?? 0.09;
-  const passiveStudentFeeTotal = Math.max(0, input.passiveStudentCount ?? 0) * ratePassiveStudent;
+  const passiveStudentFeeTotal = Number((Math.max(0, input.passiveStudentCount ?? 0) * ratePassiveStudent).toFixed(2));
 
   // 4. Student Activation Fee Calculation with Discounts & Per-Profile Rate Locking / Custom Overrides
   let effectiveStudentRate = rateStudent;
@@ -104,7 +104,7 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
   const effectiveGroovelabCount = groovelabStudentCount !== undefined ? groovelabStudentCount : 0;
 
   let campusStudentActivationFeeTotal = 0;
-  let groovelabStudentActivationFeeTotal = Math.max(0, effectiveGroovelabCount) * effectiveStudentRate;
+  let groovelabStudentActivationFeeTotal = Number((Math.max(0, effectiveGroovelabCount) * effectiveStudentRate).toFixed(2));
 
   if (input.studentProfiles && input.studentProfiles.length > 0) {
     // Exact summation of individual student profiles
@@ -117,12 +117,13 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
           : effectiveStudentRate);
       return sum + Math.max(0, price);
     }, 0);
+    campusStudentActivationFeeTotal = Number(campusStudentActivationFeeTotal.toFixed(2));
   } else {
     const billableCampusCount = Math.max(0, effectiveCampusCount - exemptStudentCount);
-    campusStudentActivationFeeTotal = billableCampusCount * effectiveStudentRate;
+    campusStudentActivationFeeTotal = Number((billableCampusCount * effectiveStudentRate).toFixed(2));
   }
 
-  const studentActivationFeeTotal = campusStudentActivationFeeTotal + groovelabStudentActivationFeeTotal;
+  const studentActivationFeeTotal = Number((campusStudentActivationFeeTotal + groovelabStudentActivationFeeTotal).toFixed(2));
   const billableCampusCount = input.studentProfiles ? input.studentProfiles.filter(p => !p.exempt_from_direct_billing).length : Math.max(0, effectiveCampusCount - exemptStudentCount);
 
   // 5. Direct Billing vs. Sammelzahler Allocation
@@ -131,26 +132,26 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
   let parentContributionTotal = 0;
 
   if (directBillingMode === 'full' && hasCampusModule) {
-    parentContributionTotal = billableCampusCount * rateStudent;
-    schoolContributionTotal = (exemptStudentCount * rateStudent) + groovelabStudentActivationFeeTotal;
+    parentContributionTotal = Number((billableCampusCount * rateStudent).toFixed(2));
+    schoolContributionTotal = Number(((exemptStudentCount * rateStudent) + groovelabStudentActivationFeeTotal).toFixed(2));
   } else if (directBillingMode === 'partial' && hasCampusModule) {
     const parentPortion = Number((rateStudent * 0.816).toFixed(2));
     const schoolPortion = Number((rateStudent - parentPortion).toFixed(2));
-    parentContributionTotal = billableCampusCount * parentPortion;
-    schoolContributionTotal = (billableCampusCount * schoolPortion) + (exemptStudentCount * rateStudent) + groovelabStudentActivationFeeTotal;
+    parentContributionTotal = Number((billableCampusCount * parentPortion).toFixed(2));
+    schoolContributionTotal = Number(((billableCampusCount * schoolPortion) + (exemptStudentCount * rateStudent) + groovelabStudentActivationFeeTotal).toFixed(2));
   } else {
-    schoolContributionTotal = studentActivationFeeTotal + (exemptStudentCount * effectiveStudentRate);
+    schoolContributionTotal = Number((studentActivationFeeTotal + (exemptStudentCount * effectiveStudentRate)).toFixed(2));
   }
 
   // 6. Audio-Tresor Storage Add-on Fee
-  const storageAddonFeeTotal = Math.max(0, input.storageAddonMonthlyFee ?? input.rates?.priceStorageAddon ?? 0);
+  const storageAddonFeeTotal = Number((Math.max(0, input.storageAddonMonthlyFee ?? input.rates?.priceStorageAddon ?? 0)).toFixed(2));
 
   // Total invoice amount billed to the music school
-  const totalMonthlySchoolInvoice = baseServerFlatRate + teacherServiceFeeTotal + passiveStudentFeeTotal + schoolContributionTotal + storageAddonFeeTotal;
+  const totalMonthlySchoolInvoice = Number((baseServerFlatRate + teacherServiceFeeTotal + passiveStudentFeeTotal + schoolContributionTotal + storageAddonFeeTotal).toFixed(2));
 
   return {
-    baseServerFlatRate,
-    bundleSavings,
+    baseServerFlatRate: Number(baseServerFlatRate.toFixed(2)),
+    bundleSavings: Number(bundleSavings.toFixed(2)),
     teacherServiceFeeTotal,
     studentActivationFeeTotal,
     campusStudentActivationFeeTotal,
@@ -159,7 +160,7 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
     storageAddonFeeTotal,
     schoolContributionTotal,
     parentContributionTotal,
-    totalMonthlySchoolInvoice: Number(totalMonthlySchoolInvoice.toFixed(2)),
+    totalMonthlySchoolInvoice,
   };
 }
 

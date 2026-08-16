@@ -1312,7 +1312,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         `)
         .in('student_id', groupStudentIds)
         .in('status', ['approved', 'ready_for_admin_review', 'draft']);
-      setSchedulesList(schedData || []);
+
+      // Deduplicate group schedules so identical slots (day + time) are only listed once
+      const uniqueSchedules: any[] = [];
+      const seenScheduleSlots = new Set<string>();
+      (schedData || []).forEach((sched: any) => {
+        const slotKey = `${sched.day_of_week}_${sched.time_slot}_${sched.rooms?.name || ''}_${sched.teacher?.first_name || ''}_${sched.teacher?.last_name || ''}`;
+        if (!seenScheduleSlots.has(slotKey)) {
+          seenScheduleSlots.add(slotKey);
+          uniqueSchedules.push(sched);
+        }
+      });
+      setSchedulesList(uniqueSchedules);
 
       // Fetch premium status
       const { data: premiumInfo } = await supabase

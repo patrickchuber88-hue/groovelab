@@ -5,6 +5,7 @@ import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { calculateSchoolEffectiveRates } from '../domain/pricingEngine';
 import { calculateCampusGroovelabBilling } from '../domain/billingCalculator';
+import { aggregateSchoolMetrics, getSchoolCanonicalBilling } from '../domain/schoolMetricsAggregator';
 import { 
   CreditCard, 
   Search, 
@@ -450,188 +451,38 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         console.warn('⚠️ pending_students_decrypted fetch warning:', pendingErr.message);
       }
 
-      const userStatsMap: Record<string, { 
-        totalStudents: number; 
-        activeStudents: number; 
-        activeCampusStudents: number; 
-        activeGroovelabStudents: number; 
-        premiumStudents: number; 
-        exemptActiveStudents: number; 
-        totalTeachers: number; 
-        activeTeachers: number; 
-        totalEmployees: number; 
-        activeEmployees: number; 
-      }> = {};
+      // 4c. Fetch songs and bands for complete metrics
+      const { data: songsDb } = await supabase
+        .from('songs')
+        .select('id, school_id');
+
+      const { data: bandsDb } = await supabase
+        .from('bands')
+        .select('id, school_id, name');
+
+      const userStatsMap: Record<string, any> = {};
 
       (schools || []).forEach(school => {
-        const schId = school.id;
-        const schoolUsers = (users || []).filter(u => u.school_id === schId);
-        const schoolPending = (pendingStudentsDb || []).filter(p => p.school_id === schId);
-
-        const studentsList: any[] = [];
-
-        schoolUsers.forEach(u => {
-          const isStudent = u.role === 'student' || (Array.isArray(u.roles) && u.roles.includes('student'));
-          if (isStudent) {
-            studentsList.push({
-              id: u.id,
-              first_name: u.first_name,
-              last_name: u.last_name,
-              is_campus_active: Boolean(u.is_campus_active || (u as any).isCampusActive),
-              is_groovelab_active: Boolean(u.is_groovelab_active || (u as any).isGroovelabActive),
-              exempt_from_direct_billing: Boolean(u.exempt_from_direct_billing)
-            });
-          }
-        });
-
-        // Merge pending onboarding students with non-generic names (1:1 dynamic with SecretaryDashboard)
-        if (schoolPending) {
-          schoolPending.forEach(ps => {
-            const fName = (ps.first_name || '').trim();
-            const isGenericName = !fName || ['ausstehendes', 'unbekannt', 'onboarding', 'test'].includes(fName.toLowerCase());
-            if (isGenericName) return;
-
-            const userMatch = schoolUsers.find(u => u.id === ps.id || (u.first_name && fName && u.first_name.toLowerCase().trim() === fName.toLowerCase()));
-            const exists = studentsList.some(s => s.id === ps.id || (s.first_name && fName && s.first_name.toLowerCase().trim() === fName.toLowerCase()));
-            if (!exists) {
-              const isCampusAct = userMatch ? Boolean(userMatch.is_campus_active) : ((ps as any).is_campus_active === true);
-              const isGrooveAct = userMatch ? Boolean(userMatch.is_groovelab_active) : ((ps as any).is_groovelab_active === true);
-              studentsList.push({
-                id: ps.id,
-                first_name: fName,
-                last_name: ps.last_name || '',
-                is_campus_active: isCampusAct,
-                is_groovelab_active: isGrooveAct,
-                exempt_from_direct_billing: false
-              });
-            }
-          });
-        }
-
-        const totalStudents = studentsList.length;
-        const activeCampusStudents = studentsList.filter(s => s.is_campus_active).length;
-        const activeGroovelabStudents = studentsList.filter(s => s.is_groovelab_active).length;
-        const activeStudents = Math.max(activeCampusStudents, activeGroovelabStudents);
-        const exemptActiveStudents = studentsList.filter(s => s.is_campus_active && s.exempt_from_direct_billing).length;
-
-        // Employees & Teachers
-        let totalEmployees = 0;
-        let activeEmployees = 0;
-        schoolUsers.forEach(u => {
-          const isEmployee = u.role === 'admin' || u.role === 'secretary' || (Array.isArray(u.roles) && (u.roles.includes('admin') || u.roles.includes('secretary')));
-          if (isEmployee) {
-            totalEmployees++;
-            if (u.is_active) activeEmployees++;
-          }
-        });
-
-        let freeDoubleRoleCount = 0;
-        let billableTeacherCount = 0;
-        schoolUsers.forEach(u => {
-          const isMgmt = u.role === 'admin' || u.role === 'secretary' || (Array.isArray(u.roles) && (u.roles.includes('admin') || u.roles.includes('secretary')));
-          const isTch = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
-
-          if (isMgmt && isTch) {
-            if (freeDoubleRoleCount < 2) {
-              freeDoubleRoleCount++;
-            } else {
-              billableTeacherCount++;
-            }
-          } else if (!isMgmt && isTch) {
-            billableTeacherCount++;
-          }
-        });
-
-        userStatsMap[schId] = {
-          totalStudents,
-          activeStudents,
-          activeCampusStudents,
-          activeGroovelabStudents,
-          premiumStudents: activeStudents,
-          exemptActiveStudents,
-          totalTeachers: billableTeacherCount,
-          activeTeachers: billableTeacherCount,
-          totalEmployees,
-          activeEmployees
-        };
+        const stats = aggregateSchoolMetrics(
+          school,
+          users || [],
+          pendingStudentsDb || [],
+          songsDb || [],
+          bandsDb || []
+        );
+        userStatsMap[school.id] = stats;
       });
 
       const calculatedInvoices: Invoice[] = (schools || [])
         .filter(school => !school.name.toLowerCase().includes('groove academy'))
         .map(school => {
-        const activeCampusUsers = metricsMap[school.id] || 0;
-        
-        const stats = userStatsMap[school.id] || { 
-          totalStudents: 0, 
-          activeStudents: 0, 
-          activeCampusStudents: 0,
-          activeGroovelabStudents: 0,
-          premiumStudents: 0, 
-          exemptActiveStudents: 0,
-          totalTeachers: 0, 
-          activeTeachers: 0,
-          totalEmployees: 0,
-          activeEmployees: 0
-        };
-
-        const totalStudents = stats.totalStudents;
-        const activeCampusStudents = stats.activeCampusStudents;
-        const activeGroovelabStudents = stats.activeGroovelabStudents;
-        const maxActiveStudents = Math.max(activeCampusStudents, activeGroovelabStudents);
-        const activeStudents = maxActiveStudents;
-        const premiumStudents = stats.premiumStudents;
-        const exemptActiveStudents = stats.exemptActiveStudents || 0;
-        
-        const teachersCount = stats.activeTeachers;
-        const employeesCount = stats.activeEmployees;
-
-        const effectiveRates = calculateSchoolEffectiveRates(school, masterPricing);
+        const stats = userStatsMap[school.id] || aggregateSchoolMetrics(school, [], []);
+        const canonical = getSchoolCanonicalBilling(school, stats, masterPricing);
+        const activeCampusUsers = metricsMap[school.id] || stats.campusStudents || 0;
+        const isBypass = canonical.isBypass;
         const hasCampus = Boolean(school.has_campus_subscription);
         const hasGroovelab = Boolean(school.has_groovelab_subscription);
         const hasKombi = school.has_kombi_discount || (hasCampus && hasGroovelab);
-
-        const isPartial = school.student_billing_option === 'student_partial';
-        const isFullDirect = school.student_billing_option === 'student_full';
-        const passiveStudentsCount = isPartial ? totalStudents : (isFullDirect ? 0 : Math.max(0, totalStudents - maxActiveStudents));
-
-        const storageAddonFee = Number(school.storage_addon_gb || 0) > 0 ? Number(school.storage_addon_monthly_fee || 1.49) : 0;
-
-        const calcResult = calculateCampusGroovelabBilling({
-          hasCampusModule: hasCampus,
-          hasGroovelabModule: hasGroovelab,
-          activeTeacherCount: teachersCount,
-          activeStudentCount: maxActiveStudents,
-          campusStudentCount: activeCampusStudents,
-          groovelabStudentCount: activeGroovelabStudents,
-          passiveStudentCount: passiveStudentsCount,
-          storageAddonMonthlyFee: storageAddonFee,
-          billingDiscountType: (school.billing_discount_type as any) || 'monthly',
-          exemptStudentCount: stats.exemptActiveStudents || 0,
-          directBillingMode: isFullDirect ? 'full' : (isPartial ? 'partial' : 'none'),
-          rates: {
-            priceCampus: effectiveRates.priceCampus,
-            priceGroovelab: effectiveRates.priceGroovelab,
-            priceKombi: effectiveRates.priceKombi,
-            priceTeacher: effectiveRates.priceTeacher,
-            priceStudent: effectiveRates.priceStudent,
-            pricePassiveStudent: effectiveRates.pricePassiveStudent
-          }
-        });
-
-        const subtotal = calcResult.totalMonthlySchoolInvoice;
-        const isBypass = school.subscription_bypass || false;
-        let status: 'trial' | 'active' | 'bypass' | 'suspended' = 'active';
-        if (school.status === 'suspended') {
-          status = 'suspended';
-        } else if (isBypass) {
-          status = 'bypass';
-        } else if (school.is_trial) {
-          status = 'trial';
-        }
-
-        const total = (isBypass || status === 'trial' || status === 'suspended') ? 0.00 : subtotal;
-
-        const b2cRevenue = premiumStudents * 9.99;
 
         return {
           schoolId: school.id,
@@ -640,42 +491,42 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           schoolZipCode: school.zip_code || '',
           schoolCity: school.city || '',
           subscriptionType: school.subscription_type === 'solo' ? 'solo' : 'standard',
-          hasCampus: school.has_campus_subscription || false,
-          hasGroovelab: school.has_groovelab_subscription || false,
+          hasCampus,
+          hasGroovelab,
           hasKombiDiscount: hasKombi,
           subscriptionBypass: isBypass,
           activeCampusUsers,
-          baseFee: calcResult.baseServerFlatRate,
-          userFee: parseFloat((calcResult.teacherServiceFeeTotal + calcResult.passiveStudentFeeTotal).toFixed(2)),
-          kombiDiscountAmount: calcResult.bundleSavings,
-          subtotal: parseFloat(subtotal.toFixed(2)),
-          total: parseFloat(total.toFixed(2)),
-          status,
+          baseFee: canonical.billingResult.baseServerFlatRate,
+          userFee: parseFloat((canonical.billingResult.teacherServiceFeeTotal + canonical.billingResult.passiveStudentFeeTotal).toFixed(2)),
+          kombiDiscountAmount: canonical.billingResult.bundleSavings,
+          subtotal: canonical.subtotal,
+          total: canonical.total,
+          status: canonical.status,
           
-          totalStudents,
-          activeStudents,
-          premiumStudents,
-          totalTeachers: teachersCount,
+          totalStudents: stats.totalStudents,
+          activeStudents: stats.activeStudents,
+          premiumStudents: stats.activeStudents,
+          totalTeachers: stats.totalTeachers,
           activeTeachers: stats.activeTeachers,
-          b2bRevenue: parseFloat(total.toFixed(2)),
-          b2cRevenue: parseFloat(b2cRevenue.toFixed(2)),
+          b2bRevenue: canonical.b2bRevenue,
+          b2cRevenue: canonical.b2cRevenue,
           userQuota: school.user_quota || 150,
           pendingUserQuota: school.pending_user_quota,
           studentBillingOption: school.student_billing_option || 'option1',
-          isGrandfathered: effectiveRates.isGrandfatheredRateActive,
+          isGrandfathered: canonical.effectiveRates.isGrandfatheredRateActive,
           
           // Custom Breakdown Fields
-          activeStudentFee: parseFloat(calcResult.studentActivationFeeTotal.toFixed(2)),
-          totalTeachersCount: teachersCount,
-          totalEmployeesCount: employeesCount,
-          passiveStudentsCount,
-          teachersHostingFee: parseFloat(calcResult.teacherServiceFeeTotal.toFixed(2)),
-          passiveStudentsHostingFee: parseFloat(calcResult.passiveStudentFeeTotal.toFixed(2)),
-          activeCampusCount: activeCampusStudents,
-          activeGroovelabCount: activeGroovelabStudents,
-          storageAddonGb: Number(school.storage_addon_gb || 0),
-          storageUsedBytes: Number(school.storage_used_bytes || 0),
-          storageAddonMonthlyFee: storageAddonFee
+          activeStudentFee: parseFloat(canonical.billingResult.studentActivationFeeTotal.toFixed(2)),
+          totalTeachersCount: stats.totalTeachers,
+          totalEmployeesCount: stats.totalEmployees,
+          passiveStudentsCount: stats.passiveStudents,
+          teachersHostingFee: parseFloat(canonical.billingResult.teacherServiceFeeTotal.toFixed(2)),
+          passiveStudentsHostingFee: parseFloat(canonical.billingResult.passiveStudentFeeTotal.toFixed(2)),
+          activeCampusCount: stats.campusStudents,
+          activeGroovelabCount: stats.groovelabStudents,
+          storageAddonGb: stats.storageAddonGb,
+          storageUsedBytes: stats.storageUsedBytes,
+          storageAddonMonthlyFee: stats.storageAddonMonthlyFee
         };
       });
 

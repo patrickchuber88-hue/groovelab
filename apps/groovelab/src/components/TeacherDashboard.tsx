@@ -12,6 +12,14 @@ import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, fo
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
+import { 
+  fetchSchoolRoster, 
+  getTeacherRoster, 
+  getTeacherStudentCount, 
+  normalizeStudentKey, 
+  isTestOrGenericStudent, 
+  deduplicateRoster 
+} from '../services/studentRosterService';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -9606,7 +9614,7 @@ export function TeacherDashboard({
               {activeTab !== 'live' && (
                 <>
                   <h2 style={{ fontSize: windowWidth < 768 ? '1.35rem' : '28px', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word', maxWidth: '100%' }}>
-                    {activeTab === 'students' ? `🎓 Schülerverwaltung (${allStudents.filter(s => activePlatform === 'campus' ? (s.is_campus_active === true || s.isCampusActive === true) : (s.is_groovelab_active === true || s.isGroovelabActive === true)).length})` : `👥 Bands (${allBands.length})`}
+                    {activeTab === 'students' ? `🎓 Schülerverwaltung (${allStudents.filter(s => activePlatform === 'campus' ? true : (s.is_groovelab_active === true || s.isGroovelabActive === true)).length})` : `👥 Bands (${allBands.length})`}
                   </h2>
                   <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
                     {teacher ? `${teacher.first_name} ${teacher.last_name} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}
@@ -16322,9 +16330,9 @@ export function TeacherDashboard({
               const filtered = allStudents.filter(student => {
                 // Strict Module Activation Filter:
                 // GrooveLab tab MUST ONLY show students who have GrooveLab activated (is_groovelab_active === true)
-                // Campus tab MUST ONLY show students who have Campus activated (is_campus_active === true)
+                // Campus tab shows all assigned students in lesson roster
                 const isModuleActive = activePlatform === 'campus'
-                  ? (student.is_campus_active === true || student.isCampusActive === true)
+                  ? true
                   : (student.is_groovelab_active === true || student.isGroovelabActive === true);
 
                 if (!isModuleActive) return false;

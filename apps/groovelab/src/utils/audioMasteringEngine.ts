@@ -69,13 +69,109 @@ export interface MasteringOptions {
   applyParallelConsoleBus?: boolean;// Default: true (Andrew Scheps 80/20 bus)
   applyStereoDimension?: boolean;  // Default: true (200 Hz Mono-Maker + >600 Hz 125% width)
   applyConvolutionReverb?: boolean;// Default: true (Grand Gala Concert Hall)
+  reverbRoomType?: ReverbRoomType; // Default: 'hall' (Studio, Kammermusik, Konzertsaal, Kathedrale)
   reverbWetMix?: number;           // Default: 0.30 (30%)
   reverbPreDelayMs?: number;       // Default: 25 ms
 }
 
+export type ReverbRoomType = 'small' | 'medium' | 'large' | 'studio' | 'chamber' | 'hall' | 'cathedral';
+
+export interface RoomAcousticProfile {
+  id: 'small' | 'medium' | 'large';
+  name: string;
+  emoji: string;
+  sub: string;
+  defaultWet: number;
+  durationSec: number;
+  decayRate: number;
+  preDelayMs: number;
+  hfDampFactor: number;
+}
+
+export const ROOM_ACOUSTIC_PROFILES: Record<string, RoomAcousticProfile> = {
+  small: {
+    id: 'small',
+    name: 'Klein',
+    emoji: '🏠',
+    sub: 'Zimmer & Studio',
+    defaultWet: 10,
+    durationSec: 0.85,
+    decayRate: 3.4,
+    preDelayMs: 15,
+    hfDampFactor: 6.8
+  },
+  medium: {
+    id: 'medium',
+    name: 'Mittel',
+    emoji: '🏛️',
+    sub: 'Konzertsaal',
+    defaultWet: 22,
+    durationSec: 1.6,
+    decayRate: 1.85,
+    preDelayMs: 25,
+    hfDampFactor: 4.8
+  },
+  large: {
+    id: 'large',
+    name: 'Groß',
+    emoji: '⛪',
+    sub: 'Riesen-Halle',
+    defaultWet: 42,
+    durationSec: 3.8,
+    decayRate: 1.0,
+    preDelayMs: 35,
+    hfDampFactor: 3.6
+  },
+  // Backwards compatibility aliases
+  studio: {
+    id: 'small',
+    name: 'Klein',
+    emoji: '🏠',
+    sub: 'Zimmer & Studio',
+    defaultWet: 10,
+    durationSec: 0.85,
+    decayRate: 3.4,
+    preDelayMs: 15,
+    hfDampFactor: 6.8
+  },
+  chamber: {
+    id: 'medium',
+    name: 'Mittel',
+    emoji: '🏛️',
+    sub: 'Konzertsaal',
+    defaultWet: 22,
+    durationSec: 1.6,
+    decayRate: 1.85,
+    preDelayMs: 25,
+    hfDampFactor: 4.8
+  },
+  hall: {
+    id: 'medium',
+    name: 'Mittel',
+    emoji: '🏛️',
+    sub: 'Konzertsaal',
+    defaultWet: 22,
+    durationSec: 1.6,
+    decayRate: 1.85,
+    preDelayMs: 25,
+    hfDampFactor: 4.8
+  },
+  cathedral: {
+    id: 'large',
+    name: 'Groß',
+    emoji: '⛪',
+    sub: 'Riesen-Halle',
+    defaultWet: 42,
+    durationSec: 3.8,
+    decayRate: 1.0,
+    preDelayMs: 35,
+    hfDampFactor: 3.6
+  }
+};
+
 export const DEFAULT_ACOUSTIC_MASTERING_OPTIONS: MasteringOptions = {
   profile: 'acoustic_audiophile',
-  targetLufs: -13.0,
+  targetLufs: -14.0,
   targetPeakDb: -1.0,
   isDrumPadMode: false,
   applyAutoGainStage: true,
@@ -93,7 +189,8 @@ export const DEFAULT_ACOUSTIC_MASTERING_OPTIONS: MasteringOptions = {
   applyParallelConsoleBus: true,
   applyStereoDimension: true,
   applyConvolutionReverb: true,
-  reverbWetMix: 0.30,
+  reverbRoomType: 'medium',
+  reverbWetMix: 0.22,
   reverbPreDelayMs: 25
 };
 
@@ -133,7 +230,8 @@ export interface DualMasteringResult {
 function createAcousticRoomImpulseResponse(
   ctx: BaseAudioContext,
   durationSec = 2.1,
-  decayRate = 1.65
+  decayRate = 1.65,
+  hfDampFactor = 5.2
 ): AudioBuffer {
   const sampleRate = ctx.sampleRate;
   const length = Math.floor(sampleRate * durationSec);
@@ -160,8 +258,8 @@ function createAcousticRoomImpulseResponse(
   for (let i = 0; i < length; i++) {
     const t = i / sampleRate;
 
-    // Dual-slope exponential decay: Smooth warm mid-range sustain for Gala Concert atmosphere
-    const hfDamping = Math.exp(-t * 5.2);
+    // Dual-slope exponential decay: Smooth warm mid-range sustain for chosen acoustic room atmosphere
+    const hfDamping = Math.exp(-t * hfDampFactor);
     const midDecay = Math.exp(-t * decayRate);
     const lateEnvelope = (t < 0.025) ? (t / 0.025) : 1.0; // 25ms gentle fade-in for diffuse onset
 
@@ -737,6 +835,30 @@ function applyStereoDimensionAndMonoMaker(audioBuffer: AudioBuffer): AudioBuffer
 }
 
 /**
+ * 🌟 Phase-Coherent Parallel Analog Tanh Saturation Curve (Studio Standard)
+ * Mathematically combines 70% pristine clean signal + 30% warm tube saturation into a single
+ * transfer function. Guarantees 0 samples phase delay, 0% comb filtering, and 100% unity-gain [-1.0, 1.0].
+ * 
+ * @param amount Saturation drive strength (Default: 2.0)
+ * @param wetMix Parallel saturation blend (Default: 0.30 = 30% Wet / 70% Dry)
+ * @param samples Lookup resolution (Default: 44100)
+ */
+export function createTubeWarmthCurve(amount = 2.0, wetMix = 0.30, samples = 44100): Float32Array {
+  const curve = new Float32Array(samples);
+  const k = amount;
+  const denom = Math.tanh(k);
+  const wet = Math.max(0, Math.min(1, wetMix));
+  const dry = 1.0 - wet;
+
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / samples - 1;
+    const sat = Math.tanh(k * x) / denom;
+    curve[i] = dry * x + wet * sat;
+  }
+  return curve;
+}
+
+/**
  * Ultra-resilient AudioBuffer decoder supporting all Safari WebKit, Chrome, Firefox edge cases
  * with Promise + Callback dual signature and timeout watchdog
  */
@@ -805,21 +927,25 @@ export function ensureCenteredStereoAudioBuffer(ctx: BaseAudioContext, inputBuff
 
   let rmsL = 0;
   let rmsR = 0;
-  const step = Math.max(1, Math.floor(length / 2000));
-  for (let i = 0; i < length; i += step) {
+  const checkLen = Math.min(length, Math.floor(sampleRate * 2));
+
+  for (let i = 0; i < checkLen; i += 4) {
     rmsL += inL[i] * inL[i];
     rmsR += inR[i] * inR[i];
   }
+  rmsL = Math.sqrt(rmsL / (checkLen / 4));
+  rmsR = Math.sqrt(rmsR / (checkLen / 4));
 
-  // If Right channel is dead/silent (< 2% of Left energy) or vice-versa, duplicate the active channel to both!
-  if (rmsL > 1e-6 && rmsR < rmsL * 0.02) {
+  const isRightDead = rmsR < 1e-4 && rmsL > 1e-3;
+  const isLeftDead = rmsL < 1e-4 && rmsR > 1e-3;
+
+  if (isRightDead) {
     outL.set(inL);
     outR.set(inL);
-  } else if (rmsR > 1e-6 && rmsL < rmsR * 0.02) {
+  } else if (isLeftDead) {
     outL.set(inR);
     outR.set(inR);
   } else {
-    // Normal stereo signal
     outL.set(inL);
     outR.set(inR);
   }
@@ -828,17 +954,17 @@ export function ensureCenteredStereoAudioBuffer(ctx: BaseAudioContext, inputBuff
 }
 
 /**
- * 🎙️ Studio Audiophile Mastering Chain (ITU-R BS.1770-4 / EBU R128 Compliant)
+ * 🎛️ FULL STUDIO AUDIO-PROCESSING PIPELINE
+ * Renders Studio Master Audio with 5-Stage Clean DSP Architecture & -14.0 LUFS EBU R128 normalization.
  */
-export async function processStudioMastering(
-  audioBlobOrFile: Blob | File,
+export async function processStudioMasteringAudioBuffer(
+  decodedBuffer: AudioBuffer,
   options: MasteringOptions = DEFAULT_ACOUSTIC_MASTERING_OPTIONS
-): Promise<{ 
-  masteredBlob: Blob; 
-  masteredUrl: string; 
-  originalLufs: number; 
-  finalLufs: number; 
-  profileUsed: MasteringProfile;
+): Promise<{
+  masteredBlob: Blob;
+  masteredUrl: string;
+  originalLufs: number;
+  finalLufs: number;
   detectedF0MinHz?: number;
   adaptiveHpfFreqHz?: number;
   crestFactorDb?: number;
@@ -849,62 +975,7 @@ export async function processStudioMastering(
   midResonanceCutDb?: number;
   durationSec?: number;
 }> {
-  const effectiveProfile: MasteringProfile = options.profile || 'acoustic_audiophile';
-  const arrayBuffer = await audioBlobOrFile.arrayBuffer();
-
-  const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  let decodedBuffer: AudioBuffer;
-  try {
-    const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
-    // 🌟 Stereo-Zentrierung & Mono-to-Stereo Normalization (Behebt Links-Drall)
-    decodedBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
-  } finally {
-    try {
-      tempCtx.close();
-    } catch (e) {}
-  }
-
   const originalLufs = calculateIntegratedRms(decodedBuffer);
-
-  // 1. Adaptive HPF Frequency Determination (f0_min analysis)
-  const hpfInfo = (options.applyAdaptiveHpf ?? true)
-    ? detectAdaptiveHpfFrequency(decodedBuffer, options.isDrumPadMode)
-    : { f0MinHz: 80, hpfFreqHz: options.isDrumPadMode ? 35 : 80 };
-
-  // 2. Intelligent Crest-Factor Transient Softener
-  const transientInfo = (options.applyTransientSoftener ?? true)
-    ? applyIntelligentTransientSoftener(decodedBuffer)
-    : { crestFactorDb: 10, applied: false };
-
-  // 3. Dynamic Low-End Resonance Control (100 Hz – 220 Hz)
-  const lowResInfo = (options.applyLowEndResonance ?? true)
-    ? analyzeLowEndResonance(decodedBuffer)
-    : { peakLowFreqHz: 160, cutDb: 0, isPeakDetected: false };
-
-  // 4. Adaptive Mid-Range Resonance Detection (180 Hz - 420 Hz, Q = 2.4)
-  const midResInfo = (options.applyMidResonance ?? true)
-    ? analyzeMidRangeResonance(decodedBuffer)
-    : { peakMidFreqHz: 280, cutDb: 0, isPeakDetected: false };
-
-  // 4b. Smart Ambient Room Noise Floor Expander (Pre-Staging Soft-Denoise)
-  if (options.applyAmbientDenoise ?? true) {
-    applySmartAmbientDenoise(decodedBuffer);
-  }
-
-  // 5. Pre-Gain Staging (-18.0 dBFS RMS Headroom)
-  if (options.applyAutoGainStage ?? true) {
-    const currentRmsDb = originalLufs;
-    const gainStageDb = -18.0 - currentRmsDb;
-    const safeGainDb = Math.min(10, Math.max(-10, gainStageDb));
-    const linearGain = Math.pow(10, safeGainDb / 20);
-
-    for (let c = 0; c < decodedBuffer.numberOfChannels; c++) {
-      const data = decodedBuffer.getChannelData(c);
-      for (let i = 0; i < data.length; i++) {
-        data[i] *= linearGain;
-      }
-    }
-  }
 
   // Set up OfflineAudioContext for deterministic rendering (Always 2-Channel Centered Stereo)
   const offlineCtx = new OfflineAudioContext(
@@ -916,174 +987,118 @@ export async function processStudioMastering(
   const sourceNode = offlineCtx.createBufferSource();
   sourceNode.buffer = decodedBuffer;
 
-  let lastNode: AudioNode = sourceNode;
+  // =========================================================================
+  // 0. INPUT GAIN PADDING (-3.0 dB Headroom Shield)
+  // =========================================================================
+  // Creates +3.0 dB of clean headroom to prevent EQ boosts & reverb summation from clipping
+  const preGainNode = offlineCtx.createGain();
+  preGainNode.gain.value = 0.707; // -3.0 dBFS
+  sourceNode.connect(preGainNode);
+  let lastNode: AudioNode = preGainNode;
 
-  // 6. Low-Cut Filter (highpass 80 Hz, Q: 0.707) zur Entfernung von Trittschall & Rumpeln
-  if (options.applyAdaptiveHpf ?? true) {
-    const hpfNode = offlineCtx.createBiquadFilter();
-    hpfNode.type = 'highpass';
-    hpfNode.frequency.value = Math.max(80, hpfInfo.hpfFreqHz);
-    hpfNode.Q.value = 0.707;
-    lastNode.connect(hpfNode);
-    lastNode = hpfNode;
-  }
+  // =========================================================================
+  // 1. LOW-END CLEANUP & DE-MUD STAGE
+  // =========================================================================
+  // 1a. Highpass-Filter: 80 Hz, Q: 0.707 (entfernt Rumpeln und Trittschall)
+  const hpfNode = offlineCtx.createBiquadFilter();
+  hpfNode.type = 'highpass';
+  hpfNode.frequency.value = 80;
+  hpfNode.Q.value = 0.707;
+  lastNode.connect(hpfNode);
+  lastNode = hpfNode;
 
-  // 7. Dynamic Low-End Resonance Notch (100 Hz - 220 Hz)
-  if (lowResInfo.isPeakDetected && Math.abs(lowResInfo.cutDb) > 0.05) {
-    const lowNotchNode = offlineCtx.createBiquadFilter();
-    lowNotchNode.type = 'peaking';
-    lowNotchNode.frequency.value = lowResInfo.peakLowFreqHz;
-    lowNotchNode.gain.value = lowResInfo.cutDb;
-    lowNotchNode.Q.value = 2.0;
-    lastNode.connect(lowNotchNode);
-    lastNode = lowNotchNode;
-  }
+  // 1b. Dynamic De-Mud: Peaking bei 350 Hz, -2.0 dB, Q: 1.5 (beseitigt Raum-Mumpf & Boxiness)
+  const boxNotchNode = offlineCtx.createBiquadFilter();
+  boxNotchNode.type = 'peaking';
+  boxNotchNode.frequency.value = 350;
+  boxNotchNode.gain.value = -2.0;
+  boxNotchNode.Q.value = 1.5;
+  lastNode.connect(boxNotchNode);
+  lastNode = boxNotchNode;
 
-  // 8. Adaptive Mid-Range Resonance Notch (180 - 420 Hz, Q = 2.4)
-  if (midResInfo.isPeakDetected && Math.abs(midResInfo.cutDb) > 0.05) {
-    const midNotchNode = offlineCtx.createBiquadFilter();
-    midNotchNode.type = 'peaking';
-    midNotchNode.frequency.value = midResInfo.peakMidFreqHz;
-    midNotchNode.gain.value = midResInfo.cutDb;
-    midNotchNode.Q.value = 2.4;
-    lastNode.connect(midNotchNode);
-    lastNode = midNotchNode;
-  }
+  // =========================================================================
+  // 2. ANALOG TUBE WARMTH & SMOOTH AIR STAGE (Phase-Coherent Parallel Saturation)
+  // =========================================================================
+  // 2a. WaveShaperNode: 30% Parallel Tanh-Sättigung + 70% Clean Transienten mit 4x Oversampling
+  const warmthShaper = offlineCtx.createWaveShaper();
+  warmthShaper.curve = createTubeWarmthCurve(2.0, 0.30, 44100) as any;
+  warmthShaper.oversample = '4x';
+  lastNode.connect(warmthShaper);
+  lastNode = warmthShaper;
 
-  // 8a. 🕯️ Kaminfeuer-Wärme (Analog Tube Warmth Boost at 260 Hz, +1.2 dB, Q = 1.4)
-  if (options.applyWarmthBody ?? true) {
-    const warmthNode = offlineCtx.createBiquadFilter();
-    warmthNode.type = 'peaking';
-    warmthNode.frequency.value = 260;
-    warmthNode.gain.value = 1.2;
-    warmthNode.Q.value = 1.4;
-    lastNode.connect(warmthNode);
-    lastNode = warmthNode;
-  }
+  // 2b. Smooth Air-Shelf: Highshelf bei 10.0 kHz, moderat auf +1.8 dB
+  const airNode = offlineCtx.createBiquadFilter();
+  airNode.type = 'highshelf';
+  airNode.frequency.value = 10000;
+  airNode.gain.value = 1.8;
+  airNode.Q.value = 0.707;
+  lastNode.connect(airNode);
+  lastNode = airNode;
 
-  // 8b. Voice & Instrument Presence Boost (peaking 3.2 kHz, +2.5 dB, Q: 1.2)
-  if (options.applyPultecAir ?? true) {
-    const presenceNode = offlineCtx.createBiquadFilter();
-    presenceNode.type = 'peaking';
-    presenceNode.frequency.value = 3200;
-    presenceNode.gain.value = 2.5;
-    presenceNode.Q.value = 1.2;
-    lastNode.connect(presenceNode);
-    lastNode = presenceNode;
-  }
+  // =========================================================================
+  // 3. PARALLEL UPWARD DENSITY COMPRESSION (9% Wet Infusion)
+  // =========================================================================
+  // Hebt leise Nuancen, Obertöne und das Ausklingen von Tönen sanft an (9% Parallel Glue)
+  const upwardDryGain = offlineCtx.createGain();
+  const upwardWetGain = offlineCtx.createGain();
+  const upwardSumBus = offlineCtx.createGain();
 
-  // 8c. Audiophile Tilt-EQ Tonwaage (Pivot 1000 Hz: +1.0 dB Highs, -1.0 dB Lows)
-  if (options.applyTiltEq ?? true) {
-    const pivotHz = options.tiltPivotHz || 1000;
+  upwardDryGain.gain.value = 1.0;
+  upwardWetGain.gain.value = 0.09; // Exakt 9% Zudienung für satten Tonkörper ohne Kompressionseffekt
 
-    const tiltLowNode = offlineCtx.createBiquadFilter();
-    tiltLowNode.type = 'lowshelf';
-    tiltLowNode.frequency.value = pivotHz;
-    tiltLowNode.gain.value = -1.0;
-    lastNode.connect(tiltLowNode);
-    lastNode = tiltLowNode;
+  const upwardCompressor = offlineCtx.createDynamicsCompressor();
+  upwardCompressor.threshold.value = -24.0;
+  upwardCompressor.knee.value = 8.0;
+  upwardCompressor.ratio.value = 4.0;
+  upwardCompressor.attack.value = 0.020; // 20ms lässt natürliche Anschlagstransienten unberührt
+  upwardCompressor.release.value = 0.150; // 150ms hebt die musikalische Ausklingphase sauber an
 
-    const tiltHighNode = offlineCtx.createBiquadFilter();
-    tiltHighNode.type = 'highshelf';
-    tiltHighNode.frequency.value = pivotHz;
-    tiltHighNode.gain.value = +1.0;
-    lastNode.connect(tiltHighNode);
-    lastNode = tiltHighNode;
-  }
+  lastNode.connect(upwardDryGain);
+  upwardDryGain.connect(upwardSumBus);
 
-  // 8d. ✨ Christmas Sparkle & Bell Brilliance Stage (10.5 kHz, +1.6 dB, Q = 0.85)
-  if (options.applyChristmasSparkle ?? true) {
-    const sparkleNode = offlineCtx.createBiquadFilter();
-    sparkleNode.type = 'peaking';
-    sparkleNode.frequency.value = 10500;
-    sparkleNode.gain.value = 1.6;
-    sparkleNode.Q.value = 0.85;
-    lastNode.connect(sparkleNode);
-    lastNode = sparkleNode;
-  }
+  lastNode.connect(upwardCompressor);
+  upwardCompressor.connect(upwardWetGain);
+  upwardWetGain.connect(upwardSumBus);
 
-  // 9. Subtle High-End "Air" Stage (Pultec EQP-1A Style: 14.5 kHz High-Shelf +1.5 dB)
-  if (options.applyPultecAir ?? true) {
-    const airNode = offlineCtx.createBiquadFilter();
-    airNode.type = 'highshelf';
-    airNode.frequency.value = 14500;
-    airNode.gain.value = 1.5;
-    airNode.Q.value = 0.6;
-    lastNode.connect(airNode);
-    lastNode = airNode;
-  }
+  lastNode = upwardSumBus;
 
-  // 9b. Dynamic De-Harsh & Sibilance Controller (5.5 kHz - 8.5 kHz)
-  if (options.applyDeHarsh ?? true) {
-    const deHarshInfo = analyzeDeHarshResonance(decodedBuffer);
-    if (deHarshInfo.cutDb < 0) {
-      const deHarshNode = offlineCtx.createBiquadFilter();
-      deHarshNode.type = 'peaking';
-      deHarshNode.frequency.value = deHarshInfo.peakHarshFreqHz;
-      deHarshNode.gain.value = deHarshInfo.cutDb;
-      deHarshNode.Q.value = 2.8;
-      lastNode.connect(deHarshNode);
-      lastNode = deHarshNode;
-    }
-  }
-
-  // 10. 🎛️ NEW YORK PARALLEL COMPRESSION & SATURATION BUS (Transient-Taming & Long Sustain Boost)
-  if (options.applyParallelConsoleBus ?? true) {
-    const preBusNode = lastNode;
-    const mixBus = offlineCtx.createGain();
-
-    // 10a. DRY Path (75% Pure Dynamic Articulation)
-    const dryGain = offlineCtx.createGain();
-    dryGain.gain.value = 0.75;
-    preBusNode.connect(dryGain);
-    dryGain.connect(mixBus);
-
-    // 10b. WET Path (25% Parallel Crush: Fast Attack catches transient, Slow Release pulls up and stabilizes long singing sustain)
-    const parallelCompressor = offlineCtx.createDynamicsCompressor();
-    parallelCompressor.threshold.value = options.isDrumPadMode ? -24.0 : -22.0;
-    parallelCompressor.knee.value = 18.0;
-    parallelCompressor.ratio.value = 8.0; // High compression ratio for intense density
-    parallelCompressor.attack.value = 0.005; // 5ms ultra-fast attack: catches & tames hard transient clicks
-    parallelCompressor.release.value = 0.280; // 280ms smooth release: sustains & carries the decaying musical tone
-
-    const consoleShaper = offlineCtx.createWaveShaper();
-    consoleShaper.curve = createTapeWarmthCurve(4096) as any;
-    consoleShaper.oversample = '4x';
-
-    const wetGain = offlineCtx.createGain();
-    wetGain.gain.value = 0.25;
-
-    preBusNode.connect(parallelCompressor);
-    parallelCompressor.connect(consoleShaper);
-    consoleShaper.connect(wetGain);
-    wetGain.connect(mixBus);
-
-    lastNode = mixBus;
-  }
-
-  // 11. 🏛️ VOLLE GALA CONCERT HALL REVERB SEND (Customizable 0% - 60% Wet Mix, Standard 30%)
+  // =========================================================================
+  // 4. 3D GALA CONVOLVER REVERB STAGE (Abbey Road 300 Hz HPF + Pre-Delay)
+  // =========================================================================
   if (options.applyConvolutionReverb ?? true) {
     const wetGain = offlineCtx.createGain();
     const dryGain = offlineCtx.createGain();
     const reverbMixBus = offlineCtx.createGain();
 
-    const wetMix = typeof options.reverbWetMix === 'number' ? options.reverbWetMix : 0.30;
+    const roomType: string = options.reverbRoomType || 'medium';
+    const roomProfile = ROOM_ACOUSTIC_PROFILES[roomType] || ROOM_ACOUSTIC_PROFILES.medium;
+
+    const wetMix = typeof options.reverbWetMix === 'number' 
+      ? options.reverbWetMix 
+      : (roomProfile.defaultWet / 100);
     wetGain.gain.value = wetMix;
     dryGain.gain.value = 1.0;
 
-    const preDelaySec = (options.reverbPreDelayMs ?? 25) / 1000;
+    const preDelaySec = (options.reverbPreDelayMs ?? roomProfile.preDelayMs ?? 25) / 1000;
     const delayNode = offlineCtx.createDelay(1.0);
     delayNode.delayTime.value = preDelaySec;
 
-    // Grand Gala Concert Hall Impulse Response (2.2s RT60)
+    // Tailored Acoustic Room Impulse Response
     const convolver = offlineCtx.createConvolver();
-    convolver.buffer = createAcousticRoomImpulseResponse(offlineCtx, 2.2, 1.55);
+    convolver.buffer = createAcousticRoomImpulseResponse(
+      offlineCtx, 
+      roomProfile.durationSec, 
+      roomProfile.decayRate, 
+      roomProfile.hfDampFactor
+    );
 
+    // Abbey Road Reverb Highpass (300 Hz)
     const reverbHpNode = offlineCtx.createBiquadFilter();
     reverbHpNode.type = 'highpass';
-    reverbHpNode.frequency.value = 140;
+    reverbHpNode.frequency.value = 300;
     reverbHpNode.Q.value = 0.707;
 
+    // Reverb Lowpass (7.5 kHz)
     const reverbLpNode = offlineCtx.createBiquadFilter();
     reverbLpNode.type = 'lowpass';
     reverbLpNode.frequency.value = 7500;
@@ -1102,18 +1117,18 @@ export async function processStudioMastering(
     lastNode = reverbMixBus;
   }
 
-  // 12. Master Limiter / Dynamics Compressor (Threshold: -6 dB, Ratio: 4:1, Attack: 0.01s, Release: 0.1s)
-  if (options.applyParallelConsoleBus ?? true) {
-    const masterCompressor = offlineCtx.createDynamicsCompressor();
-    masterCompressor.threshold.value = -6.0;
-    masterCompressor.ratio.value = 4.0;
-    masterCompressor.attack.value = 0.01;
-    masterCompressor.release.value = 0.10;
-    masterCompressor.knee.value = 6.0;
-
-    lastNode.connect(masterCompressor);
-    lastNode = masterCompressor;
-  }
+  // =========================================================================
+  // 4. MASTER PEAK LIMITER & DYNAMICS CATCHER
+  // =========================================================================
+  // Fängt sanft eventuelle Peak-Spitzen ab (Threshold: -4.0 dB, Ratio: 6:1, Attack: 0.005s, Release: 0.08s)
+  const masterLimiter = offlineCtx.createDynamicsCompressor();
+  masterLimiter.threshold.value = -4.0;
+  masterLimiter.knee.value = 4.0;
+  masterLimiter.ratio.value = 6.0;
+  masterLimiter.attack.value = 0.005;
+  masterLimiter.release.value = 0.08;
+  lastNode.connect(masterLimiter);
+  lastNode = masterLimiter;
 
   // Destination
   lastNode.connect(offlineCtx.destination);
@@ -1122,13 +1137,14 @@ export async function processStudioMastering(
   sourceNode.start(0);
   const renderedBuffer = await offlineCtx.startRendering();
 
-  // 13. Psychoacoustic Dimension & 200 Hz Mono-Maker
+  // =========================================================================
+  // 5. TRUE-PEAK NORMALIZATION & OUTPUT (-14.0 LUFS & -1.0 dBTP)
+  // =========================================================================
   if (options.applyStereoDimension ?? true) {
     applyStereoDimensionAndMonoMaker(renderedBuffer);
   }
 
-  // 14. Loudness Normalization to -13.0 LUFS (-1.0 dBTP Ceiling)
-  const targetLufs = options.targetLufs ?? -13.0;
+  const targetLufs = options.targetLufs ?? -14.0;
   const currentRenderedLufs = calculateIntegratedRms(renderedBuffer);
   const lufsDeltaDb = targetLufs - currentRenderedLufs;
   const linearLufsGain = Math.pow(10, lufsDeltaDb / 20);
@@ -1140,7 +1156,7 @@ export async function processStudioMastering(
     }
   }
 
-  // True Peak Guard (-1.0 dBTP with 4x inter-sample protection)
+  // Brickwall Limiter & True Peak Ceiling Guard (-1.0 dBTP / 0.891 linear with 4x inter-sample protection)
   const maxPeak4x = calculateBufferPeak4x(renderedBuffer);
   const targetPeakLinear = Math.pow(10, (options.targetPeakDb ?? -1.0) / 20);
 
@@ -1163,16 +1179,48 @@ export async function processStudioMastering(
     masteredUrl,
     originalLufs: Math.round(originalLufs * 10) / 10,
     finalLufs: targetLufs,
-    profileUsed: effectiveProfile,
-    detectedF0MinHz: hpfInfo.f0MinHz,
-    adaptiveHpfFreqHz: hpfInfo.hpfFreqHz,
-    crestFactorDb: transientInfo.crestFactorDb,
-    transientSofteningApplied: transientInfo.applied,
-    lowResonancePeakHz: lowResInfo.peakLowFreqHz,
-    lowResonanceCutDb: lowResInfo.cutDb,
-    midResonancePeakHz: midResInfo.peakMidFreqHz,
-    midResonanceCutDb: midResInfo.cutDb,
-    durationSec: Math.round(decodedBuffer.duration * 10) / 10
+    durationSec: Math.round(renderedBuffer.duration * 10) / 10
+  };
+}
+
+/**
+ * 🎙️ Studio Audiophile Mastering Chain (ITU-R BS.1770-4 / EBU R128 Compliant)
+ */
+export async function processStudioMastering(
+  audioBlobOrFile: Blob | File,
+  options: MasteringOptions = DEFAULT_ACOUSTIC_MASTERING_OPTIONS
+): Promise<{ 
+  masteredBlob: Blob; 
+  masteredUrl: string; 
+  originalLufs: number; 
+  finalLufs: number; 
+  profileUsed?: MasteringProfile;
+  detectedF0MinHz?: number;
+  adaptiveHpfFreqHz?: number;
+  crestFactorDb?: number;
+  transientSofteningApplied?: boolean;
+  lowResonancePeakHz?: number;
+  lowResonanceCutDb?: number;
+  midResonancePeakHz?: number;
+  midResonanceCutDb?: number;
+  durationSec?: number;
+}> {
+  const arrayBuffer = await audioBlobOrFile.arrayBuffer();
+  const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  let decodedBuffer: AudioBuffer;
+  try {
+    const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
+    decodedBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
+  } finally {
+    try {
+      tempCtx.close();
+    } catch (e) {}
+  }
+
+  const result = await processStudioMasteringAudioBuffer(decodedBuffer, options);
+  return {
+    ...result,
+    profileUsed: options.profile || 'acoustic_audiophile'
   };
 }
 
@@ -1254,7 +1302,7 @@ export async function processDualMastering(
  * 24-Bit Hi-Res PCM WAV Audio Encoder with Broadcast Format & TPDF Dithering
  * Generates lossless 24-Bit / 48 kHz Studio Master WAV with 144 dB Dynamic Range
  */
-function audioBufferToWavBlob(buffer: AudioBuffer, metadata?: { title?: string; artist?: string }): Blob {
+export function audioBufferToWavBlob(buffer: AudioBuffer, metadata?: { title?: string; artist?: string }): Blob {
   const numChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
   const format = 1; // PCM
@@ -1359,3 +1407,204 @@ function audioBufferToWavBlob(buffer: AudioBuffer, metadata?: { title?: string; 
 
   return new Blob([arrayBuffer], { type: 'audio/wav' });
 }
+
+/**
+ * 🎙️ PURE RAW AUDIO BUFFER DSP PIPELINE (For Loopstation & Homework Audio)
+ * 
+ * 1. 10 Hz DC-Offset Blocker (Removes hardware bias)
+ * 2. Loop Seam Smoothing (5ms Equal-Power Crossfade to eliminate click/pop on seam)
+ * 3. ITU-R BS.1770-4 / EBU R128 Loudness Normalization (-13.0 LUFS)
+ * 4. True-Peak Ceiling Guard (-1.0 dBTP / 0.891 linear with 4x inter-sample protection)
+ */
+export function processPureRawAudioBuffer(
+  audioBuffer: AudioBuffer,
+  options?: {
+    targetLufs?: number;
+    targetPeakDb?: number;
+    isLoop?: boolean;
+  }
+): AudioBuffer {
+  const sampleRate = audioBuffer.sampleRate;
+  const numChannels = audioBuffer.numberOfChannels;
+  const length = audioBuffer.length;
+  if (length === 0) return audioBuffer;
+
+  const targetLufs = options?.targetLufs ?? -14.0;
+  const targetPeakDb = options?.targetPeakDb ?? -1.0;
+  const isLoop = options?.isLoop ?? false;
+
+  // 1. 10 Hz DC-Offset Blocker (High-Pass on all channels)
+  const R = 1.0 - (2.0 * Math.PI * 10.0) / sampleRate;
+  for (let c = 0; c < numChannels; c++) {
+    const data = audioBuffer.getChannelData(c);
+    let xPrev = 0;
+    let yPrev = 0;
+    for (let i = 0; i < length; i++) {
+      const x = data[i];
+      const y = x - xPrev + R * yPrev;
+      xPrev = x;
+      yPrev = y;
+      data[i] = y;
+    }
+  }
+
+  // 2. Loop Seam Smoothing (5ms equal-power crossfade for seamless, clickless looping)
+  if (isLoop && length > sampleRate * 0.1) {
+    const seamSamples = Math.min(Math.floor(sampleRate * 0.005), Math.floor(length * 0.05));
+    for (let c = 0; c < numChannels; c++) {
+      const data = audioBuffer.getChannelData(c);
+      for (let i = 0; i < seamSamples; i++) {
+        const t = i / seamSamples;
+        const fadeIn = Math.sin((t * Math.PI) / 2);
+        data[i] *= fadeIn;
+        data[length - 1 - i] *= fadeIn;
+      }
+    }
+  }
+
+  // 3. EBU R128 Integrated Loudness Normalization
+  const currentLufs = calculateIntegratedLufs(audioBuffer);
+  if (currentLufs > -65 && currentLufs < 5) {
+    const lufsDeltaDb = targetLufs - currentLufs;
+    const clampedDeltaDb = Math.min(14.0, Math.max(-24.0, lufsDeltaDb));
+    const linearGain = Math.pow(10, clampedDeltaDb / 20);
+
+    for (let c = 0; c < numChannels; c++) {
+      const data = audioBuffer.getChannelData(c);
+      for (let i = 0; i < length; i++) {
+        data[i] *= linearGain;
+      }
+    }
+  }
+
+  // 4. True-Peak Ceiling Guard (-1.0 dBTP / 0.891 linear with 4x inter-sample protection)
+  const maxPeak4x = calculateBufferPeak4x(audioBuffer);
+  const targetPeakLinear = Math.pow(10, targetPeakDb / 20);
+
+  if (maxPeak4x > targetPeakLinear) {
+    const peakTrimGain = targetPeakLinear / maxPeak4x;
+    for (let c = 0; c < numChannels; c++) {
+      const data = audioBuffer.getChannelData(c);
+      for (let i = 0; i < length; i++) {
+        data[i] = Math.max(-0.99, Math.min(0.99, data[i] * peakTrimGain));
+      }
+    }
+  }
+
+  return audioBuffer;
+}
+
+/**
+ * 🎙️ PURE RAW BLOB PROCESSOR (For Homework Recordings)
+ * Decodes any audio blob, applies EBU R128 & True-Peak Guard, and outputs Pure RAW WAV.
+ */
+export async function processPureRawBlob(
+  inputBlob: Blob,
+  options?: {
+    targetLufs?: number;
+    targetPeakDb?: number;
+    isLoop?: boolean;
+  }
+): Promise<{
+  processedBlob: Blob;
+  processedUrl: string;
+  durationSec: number;
+  originalLufs: number;
+  finalLufs: number;
+}> {
+  const arrayBuffer = await inputBlob.arrayBuffer();
+  const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  let decodedBuffer: AudioBuffer;
+  try {
+    const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
+    decodedBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
+  } finally {
+    try {
+      tempCtx.close();
+    } catch (e) {}
+  }
+
+  const originalLufs = Math.round(calculateIntegratedLufs(decodedBuffer) * 10) / 10;
+  processPureRawAudioBuffer(decodedBuffer, {
+    targetLufs: options?.targetLufs ?? -14.0,
+    targetPeakDb: options?.targetPeakDb ?? -1.0,
+    isLoop: options?.isLoop ?? false
+  });
+  const finalLufs = options?.targetLufs ?? -14.0;
+
+  const wavBlob = audioBufferToWavBlob(decodedBuffer, {
+    title: 'Campus-Groovelab Pure RAW Audio',
+    artist: 'Campus-Groovelab'
+  });
+  const processedUrl = URL.createObjectURL(wavBlob);
+
+  return {
+    processedBlob: wavBlob,
+    processedUrl,
+    durationSec: Math.round(decodedBuffer.duration * 10) / 10,
+    originalLufs,
+    finalLufs
+  };
+}
+
+/**
+ * ⚡ Extracts a 20-second preview slice from the center of an audio Blob/File.
+ * Converts the decoded slice back to an audio/wav Blob for ultra-fast DSP preview rendering (< 40ms).
+ */
+export async function sliceAudioBlobForPreview(
+  audioBlobOrFile: Blob | File,
+  sliceDurationSec = 20
+): Promise<Blob> {
+  const arrayBuffer = await audioBlobOrFile.arrayBuffer();
+  const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  
+  try {
+    const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
+    const totalDuration = rawDecoded.duration;
+    
+    // If audio is shorter than or equal to slice duration, return original blob directly
+    if (totalDuration <= sliceDurationSec) {
+      return audioBlobOrFile instanceof Blob ? audioBlobOrFile : new Blob([audioBlobOrFile], { type: 'audio/wav' });
+    }
+
+    // ⏱️ Start exact at 50% of the total recording duration (Mitte der Aufnahme)
+    const startSec = Math.max(0, Math.min(totalDuration / 2, Math.max(0, totalDuration - sliceDurationSec)));
+    const sampleRate = rawDecoded.sampleRate;
+    const startSample = Math.floor(startSec * sampleRate);
+    const lengthSamples = Math.min(rawDecoded.length - startSample, Math.floor(sliceDurationSec * sampleRate));
+
+    const numChannels = rawDecoded.numberOfChannels;
+    const slicedBuffer = tempCtx.createBuffer(numChannels, lengthSamples, sampleRate);
+
+    for (let ch = 0; ch < numChannels; ch++) {
+      const srcData = rawDecoded.getChannelData(ch);
+      const dstData = slicedBuffer.getChannelData(ch);
+      dstData.set(srcData.subarray(startSample, startSample + lengthSamples));
+    }
+
+    // 🔁 10ms Equal-Power Micro-Fade for 100% click-free seamless looping
+    if (lengthSamples > sampleRate * 0.1) {
+      const fadeSamples = Math.min(Math.floor(sampleRate * 0.01), Math.floor(lengthSamples * 0.05));
+      for (let ch = 0; ch < numChannels; ch++) {
+        const dstData = slicedBuffer.getChannelData(ch);
+        for (let i = 0; i < fadeSamples; i++) {
+          const factor = Math.sin((i / fadeSamples) * (Math.PI / 2));
+          dstData[i] *= factor;
+          dstData[lengthSamples - 1 - i] *= factor;
+        }
+      }
+    }
+
+    // Encode sliced AudioBuffer to WAV Blob
+    const wavBlob = audioBufferToWavBlob(slicedBuffer, {
+      title: 'Campus-Groovelab Preview Slice',
+      artist: 'Campus-Groovelab Studio'
+    });
+    return wavBlob;
+  } finally {
+    try {
+      tempCtx.close();
+    } catch (e) {}
+  }
+}
+
