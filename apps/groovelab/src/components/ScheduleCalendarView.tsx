@@ -5041,7 +5041,7 @@ export function ScheduleCalendarView({
                   </button>
                 )}
                 {(() => {
-                  const todayStr = toLocalYYYYMMDD(currentDate);
+                  const todayStr = toLocalYYYYMMDD(getSimulatedNow());
                   const isToday = dateStr === todayStr;
                   return (
                     <>
@@ -5397,7 +5397,7 @@ export function ScheduleCalendarView({
 
                 {/* Google Calendar Real-Time "Red Jet-Line" Current Time Indicator */}
                 {(() => {
-                  const todayStr = toLocalYYYYMMDD(currentDate);
+                  const todayStr = toLocalYYYYMMDD(getSimulatedNow());
                   const isToday = dateStr === todayStr;
                   if (!isToday) return null;
 

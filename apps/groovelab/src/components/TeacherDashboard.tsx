@@ -7660,10 +7660,31 @@ export function TeacherDashboard({
                   rawTimeline.forEach((slot: any) => {
                     if (!slot.student) {
                       groupedTimeline.push({ ...slot, isBreak: true });
+                    } else if (slot.status === 'rescheduled_away') {
+                      // If this slot was rescheduled away to another day, check if there is an active slot for this timeSlot in rawTimeline
+                      const hasActiveSlotAtSameTime = rawTimeline.some((other: any) => 
+                        other !== slot && 
+                        other.timeSlot === slot.timeSlot && 
+                        other.status !== 'rescheduled_away' && 
+                        other.status !== 'canceled_by_student' &&
+                        other.status !== 'cancelled'
+                      );
+                      // If there is an active replacement slot at this time, the moved-away slot is superseded in the timeline (it is displayed in the Vorbereitung card)
+                      if (!hasActiveSlotAtSameTime) {
+                        groupedTimeline.push({
+                          ...slot,
+                          isBreak: false,
+                          isGroup: false,
+                          students: splitAndNormalizeStudents([slot.student], allStudents),
+                          slots: [slot]
+                        });
+                      }
                     } else {
+                      // Active slot: only merge with another active slot at the same time that is NOT rescheduled_away
                       const existing = groupedTimeline.find(item => 
                         !item.isBreak && 
-                        item.timeSlot === slot.timeSlot
+                        item.timeSlot === slot.timeSlot &&
+                        !item.slots.some((s: any) => s.status === 'rescheduled_away')
                       );
                       const subStudents = splitAndNormalizeStudents([slot.student], allStudents);
                       if (existing) {
@@ -10697,10 +10718,30 @@ export function TeacherDashboard({
                           rawTimeline.forEach((slot: any) => {
                             if (!slot.student) {
                               groupedTimeline.push({ ...slot, isBreak: true });
+                            } else if (slot.status === 'rescheduled_away') {
+                              // If this slot was rescheduled away to another day, check if there is an active slot for this timeSlot in rawTimeline
+                              const hasActiveSlotAtSameTime = rawTimeline.some((other: any) => 
+                                other !== slot && 
+                                other.timeSlot === slot.timeSlot && 
+                                other.status !== 'rescheduled_away' && 
+                                other.status !== 'canceled_by_student' &&
+                                other.status !== 'cancelled'
+                              );
+                              if (!hasActiveSlotAtSameTime) {
+                                groupedTimeline.push({
+                                  ...slot,
+                                  isBreak: false,
+                                  isGroup: false,
+                                  students: splitAndNormalizeStudents([slot.student], allStudents),
+                                  slots: [slot]
+                                });
+                              }
                             } else {
+                              // Active slot: only merge with another active slot at the same time that is NOT rescheduled_away
                               const existing = groupedTimeline.find(item => 
                                 !item.isBreak && 
-                                item.timeSlot === slot.timeSlot
+                                item.timeSlot === slot.timeSlot &&
+                                !item.slots.some((s: any) => s.status === 'rescheduled_away')
                               );
                               const subStudents = splitAndNormalizeStudents([slot.student], allStudents);
                               if (existing) {

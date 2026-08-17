@@ -5532,28 +5532,115 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [lehrwerke, setLehrwerke] = useState<any[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
   const [activeSongSkills, setActiveSongSkills] = useState<any[]>([]);
-  const songStats = useMemo(() => {
-    const assigned = songs.filter(song => {
-      const isAssigned = progressItems.some(item => 
-        item.topic_name.toLowerCase() === song.title.toLowerCase() ||
-        item.topic_name.toLowerCase().includes(song.title.toLowerCase())
-      );
-      return song.is_campus_active && isAssigned;
+
+  // Unified canonical resolver for all student songs (combining activeSongSkills, progressItems, and songs catalog)
+  const assignedCampusSongs = useMemo(() => {
+    const songsMap = new Map<string, any>();
+
+    // 1. From activeSongSkills (Direct user assignments in user_song_skills)
+    (activeSongSkills || []).forEach((skill: any) => {
+      const songObj = skill.songs || {};
+      const title = songObj.title || skill.title || skill.song_title || '';
+      const artist = songObj.artist || skill.artist || 'Unbekannt';
+      const id = songObj.id || skill.song_id || skill.id;
+      if (title) {
+        const normKey = title.toLowerCase().trim();
+        songsMap.set(normKey, {
+          id: id || normKey,
+          title,
+          artist,
+          audio_url: songObj.audio_url || skill.audio_url,
+          tempo_bpm: songObj.tempo_bpm || skill.tempo_bpm,
+          genre: songObj.genre || skill.genre,
+          color_scheme: songObj.color_scheme,
+          is_campus_active: true,
+          progress_percent: skill.progress_percent || 0,
+          status: skill.status || (skill.progress_percent === 100 ? 'MASTERED' : 'IN_PROGRESS'),
+          is_current_homework: Boolean(skill.is_current_homework)
+        });
+      }
     });
 
-    const mastered = assigned.filter(song => {
-      const progressItem = progressItems.find(item => 
-        item.topic_name.toLowerCase() === song.title.toLowerCase() ||
-        item.topic_name.toLowerCase().includes(song.title.toLowerCase())
-      );
-      return progressItem?.status === 'MASTERED';
+    // 2. From progressItems (Direct assignments in progress_matrix)
+    (progressItems || []).forEach((item: any) => {
+      const rawTopic = (item.topic_name || item.title || '').trim();
+      if (!rawTopic || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.includes(' - Seite ')) return;
+      
+      const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
+      const normKey = cleanT.toLowerCase();
+      
+      const existing = songsMap.get(normKey) || Array.from(songsMap.values()).find(s => s.title.toLowerCase() === normKey || normKey.includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(normKey));
+      
+      if (existing) {
+        if (item.is_current_homework) existing.is_current_homework = true;
+        if (item.status === 'MASTERED') existing.status = 'MASTERED';
+        if (item.homework_notes) existing.homework_notes = item.homework_notes;
+        if (item.progress_percent !== undefined) existing.progress_percent = item.progress_percent;
+      } else {
+        const catalogSong = (songs || []).find(s => 
+          s.id === item.song_id || 
+          s.title.toLowerCase() === normKey || 
+          normKey.includes(s.title.toLowerCase()) || 
+          s.title.toLowerCase().includes(normKey)
+        );
+
+        let title = cleanT;
+        let artist = 'Unbekannt';
+        if (catalogSong) {
+          title = catalogSong.title;
+          artist = catalogSong.artist || 'Unbekannt';
+        } else if (cleanT.includes(' - ')) {
+          const parts = cleanT.split(' - ');
+          artist = parts[0].trim();
+          title = parts.slice(1).join(' - ').trim();
+        }
+
+        songsMap.set(title.toLowerCase().trim(), {
+          id: item.song_id || catalogSong?.id || item.id || normKey,
+          title,
+          artist,
+          audio_url: catalogSong?.audio_url || item.audio_url,
+          tempo_bpm: catalogSong?.tempo_bpm || item.tempo_bpm,
+          genre: catalogSong?.genre || item.genre,
+          color_scheme: catalogSong?.color_scheme,
+          is_campus_active: true,
+          progress_percent: item.progress_percent || (item.status === 'MASTERED' ? 100 : 0),
+          status: item.status,
+          is_current_homework: Boolean(item.is_current_homework),
+          homework_notes: item.homework_notes
+        });
+      }
     });
+
+    // 3. Check songs catalog for any is_campus_active songs matching assigned items
+    (songs || []).forEach((s: any) => {
+      if (!s.title) return;
+      const normKey = s.title.toLowerCase().trim();
+      if (songsMap.has(normKey)) return;
+      const isAssigned = (progressItems || []).some(item => 
+        (item.topic_name || '').toLowerCase().includes(normKey) ||
+        normKey.includes((item.topic_name || '').toLowerCase())
+      );
+      if (isAssigned) {
+        songsMap.set(normKey, {
+          ...s,
+          artist: s.artist || 'Unbekannt'
+        });
+      }
+    });
+
+    return Array.from(songsMap.values());
+  }, [activeSongSkills, progressItems, songs]);
+
+  const songStats = useMemo(() => {
+    const assigned = assignedCampusSongs;
+    const mastered = assigned.filter(song => song.status === 'MASTERED' || (song.progress_percent || 0) === 100);
 
     return {
       assignedCount: assigned.length,
       masteredCount: mastered.length
     };
-  }, [songs, progressItems]);
+  }, [assignedCampusSongs]);
   const [songSearch, setSongSearch] = useState('');
   const [songSearchDebounced, setSongSearchDebounced] = useState('');
 
@@ -5566,6 +5653,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     };
   }, [songSearch]);
 
+  const [selectedSongForDetail, setSelectedSongForDetail] = useState<any | null>(null);
   const [selectedLehrwerkForDetail, setSelectedLehrwerkForDetail] = useState<any | null>(null);
   const [localProgress, setLocalProgress] = useState<any[]>(() => {
     try {
@@ -5575,7 +5663,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       return [];
     }
   });
-  const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke' | 'schnelltext'>('songs');
+  const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke'>('songs');
+  const [juniorMediathekFilter, setJuniorMediathekFilter] = useState<'all' | 'songs' | 'lehrwerke' | 'homework'>('all');
   const mediathekTouchStartXRef = useRef<number | null>(null);
 
   const handleMediathekTouchStart = (e: React.TouchEvent) => {
@@ -5589,10 +5678,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     if (Math.abs(diffX) > 40) {
       if (diffX > 0) {
         if (mediathekTab === 'songs') setMediathekTab('lehrwerke');
-        else if (mediathekTab === 'lehrwerke') setMediathekTab('schnelltext');
       } else {
-        if (mediathekTab === 'schnelltext') setMediathekTab('lehrwerke');
-        else if (mediathekTab === 'lehrwerke') setMediathekTab('songs');
+        if (mediathekTab === 'lehrwerke') setMediathekTab('songs');
       }
     }
     mediathekTouchStartXRef.current = null;
@@ -10895,173 +10982,167 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   );
                 })()}
 
-                {/* Top Mediathek Category Tab Bar */}
+                {/* Apple-Style Filter Chips Bar */}
                 {(() => {
                   const brandColor = studentUser?.schools?.brand_color || '#34a853';
+                  
+                  const assignedSongs = assignedCampusSongs;
+                  const assignedLehrwerke = lehrwerke.filter(item => 
+                    localProgress.some((p: any) => String(p.studentId) === String(studentId) && String(p.lehrwerkId) === String(item.id))
+                  );
+
+                  const homeworkSongs = assignedSongs.filter(song => Boolean(song.is_current_homework));
+                  const homeworkCount = homeworkSongs.length;
+
                   return (
-                    <div className="mediathek-pill-bar" style={{
-                      width: '100%',
-                      justifyContent: 'center',
+                    <div style={{
+                      display: 'flex',
                       alignItems: 'center',
-                      margin: '4px 0 4px 0'
+                      gap: '8px',
+                      overflowX: 'auto',
+                      padding: '4px 2px',
+                      scrollbarWidth: 'none',
+                      msOverflowStyle: 'none',
+                      width: '100%'
                     }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        background: 'rgba(241, 245, 249, 0.95)',
-                        borderRadius: '100px',
-                        padding: '4px',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        gap: '4px',
-                        border: '1px solid rgba(226, 232, 240, 0.8)'
-                      }}>
-                        <button
-                          type="button"
-                          onClick={() => setMediathekTab('songs')}
-                          style={{
-                            flex: 1,
-                            height: '36px',
-                            borderRadius: '100px',
-                            border: 'none',
-                            background: mediathekTab === 'songs' ? brandColor : 'transparent',
-                            color: mediathekTab === 'songs' ? '#ffffff' : '#64748b',
-                            fontWeight: 850,
-                            fontSize: '0.78rem',
-                            cursor: 'pointer',
-                            boxShadow: mediathekTab === 'songs' ? `0 2px 8px ${brandColor}40` : 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '5px',
-                            whiteSpace: 'nowrap',
-                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                          }}
-                        >
-                          <Music size={14} style={{ color: mediathekTab === 'songs' ? '#ffffff' : '#64748b' }} />
-                          <span>Songs ({songs.length})</span>
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => setJuniorMediathekFilter('all')}
+                        style={{
+                          height: '36px',
+                          padding: '0 16px',
+                          borderRadius: '100px',
+                          border: juniorMediathekFilter === 'all' ? `1.5px solid ${brandColor}` : '1px solid #e2e8f0',
+                          background: juniorMediathekFilter === 'all' ? `${brandColor}15` : '#ffffff',
+                          color: juniorMediathekFilter === 'all' ? brandColor : '#64748b',
+                          fontWeight: 850,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          boxShadow: juniorMediathekFilter === 'all' ? `0 2px 8px ${brandColor}20` : 'none'
+                        }}
+                      >
+                        <span>Alles ({assignedSongs.length + assignedLehrwerke.length})</span>
+                      </button>
 
-                        <button
-                          type="button"
-                          onClick={() => setMediathekTab('lehrwerke')}
-                          style={{
-                            flex: 1,
-                            height: '36px',
-                            borderRadius: '100px',
-                            border: 'none',
-                            background: mediathekTab === 'lehrwerke' ? brandColor : 'transparent',
-                            color: mediathekTab === 'lehrwerke' ? '#ffffff' : '#64748b',
-                            fontWeight: 850,
-                            fontSize: '0.78rem',
-                            cursor: 'pointer',
-                            boxShadow: mediathekTab === 'lehrwerke' ? `0 2px 8px ${brandColor}40` : 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '5px',
-                            whiteSpace: 'nowrap',
-                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                          }}
-                        >
-                          <Library size={14} style={{ color: mediathekTab === 'lehrwerke' ? '#ffffff' : '#64748b' }} />
-                          <span>Lehrwerke ({lehrwerke.length})</span>
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => setJuniorMediathekFilter('songs')}
+                        style={{
+                          height: '36px',
+                          padding: '0 16px',
+                          borderRadius: '100px',
+                          border: juniorMediathekFilter === 'songs' ? `1.5px solid ${brandColor}` : '1px solid #e2e8f0',
+                          background: juniorMediathekFilter === 'songs' ? `${brandColor}15` : '#ffffff',
+                          color: juniorMediathekFilter === 'songs' ? brandColor : '#64748b',
+                          fontWeight: 850,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          boxShadow: juniorMediathekFilter === 'songs' ? `0 2px 8px ${brandColor}20` : 'none'
+                        }}
+                      >
+                        <Music size={14} />
+                        <span>Songs ({assignedSongs.length})</span>
+                      </button>
 
+                      <button
+                        type="button"
+                        onClick={() => setJuniorMediathekFilter('lehrwerke')}
+                        style={{
+                          height: '36px',
+                          padding: '0 16px',
+                          borderRadius: '100px',
+                          border: juniorMediathekFilter === 'lehrwerke' ? `1.5px solid ${brandColor}` : '1px solid #e2e8f0',
+                          background: juniorMediathekFilter === 'lehrwerke' ? `${brandColor}15` : '#ffffff',
+                          color: juniorMediathekFilter === 'lehrwerke' ? brandColor : '#64748b',
+                          fontWeight: 850,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          boxShadow: juniorMediathekFilter === 'lehrwerke' ? `0 2px 8px ${brandColor}20` : 'none'
+                        }}
+                      >
+                        <Library size={14} />
+                        <span>Lehrwerke ({assignedLehrwerke.length})</span>
+                      </button>
+
+                      {homeworkCount > 0 && (
                         <button
                           type="button"
-                          onClick={() => setMediathekTab('schnelltext')}
+                          onClick={() => setJuniorMediathekFilter('homework')}
                           style={{
-                            flex: 1,
                             height: '36px',
+                            padding: '0 16px',
                             borderRadius: '100px',
-                            border: 'none',
-                            background: mediathekTab === 'schnelltext' ? brandColor : 'transparent',
-                            color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b',
+                            border: juniorMediathekFilter === 'homework' ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+                            background: juniorMediathekFilter === 'homework' ? '#e0f2fe' : '#ffffff',
+                            color: juniorMediathekFilter === 'homework' ? '#0369a1' : '#64748b',
                             fontWeight: 850,
-                            fontSize: '0.78rem',
+                            fontSize: '0.8rem',
                             cursor: 'pointer',
-                            boxShadow: mediathekTab === 'schnelltext' ? `0 2px 8px ${brandColor}40` : 'none',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '5px',
+                            gap: '6px',
                             whiteSpace: 'nowrap',
                             transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                           }}
                         >
-                          <Zap size={14} style={{ color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b' }} />
-                          <span>Schnell-Text</span>
+                          <Star size={14} color="#0284c7" />
+                          <span>Hausaufgabe ({homeworkCount})</span>
                         </button>
-                      </div>
+                      )}
                     </div>
                   );
                 })()}
 
-                {/* Swipecard Pagination Dots Bar (Mobile Only) */}
-                {(() => {
-                  const brandColor = studentUser?.schools?.brand_color || '#34a853';
-                  return (
-                    <div className="mediathek-swipe-dots" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', margin: '-12px 0 4px 0' }}>
-                      <button type="button" onClick={() => setMediathekTab('songs')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
-                        <div className={`mediathek-dot ${mediathekTab === 'songs' ? 'active' : ''}`} style={{ background: mediathekTab === 'songs' ? brandColor : '#cbd5e1' }} />
-                      </button>
-                      <button type="button" onClick={() => setMediathekTab('lehrwerke')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
-                        <div className={`mediathek-dot ${mediathekTab === 'lehrwerke' ? 'active' : ''}`} style={{ background: mediathekTab === 'lehrwerke' ? brandColor : '#cbd5e1' }} />
-                      </button>
-                      <button type="button" onClick={() => setMediathekTab('schnelltext')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
-                        <div className={`mediathek-dot ${mediathekTab === 'schnelltext' ? 'active' : ''}`} style={{ background: mediathekTab === 'schnelltext' ? brandColor : '#cbd5e1' }} />
-                      </button>
-                    </div>
-                  );
-                })()}
+                {/* Unified Smart Search Field */}
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input 
+                    placeholder="Songs nach Titel/Interpret oder Lehrwerke nach Titel/Autor durchsuchen..." 
+                    value={songSearch}
+                    onChange={e => setSongSearch(e.target.value)}
+                    style={{ 
+                      width: '100%', 
+                      padding: '12px 14px 12px 48px', 
+                      borderRadius: '14px', 
+                      border: '1px solid #e2e8f0', 
+                      background: '#f8fafc', 
+                      fontWeight: 600, 
+                      fontSize: '0.92rem', 
+                      outline: 'none', 
+                      transition: 'all 0.2s',
+                      boxSizing: 'border-box',
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
+                    }}
+                  />
+                </div>
 
-                {/* Unified Smart Search Field (Hidden on Mobile when Schnelltext tab is selected) */}
-                {!(isMobile && mediathekTab === 'schnelltext') && (
-                  <div style={{ position: 'relative', width: '100%' }}>
-                    <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input 
-                      placeholder="Songs nach Titel/Interpret oder Lehrwerke nach Titel/Autor durchsuchen..." 
-                      value={songSearch}
-                      onChange={e => setSongSearch(e.target.value)}
-                      style={{ 
-                        width: '100%', 
-                        padding: '12px 14px 12px 48px', 
-                        borderRadius: '14px', 
-                        border: '1px solid #e2e8f0', 
-                        background: '#f8fafc', 
-                        fontWeight: 600, 
-                        fontSize: '0.92rem', 
-                        outline: 'none', 
-                        transition: 'all 0.2s',
-                        boxSizing: 'border-box',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Two Columns Layout */}
+                {/* Apple-Style Curated Playlist Flow (1 Unified Column Feed) */}
                 {(() => {
                   const brandColor = studentUser?.schools?.brand_color || '#34a853';
                   
-                  const isMastered = (sng: any) => {
-                    const progressItem = progressItems.find(item => 
-                      item.topic_name.toLowerCase() === sng.title.toLowerCase() ||
-                      item.topic_name.toLowerCase().includes(sng.title.toLowerCase())
-                    );
-                    return progressItem?.status === 'MASTERED';
-                  };
+                  const isMastered = (sng: any) => sng.status === 'MASTERED' || (sng.progress_percent || 0) === 100;
                   
-                  const filteredSongs = songs.filter(song => {
+                  const filteredSongs = assignedCampusSongs.filter(song => {
                     const matchesSearch = songSearchDebounced === '' || 
                       song.title?.toLowerCase().includes(songSearchDebounced.toLowerCase()) || 
                       song.artist?.toLowerCase().includes(songSearchDebounced.toLowerCase());
-                    const isAssigned = progressItems.some(item => 
-                      item.topic_name.toLowerCase() === song.title.toLowerCase() ||
-                      item.topic_name.toLowerCase().includes(song.title.toLowerCase())
-                    );
-                    return matchesSearch && song.is_campus_active && isAssigned;
+                    const matchesHomework = juniorMediathekFilter !== 'homework' || Boolean(song.is_current_homework);
+                    return matchesSearch && matchesHomework;
                   }).sort((a, b) => {
                     const aMastered = isMastered(a);
                     const bMastered = isMastered(b);
@@ -11075,263 +11156,315 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       item.title?.toLowerCase().includes(songSearchDebounced.toLowerCase()) || 
                       item.author?.toLowerCase().includes(songSearchDebounced.toLowerCase());
                     const isAssigned = localProgress.some((p: any) => String(p.studentId) === String(studentId) && String(p.lehrwerkId) === String(item.id));
-                    return matchesSearch && isAssigned;
+                    const matchesFilter = juniorMediathekFilter !== 'homework'; // Lehrwerke do not have current homework flag unless pages mapped
+                    return matchesSearch && isAssigned && matchesFilter;
                   });
 
-                  return (
-                    <div 
-                      onTouchStart={handleMediathekTouchStart}
-                      onTouchEnd={handleMediathekTouchEnd}
-                      style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: '1fr', 
-                        gap: '30px', 
-                        alignItems: 'flex-start',
-                        width: '100%'
-                      }}
-                      className="mediathek-grid-layout"
-                    >
-                      {/* Left Column: Songs */}
-                      <div 
-                        style={{ display: mediathekTab === 'songs' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }}
-                        className={`mediathek-col-card mediathek-col-songs ${mediathekTab === 'songs' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
-                      >
-                        <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Music size={16} color={brandColor} /> Songs ({filteredSongs.length})
-                        </h3>
+                  // Find primary active mission song for Hero Spotlight Card
+                  const activeMissionSong = filteredSongs.find(song => Boolean(song.is_current_homework));
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  const showSongsSection = juniorMediathekFilter === 'all' || juniorMediathekFilter === 'songs' || juniorMediathekFilter === 'homework';
+                  const showLehrwerkeSection = juniorMediathekFilter === 'all' || juniorMediathekFilter === 'lehrwerke';
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
+                      
+                      {/* Apple-Music Hero Spotlight: "Deine heutige Mission" */}
+                      {activeMissionSong && (
+                        <div 
+                          onClick={() => setSelectedSongForDetail(activeMissionSong)}
+                          style={{
+                            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                            borderRadius: '28px',
+                            padding: '24px',
+                            color: '#ffffff',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            boxShadow: '0 12px 32px -4px rgba(15, 23, 42, 0.25)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '16px',
+                            cursor: 'pointer',
+                            border: '1px solid rgba(255, 255, 255, 0.1)'
+                          }}
+                          className="hover-scale"
+                        >
+                          {/* Ambient glow accent */}
+                          <div style={{
+                            position: 'absolute',
+                            top: '-30px',
+                            right: '-30px',
+                            width: '180px',
+                            height: '180px',
+                            background: 'radial-gradient(circle, rgba(34, 197, 94, 0.35) 0%, transparent 70%)',
+                            pointerEvents: 'none'
+                          }} />
+
+                          {/* Pill Tag */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: 'rgba(34, 197, 94, 0.2)',
+                              color: '#4ade80',
+                              border: '1px solid rgba(34, 197, 94, 0.4)',
+                              padding: '4px 12px',
+                              borderRadius: '100px',
+                              fontSize: '0.72rem',
+                              fontWeight: 900,
+                              letterSpacing: '0.04em',
+                              textTransform: 'uppercase'
+                            }}>
+                              <Star size={12} fill="#4ade80" />
+                              <span>Deine heutige Mission</span>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>Tippe für Details</span>
+                          </div>
+
+                          {/* Hero Main Content */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', zIndex: 2 }}>
+                            {renderSongVinylCover(getSongColor(activeMissionSong.title || ''), 'md')}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <h3 style={{ margin: '0 0 4px 0', fontSize: '1.45rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                                {activeMissionSong.title}
+                              </h3>
+                              <p style={{ margin: 0, fontSize: '0.88rem', color: '#cbd5e1', fontWeight: 650 }}>
+                                von {activeMissionSong.artist}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Action Button inside Hero Card */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTopic(activeMissionSong.title);
+                              handleTabChangeLocal('practice');
+                            }}
+                            style={{
+                              zIndex: 2,
+                              width: '100%',
+                              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                              color: '#ffffff',
+                              border: 'none',
+                              padding: '12px 18px',
+                              borderRadius: '14px',
+                              fontWeight: 900,
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              boxShadow: '0 4px 16px rgba(34, 197, 94, 0.35)',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <Play size={16} fill="white" color="white" />
+                            <span>Jetzt üben (Timer starten)</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* SECTION 1: SONGS PLAYLIST (Multi-Column Grid) */}
+                      {showSongsSection && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Music size={16} color={brandColor} /> Songs ({filteredSongs.length})
+                            </h3>
+                          </div>
+
                           {filteredSongs.length === 0 ? (
                             <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
-                              Keine Songs gefunden.
+                              Keine Songs in dieser Auswahl gefunden.
                             </div>
                           ) : (
-                            filteredSongs.map(song => {
-                              const lwColor = getSongColor(song.title || '');
-                              const coverBg = `linear-gradient(135deg, ${lwColor.from} 0%, ${lwColor.to} 100%)`;
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                              gap: '14px',
+                              width: '100%'
+                            }}>
+                              {filteredSongs.map(song => {
+                                const lwColor = getSongColor(song.title || '');
 
-                              // Check progress status
-                              const progressItem = progressItems.find(item => 
-                                item.topic_name.toLowerCase() === song.title.toLowerCase() ||
-                                item.topic_name.toLowerCase().includes(song.title.toLowerCase())
-                              );
+                                // Check progress status
+                                const progressItem = progressItems.find(item => 
+                                  item.topic_name.toLowerCase() === song.title.toLowerCase() ||
+                                  item.topic_name.toLowerCase().includes(song.title.toLowerCase())
+                                );
 
-                              let statusColor = '';
-                              let statusBg = '';
-                              let statusText = '';
+                                let statusColor = '';
+                                let statusBg = '';
+                                let statusText = '';
 
-                              if (progressItem) {
-                                if (progressItem.is_current_homework) {
-                                  statusColor = '#06b6d4';
-                                  statusBg = '#ecfeff';
-                                  statusText = 'Aktuelle Mission';
-                                } else if (progressItem.status === 'THEORY_DONE') {
-                                  statusColor = '#a855f7';
-                                  statusBg = '#f3e8ff';
-                                  statusText = 'Theorie gelesen';
-                                } else if (progressItem.status === 'MASTERED') {
-                                  statusColor = '#34a853';
-                                  statusBg = '#e6f4ea';
-                                  statusText = 'Meisterwerk!';
-                                } else {
-                                  statusColor = '#34a853';
-                                  statusBg = '#e6f4ea';
-                                  statusText = 'In Arbeit';
+                                if (progressItem) {
+                                  if (progressItem.is_current_homework) {
+                                    statusColor = '#06b6d4';
+                                    statusBg = '#ecfeff';
+                                    statusText = 'Aktuelle Mission';
+                                  } else if (progressItem.status === 'THEORY_DONE') {
+                                    statusColor = '#a855f7';
+                                    statusBg = '#f3e8ff';
+                                    statusText = 'Theorie gelesen';
+                                  } else if (progressItem.status === 'MASTERED') {
+                                    statusColor = '#34a853';
+                                    statusBg = '#e6f4ea';
+                                    statusText = 'Meisterwerk!';
+                                  } else {
+                                    statusColor = '#34a853';
+                                    statusBg = '#e6f4ea';
+                                    statusText = 'In Arbeit';
+                                  }
                                 }
-                              }
 
-                              return (
-                                <div 
-                                  key={song.id} 
-                                  className="glass-panel hover-scale"
-                                  style={{ 
-                                    padding: '14px 18px', 
-                                    display: 'flex', 
-                                    gap: '12px',
-                                    alignItems: 'center', 
-                                    background: 'white', 
-                                    borderRadius: '24px', 
-                                    border: '1px solid #e2e8f0', 
-                                    borderLeft: `5px solid ${lwColor.from}`,
-                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)', 
-                                    transition: 'all 0.2s ease',
-                                    minHeight: '92px',
-                                    boxSizing: 'border-box'
-                                  }}
-                                >
-                                  {/* Pastel Sleeve + Vinyl peeking out Cover */}
-                                  {renderSongVinylCover(lwColor, 'sm')}
+                                return (
+                                  <div 
+                                    key={song.id} 
+                                    onClick={() => setSelectedSongForDetail(song)}
+                                    className="glass-panel hover-scale"
+                                    style={{ 
+                                      padding: '14px 18px', 
+                                      display: 'flex', 
+                                      gap: '12px',
+                                      alignItems: 'center', 
+                                      background: 'white', 
+                                      borderRadius: '24px', 
+                                      border: '1px solid #e2e8f0', 
+                                      borderLeft: `5px solid ${lwColor.from}`,
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)', 
+                                      transition: 'all 0.2s ease',
+                                      minHeight: '92px',
+                                      boxSizing: 'border-box',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {/* Pastel Sleeve + Vinyl peeking out Cover */}
+                                    {renderSongVinylCover(lwColor, 'sm')}
 
-                                  {/* Title and Artist */}
-                                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                    <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.15rem', letterSpacing: '-0.02em', lineHeight: '1.2' }}>{song.title}</div>
-                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>von {song.artist}</div>
-                                  </div>
+                                    {/* Title and Artist */}
+                                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                      <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.05rem', letterSpacing: '-0.02em', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
+                                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {song.artist}</div>
+                                    </div>
 
-                                  {statusText && (
-                                    <span style={{
-                                      background: statusBg,
-                                      color: statusColor,
-                                      padding: '4px 8px',
-                                      borderRadius: '8px',
-                                      fontSize: '0.65rem',
-                                      fontWeight: 900,
-                                      textTransform: 'uppercase',
-                                      whiteSpace: 'nowrap',
-                                      alignSelf: 'center',
-                                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
-                                    }}>
-                                      {statusText}
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Right Column: Lehrwerke */}
-                      <div 
-                        style={{ display: mediathekTab === 'lehrwerke' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }}
-                        className={`mediathek-col-card mediathek-col-lehrwerke ${mediathekTab === 'lehrwerke' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
-                      >
-                        <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Library size={16} color={brandColor} /> Lehrwerke ({filteredLehrwerke.length})
-                        </h3>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-                          {filteredLehrwerke.length === 0 ? (
-                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
-                              Keine Lehrwerke gefunden.
-                            </div>
-                          ) : (
-                            filteredLehrwerke.map(item => {
-                              const gradient = getLehrwerkColor(item.title, lehrwerke);
-                              
-                              // Check textbook progress
-                              const assignment = localProgress.find((p: any) => String(p.studentId) === String(studentId) && String(p.lehrwerkId) === String(item.id));
-                              let masteredCount = 0;
-                              if (assignment && assignment.pageStates) {
-                                masteredCount = Object.values(assignment.pageStates).filter((s: any) => s.status === 'mastered').length;
-                              }
-                              const pct = item.totalPages > 0 ? (masteredCount / item.totalPages) : 0;
-
-                              return (
-                                <div 
-                                  key={item.id} 
-                                  className="glass-panel hover-scale" 
-                                  style={{ 
-                                    padding: '14px 18px', 
-                                    background: 'white', 
-                                    display: 'flex', 
-                                    gap: '12px', 
-                                    alignItems: 'center', 
-                                    borderRadius: '24px', 
-                                    border: '1px solid #e2e8f0', 
-                                    borderLeft: `5px solid ${gradient.from}`,
-                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
-                                    position: 'relative',
-                                    transition: 'all 0.2s ease',
-                                    minHeight: '92px',
-                                    boxSizing: 'border-box'
-                                  }}
-                                >
-                                  <div style={{ 
-                                    width: '44px', 
-                                    height: '58px', 
-                                    background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                                    borderRadius: '6px', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    color: gradient.text, 
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-                                    flexShrink: 0
-                                  }}>
-                                    <BookOpen size={18} color={gradient.text} />
-                                  </div>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
-                                    {item.author && <p style={{ margin: '0 0 2px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {item.author}</p>}
-                                    <p style={{ margin: 0, fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
-                                    
-                                    {masteredCount > 0 && (
-                                      <div style={{ marginTop: '8px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#64748b', fontWeight: 700, marginBottom: '4px' }}>
-                                          <span>{masteredCount} / {item.totalPages} Seiten geschafft</span>
-                                          <span>{Math.round(pct * 100)}%</span>
-                                        </div>
-                                        <div style={{ width: '100%', height: '5px', borderRadius: '3px', background: '#e2e8f0', overflow: 'hidden' }}>
-                                          <div style={{ width: `${Math.min(100, pct * 100)}%`, height: '100%', background: gradient.from, borderRadius: '3px' }} />
-                                        </div>
-                                      </div>
+                                    {statusText && (
+                                      <span style={{
+                                        background: statusBg,
+                                        color: statusColor,
+                                        padding: '4px 8px',
+                                        borderRadius: '8px',
+                                        fontSize: '0.65rem',
+                                        fontWeight: 900,
+                                        textTransform: 'uppercase',
+                                        whiteSpace: 'nowrap',
+                                        alignSelf: 'center',
+                                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                                      }}>
+                                        {statusText}
+                                      </span>
                                     )}
                                   </div>
-                                </div>
-                              );
-                            })
+                                );
+                              })}
+                            </div>
                           )}
                         </div>
-                      </div>
+                      )}
 
-                      {/* Column 3: Schnell-Text (Mobile view integration) */}
-                      <div 
-                        style={{ display: mediathekTab === 'schnelltext' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }}
-                        className={`mediathek-col-card mediathek-col-schnelltext-mobile ${mediathekTab === 'schnelltext' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
-                      >
-                        <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Zap size={16} color={brandColor} /> Schnell-Text ({textbausteine.filter((tb: any) => tb.active).length})
-                        </h3>
+                      {/* SECTION 2: LEHRWERKE PLAYLIST (Multi-Column Grid) */}
+                      {showLehrwerkeSection && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', marginTop: showSongsSection ? '12px' : '0' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Library size={16} color={brandColor} /> Lehrwerke ({filteredLehrwerke.length})
+                            </h3>
+                          </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', width: '100%' }}>
-                          {textbausteine.filter((tb: any) => tb.active).map((tb: any) => {
-                            const parts = tb.label.split(' ');
-                            const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
-                            const emoji = hasEmoji ? parts[0] : '🎵';
-                            const name = hasEmoji ? parts.slice(1).join(' ') : parts.join(' ');
-
-                            return (
-                              <div 
-                                key={tb.id} 
-                                style={{ 
-                                  border: '1px solid #e2e8f0', 
-                                  borderRadius: '16px', 
-                                  padding: '12px 10px', 
-                                  background: 'white',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  textAlign: 'center',
-                                  gap: '8px',
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-                                  minHeight: '115px'
-                                }}
-                              >
-                                <span style={{ fontSize: '1.5rem', marginTop: '2px', filter: 'grayscale(100%)' }}>
-                                  {emoji}
-                                </span>
+                          {filteredLehrwerke.length === 0 ? (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+                              Keine Lehrwerke in dieser Auswahl gefunden.
+                            </div>
+                          ) : (
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                              gap: '14px',
+                              width: '100%'
+                            }}>
+                              {filteredLehrwerke.map(item => {
+                                const gradient = getLehrwerkColor(item.title, lehrwerke);
                                 
-                                <span style={{ 
-                                  fontSize: '0.75rem', 
-                                  fontWeight: 800, 
-                                  color: '#1e293b', 
-                                  display: '-webkit-box', 
-                                  WebkitLineClamp: 2, 
-                                  WebkitBoxOrient: 'vertical', 
-                                  overflow: 'hidden', 
-                                  lineHeight: '1.2', 
-                                  height: '2.4em', 
-                                  wordBreak: 'break-word'
-                                }}>
-                                  {name}
-                                </span>
-                              </div>
-                            );
-                          })}
+                                // Check textbook progress
+                                const assignment = localProgress.find((p: any) => String(p.studentId) === String(studentId) && String(p.lehrwerkId) === String(item.id));
+                                let masteredCount = 0;
+                                if (assignment && assignment.pageStates) {
+                                  masteredCount = Object.values(assignment.pageStates).filter((s: any) => s.status === 'mastered').length;
+                                }
+                                const pct = item.totalPages > 0 ? (masteredCount / item.totalPages) : 0;
+
+                                return (
+                                  <div 
+                                    key={item.id} 
+                                    onClick={() => setSelectedLehrwerkForDetail(item)}
+                                    className="glass-panel hover-scale" 
+                                    style={{ 
+                                      padding: '14px 18px', 
+                                      background: 'white', 
+                                      display: 'flex', 
+                                      gap: '12px', 
+                                      alignItems: 'center', 
+                                      borderRadius: '24px', 
+                                      border: '1px solid #e2e8f0', 
+                                      borderLeft: `5px solid ${gradient.from}`,
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+                                      position: 'relative',
+                                      transition: 'all 0.2s ease',
+                                      minHeight: '92px',
+                                      boxSizing: 'border-box',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <div style={{ 
+                                      width: '44px', 
+                                      height: '58px', 
+                                      background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
+                                      borderRadius: '6px', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      color: gradient.text, 
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                                      flexShrink: 0
+                                    }}>
+                                      <BookOpen size={18} color={gradient.text} />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
+                                      {item.author && <p style={{ margin: '0 0 2px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {item.author}</p>}
+                                      <p style={{ margin: 0, fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
+                                      
+                                      {masteredCount > 0 && (
+                                        <div style={{ marginTop: '8px' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#64748b', fontWeight: 700, marginBottom: '4px' }}>
+                                            <span>{masteredCount} / {item.totalPages} Seiten</span>
+                                            <span>{Math.round(pct * 100)}%</span>
+                                          </div>
+                                          <div style={{ width: '100%', height: '5px', borderRadius: '3px', background: '#e2e8f0', overflow: 'hidden' }}>
+                                            <div style={{ width: `${Math.min(100, pct * 100)}%`, height: '100%', background: gradient.from, borderRadius: '3px' }} />
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -12050,514 +12183,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       <div style={{ display: (activeTab === 'homework_book' && studentUser) ? 'block' : 'none', marginTop: '0px', width: '100%' }}>
         {activeTab === 'homework_book' && studentUser && (
-          studentUiLevel === 'junior' ? (
-            <div style={{
-              maxWidth: '680px',
-              margin: '32px auto',
-              padding: '0 16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '20px'
-            }}>
-              {/* Header */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 8px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <div style={{
-                    background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                    color: '#15803d',
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)'
-                  }}>
-                    <BookOpen size={24} strokeWidth={2.4} />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 950, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Mein Aufgabenheft
-                    </span>
-                    <h2 style={{ margin: '2px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      Deine aktuellen Aufgaben 🎵
-                    </h2>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleTabChangeLocal('briefing')}
-                  style={{
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    color: '#475569',
-                    fontSize: '0.85rem',
-                    fontWeight: 850,
-                    padding: '8px 16px',
-                    borderRadius: '100px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  className="hover-scale"
-                >
-                  <ChevronLeft size={16} />
-                  <span>Zurück</span>
-                </button>
-              </div>
-
-              {/* Pure White Stage Hero Card */}
-              {(() => {
-                const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
-                const currentWeekStr = latestItem ? getItemWeek(latestItem) : getISOWeekRaw(new Date(), 1);
-                const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
-
-                const activeJuniorBooksMap: Record<string, { pages: { num: number; notes: string; status: string }[] }> = {};
-                (localProgress || []).forEach((assignment: any) => {
-                  const assignStdId = String(assignment.studentId || assignment.student_id || '');
-                  if (assignStdId !== String(studentId) || !assignment.pageStates) return;
-                  const assignBookId = String(assignment.lehrwerkId || assignment.lehrwerk_id || '');
-                  const book = lehrwerke.find(g => String(g.id) === assignBookId);
-                  if (!book) return;
-
-                  Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
-                    if (pState?.status === 'homework' || pState?.isCurrentHomework || pState?.is_current_homework) {
-                      const pageNum = parseInt(pNumStr, 10);
-                      if (!isNaN(pageNum)) {
-                        if (!activeJuniorBooksMap[book.title]) {
-                          activeJuniorBooksMap[book.title] = { pages: [] };
-                        }
-                        if (!activeJuniorBooksMap[book.title].pages.some(p => p.num === pageNum)) {
-                          let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
-                          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                            try {
-                              const parsed = JSON.parse(cleanNote);
-                              if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                              }
-                            } catch {}
-                          }
-                          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                          activeJuniorBooksMap[book.title].pages.push({
-                            num: pageNum,
-                            notes: cleanNote,
-                            status: pState.status || 'homework'
-                          });
-                        }
-                      }
-                    }
-                  });
-                });
-
-                const otherActiveSongs: any[] = [];
-                (progressItems || []).forEach(item => {
-                  if (item.topic_name.startsWith('Hausaufgabe KW ')) return;
-                  if (item.topic_name.includes(' - Seite ')) {
-                    const parts = item.topic_name.split(' - Seite ');
-                    const bookTitle = cleanTitle(parts[0].trim());
-                    const pageNum = parseInt(parts[1], 10);
-                    const book = lehrwerke.find(g => g.title === bookTitle);
-                    if (book) {
-                      if (!activeJuniorBooksMap[bookTitle]) {
-                        activeJuniorBooksMap[bookTitle] = { pages: [] };
-                      }
-                      if (!isNaN(pageNum) && !activeJuniorBooksMap[bookTitle].pages.some(p => p.num === pageNum)) {
-                        let cleanNote = item.homework_notes || '';
-                        if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                          try {
-                            const parsed = JSON.parse(cleanNote);
-                            if (Array.isArray(parsed)) {
-                              cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                            }
-                          } catch {}
-                        }
-                        cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                        activeJuniorBooksMap[bookTitle].pages.push({
-                          num: pageNum,
-                          notes: cleanNote,
-                          status: item.status || 'homework'
-                        });
-                      }
-                    }
-                  } else {
-                    const isSongHw = (() => {
-                      const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
-                                      (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
-                      if (localHw === 'false') return false;
-                      if (localHw === 'true') return true;
-                      if (!item.is_current_homework || item.status === 'MASTERED') return false;
-                      if (item.updated_at) {
-                        const itemWeek = getItemWeek(item);
-                        if (itemWeek && itemWeek !== currentWeekStr) return false;
-                      }
-                      return true;
-                    })();
-                    if (isSongHw) {
-                      const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                      if (!otherActiveSongs.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                        let cleanNote = item.homework_notes || '';
-                        if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                          try {
-                            const parsed = JSON.parse(cleanNote);
-                            if (Array.isArray(parsed)) {
-                              cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                            }
-                          } catch {}
-                        }
-                        cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                        otherActiveSongs.push({
-                          ...item,
-                          homework_notes: cleanNote
-                        });
-                      }
-                    }
-                  }
-                });
-
-                (activeSongSkills || []).forEach((skill: any) => {
-                  const localHw = localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
-                                  (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
-                                  (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null);
-
-                  const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
-
-                  if (isHw && skill.progress_percent !== 100 && !skill.is_stage_ready && skill.status !== 'MASTERED') {
-                    const songArtist = skill.songs?.artist || skill.artist || '';
-                    const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-                    const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-                    const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                    const cleanT = cleanTitle(fullTitle);
-
-                    if (!otherActiveSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                      let cleanNote = localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
-                                       (skill.song_id ? localStorage.getItem(`song_note_${studentId}_${skill.song_id}`) : '') ||
-                                       (skill.songs?.id ? localStorage.getItem(`song_note_${studentId}_${skill.songs.id}`) : '') ||
-                                       skill.homework_notes || '';
-                      if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                        try {
-                          const parsed = JSON.parse(cleanNote);
-                          if (Array.isArray(parsed)) {
-                            cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                          }
-                        } catch {}
-                      }
-                      cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                      otherActiveSongs.push({
-                        id: skill.id,
-                        song_id: skill.song_id || skill.songs?.id,
-                        topic_name: fullTitle,
-                        title: fullTitle,
-                        is_current_homework: true,
-                        status: 'IN_PROGRESS',
-                        homework_notes: cleanNote
-                      });
-                    }
-                  }
-                });
-
-                Object.keys(activeJuniorBooksMap).forEach(title => {
-                  activeJuniorBooksMap[title].pages.sort((a, b) => a.num - b.num);
-                });
-
-                const formattedJuniorBooks = Object.entries(activeJuniorBooksMap).map(([title, info]) => {
-                  const pageNums = info.pages.map(p => p.num);
-                  const notesList = info.pages.filter(p => p.notes && p.notes.length > 0).map(p => ({ num: p.num, text: p.notes }));
-                  return {
-                    title,
-                    pageNums,
-                    notesList
-                  };
-                });
-
-                const currentWeekNotes: string[] = [];
-                (progressItems || []).forEach(item => {
-                  const itemW = getItemWeek(item);
-                  const isActive = item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW ') || itemW === currentWeekStr;
-                  if (isActive && item.homework_notes && item.homework_notes.trim()) {
-                    try {
-                      const parsed = JSON.parse(item.homework_notes);
-                      if (Array.isArray(parsed)) {
-                        parsed.forEach((n: any) => {
-                          if (typeof n === 'string' && n.trim() && !currentWeekNotes.includes(n.trim())) currentWeekNotes.push(n.trim());
-                        });
-                      } else if (typeof parsed === 'string' && parsed.trim() && !currentWeekNotes.includes(parsed.trim())) {
-                        currentWeekNotes.push(parsed.trim());
-                      }
-                    } catch {
-                      if (!currentWeekNotes.includes(item.homework_notes.trim())) currentWeekNotes.push(item.homework_notes.trim());
-                    }
-                  }
-                });
-
-                try {
-                  const localGenNotes = localStorage.getItem(`campus_homework_notes_${studentId}`);
-                  if (localGenNotes && localGenNotes.trim()) {
-                    try {
-                      const parsed = JSON.parse(localGenNotes);
-                      if (Array.isArray(parsed)) {
-                        parsed.forEach((n: any) => {
-                          if (typeof n === 'string' && n.trim() && !currentWeekNotes.includes(n.trim())) currentWeekNotes.push(n.trim());
-                        });
-                      } else if (typeof parsed === 'string' && parsed.trim() && !currentWeekNotes.includes(parsed.trim())) {
-                        currentWeekNotes.push(parsed.trim());
-                      }
-                    } catch {
-                      if (!currentWeekNotes.includes(localGenNotes.trim())) currentWeekNotes.push(localGenNotes.trim());
-                    }
-                  }
-                } catch {}
-
-                const audioTracks: AudioTrackItem[] = [];
-                currentWeekNotes.forEach((n, idx) => {
-                  if (typeof n === 'string') {
-                    if (n.startsWith('AUDIO:')) {
-                      const parts = n.substring(6).split('|');
-                      audioTracks.push({
-                        url: parts[0],
-                        duration: parseFloat(parts[1]) || 0,
-                        label: parts[3] || `Aufnahme #${audioTracks.length + 1}`,
-                        idx
-                      });
-                    } else if (n.startsWith('[') || n.startsWith('{')) {
-                      try {
-                        const parsed = JSON.parse(n);
-                        if (Array.isArray(parsed)) {
-                          parsed.forEach((item: string) => {
-                            if (typeof item === 'string' && item.startsWith('AUDIO:')) {
-                              const parts = item.substring(6).split('|');
-                              audioTracks.push({
-                                url: parts[0],
-                                duration: parseFloat(parts[1]) || 0,
-                                label: parts[3] || `Aufnahme #${audioTracks.length + 1}`,
-                                idx
-                              });
-                            }
-                          });
-                        }
-                      } catch {}
-                    }
-                  }
-                });
-
-                const cleanGeneralNote = (text: string) => {
-                  if (!text) return '';
-                  let clean = text;
-                  if (clean.startsWith('[') || clean.startsWith('{') || clean.startsWith('"')) {
-                    try {
-                      const p = JSON.parse(clean);
-                      if (Array.isArray(p)) {
-                        clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                      } else if (typeof p === 'string') {
-                        clean = p;
-                      }
-                    } catch {}
-                  }
-                  return clean
-                    .replace(/\["AUDIO:[^"]*"\]/g, '')
-                    .replace(/AUDIO:[^\s,|]+/g, '')
-                    .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
-                    .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
-                    .trim();
-                };
-
-                const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'));
-                const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
-                const hasAnyHomework = formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0 || audioTracks.length > 0 || Boolean(generalNote);
-
-                return (
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '28px',
-                    padding: '28px 32px',
-                    border: '1.5px solid #f1f5f9',
-                    boxShadow: '0 8px 24px -4px rgba(0,0,0,0.06)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px'
-                  }}>
-                    {hasAnyHomework ? (
-                      <>
-                        {/* Lehrwerke / Bücher Liste (Editorial Flow) */}
-                        {formattedJuniorBooks.map((bookItem, idx) => (
-                          <div key={`j-tab-book-${idx}`} style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px',
-                            paddingBottom: (idx < formattedJuniorBooks.length - 1 || otherActiveSongs.length > 0 || audioTracks.length > 0) ? '12px' : '0',
-                            borderBottom: (idx < formattedJuniorBooks.length - 1 || otherActiveSongs.length > 0 || audioTracks.length > 0) ? '1px solid rgba(0,0,0,0.06)' : 'none'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                <div style={{
-                                  width: '28px',
-                                  height: '28px',
-                                  borderRadius: '8px',
-                                  background: '#fee2e2',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: '#dc2626',
-                                  flexShrink: 0
-                                }}>
-                                  <BookOpen size={14} strokeWidth={2.4} />
-                                </div>
-                                <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                  {bookItem.title}
-                                </span>
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                                {bookItem.pageNums.map((pNum) => (
-                                  <span key={`p-tab-${pNum}`} style={{
-                                    background: '#dcfce7',
-                                    color: '#15803d',
-                                    fontSize: '0.80rem',
-                                    fontWeight: 900,
-                                    padding: '3px 9px',
-                                    borderRadius: '7px',
-                                    flexShrink: 0
-                                  }}>
-                                    S. {pNum}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-
-                            {bookItem.notesList.length > 0 && (
-                              <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '4px',
-                                marginLeft: '38px'
-                              }}>
-                                {bookItem.notesList.map((n, nIdx) => (
-                                  <div key={`j-tab-n-${nIdx}`} style={{ fontSize: '0.88rem', color: '#334155', fontWeight: 600, lineHeight: 1.4 }}>
-                                    <strong style={{ color: '#dc2626', fontWeight: 850 }}>S. {n.num}:</strong> {n.text}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-
-                        {/* Songs Liste (Editorial Flow) */}
-                        {otherActiveSongs.map((item, idx) => (
-                          <div key={`j-tab-song-${idx}`} style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px',
-                            paddingBottom: (idx < otherActiveSongs.length - 1 || audioTracks.length > 0) ? '12px' : '0',
-                            borderBottom: (idx < otherActiveSongs.length - 1 || audioTracks.length > 0) ? '1px solid rgba(0,0,0,0.06)' : 'none'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div style={{
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '8px',
-                                background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#4338ca',
-                                flexShrink: 0
-                              }}>
-                                <Music size={14} strokeWidth={2.4} />
-                              </div>
-                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {cleanTitle(item.topic_name || item.title)}
-                              </span>
-                            </div>
-
-                            {item.homework_notes ? (
-                              <div style={{
-                                fontSize: '0.88rem',
-                                color: '#334155',
-                                fontWeight: 600,
-                                lineHeight: 1.4,
-                                marginLeft: '38px'
-                              }}>
-                                <strong style={{ color: '#4f46e5', fontWeight: 850 }}>📌 Fahrplan:</strong> {item.homework_notes}
-                              </div>
-                            ) : null}
-                          </div>
-                        ))}
-
-                        {/* Unterrichtsaufnahmen */}
-                        {audioTracks.length > 0 && (
-                          <div style={{ paddingTop: '2px' }}>
-                            <AudioTrackCarousel
-                              tracks={audioTracks}
-                              readOnly={true}
-                            />
-                          </div>
-                        )}
-
-                        {/* Zusätzliche Bemerkung / Hinweis */}
-                        {generalNote && (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'baseline',
-                            gap: '8px',
-                            fontSize: '0.88rem',
-                            color: '#334155',
-                            fontWeight: 600,
-                            paddingTop: '10px',
-                            borderTop: '1px dashed #e2e8f0'
-                          }}>
-                            <FileText size={15} style={{ color: '#16a34a', flexShrink: 0 }} />
-                            <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Hinweis:</strong>
-                            <span style={{ whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{generalNote}</span>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div style={{ padding: '40px 16px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🎉</div>
-                        <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a' }}>
-                          Keine offenen Aufgaben
-                        </h3>
-                        <p style={{ margin: 0, fontSize: '0.90rem', color: '#64748b', fontWeight: 650 }}>
-                          Du hast für diese Woche alles erledigt oder kannst frei üben!
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          ) : (
-            <MeisterwerkDocumentationModal
-              student={{
-                ...studentUser,
-                id: studentId,
-                first_name: studentUser ? studentUser.first_name : '',
-                last_name: studentUser ? studentUser.last_name : '',
-                photo_url: (studentUser && studentUser.photo_url) || '/avatar_ghost.jpg',
-                is_campus_active: studentUser ? studentUser.is_campus_active : false,
-                school_id: studentUser?.school_id,
-                schoolId: studentUser?.school_id,
-                schools: studentUser?.schools,
-                school_name: studentUser?.schools?.name || studentUser?.school_name,
-                instrument: studentUser?.instrument
-              }}
-              onClose={() => {}}
-              teacherId={studentUser ? studentUser.teacher_id : null}
-              readOnly={true}
-              isEmbed={true}
-              initialModalTab={homeworkBookTab}
-              uiLevel={studentUiLevel || 'junior'}
-            />
-          )
+          <MeisterwerkDocumentationModal
+            student={{
+              ...studentUser,
+              id: studentId,
+              first_name: studentUser ? studentUser.first_name : '',
+              last_name: studentUser ? studentUser.last_name : '',
+              photo_url: (studentUser && studentUser.photo_url) || '/avatar_ghost.jpg',
+              is_campus_active: studentUser ? studentUser.is_campus_active : false,
+              school_id: studentUser?.school_id,
+              schoolId: studentUser?.school_id,
+              schools: studentUser?.schools,
+              school_name: studentUser?.schools?.name || studentUser?.school_name,
+              instrument: studentUser?.instrument
+            }}
+            onClose={() => handleTabChangeLocal('briefing')}
+            teacherId={studentUser ? studentUser.teacher_id : null}
+            readOnly={true}
+            isEmbed={true}
+            initialModalTab={homeworkBookTab}
+            uiLevel={studentUiLevel || 'junior'}
+          />
         )}
       </div>
 
@@ -20468,6 +20114,269 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         )}
       </div>
 
+      {/* Junior-Optimized Song Detail Modal */}
+      {selectedSongForDetail && (() => {
+        const song = selectedSongForDetail;
+        const lwColor = getSongColor(song.title || '');
+        const progressItem = progressItems.find(item => 
+          item.topic_name.toLowerCase() === song.title.toLowerCase() ||
+          item.topic_name.toLowerCase().includes(song.title.toLowerCase())
+        );
+        const isMastered = song.status === 'MASTERED' || progressItem?.status === 'MASTERED' || (song.progress_percent || 0) === 100;
+        const isCurrentMission = Boolean(song.is_current_homework || progressItem?.is_current_homework);
+        const progressPercent = isMastered ? 100 : (song.progress_percent || progressItem?.progress_percent || 0);
+
+        // Extract verified teacher homework notes / roadmap
+        const rawNotes = song.homework_notes || progressItem?.homework_notes || localStorage.getItem(`song_note_${studentId}_${song.id}`) || '';
+        let cleanNotes = '';
+        if (typeof rawNotes === 'string' && rawNotes.trim()) {
+          try {
+            const parsed = JSON.parse(rawNotes);
+            if (Array.isArray(parsed)) {
+              cleanNotes = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+            } else if (typeof parsed === 'string') {
+              cleanNotes = parsed;
+            }
+          } catch {
+            cleanNotes = rawNotes;
+          }
+        }
+        cleanNotes = cleanNotes
+          .replace(/\["AUDIO:[^"]*"\]/g, '')
+          .replace(/AUDIO:[^\s,|]+/g, '')
+          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+          .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
+          .trim();
+
+        return (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 4000,
+            background: 'rgba(9, 9, 11, 0.65)',
+            backdropFilter: 'blur(20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            fontFamily: '"Plus Jakarta Sans", sans-serif'
+          }}>
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '32px',
+              width: '100%',
+              maxWidth: '580px',
+              maxHeight: '90vh',
+              boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              position: 'relative'
+            }} className="animation-slide-up">
+              
+              {/* Header Hero */}
+              <div style={{
+                padding: '24px 28px',
+                background: `linear-gradient(135deg, ${lwColor.from}15 0%, ${lwColor.to}25 100%)`,
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '16px'
+              }}>
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                  {renderSongVinylCover(lwColor, 'md')}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 850,
+                        color: isMastered ? '#15803d' : (isCurrentMission ? '#0369a1' : '#475569'),
+                        background: isMastered ? '#dcfce7' : (isCurrentMission ? '#e0f2fe' : '#f1f5f9'),
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em'
+                      }}>
+                        {isMastered ? 'Meisterwerk 🏆' : (isCurrentMission ? 'Aktuelle Hausaufgabe 🚀' : 'Song im Repertoire 🎵')}
+                      </span>
+                      {song.genre && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 750, color: '#64748b' }}>
+                          • {song.genre}
+                        </span>
+                      )}
+                    </div>
+                    <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                      {song.title}
+                    </h2>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 700 }}>
+                      von {song.artist}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSelectedSongForDetail(null)}
+                  style={{
+                    background: '#f1f5f9',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '34px',
+                    height: '34px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    flexShrink: 0
+                  }}
+                  className="hover-scale"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div style={{ padding: '24px 28px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                
+                {/* Real Progress Card */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '20px',
+                  padding: '18px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.84rem', fontWeight: 850, color: '#1e293b' }}>
+                      Lernfortschritt
+                    </span>
+                    <span style={{
+                      background: isMastered ? '#dcfce7' : '#e0f2fe',
+                      color: isMastered ? '#15803d' : '#0369a1',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.74rem',
+                      fontWeight: 900
+                    }}>
+                      {progressPercent}%
+                    </span>
+                  </div>
+
+                  <div style={{ width: '100%', height: '8px', borderRadius: '4px', background: '#e2e8f0', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${Math.min(100, Math.max(progressPercent, isMastered ? 100 : 5))}%`,
+                      height: '100%',
+                      background: isMastered ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)',
+                      borderRadius: '4px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+
+                  <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 650 }}>
+                    {isMastered 
+                      ? '🏆 Dieser Song wurde erfolgreich als Meisterwerk abgeschlossen!'
+                      : (isCurrentMission 
+                        ? '🚀 Dieser Song ist aktuell Teil deiner Hausaufgaben.'
+                        : '🎵 Dieser Song ist in deinem aktiven Repertoire.')}
+                  </span>
+                </div>
+
+                {/* Verified Teacher Homework Notes / Roadmap */}
+                {cleanNotes && (
+                  <div style={{
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '18px',
+                    padding: '16px 18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 850, color: '#166534', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      📌 Fahrplan & Übe-Tipp der Lehrkraft:
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: '#14532d', fontWeight: 650, lineHeight: 1.45 }}>
+                      {cleanNotes}
+                    </p>
+                  </div>
+                )}
+
+                {/* Song Meta Information (BPM, Tempo, Instrumentation) */}
+                {(song.tempo_bpm || song.genre || song.instrumentation) && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    flexWrap: 'wrap'
+                  }}>
+                    {song.tempo_bpm && (
+                      <span style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#334155', padding: '4px 10px', borderRadius: '8px', fontSize: '0.74rem', fontWeight: 750 }}>
+                        ⚡ {song.tempo_bpm} BPM
+                      </span>
+                    )}
+                    {song.genre && (
+                      <span style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#334155', padding: '4px 10px', borderRadius: '8px', fontSize: '0.74rem', fontWeight: 750 }}>
+                        🎸 Genre: {song.genre}
+                      </span>
+                    )}
+                    {song.instrumentation && (
+                      <span style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#334155', padding: '4px 10px', borderRadius: '8px', fontSize: '0.74rem', fontWeight: 750 }}>
+                        🎵 {song.instrumentation}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Audio Play-Along Trigger if audio_url */}
+                {song.audio_url && (
+                  <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Volume2 size={14} color="#34a853" /> Play-Along Audio:
+                    </span>
+                    <audio controls src={song.audio_url} style={{ width: '100%', height: '36px', borderRadius: '8px' }} />
+                  </div>
+                )}
+
+                {/* Action CTA Button */}
+                <button
+                  onClick={() => {
+                    setSelectedTopic(song.title);
+                    setSelectedSongForDetail(null);
+                    handleTabChangeLocal('practice');
+                  }}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '16px 20px',
+                    borderRadius: '18px',
+                    fontWeight: 950,
+                    fontSize: '0.96rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 8px 22px rgba(34, 197, 94, 0.28)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s ease',
+                    marginTop: '4px'
+                  }}
+                  className="hover-scale"
+                >
+                  <Play size={18} fill="white" color="white" />
+                  <span>An diesem Song üben (Timer starten)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Notebook Lehrwerk Detail Modal */}
       {selectedLehrwerkForDetail && (() => {
         const book = selectedLehrwerkForDetail;
@@ -20510,6 +20419,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           .sort((a, b) => a.num - b.num);
 
         const masteredCount = sortedPages.filter(p => p.status === 'MASTERED').length;
+        const totalPages = book.totalPages || 50;
+        const pct = totalPages > 0 ? (masteredCount / totalPages) : 0;
 
         return (
           <div style={{
@@ -20522,211 +20433,310 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             alignItems: 'center',
             justifyContent: 'center',
             padding: '20px',
-            fontFamily: '"Inter", sans-serif'
+            fontFamily: '"Plus Jakarta Sans", sans-serif'
           }}>
             <div style={{
-              background: '#f3f3f6',
+              background: '#ffffff',
               borderRadius: '32px',
               width: '100%',
-              maxWidth: '1100px',
-              height: '80vh',
+              maxWidth: '920px',
+              maxHeight: '90vh',
               boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              border: '1px solid rgba(0, 0, 0, 0.05)',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
               position: 'relative'
             }} className="animation-slide-up">
               
-              {/* Header - Waldgrün Header */}
+              {/* Header - Clean White Apple Header */}
               <div style={{
-                padding: '16px 24px',
-                background: '#456355',
-                borderBottom: '1px solid rgba(50, 72, 62, 0.8)',
+                padding: '20px 28px',
+                background: '#ffffff',
+                borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                zIndex: 50,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+                zIndex: 50
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <BookOpen size={20} color="#ffffff" />
-                  <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#ffffff', fontFamily: 'Urbanist' }}>
-                    Lehrwerk-Details: {book.title}
-                  </h2>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: `${gradient.from}20`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: gradient.from
+                  }}>
+                    <BookOpen size={18} />
+                  </div>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                      {book.title}
+                    </h2>
+                    {book.author && (
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 650 }}>
+                        von {book.author}
+                      </p>
+                    )}
+                  </div>
                 </div>
+
                 <button
                   onClick={() => setSelectedLehrwerkForDetail(null)}
                   style={{
-                    background: 'rgba(255,255,255,0.15)',
-                    border: '1px solid rgba(255,255,255,0.08)',
+                    background: '#f1f5f9',
+                    border: 'none',
                     borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
+                    width: '34px',
+                    height: '34px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    color: '#ffffff',
+                    color: '#64748b',
                     transition: 'all 0.18s ease'
                   }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                  }}
+                  className="hover-scale"
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </button>
               </div>
 
-              {/* Inside Pages of the Notebook (Left/Right Pages) */}
+              {/* Inside Content: Left Hero Card + Right Pages Flow */}
               <div style={{
                 display: 'flex',
                 flex: 1,
-                overflow: 'hidden',
-                position: 'relative'
+                overflowY: 'auto',
+                padding: '24px 28px',
+                gap: '24px',
+                flexDirection: isMobile ? 'column' : 'row'
               }}>
                 
-                {/* Left Page (Information & General Progress) */}
+                {/* Left Column (3D Book Artwork & Progress Stage) */}
                 <div style={{
-                  flex: 1,
-                  padding: '32px',
-                  overflowY: 'auto',
-                  background: '#ffffff',
-                  borderRight: '1px solid #e2e8f0',
-                  position: 'relative'
+                  flex: isMobile ? 'none' : '0 0 320px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '18px'
                 }}>
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    gap: '14px'
+                  }}>
+                    {/* 3D Bookcover Artwork */}
+                    <div style={{ 
+                      width: '100px', 
+                      height: '135px', 
+                      background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
+                      borderRadius: '10px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                      borderLeft: '4px solid rgba(255,255,255,0.4)'
+                    }}>
+                      <BookOpen size={42} color={gradient.text} />
+                    </div>
 
-                  {/* Content Container */}
-                  <div style={{ paddingRight: '12px' }}>
-                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '24px' }}>
-                      <div style={{ 
-                        width: '80px', 
-                        height: '105px', 
-                        background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                        borderRadius: '4px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                      }}>
-                        <BookOpen size={36} color={gradient.text} />
-                      </div>
-                      <div>
-                        <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                          {book.title}
-                        </h2>
-                        {book.author && (
-                          <p style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>
-                            von {book.author}
-                          </p>
-                        )}
-                        <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>
-                          📖 {book.totalPages || 50} Seiten
+                    <div>
+                      <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                        {book.title}
+                      </h3>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 750 }}>
+                        📖 {book.totalPages || 50} Seiten Gesamtumfang
+                      </span>
+                    </div>
+
+                    {/* Progress Card */}
+                    <div style={{
+                      width: '100%',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '16px',
+                      padding: '16px',
+                      boxSizing: 'border-box',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>Fortschritt</span>
+                        <span style={{
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.72rem',
+                          fontWeight: 900
+                        }}>
+                          {Math.round(pct * 100)}%
                         </span>
                       </div>
-                    </div>
 
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '20px 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px' }}>
-                      📊 Dein Fortschritt
-                    </h3>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.7)', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                        <span>Gemeisterte Seiten</span>
-                        <span>{masteredCount} / {book.totalPages || 50} Seiten</span>
+                      <div style={{ width: '100%', height: '8px', borderRadius: '4px', background: '#e2e8f0', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(100, pct * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)', borderRadius: '4px', transition: 'width 0.3s ease' }} />
                       </div>
-                      <div style={{ width: '100%', height: '10px', borderRadius: '5px', background: '#cbd5e1', overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.min(100, (masteredCount / (book.totalPages || 50)) * 100)}%`, height: '100%', background: gradient.text, borderRadius: '5px', transition: 'width 0.3s ease' }} />
-                      </div>
-                      <p style={{ fontSize: '0.78rem', color: '#475569', margin: '4px 0 0 0', lineHeight: '1.4', fontWeight: 600 }}>
-                        {masteredCount === 0 
-                          ? 'Du hast noch keine Seiten dieses Lehrwerks abgeschlossen. Viel Spaß beim Üben! 🚀' 
-                          : masteredCount === (book.totalPages || 50) 
-                          ? 'Wahnsinn! Du hast dieses Lehrwerk vollständig durchgearbeitet! 🏆✨' 
-                          : 'Weiter so! Jeder Meilenstein bringt dich deinem Ziel näher.'}
-                      </p>
+
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
+                        {masteredCount} von {book.totalPages || 50} Seiten gemeistert
+                      </span>
                     </div>
                   </div>
+
+                  {/* Action CTA Button */}
+                  <button
+                    onClick={() => {
+                      setSelectedTopic(book.title);
+                      setSelectedLehrwerkForDetail(null);
+                      handleTabChangeLocal('practice');
+                    }}
+                    style={{
+                      width: '100%',
+                      background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '16px 20px',
+                      borderRadius: '18px',
+                      fontWeight: 950,
+                      fontSize: '0.92rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 8px 22px rgba(34, 197, 94, 0.28)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Play size={17} fill="white" color="white" />
+                    <span>An diesem Lehrwerk üben (Timer starten)</span>
+                  </button>
                 </div>
 
-                {/* Right Page (Assigned Pages & Notes) */}
+                {/* Right Column: Hausaufgabenheft Editorial Flow */}
                 <div style={{
                   flex: 1,
-                  padding: '32px',
-                  overflowY: 'auto',
                   background: '#f8fafc',
-                  position: 'relative'
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  overflowY: 'auto'
                 }}>
-
-                  {/* Content Container */}
-                  <div style={{ paddingLeft: '12px' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0', borderBottom: '2px solid #cbd5e1', paddingBottom: '6px' }}>
-                      📋 Aufgaben & Seiten
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CheckCircle size={16} color="#34a853" /> Aufgaben & Buchseiten
                     </h3>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {sortedPages.map((page) => {
-                        let badgeBg = '#e6f4ea';
-                        let badgeColor = '#34a853';
-                        let badgeText = 'In Arbeit';
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 750 }}>
+                      {sortedPages.length} {sortedPages.length === 1 ? 'Eintrag' : 'Einträge'}
+                    </span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {sortedPages.map((page) => {
+                      let badgeBg = '#e6f4ea';
+                      let badgeColor = '#15803d';
+                      let badgeText = 'In Arbeit';
 
-                        if (page.status === 'THEORY_DONE') {
-                          badgeBg = '#f3e8ff';
-                          badgeColor = '#6b21a8';
-                          badgeText = 'Theorie';
-                        } else if (page.status === 'MASTERED') {
-                          badgeBg = '#e6f4ea';
-                          badgeColor = '#34a853';
-                          badgeText = 'Erledigt';
-                        }
+                      if (page.status === 'THEORY_DONE') {
+                        badgeBg = '#f3e8ff';
+                        badgeColor = '#6b21a8';
+                        badgeText = 'Theorie gelesen';
+                      } else if (page.status === 'MASTERED') {
+                        badgeBg = '#dcfce7';
+                        badgeColor = '#15803d';
+                        badgeText = '✓ Geschafft!';
+                      }
 
-                        return (
-                          <div key={page.num} style={{
-                            background: 'rgba(255, 255, 255, 0.7)',
-                            border: '1px solid #e2e8f0',
-                            padding: '12px 16px',
-                            borderRadius: '16px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px'
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
-                                Seite {page.num}
-                              </span>
+                      return (
+                        <div key={page.num} style={{
+                          background: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          padding: '14px 18px',
+                          borderRadius: '18px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <span style={{
-                                background: badgeBg,
-                                color: badgeColor,
-                                padding: '2px 8px',
-                                borderRadius: '6px',
-                                fontSize: '0.65rem',
-                                fontWeight: 900,
-                                textTransform: 'uppercase'
+                                background: '#dcfce7',
+                                color: '#15803d',
+                                padding: '3px 10px',
+                                borderRadius: '100px',
+                                fontSize: '0.78rem',
+                                fontWeight: 900
                               }}>
-                                {badgeText}
+                                S. {page.num}
+                              </span>
+                              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                                Buchseite {page.num}
                               </span>
                             </div>
-                            {page.notes && (
-                              <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', fontWeight: 550, fontStyle: 'italic', background: '#ffffff', padding: '8px 12px', borderRadius: '8px', borderLeft: '3px solid #3b82f6' }}>
-                                {page.notes}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
 
-                      {sortedPages.length === 0 && (
-                        <p style={{ fontStyle: 'italic', color: '#64748b', fontSize: '0.85rem', textAlign: 'center', marginTop: '24px' }}>
-                          Hier sind aktuell keine Seiten eingetragen.
-                        </p>
-                      )}
-                    </div>
+                            <span style={{
+                              background: badgeBg,
+                              color: badgeColor,
+                              padding: '3px 10px',
+                              borderRadius: '8px',
+                              fontSize: '0.68rem',
+                              fontWeight: 900,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.02em'
+                            }}>
+                              {badgeText}
+                            </span>
+                          </div>
+
+                          {page.notes && (
+                            <div style={{
+                              background: '#f0fdf4',
+                              border: '1px solid #bbf7d0',
+                              padding: '8px 12px',
+                              borderRadius: '10px',
+                              fontSize: '0.78rem',
+                              color: '#166534',
+                              fontWeight: 650,
+                              lineHeight: 1.4
+                            }}>
+                              💡 <strong>Tipp der Lehrkraft:</strong> {page.notes}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {sortedPages.length === 0 && (
+                      <div style={{
+                        padding: '32px 20px',
+                        textAlign: 'center',
+                        color: '#94a3b8',
+                        fontSize: '0.85rem',
+                        fontStyle: 'italic',
+                        background: '#ffffff',
+                        borderRadius: '18px',
+                        border: '1px dashed #cbd5e1'
+                      }}>
+                        Hier sind aktuell noch keine einzelnen Seiten eingetragen.
+                      </div>
+                    )}
                   </div>
                 </div>
-
-
 
               </div>
             </div>

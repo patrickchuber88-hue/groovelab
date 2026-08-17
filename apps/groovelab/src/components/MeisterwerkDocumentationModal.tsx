@@ -6371,17 +6371,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
           ) : activeViewMode === 'recordings' ? (
             <>
-              {/* LEFT PAGE: Lehrer Aufnahmen */}
+              {/* ========================================================================= */}
+              {/* LEFT PAGE: 🎙️ AUFNAHMEN VOM LEHRER (Play-Alongs & Unterrichts-Audios)     */}
+              {/* ========================================================================= */}
               <div style={{
                 flex: isTeacherTools ? '1 1 100%' : '1 1 0%',
                 overflowY: 'auto',
                 display: 'flex',
                 flexDirection: 'column',
-                background: useNotebookLayout ? '#faf8f2' : 'white',
+                background: useNotebookLayout ? '#faf8f2' : '#ffffff',
                 borderRadius: isTeacherTools ? '0 0 20px 20px' : (useNotebookLayout ? '0 0 0 20px' : '0'),
                 boxShadow: useNotebookLayout ? '-10px 10px 20px rgba(0,0,0,0.15)' : 'none',
                 borderRight: isTeacherTools ? 'none' : (useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed'),
-                padding: isMobileOrSim ? '20px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px 28px 80px 28px'
+                padding: isMobileOrSim ? '20px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px'
               }}>
                 {useNotebookLayout && !isTeacherTools && (
                   <div style={{
@@ -6406,142 +6408,217 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </div>
                 )}
                 
-                <h3 style={{
-                  fontSize: '1rem',
-                  fontWeight: 850,
-                  color: '#1d1d1f',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <Mic size={16} /> Aufnahmen vom Lehrer
-                </h3>
+                {/* Header: Teacher Recordings */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
+                    color: '#15803d',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 10px rgba(52, 168, 83, 0.15)',
+                    flexShrink: 0
+                  }}>
+                    <Mic size={20} strokeWidth={2.4} />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Vom Unterricht
+                    </span>
+                    <h3 style={{ margin: '1px 0 0 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                      Aufnahmen von deiner Lehrkraft
+                    </h3>
+                  </div>
+                </div>
 
+                {/* Teacher Record Tool (when teacher is viewing) */}
                 {isTeacherTools && (
                   <div style={{
                     margin: '0 0 24px 0',
-                    padding: '16px',
+                    padding: '18px 20px',
                     background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    border: '1.5px solid #e2e8f0',
                     borderRadius: '20px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '12px'
+                    gap: '12px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                   }}>
-                    {(() => {
-                      return (
-                        <>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>Neue Aufnahme erstellen (max. 60s)</span>
-                              </span>
-                              {!isRecordingAudio ? (
-                                <button
-                                  type="button"
-                                  onClick={startRecordingAudio}
-                                  disabled={isUploadingAudio}
-                                  style={{
-                                    background: '#34a853',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '6px 12px',
-                                    borderRadius: '12px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
-                                  <span>Aufnahme starten</span>
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => stopRecordingAudio()}
-                                  style={{
-                                    background: '#ef4444',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '6px 12px',
-                                    borderRadius: '12px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  <span style={{ width: '8px', height: '8px', background: 'currentColor', display: 'inline-block' }} />
-                                  <span>Stopp ({audioDuration}s / 60s)</span>
-                                </button>
-                              )}
-                            </div>
-                            
-                            {!isRecordingAudio && (
-                              <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                                <input
-                                  type="text"
-                                  placeholder="Kassetten-Beschriftung (z.B. Play-Along Tempo 120)"
-                                  value={audioLabel}
-                                  onChange={(e) => setAudioLabel(e.target.value)}
-                                  style={{
-                                    flex: 1,
-                                    fontSize: '0.74rem',
-                                    padding: '6px 12px',
-                                    borderRadius: '10px',
-                                    border: '1px solid #cbd5e1',
-                                    background: '#fff',
-                                    outline: 'none',
-                                    fontFamily: 'monospace'
-                                  }}
-                                />
-                              </div>
-                            )}
-                          </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>🎙️ Neue Lehrkraft-Aufnahme erstellen (max. 60s)</span>
+                      </span>
+                      {!isRecordingAudio ? (
+                        <button
+                          type="button"
+                          onClick={startRecordingAudio}
+                          disabled={isUploadingAudio}
+                          style={{
+                            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '12px',
+                            fontSize: '0.78rem',
+                            fontWeight: 850,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 3px 10px rgba(34, 197, 94, 0.25)'
+                          }}
+                          className="hover-scale"
+                        >
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
+                          <span>Aufnahme starten</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => stopRecordingAudio()}
+                          style={{
+                            background: '#ef4444',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '12px',
+                            fontSize: '0.78rem',
+                            fontWeight: 850,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 3px 10px rgba(239, 68, 68, 0.3)'
+                          }}
+                          className="hover-scale"
+                        >
+                          <span style={{ width: '8px', height: '8px', background: '#ffffff', display: 'inline-block' }} />
+                          <span>Stopp ({audioDuration}s / 60s)</span>
+                        </button>
+                      )}
+                    </div>
+                    
+                    {!isRecordingAudio && (
+                      <input
+                        type="text"
+                        placeholder="Titel der Aufnahme (z. B. Song-Teil A langsam üben)..."
+                        value={audioLabel}
+                        onChange={(e) => setAudioLabel(e.target.value)}
+                        style={{
+                          width: '100%',
+                          fontSize: '0.84rem',
+                          padding: '10px 14px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #cbd5e1',
+                          background: '#fff',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    )}
 
-                          {isUploadingAudio && (
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>⏳</span> Lade Audio-Feedback hoch...
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
+                    {isUploadingAudio && (
+                      <div style={{ fontSize: '0.76rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                        <span>⏳</span> Audio wird gesichert und zur Schüler-Übersicht hinzugefügt...
+                      </div>
+                    )}
                   </div>
                 )}
 
+                {/* Teacher Recordings Gallery */}
                 {(() => {
-                  const teacherAudios = homeworkNotesList
-                    .map((note, originalIdx) => ({ note, originalIdx }))
-                    .filter(item => item.note.startsWith("AUDIO:"))
-                    .map(item => {
-                      const parts = item.note.substring(6).split('|');
-                      return {
-                        url: parts[0],
-                        duration: parseInt(parts[1] || '0', 10),
-                        date: parts[2],
-                        label: parts[3] || 'Play-Along',
-                        role: parts[4] || 'teacher',
-                        originalIdx: item.originalIdx
-                      };
-                    })
-                    .filter(aud => aud.role === 'teacher');
+                  // Collect ALL teacher audios from homeworkNotesList, local storage, and progressItems
+                  const rawAudioStrings: { str: string; originalIdx: number }[] = [];
+                  (homeworkNotesList || []).forEach((note, idx) => {
+                    if (typeof note === 'string' && note.includes('AUDIO:')) {
+                      rawAudioStrings.push({ str: note, originalIdx: idx });
+                    }
+                  });
+
+                  try {
+                    if (student?.id) {
+                      const localGen = localStorage.getItem(`campus_homework_notes_${student.id}`);
+                      if (localGen && localGen.includes('AUDIO:')) {
+                        try {
+                          const p = JSON.parse(localGen);
+                          if (Array.isArray(p)) {
+                            p.forEach((item: any) => {
+                              if (typeof item === 'string' && item.includes('AUDIO:') && !rawAudioStrings.some(x => x.str === item)) {
+                                rawAudioStrings.push({ str: item, originalIdx: -1 });
+                              }
+                            });
+                          }
+                        } catch {
+                          if (!rawAudioStrings.some(x => x.str === localGen)) {
+                            rawAudioStrings.push({ str: localGen, originalIdx: -1 });
+                          }
+                        }
+                      }
+                    }
+                  } catch {}
+
+                  const teacherAudios: any[] = [];
+                  const seenTeacherUrls = new Set<string>();
+
+                  rawAudioStrings.forEach(item => {
+                    const cleanStr = item.str.startsWith('[') ? item.str.replace(/[\[\]"]/g, '') : item.str;
+                    const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+                    const url = parts[0]?.trim();
+                    if (!url || seenTeacherUrls.has(url)) return;
+
+                    const role = parts[4];
+                    // Any audio in homework notes without role='student' is TEACHER audio!
+                    if (role === 'student') return;
+
+                    seenTeacherUrls.add(url);
+                    teacherAudios.push({
+                      url,
+                      duration: parseInt(parts[1] || '0', 10),
+                      date: parts[2] || new Date().toISOString(),
+                      label: parts[3] || `Aufnahme #${teacherAudios.length + 1}`,
+                      originalIdx: item.originalIdx
+                    });
+                  });
 
                   if (teacherAudios.length === 0) {
                     return (
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '12px', textAlign: 'center' }}>
-                        <Mic size={28} style={{ opacity: 0.4, color: '#64748b' }} />
+                      <div style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#94a3b8',
+                        padding: '60px 20px',
+                        gap: '14px',
+                        textAlign: 'center',
+                        background: '#f8fafc',
+                        borderRadius: '24px',
+                        border: '1.5px dashed #e2e8f0'
+                      }}>
+                        <div style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '50%',
+                          background: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#34a853',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
+                        }}>
+                          <Music size={26} />
+                        </div>
                         <div>
-                          <p style={{ fontWeight: 700, fontSize: '0.86rem', color: '#64748b', margin: '0 0 2px' }}>Keine Aufnahmen vom Lehrer</p>
-                          <p style={{ fontSize: '0.74rem', margin: 0, opacity: 0.8 }}>Dein Lehrer hat für diese Woche noch keine Audio-Beispiele hinterlassen.</p>
+                          <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>
+                            Noch keine Aufnahmen vom Lehrer
+                          </h4>
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 600, maxWidth: '280px', lineHeight: 1.45 }}>
+                            Sobald dein Lehrer im Unterricht ein Play-Along oder Übe-Beispiel aufnimmt, findest du es hier zum Mitspielen!
+                          </p>
                         </div>
                       </div>
                     );
@@ -6550,14 +6627,67 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   return (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
                       {teacherAudios.map((aud, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'center' }}>
-                          <RetroCassettePlayer
-                            url={aud.url}
+                        <div key={`teacher-aud-${idx}`} style={{
+                          background: '#ffffff',
+                          borderRadius: '20px',
+                          padding: '16px',
+                          border: '1.5px solid #e2e8f0',
+                          boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                              <div style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '8px',
+                                background: '#dcfce7',
+                                color: '#15803d',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                <Play size={13} fill="#15803d" />
+                              </div>
+                              <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {aud.label}
+                              </span>
+                            </div>
+
+                            {!readOnly && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteNote(aud.originalIdx)}
+                                style={{
+                                  border: 'none',
+                                  background: '#fee2e2',
+                                  color: '#dc2626',
+                                  borderRadius: '8px',
+                                  padding: '4px 8px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800
+                                }}
+                                className="hover-scale"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+
+                          <InlineAudioPlayer 
+                            url={aud.url} 
+                            label={aud.label} 
                             duration={aud.duration}
-                            index={idx}
-                            label={aud.label}
-                            onDelete={readOnly ? undefined : () => handleDeleteNote(aud.originalIdx)}
                           />
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.70rem', color: '#64748b', fontWeight: 700, paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
+                            <span style={{ color: '#15803d', fontWeight: 850 }}>👨‍🏫 Lehrkraft-Audio</span>
+                            <span>{aud.duration > 0 ? `${aud.duration} Sek.` : 'Audio'}</span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -6565,316 +6695,300 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 })()}
               </div>
 
-                {/* RIGHT PAGE: Schüler Aufnahmen (Private Sandbox & Freigabe) */}
-                <div style={{
-                  flex: '1 1 0%',
-                  overflowY: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  background: useNotebookLayout ? 'white' : '#f8fafc',
-                  backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
-                  borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
-                  borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
-                  boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
-                  position: 'relative',
-                  padding: '28px'
-                }}>
-                  {useNotebookLayout && (
-                    <div style={{
-                      position: 'absolute',
-                      top: 0,
-                      bottom: 0,
-                      left: '42px',
-                      width: '2px',
-                      background: '#fca5a5',
-                      zIndex: 10
-                    }} />
-                  )}
-                  {useNotebookLayout && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '20px',
-                      bottom: '20px',
-                      left: '8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-around',
-                      zIndex: 25
-                    }}>
-                      {Array.from({ length: 6 }).map((_, idx) => (
-                        <div key={idx} style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: '#121214',
-                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                        }} />
-                      ))}
-                    </div>
-                  )}
+              {/* ========================================================================= */}
+              {/* RIGHT PAGE: ⭐ EIGENE AUFNAHMEN (SCHÜLER - Private Audio-Sandbox)          */}
+              {/* ========================================================================= */}
+              <div style={{
+                flex: '1 1 0%',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                background: useNotebookLayout ? 'white' : '#f8fafc',
+                backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
+                borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
+                borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
+                boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
+                position: 'relative',
+                padding: '28px'
+              }}>
+                {useNotebookLayout && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: '42px',
+                    width: '2px',
+                    background: '#fca5a5',
+                    zIndex: 10
+                  }} />
+                )}
+                {useNotebookLayout && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '20px',
+                    bottom: '20px',
+                    left: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-around',
+                    zIndex: 25
+                  }}>
+                    {Array.from({ length: 6 }).map((_, idx) => (
+                      <div key={idx} style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: '#121214',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
+                      }} />
+                    ))}
+                  </div>
+                )}
 
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 850,
-                    color: '#1d1d1f',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    marginBottom: '12px',
+                {/* Header: Student Own Recordings */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
+                    color: '#6d28d9',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px'
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 10px rgba(109, 40, 217, 0.15)',
+                    flexShrink: 0
                   }}>
-                    <Music size={16} /> {isTeacherTools ? 'Freigegebene Schüler-Aufnahmen' : 'Eigene Aufnahmen (Schüler)'}
-                  </h3>
+                    <Star size={20} strokeWidth={2.4} fill="#6d28d9" />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.70rem', fontWeight: 900, color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Dein Übe-Studio
+                    </span>
+                    <h3 style={{ margin: '1px 0 0 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                      {isTeacherTools ? 'Freigegebene Schüler-Aufnahmen' : 'Deine eigenen Aufnahmen'}
+                    </h3>
+                  </div>
+                </div>
 
-                  {/* Encouraging Privacy info banner for students */}
-                  {!isTeacherTools && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 12px',
-                      background: 'rgba(241, 245, 249, 0.8)',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '12px',
-                      fontSize: '0.72rem',
-                      color: '#475569',
-                      fontWeight: 650,
-                      marginBottom: '16px'
-                    }}>
-                      <Lock size={14} color="#64748b" style={{ flexShrink: 0 }} />
-                      <span>
-                        Deine Aufnahmen sind <strong>standardmäßig privat</strong> und für deinen Lehrer unsichtbar. Du entscheidest selbst, wann du eine Aufnahme freigibst oder in deiner Audio-Biografie speicherst.
-                      </span>
-                    </div>
-                  )}
+                {/* Privacy Badge for Students */}
+                {!isTeacherTools && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px 14px',
+                    background: '#ffffff',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '16px',
+                    fontSize: '0.76rem',
+                    color: '#475569',
+                    fontWeight: 650,
+                    marginBottom: '18px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                  }}>
+                    <Lock size={15} color="#6366f1" style={{ flexShrink: 0 }} />
+                    <span>
+                      Deine Aufnahmen sind <strong style={{ color: '#4338ca' }}>standardmäßig privat</strong> und nur für dich sichtbar.
+                    </span>
+                  </div>
+                )}
 
-                  {/* For student: render the recording widget on their page inside the gallery */}
-                  {!isTeacherTools && (
-                    <div style={{
-                      margin: '0 0 24px 0',
-                      padding: '16px',
-                      background: '#fafafa',
-                      borderRadius: '20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px'
-                    }}>
-                      {(() => {
-                        const audios = homeworkNotesList
-                          .map((note, originalIdx) => ({ note, originalIdx }))
-                          .filter(item => item.note.startsWith("AUDIO:"))
-                          .map(item => {
-                            const parts = item.note.substring(6).split('|');
-                            return {
-                              url: parts[0],
-                              duration: parseInt(parts[1] || '0', 10),
-                              date: parts[2],
-                              label: parts[3] || 'Play-Along',
-                              role: parts[4] || 'teacher',
-                              visibility: parts[5] || (parts[4] === 'student' ? 'private' : 'shared_with_teacher'),
-                              originalIdx: item.originalIdx
-                            };
-                          });
-                        
-                        const now = new Date();
-                        const currentMonth = now.getMonth();
-                        const currentYear = now.getFullYear();
-                        const currentMonthAudios = audios.filter(aud => {
-                          if (!aud.date) return false;
-                          const d = new Date(aud.date);
-                          return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-                        });
-                        const totalUsedSeconds = currentMonthAudios.reduce((sum, aud) => sum + aud.duration, 0);
-                        const monthlyLimitSeconds = 240;
-                        const isLimitReached = totalUsedSeconds >= monthlyLimitSeconds;
+                {/* Kid-Friendly Studio Recording Tool (for students) */}
+                {!isTeacherTools && (
+                  <div style={{
+                    margin: '0 0 24px 0',
+                    padding: '20px',
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    border: '1.5px solid #e0e7ff',
+                    boxShadow: '0 6px 20px rgba(99, 102, 241, 0.06)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px'
+                  }}>
+                    {(() => {
+                      // Student recordings calculate monthly quota
+                      let studentRecordingsTotalSec = 0;
+                      try {
+                        if (student?.id) {
+                          const stored = localStorage.getItem(`campus_junior_recordings_${student.id}`);
+                          if (stored) {
+                            const recs = JSON.parse(stored);
+                            studentRecordingsTotalSec = recs.reduce((acc: number, r: any) => acc + (parseInt(r.duration, 10) || 0), 0);
+                          }
+                        }
+                      } catch {}
 
-                        return (
-                          <>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span>Neue Aufnahme erstellen (max. 60s)</span>
-                                </span>
-                                {!isRecordingAudio ? (
-                                  <button
-                                    type="button"
-                                    onClick={startRecordingAudio}
-                                    disabled={isUploadingAudio || isLimitReached}
-                                    style={{
-                                      background: isLimitReached ? '#94a3b8' : '#34a853',
-                                      color: '#fff',
-                                      border: 'none',
-                                      padding: '6px 12px',
-                                      borderRadius: '12px',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 800,
-                                      cursor: isLimitReached ? 'not-allowed' : 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px'
-                                    }}
-                                  >
-                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
-                                    <span>Aufnahme starten</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => stopRecordingAudio()}
-                                    style={{
-                                      background: '#ef4444',
-                                      color: '#fff',
-                                      border: 'none',
-                                      padding: '6px 12px',
-                                      borderRadius: '12px',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 800,
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px'
-                                    }}
-                                  >
-                                    <span style={{ width: '8px', height: '8px', background: 'currentColor', display: 'inline-block' }} />
-                                    <span>Stopp ({audioDuration}s / 60s)</span>
-                                  </button>
-                                )}
-                              </div>
-                              
-                              {!isRecordingAudio && !isLimitReached && (
-                                <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                                  <input
-                                    type="text"
-                                    placeholder="Kassetten-Beschriftung (z.B. Mein Übe-Versuch)"
-                                    value={audioLabel}
-                                    onChange={(e) => setAudioLabel(e.target.value)}
-                                    style={{
-                                      flex: 1,
-                                      fontSize: '0.74rem',
-                                      padding: '6px 12px',
-                                      borderRadius: '10px',
-                                      border: '1px solid #cbd5e1',
-                                      background: '#fff',
-                                      outline: 'none',
-                                      fontFamily: 'monospace'
-                                    }}
-                                  />
-                                </div>
-                              )}
+                      const monthlyLimit = 240;
+                      const isLimitReached = studentRecordingsTotalSec >= monthlyLimit;
+
+                      return (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>🎙️ Selbstaufnahme (max. 60 Sek.)</span>
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: isLimitReached ? '#dc2626' : '#6366f1', fontWeight: 800, background: isLimitReached ? '#fee2e2' : '#eef2ff', padding: '3px 9px', borderRadius: '100px' }}>
+                              ⏱️ {studentRecordingsTotalSec}s / {monthlyLimit}s verbraucht
+                            </span>
+                          </div>
+
+                          {!isRecordingAudio && !isLimitReached && (
+                            <input
+                              type="text"
+                              placeholder="Name für deine Aufnahme (z. B. Mein Gitarren-Hit)..."
+                              value={audioLabel}
+                              onChange={(e) => setAudioLabel(e.target.value)}
+                              style={{
+                                width: '100%',
+                                fontSize: '0.84rem',
+                                padding: '10px 14px',
+                                borderRadius: '12px',
+                                border: '1.5px solid #cbd5e1',
+                                background: '#f8fafc',
+                                outline: 'none',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                          )}
+
+                          {!isRecordingAudio ? (
+                            <button
+                              type="button"
+                              onClick={startRecordingAudio}
+                              disabled={isUploadingAudio || isLimitReached}
+                              style={{
+                                width: '100%',
+                                background: isLimitReached ? '#cbd5e1' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '14px 20px',
+                                borderRadius: '16px',
+                                fontSize: '0.90rem',
+                                fontWeight: 900,
+                                cursor: isLimitReached ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: isLimitReached ? 'none' : '0 4px 14px rgba(99, 102, 241, 0.3)',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className={isLimitReached ? '' : 'hover-scale'}
+                            >
+                              <Mic size={18} strokeWidth={2.4} />
+                              <span>Aufnahme starten</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => stopRecordingAudio()}
+                              style={{
+                                width: '100%',
+                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '14px 20px',
+                                borderRadius: '16px',
+                                fontSize: '0.90rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
+                                animation: 'pulse 1.5s infinite'
+                              }}
+                              className="hover-scale"
+                            >
+                              <span style={{ width: '10px', height: '10px', background: '#ffffff', borderRadius: '2px', display: 'inline-block' }} />
+                              <span>Aufnahme beenden ({audioDuration}s / 60s)</span>
+                            </button>
+                          )}
+
+                          {isUploadingAudio && (
+                            <div style={{ fontSize: '0.76rem', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 750 }}>
+                              <span>⏳</span> Deine Aufnahme wird gespeichert...
                             </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
 
-                            <div style={{ 
-                              fontSize: '0.72rem', 
-                              color: isLimitReached ? '#ef4444' : '#475569', 
-                              fontWeight: 700, 
-                              marginTop: '2px',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center'
-                            }}>
-                              <span>
-                                {isLimitReached 
-                                  ? '⚠️ Monatliches Aufnahme-Limit (240 Sek.) erreicht.'
-                                  : `Aufnahmezeit diesen Monat: ${totalUsedSeconds}s / ${monthlyLimitSeconds}s verbraucht.`}
-                              </span>
-                            </div>
+                {/* Student Recordings List */}
+                {(() => {
+                  const studentAudios: any[] = [];
+                  const seenStudentUrls = new Set<string>();
 
-                            {isUploadingAudio && (
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>⏳</span> Lade Audio-Feedback hoch...
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
-
-                  {(() => {
-                    const combinedList: { note: string; originalIdx: number }[] = homeworkNotesList
-                      .map((note, originalIdx) => ({ note, originalIdx }));
-
-                    // Also pull from student's local Junior Recordings vault to ensure 100% immediate appearance
-                    try {
-                      if (student?.id) {
-                        const juniorKey = `campus_junior_recordings_${student.id}`;
-                        const storedJunior = localStorage.getItem(juniorKey);
-                        if (storedJunior) {
-                          const juniorRecs = JSON.parse(storedJunior);
-                          juniorRecs.forEach((rec: any) => {
-                            const metaStr = `AUDIO:${rec.url}|${rec.duration || 0}|${rec.date || new Date().toISOString()}|${rec.title || 'Mein Song'}|student|private|${rec.id}`;
-                            if (!combinedList.some(item => item.note.includes(rec.id) || (rec.url && item.note.includes(rec.url)))) {
-                              combinedList.push({ note: metaStr, originalIdx: -1 });
+                  // 1. Load from local student recordings vault
+                  try {
+                    if (student?.id) {
+                      const juniorKey = `campus_junior_recordings_${student.id}`;
+                      const stored = localStorage.getItem(juniorKey);
+                      if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (Array.isArray(parsed)) {
+                          parsed.forEach((rec: any, idx: number) => {
+                            if (rec.url && !seenStudentUrls.has(rec.url)) {
+                              seenStudentUrls.add(rec.url);
+                              studentAudios.push({
+                                id: rec.id || `stud-${idx}`,
+                                url: rec.url,
+                                duration: parseInt(rec.duration || '0', 10),
+                                date: rec.date || new Date().toISOString(),
+                                label: rec.title || rec.label || `Eigene Aufnahme #${studentAudios.length + 1}`,
+                                visibility: rec.visibility || 'private',
+                                originalIdx: -1,
+                                source: 'local_junior'
+                              });
                             }
                           });
                         }
                       }
-                    } catch {}
-
-                    const allAudios = combinedList
-                      .filter(item => item.note.startsWith("AUDIO:"))
-                      .map(item => {
-                        const parts = item.note.substring(6).split('|');
-                        return {
-                          url: parts[0],
-                          duration: parseInt(parts[1] || '0', 10),
-                          date: parts[2],
-                          label: parts[3] || 'Aufnahme',
-                          role: parts[4] || 'student',
-                          visibility: (parts[5] || (parts[4] === 'teacher' ? 'shared_with_teacher' : 'private')) as 'private' | 'shared_with_teacher',
-                          originalIdx: item.originalIdx
-                        };
-                      });
-
-                    const studentAudios = allAudios.filter(aud => aud.role === 'student');
-
-                    // If teacher is viewing, only show recordings explicitly shared with teacher
-                    if (isTeacherTools) {
-                      const sharedAudios = studentAudios.filter(aud => aud.visibility === 'shared_with_teacher');
-
-                      if (sharedAudios.length === 0) {
-                        return (
-                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '14px', textAlign: 'center' }}>
-                            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-                              <Lock size={22} />
-                            </div>
-                            <div>
-                              <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#334155', margin: '0 0 4px' }}>Keine freigegebenen Aufnahmen</p>
-                              <p style={{ fontSize: '0.76rem', color: '#64748b', margin: 0, maxWidth: '300px', lineHeight: 1.45 }}>
-                                Der Schüler nutzt diesen Bereich zum ungestörten, privaten Ausprobieren. Sobald er eine Aufnahme für dich freigibt, erscheint sie hier.
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
-                          {sharedAudios.map((aud, idx) => (
-                            <div key={idx} style={{ display: 'flex', justifyContent: 'center' }}>
-                              <RetroCassettePlayer
-                                url={aud.url}
-                                duration={aud.duration}
-                                index={idx}
-                                label={aud.label}
-                                visibility="shared_with_teacher"
-                                isStudentView={false}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      );
                     }
+                  } catch {}
 
-                    // Student View: Show all student audios with privacy toggle and share to playlist button
-                    if (studentAudios.length === 0) {
+                  // 2. Load any role='student' from homework notes
+                  (homeworkNotesList || []).forEach((note, idx) => {
+                    if (typeof note === 'string' && note.includes('AUDIO:')) {
+                      const cleanStr = note.startsWith('[') ? note.replace(/[\[\]"]/g, '') : note;
+                      const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+                      const url = parts[0]?.trim();
+                      if (url && !seenStudentUrls.has(url) && parts[4] === 'student') {
+                        seenStudentUrls.add(url);
+                        studentAudios.push({
+                          id: `hw-${idx}`,
+                          url,
+                          duration: parseInt(parts[1] || '0', 10),
+                          date: parts[2] || new Date().toISOString(),
+                          label: parts[3] || `Eigene Aufnahme #${studentAudios.length + 1}`,
+                          visibility: (parts[5] || 'private') as 'private' | 'shared_with_teacher',
+                          originalIdx: idx,
+                          source: 'homework_note'
+                        });
+                      }
+                    }
+                  });
+
+                  // If teacher is viewing, only show student recordings that are shared
+                  if (isTeacherTools) {
+                    const sharedAudios = studentAudios.filter(aud => aud.visibility === 'shared_with_teacher');
+
+                    if (sharedAudios.length === 0) {
                       return (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '12px', textAlign: 'center' }}>
-                          <Music size={28} style={{ opacity: 0.4, color: '#64748b' }} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '14px', textAlign: 'center' }}>
+                          <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                            <Lock size={22} />
+                          </div>
                           <div>
-                            <p style={{ fontWeight: 700, fontSize: '0.86rem', color: '#64748b', margin: '0 0 2px' }}>Keine eigenen Aufnahmen</p>
-                            <p style={{ fontSize: '0.74rem', margin: 0, opacity: 0.8 }}>Nimm dein Spiel auf, probiere dich aus und teile Meisterwerke in deiner Audio-Biografie!</p>
+                            <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#334155', margin: '0 0 4px' }}>Keine freigegebenen Aufnahmen</p>
+                            <p style={{ fontSize: '0.76rem', color: '#64748b', margin: 0, maxWidth: '300px', lineHeight: 1.45 }}>
+                              Der Schüler nutzt diesen Bereich zum ungestörten, privaten Ausprobieren. Sobald er eine Aufnahme für dich freigibt, erscheint sie hier.
+                            </p>
                           </div>
                         </div>
                       );
@@ -6882,25 +6996,155 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                     return (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
-                        {studentAudios.map((aud, idx) => (
-                          <div key={idx} style={{ display: 'flex', justifyContent: 'center' }}>
-                            <RetroCassettePlayer
-                              url={aud.url}
-                              duration={aud.duration}
-                              index={idx}
-                              label={aud.label}
-                              visibility={aud.visibility}
-                              isStudentView={true}
-                              onToggleVisibility={() => handleToggleAudioVisibility(aud.originalIdx)}
-                              onShareToPlaylist={() => handleOpenShareModal(aud)}
-                              onDelete={readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
-                            />
+                        {sharedAudios.map((aud, idx) => (
+                          <div key={`shared-aud-${idx}`} style={{
+                            background: '#ffffff',
+                            borderRadius: '20px',
+                            padding: '16px',
+                            border: '1.5px solid #e2e8f0',
+                            boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px'
+                          }}>
+                            <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>{aud.label}</span>
+                            <InlineAudioPlayer url={aud.url} label={aud.label} duration={aud.duration} />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.70rem', color: '#16a34a', fontWeight: 800 }}>
+                              <span>🎓 Für Lehrer freigegeben</span>
+                              <span>{aud.duration > 0 ? `${aud.duration} Sek.` : 'Audio'}</span>
+                            </div>
                           </div>
                         ))}
                       </div>
                     );
-                  })()}
-                </div>
+                  }
+
+                  // Student view: show all student audios (without playlist sharing)
+                  if (studentAudios.length === 0) {
+                    return (
+                      <div style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#94a3b8',
+                        padding: '60px 20px',
+                        gap: '14px',
+                        textAlign: 'center',
+                        background: '#ffffff',
+                        borderRadius: '24px',
+                        border: '1.5px dashed #e2e8f0'
+                      }}>
+                        <div style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '50%',
+                          background: '#f5f3ff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#6366f1'
+                        }}>
+                          <Star size={26} />
+                        </div>
+                        <div>
+                          <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>
+                            Noch keine eigenen Aufnahmen
+                          </h4>
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 600, maxWidth: '280px', lineHeight: 1.45 }}>
+                            Nimm dein Üben auf, höre dir selbst zu und sammle deine besten Takes in deinem Übe-Studio!
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
+                      {studentAudios.map((aud, idx) => (
+                        <div key={`stud-rec-${idx}`} style={{
+                          background: '#ffffff',
+                          borderRadius: '20px',
+                          padding: '16px',
+                          border: '1.5px solid #e2e8f0',
+                          boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                              <div style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '8px',
+                                background: '#ede9fe',
+                                color: '#6d28d9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                <Music size={13} strokeWidth={2.4} />
+                              </div>
+                              <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {aud.label}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (aud.source === 'local_junior' && student?.id) {
+                                  try {
+                                    const juniorKey = `campus_junior_recordings_${student.id}`;
+                                    const stored = localStorage.getItem(juniorKey);
+                                    if (stored) {
+                                      const recs = JSON.parse(stored).filter((r: any) => r.url !== aud.url && r.id !== aud.id);
+                                      localStorage.setItem(juniorKey, JSON.stringify(recs));
+                                      setHomeworkNotesList([...homeworkNotesList]);
+                                    }
+                                  } catch {}
+                                } else if (aud.originalIdx >= 0) {
+                                  handleDeleteNote(aud.originalIdx);
+                                }
+                              }}
+                              style={{
+                                border: 'none',
+                                background: '#fee2e2',
+                                color: '#dc2626',
+                                borderRadius: '8px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                fontSize: '0.72rem',
+                                fontWeight: 800
+                              }}
+                              className="hover-scale"
+                              title="Aufnahme löschen"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          <InlineAudioPlayer 
+                            url={aud.url} 
+                            label={aud.label} 
+                            duration={aud.duration}
+                          />
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.70rem', color: '#64748b', fontWeight: 700, paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
+                            <span style={{ color: '#6366f1', fontWeight: 850, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Lock size={11} /> Nur für dich (Privat)
+                            </span>
+                            <span>{aud.duration > 0 ? `${aud.duration} Sek.` : 'Audio'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
 
                 {/* 💽 Share to Audio-Biografie Playlist Modal */}
                 {shareAudioModal && shareAudioModal.isOpen && (
@@ -7275,7 +7519,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             minHeight: '0',
             maxHeight: isMobileView ? 'none' : '100%',
             overflowY: isMobileView ? 'visible' : 'auto',
-            display: isMobileView ? (mobileProtokollTab === 'repertoire' ? 'flex' : 'none') : 'flex',
+            display: (uiLevel === 'junior' && readOnly) ? 'none' : (isMobileView ? (mobileProtokollTab === 'repertoire' ? 'flex' : 'none') : 'flex'),
             flexDirection: 'column',
             justifyContent: 'flex-start',
             gap: '16px',
@@ -10113,58 +10357,60 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </div>{/* close inner scrollable div */}
 
                 {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom (Trophy Dock) */}
-                <div style={{ padding: '8px 16px 14px 16px', display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', background: '#ffffff' }}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveModalTab('logbook')}
-                    style={{
-                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
-                      boxShadow: '0 3px 8px rgba(99, 102, 241, 0.25)',
-                      transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Award size={14} />
-                    <span style={{ whiteSpace: 'nowrap' }}>Deine Meisterwerke</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
-                    style={{
-                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
-                      boxShadow: '0 3px 8px rgba(217, 119, 6, 0.25)',
-                      transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Star size={14} fill="#fff" />
-                    <span style={{ whiteSpace: 'nowrap' }}>Sticker-Album</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('audiobiography'); setActiveSubView('hub'); }}
-                    style={{
-                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
-                      background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
-                      boxShadow: '0 3px 8px rgba(16, 185, 129, 0.25)',
-                      transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Disc size={14} />
-                    <span style={{ whiteSpace: 'nowrap' }}>Audio-Biografie</span>
-                  </button>
-                </div>
+                {!(uiLevel === 'junior' && readOnly) && (
+                  <div style={{ padding: '8px 16px 14px 16px', display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', background: '#ffffff' }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveModalTab('logbook')}
+                      style={{
+                        flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
+                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                        boxShadow: '0 3px 8px rgba(99, 102, 241, 0.25)',
+                        transition: 'all 0.15s ease',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Award size={14} />
+                      <span style={{ whiteSpace: 'nowrap' }}>Deine Meisterwerke</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
+                      style={{
+                        flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                        boxShadow: '0 3px 8px rgba(217, 119, 6, 0.25)',
+                        transition: 'all 0.15s ease',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Star size={14} fill="#fff" />
+                      <span style={{ whiteSpace: 'nowrap' }}>Sticker-Album</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setActiveModalTab('audiobiography'); setActiveSubView('hub'); }}
+                      style={{
+                        flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
+                        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                        boxShadow: '0 3px 8px rgba(16, 185, 129, 0.25)',
+                        transition: 'all 0.15s ease',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Disc size={14} />
+                      <span style={{ whiteSpace: 'nowrap' }}>Audio-Biografie</span>
+                    </button>
+                  </div>
+                )}
               </>
         )}
       </div>
 
-        {useNotebookLayout && !isMobileView && (
+        {useNotebookLayout && !isMobileView && !(uiLevel === 'junior' && readOnly) && (
           <div style={{
             width: '6px',
             background: '#18181b',
@@ -10197,7 +10443,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         {/* COLUMN 3: ✍️ DOKUMENTATION & HAUSAUFGABE (32%) */}
           
           <div style={{
-            flex: isMobileView ? 'none' : '1 1 0%',
+            flex: (uiLevel === 'junior' && readOnly) ? '1 1 100%' : (isMobileView ? 'none' : '1 1 0%'),
+            width: (uiLevel === 'junior' && readOnly) ? '100%' : 'auto',
+            maxWidth: (uiLevel === 'junior' && readOnly) ? '760px' : 'none',
+            margin: (uiLevel === 'junior' && readOnly) ? '0 auto' : '0',
             height: isMobileView ? 'auto' : '100%',
             minHeight: '0',
             maxHeight: isMobileView ? 'none' : '100%',
@@ -10209,7 +10458,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             gap: '20px',
             background: useNotebookLayout ? 'white' : '#f8fafc',
             backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
-            borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
+            borderLeft: (uiLevel === 'junior' && readOnly) ? 'none' : (useNotebookLayout ? 'none' : '1px solid #e4e4e7'),
             borderRadius: '0',
             boxShadow: 'none',
             position: 'relative',
@@ -12432,6 +12681,95 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       )}
                     </div>
                   </div>
+
+                  {/* In Junior mode: Render the 3 Trophy Dock Buttons directly on the right side */}
+                  {(uiLevel === 'junior' && readOnly) && (
+                    <div style={{
+                      display: 'flex',
+                      gap: '12px',
+                      marginTop: '8px',
+                      width: '100%',
+                      flexWrap: 'wrap'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveModalTab('logbook')}
+                        style={{
+                          flex: '1 1 140px',
+                          padding: '12px 14px',
+                          borderRadius: '16px',
+                          border: 'none',
+                          background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                          color: 'white',
+                          fontWeight: 850,
+                          fontSize: '0.84rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 14px rgba(99, 102, 241, 0.25)',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Award size={16} />
+                        <span style={{ whiteSpace: 'nowrap' }}>Deine Meisterwerke</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
+                        style={{
+                          flex: '1 1 140px',
+                          padding: '12px 14px',
+                          borderRadius: '16px',
+                          border: 'none',
+                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                          color: 'white',
+                          fontWeight: 850,
+                          fontSize: '0.84rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 14px rgba(217, 119, 6, 0.25)',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Star size={16} fill="#fff" />
+                        <span style={{ whiteSpace: 'nowrap' }}>Sticker-Album</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => { setActiveModalTab('audiobiography'); setActiveSubView('hub'); }}
+                        style={{
+                          flex: '1 1 140px',
+                          padding: '12px 14px',
+                          borderRadius: '16px',
+                          border: 'none',
+                          background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                          color: 'white',
+                          fontWeight: 850,
+                          fontSize: '0.84rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Disc size={16} />
+                        <span style={{ whiteSpace: 'nowrap' }}>Audio-Biografie</span>
+                      </button>
+                    </div>
+                  )}
 
                   {/* Clean Bottom Spacing */}
                   <div style={{ paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '24px' : '8px' }} />
