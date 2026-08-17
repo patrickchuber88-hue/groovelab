@@ -8195,9 +8195,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         style={{
                           display: 'flex',
                           flexDirection: 'row',
-                          gap: '14px',
+                          gap: '10px',
                           overflowX: 'auto',
-                          paddingBottom: '14px',
+                          paddingBottom: '10px',
                           scrollSnapType: 'x mandatory',
                           WebkitOverflowScrolling: 'touch',
                           scrollbarWidth: 'thin',
@@ -8209,19 +8209,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           onClick={() => setShowCreateSongModal(!showCreateSongModal)}
                           style={{
                             flex: '0 0 auto',
-                            width: activeSongs.length === 0 ? '160px' : '140px',
+                            width: activeSongs.length === 0 ? '135px' : '115px',
                             scrollSnapAlign: 'start',
                             background: 'rgba(248, 250, 252, 0.7)',
-                            borderRadius: '20px',
+                            borderRadius: '16px',
                             border: '2px dashed #cbd5e1',
-                            padding: '14px 10px',
-                            minHeight: '210px',
+                            padding: '10px 8px',
+                            minHeight: '135px',
                             cursor: 'pointer',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '10px',
+                            gap: '8px',
                             textAlign: 'center',
                             transition: 'all 0.2s',
                             boxSizing: 'border-box'
@@ -8229,8 +8229,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           className="hover-scale"
                         >
                           <div style={{
-                            width: '42px',
-                            height: '42px',
+                            width: '36px',
+                            height: '36px',
                             borderRadius: '50%',
                             background: '#ffffff',
                             border: '1.5px solid #e2e8f0',
@@ -8238,13 +8238,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             alignItems: 'center',
                             justifyContent: 'center',
                             color: '#34a853',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                            boxShadow: '0 3px 8px rgba(0,0,0,0.04)'
                           }}>
-                            <Plus size={20} strokeWidth={2.5} />
+                            <Plus size={18} strokeWidth={2.5} />
                           </div>
                           <div>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>Song</div>
-                            <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Neu anlegen</div>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a' }}>Song</div>
+                            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Neu</div>
                           </div>
                         </div>
 
@@ -8261,52 +8261,52 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               onClick={() => selectActiveSong(skill)}
                               style={{
                                 flex: '0 0 auto',
-                                width: '160px',
+                                width: '135px',
                                 scrollSnapAlign: 'start',
                                 background: '#ffffff',
-                                borderRadius: '20px',
+                                borderRadius: '16px',
                                 border: isSelected ? '2px solid #34a853' : '1.5px solid #e8e8ed',
-                                boxShadow: isSelected ? '0 8px 25px rgba(52, 168, 83, 0.18)' : '0 4px 14px rgba(0,0,0,0.03)',
-                                padding: '12px',
+                                boxShadow: isSelected ? '0 6px 18px rgba(52, 168, 83, 0.18)' : '0 2px 8px rgba(0,0,0,0.03)',
+                                padding: '8px 10px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
-                                gap: '10px',
+                                gap: '8px',
                                 position: 'relative',
                                 transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                                 boxSizing: 'border-box'
                               }}
                               className="hover-scale"
                             >
-                              {/* Song Showcase Area: Pastel Sleeve + Peeking Black Vinyl */}
+                              {/* Compact Song Showcase Area: Pastel Sleeve + Peeking Black Vinyl (size: sm) */}
                               <div style={{
                                 width: '100%',
-                                height: '148px',
+                                height: '78px',
                                 background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
-                                borderRadius: '16px',
+                                borderRadius: '12px',
                                 position: 'relative',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 overflow: 'hidden'
                               }}>
-                                {renderSongVinylCover(songColor, 'md')}
+                                {renderSongVinylCover(songColor, 'sm')}
 
                                 {/* Top-Right Pill: % gemeistert */}
                                 <div style={{
                                   position: 'absolute',
-                                  top: '6px',
-                                  right: '6px',
+                                  top: '4px',
+                                  right: '4px',
                                   background: progress >= 100 ? '#34a853' : 'rgba(15, 23, 42, 0.72)',
                                   backdropFilter: 'blur(8px)',
                                   color: '#ffffff',
-                                  fontSize: '0.62rem',
+                                  fontSize: '0.58rem',
                                   fontWeight: 900,
-                                  padding: '2.5px 7.5px',
+                                  padding: '2px 6px',
                                   borderRadius: '100px',
                                   border: '1px solid rgba(255,255,255,0.18)',
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                                   zIndex: 10
                                 }}>
                                   {progress}%
@@ -8322,34 +8322,34 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     }}
                                     style={{
                                       position: 'absolute',
-                                      top: '6px',
-                                      left: '6px',
-                                      background: 'rgba(255, 255, 255, 0.9)',
+                                      top: '4px',
+                                      left: '4px',
+                                      background: 'rgba(255, 255, 255, 0.92)',
                                       border: 'none',
                                       color: '#ef4444',
                                       cursor: 'pointer',
-                                      width: '22px',
-                                      height: '22px',
+                                      width: '18px',
+                                      height: '18px',
                                       borderRadius: '50%',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
+                                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                                       transition: 'all 0.2s',
                                       zIndex: 10
                                     }}
                                     title="Song entfernen"
                                   >
-                                    <X size={12} strokeWidth={2.5} />
+                                    <X size={10} strokeWidth={2.5} />
                                   </button>
                                 )}
                               </div>
 
                               {/* Card Info Below */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <h4 style={{
                                   margin: 0,
-                                  fontSize: '0.85rem',
+                                  fontSize: '0.78rem',
                                   fontWeight: 900,
                                   color: '#0f172a',
                                   whiteSpace: 'nowrap',
@@ -8360,15 +8360,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   {songTitle}
                                 </h4>
 
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
-                                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90px' }}>{songArtist}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.64rem', color: '#64748b', fontWeight: 700 }}>
+                                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '75px' }}>{songArtist}</span>
                                   <span style={{ color: skill.songs?.teacher_id || skill.created_by_teacher ? '#16a34a' : '#d97706', fontWeight: 800 }}>
                                     {skill.songs?.teacher_id || skill.created_by_teacher ? '🎓 Lehrer' : '⭐ Wunsch'}
                                   </span>
                                 </div>
 
                                 {/* Subtle Progress Bar */}
-                                <div style={{ width: '100%', height: '4px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden', marginTop: '3px' }}>
+                                <div style={{ width: '100%', height: '3px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
                                   <div style={{
                                     width: `${progress}%`,
                                     height: '100%',
@@ -8731,51 +8731,51 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 )}
                 </div>{/* close inner scrollable div */}
 
-                {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom */}
-                <div style={{ padding: '12px 20px 24px 20px', display: 'flex', gap: '10px' }}>
+                {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom (Trophy Dock) */}
+                <div style={{ padding: '8px 16px 14px 16px', display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', background: '#ffffff' }}>
                   <button
                     type="button"
                     onClick={() => setActiveModalTab('logbook')}
                     style={{
-                      flex: 1, padding: '13px 8px', borderRadius: '14px', border: 'none',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(99, 102, 241, 0.2)',
+                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                      boxShadow: '0 3px 8px rgba(99, 102, 241, 0.25)',
                       transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
                     }}
                     className="hover-scale"
                   >
-                    <Award size={15} />
+                    <Award size={14} />
                     <span style={{ whiteSpace: 'nowrap' }}>Deine Meisterwerke</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
                     style={{
-                      flex: 1, padding: '13px 8px', borderRadius: '14px', border: 'none',
-                      background: '#d97706', color: 'white', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(217, 119, 6, 0.2)',
+                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                      boxShadow: '0 3px 8px rgba(217, 119, 6, 0.25)',
                       transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
                     }}
                     className="hover-scale"
                   >
-                    <Star size={15} fill="#fff" />
+                    <Star size={14} fill="#fff" />
                     <span style={{ whiteSpace: 'nowrap' }}>Sticker-Album</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => { setActiveModalTab('audiobiography'); setActiveSubView('hub'); }}
                     style={{
-                      flex: 1, padding: '13px 8px', borderRadius: '14px', border: 'none',
-                      background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: 'white', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(16, 185, 129, 0.25)',
+                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
+                      background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                      boxShadow: '0 3px 8px rgba(16, 185, 129, 0.25)',
                       transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
                     }}
                     className="hover-scale"
                   >
-                    <Disc size={15} />
+                    <Disc size={14} />
                     <span style={{ whiteSpace: 'nowrap' }}>Audio-Biografie</span>
                   </button>
                 </div>
@@ -13540,241 +13540,172 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
     if (audioRef.current) audioRef.current.playbackRate = playbackRate;
   }, [playbackRate]);
 
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  // 18 dynamic waveform bar heights for modern voice-note look
+  const waveformHeights = [40, 65, 30, 85, 55, 95, 70, 45, 80, 100, 60, 90, 75, 40, 85, 50, 70, 35];
+  const progressRatio = duration > 0 ? currentTime / duration : 0;
+
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #2c2a29 0%, #1a1817 100%)',
-      borderRadius: '16px',
-      padding: '16px',
+      background: '#ffffff',
+      borderRadius: '14px',
+      border: '1.5px solid #e2e8f0',
+      padding: '8px 12px',
       width: '100%',
-      maxWidth: '360px',
-      border: '4px solid #0f0e0d',
-      boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+      maxWidth: '380px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
       display: 'flex',
-      flexDirection: 'column',
-      gap: '12px',
-      fontFamily: 'monospace',
-      color: '#fff',
-      alignSelf: 'center',
-      position: 'relative',
-      userSelect: 'none'
+      alignItems: 'center',
+      gap: '10px',
+      boxSizing: 'border-box',
+      position: 'relative'
     }}>
       <audio ref={audioRef} src={resolvedUrl} />
-      
-      {/* 4 Screws in corners */}
-      <div style={{ position: 'absolute', top: '4px', left: '4px', width: '3px', height: '3px', borderRadius: '50%', background: '#64748b', opacity: 0.8 }} />
-      <div style={{ position: 'absolute', top: '4px', right: '4px', width: '3px', height: '3px', borderRadius: '50%', background: '#64748b', opacity: 0.8 }} />
-      <div style={{ position: 'absolute', bottom: '4px', left: '4px', width: '3px', height: '3px', borderRadius: '50%', background: '#64748b', opacity: 0.8 }} />
-      <div style={{ position: 'absolute', bottom: '4px', right: '4px', width: '3px', height: '3px', borderRadius: '50%', background: '#64748b', opacity: 0.8 }} />
 
-      {/* Cassette Top Notch/Details */}
-      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', gap: '10px', marginTop: '1px' }}>
-        <div style={{ width: '8px', height: '2px', background: '#334155', borderRadius: '0.5px' }} />
-        <div style={{ width: '18px', height: '2px', background: '#334155', borderRadius: '0.5px' }} />
-        <div style={{ width: '8px', height: '2px', background: '#334155', borderRadius: '0.5px' }} />
-      </div>
-
-      {/* Sticker Label Area */}
-      <div style={{
-        background: 'linear-gradient(to bottom, #dbeafe 0%, #eff6ff 100%)',
-        border: '2px solid #000',
-        borderRadius: '6px',
-        padding: '8px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-        position: 'relative'
-      }}>
-        <div style={{ height: '3px', background: '#ef4444', width: '100%' }} />
-        
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: '#1e3a8a', fontWeight: 900 }}>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>
-            {label.toUpperCase()}
-          </span>
-          <span>{Math.round(currentTime)}s / {duration || '0'}s</span>
-        </div>
-
-        {/* Interactive Seek Range Slider */}
-        <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '6px', margin: '2px 0' }}>
-          <input
-            type="range"
-            min={0}
-            max={duration || 100}
-            step={0.1}
-            value={currentTime}
-            onChange={(e) => {
-              const newTime = parseFloat(e.target.value);
-              setCurrentTime(newTime);
-              if (audioRef.current) {
-                audioRef.current.currentTime = newTime;
-              }
-            }}
-            style={{
-              width: '100%',
-              accentColor: '#ef4444',
-              cursor: 'pointer',
-              height: '14px'
-            }}
-          />
-        </div>
-
-        <div style={{
-          background: '#000',
-          borderRadius: '4px',
-          height: '28px',
-          margin: '4px 0',
+      {/* Play / Pause Circular Button */}
+      <button
+        type="button"
+        onClick={(e) => togglePlay(e)}
+        style={{
+          width: '36px',
+          height: '36px',
+          borderRadius: '50%',
+          background: isPlaying ? '#22c55e' : '#34a853',
+          color: '#ffffff',
+          border: 'none',
+          cursor: 'pointer',
           display: 'flex',
-          justifyContent: 'space-around',
           alignItems: 'center',
-          padding: '0 20px',
-          position: 'relative'
-        }}>
-          <div 
-            className={isPlaying ? 'spinning' : ''}
-            style={{
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              background: '#94a3b8',
-              border: '3px dashed #334155',
-              animation: isPlaying ? 'spin 4s linear infinite' : 'none'
-            }} 
-          />
-          <div 
-            className={isPlaying ? 'spinning' : ''}
-            style={{
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              background: '#94a3b8',
-              border: '3px dashed #334155',
-              animation: isPlaying ? 'spin 4s linear infinite' : 'none'
-            }} 
-          />
+          justifyContent: 'center',
+          flexShrink: 0,
+          boxShadow: isPlaying ? '0 0 12px rgba(34, 197, 94, 0.4)' : '0 2px 6px rgba(52, 168, 83, 0.25)',
+          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}
+        className="hover-scale"
+        title={isPlaying ? 'Pause' : 'Abspielen'}
+      >
+        {isPlaying ? (
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+            <rect x="6" y="5" width="4" height="14" rx="1.5" />
+            <rect x="14" y="5" width="4" height="14" rx="1.5" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ marginLeft: '2px' }}>
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
+      </button>
+
+      {/* Center Waveform & Metadata */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+          <span style={{
+            fontSize: '0.74rem',
+            fontWeight: 800,
+            color: '#0f172a',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '160px'
+          }}>
+            {label || 'Sprachnotiz'}
+          </span>
+          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
+        </div>
+
+        {/* Interactive Soundwave Bar Track */}
+        <div 
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
+            const newTime = newRatio * (duration || 0);
+            setCurrentTime(newTime);
+            if (audioRef.current) audioRef.current.currentTime = newTime;
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2.5px',
+            height: '18px',
+            cursor: 'pointer',
+            padding: '2px 0'
+          }}
+          title="Klicken zum Spulen"
+        >
+          {waveformHeights.map((h, i) => {
+            const barRatio = i / waveformHeights.length;
+            const isFilled = barRatio <= progressRatio;
+            return (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  height: `${h}%`,
+                  minHeight: '3px',
+                  borderRadius: '2px',
+                  background: isFilled 
+                    ? (isPlaying ? '#22c55e' : '#34a853') 
+                    : '#e2e8f0',
+                  transition: 'background 0.1s ease, height 0.15s ease'
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 
-      {/* Control Buttons */}
-      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+      {/* Speed Button (1x / 0.8x / 0.6x) */}
+      <button
+        type="button"
+        onClick={() => setPlaybackRate(prev => prev === 1 ? 0.8 : (prev === 0.8 ? 0.6 : 1))}
+        style={{
+          background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
+          border: playbackRate !== 1 ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
+          color: playbackRate !== 1 ? '#2563eb' : '#64748b',
+          borderRadius: '6px',
+          padding: '3px 6px',
+          fontSize: '0.66rem',
+          fontWeight: 800,
+          cursor: 'pointer',
+          flexShrink: 0
+        }}
+        title="Tempo anpassen"
+      >
+        {playbackRate}x
+      </button>
+
+      {/* Delete Icon Button */}
+      {onDelete && (
         <button
           type="button"
-          onClick={() => togglePlay()}
+          onClick={onDelete}
           style={{
-            background: '#d97706',
-            color: '#fff',
+            background: 'transparent',
             border: 'none',
-            borderRadius: '8px',
-            padding: '8px 16px',
-            fontSize: '0.72rem',
-            fontWeight: 800,
+            color: '#94a3b8',
             cursor: 'pointer',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            padding: '4px',
+            borderRadius: '6px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '4px'
+            flexShrink: 0,
+            transition: 'all 0.15s'
           }}
+          className="hover-scale"
+          title="Aufnahme löschen"
         >
-          {isPlaying ? (
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-              <rect x="5" y="5" width="4" height="14" rx="1" />
-              <rect x="15" y="5" width="4" height="14" rx="1" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-          )}
-          <span>{isPlaying ? 'PAUSE' : 'PLAY'}</span>
+          <Trash2 size={13} style={{ color: '#ef4444' }} />
         </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current.currentTime = 0;
-              setIsPlaying(false);
-              setCurrentTime(0);
-            }
-          }}
-          style={{
-            background: '#475569',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '8px 16px',
-            fontSize: '0.72rem',
-            fontWeight: 800,
-            cursor: 'pointer',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px'
-          }}
-        >
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-            <rect x="5" y="5" width="14" height="14" rx="1.5"/>
-          </svg>
-          <span>STOP</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setPlaybackRate(prev => prev === 1 ? 0.8 : (prev === 0.8 ? 0.6 : 1))}
-          title="Wiedergabegeschwindigkeit verlangsamen zum Üben"
-          style={{
-            background: playbackRate !== 1 ? '#2563eb' : '#475569',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '8px 10px',
-            fontSize: '0.70rem',
-            fontWeight: 800,
-            cursor: 'pointer',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <span>{playbackRate}x</span>
-        </button>
-
-        {onDelete && (
-          <button
-            type="button"
-            onClick={onDelete}
-            style={{
-              background: '#ef4444',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '8px 16px',
-              fontSize: '0.72rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px'
-            }}
-          >
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>
-            </svg>
-            <span>LÖSCHEN</span>
-          </button>
-        )}
-      </div>
-
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}} />
+      )}
     </div>
   );
 };
