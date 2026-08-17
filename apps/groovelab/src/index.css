@@ -2215,8 +2215,27 @@ div[style*="overflow"]::-webkit-scrollbar, div[style*="maxHeight"]::-webkit-scro
   margin-top: 6px !important;
   gap: 8px !important;
 }
+.custom-horizontal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
 
+.custom-horizontal-scrollbar::-webkit-scrollbar {
+  height: 6px;
+}
 
+.custom-horizontal-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
 
+.custom-horizontal-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.custom-horizontal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
 
 

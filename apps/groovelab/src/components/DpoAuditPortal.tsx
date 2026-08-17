@@ -28,8 +28,8 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
   const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
   const [showAvvModal, setShowAvvModal] = useState<boolean>(false);
 
-  // Sanitize school name to fix typos like "Musäk"
-  const cleanSchoolName = schoolName.replace(/Musäk/g, 'Musik');
+  // Real school name
+  const cleanSchoolName = schoolName || 'Musäk Bad Säckingen';
 
   // Helper to format timestamps strictly in German Local Time (Europe/Berlin CEST/MESZ)
   const formatGermanTime = (dateObj: Date = new Date()) => {

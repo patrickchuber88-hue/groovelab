@@ -179,9 +179,11 @@ export function ScheduleCalendarViewDesktop({
     return d.getHours() * 60 + d.getMinutes();
   });
 
-  const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-  const isGroovelab = localStorage.getItem('groovelab_active_platform') === 'groovelab';
-  const isAdminView = currentUserRole === 'admin' || currentUserRole === 'secretary';
+  const activePlatformStored = typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_active_platform') || 'campus') : 'campus';
+  const isGroovelab = activePlatformStored === 'groovelab';
+  const isCampus = !isGroovelab;
+  const isTeacher = currentUserRole === 'teacher' || (!currentUserRole && typeof localStorage !== 'undefined' && localStorage.getItem('user_role') === 'teacher');
+  const isAdminView = (currentUserRole === 'admin' || currentUserRole === 'secretary') && !isTeacher && activePlatformStored !== 'campus';
 
   let brandColor = '#34a853'; // Campus Green
   let lightBg = 'rgba(52, 168, 83, 0.06)';
@@ -4584,13 +4586,13 @@ export function ScheduleCalendarViewDesktop({
                 ) : (
                   <span style={{ 
                     fontSize: '0.72rem', 
-                    color: '#ea4335', 
+                    color: isCampus ? '#2e7d32' : (isGroovelab ? '#b45309' : '#ea4335'), 
                     fontWeight: 600, 
-                    background: '#fce8e6', 
+                    background: isCampus ? '#e6f4ea' : (isGroovelab ? '#fefce8' : '#fce8e6'), 
                     padding: '4px 10px', 
                     borderRadius: '6px', 
                     display: 'inline-flex', 
-                    alignItems: 'center',
+                    alignItems: 'center', 
                     minHeight: '28px'
                   }}>
                     Stundenplan noch nicht eingereicht & freigegeben
@@ -4651,7 +4653,7 @@ export function ScheduleCalendarViewDesktop({
                 type="button"
                 onClick={() => toggleRealNames()}
                 className={`apple-btn ${showRealNames ? 'active' : ''}`}
-                style={{ color: showRealNames ? '#ea4335' : undefined }}
+                style={{ color: showRealNames ? brandColor : undefined }}
                 title={showRealNames ? "Namen sind geschützt (Nachnamen gekürzt) – klicken zum Anzeigen" : "Vollständige Namen werden angezeigt – klicken zum Schützen"}
               >
                 {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -4696,7 +4698,7 @@ export function ScheduleCalendarViewDesktop({
               <button
                 onClick={handleResetWeek}
                 className="apple-btn"
-                style={{ color: '#ef4444' }}
+                style={{ color: '#64748b' }}
                 title="Alle ungespeicherten Änderungen in dieser Woche verwerfen"
               >
                 <Trash2 size={13} />
@@ -5370,12 +5372,12 @@ export function ScheduleCalendarViewDesktop({
                         right: '-4px',
                         top: `${redTopPx}px`,
                         height: '2px',
-                        background: '#ea4335',
+                        background: brandColor,
                         zIndex: 25,
                         pointerEvents: 'none',
                         display: 'flex',
                         alignItems: 'center',
-                        boxShadow: '0 0 8px rgba(234, 67, 53, 0.6)'
+                        boxShadow: `0 0 8px ${brandColor}99`
                       }}
                     >
                       <div
@@ -5383,9 +5385,9 @@ export function ScheduleCalendarViewDesktop({
                           width: '10px',
                           height: '10px',
                           borderRadius: '50%',
-                          background: '#ea4335',
+                          background: brandColor,
                           marginLeft: '-4px',
-                          boxShadow: '0 0 6px rgba(234, 67, 53, 0.8)'
+                          boxShadow: `0 0 6px ${brandColor}`
                         }}
                       />
                     </div>

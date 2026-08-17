@@ -250,9 +250,11 @@ export function ScheduleCalendarView({
     return d.getHours() * 60 + d.getMinutes();
   });
 
-  const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-  const isGroovelab = localStorage.getItem('groovelab_active_platform') === 'groovelab';
-  const isAdminView = currentUserRole === 'admin' || currentUserRole === 'secretary';
+  const activePlatformStored = typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_active_platform') || 'campus') : 'campus';
+  const isGroovelab = activePlatformStored === 'groovelab';
+  const isCampus = !isGroovelab;
+  const isTeacher = currentUserRole === 'teacher' || (!currentUserRole && typeof localStorage !== 'undefined' && localStorage.getItem('user_role') === 'teacher');
+  const isAdminView = (currentUserRole === 'admin' || currentUserRole === 'secretary') && !isTeacher && activePlatformStored !== 'campus';
 
   let brandColor = '#34a853'; // Campus Green
   let lightBg = 'rgba(52, 168, 83, 0.06)';
@@ -4558,9 +4560,9 @@ export function ScheduleCalendarView({
                 ) : (
                   <span style={{ 
                     fontSize: '0.72rem', 
-                    color: '#ea4335', 
+                    color: isCampus ? '#2e7d32' : (isGroovelab ? '#b45309' : '#ea4335'), 
                     fontWeight: 600, 
-                    background: '#fce8e6', 
+                    background: isCampus ? '#e6f4ea' : (isGroovelab ? '#fefce8' : '#fce8e6'), 
                     padding: '4px 10px', 
                     borderRadius: '6px', 
                     display: 'inline-flex', 
@@ -4625,7 +4627,7 @@ export function ScheduleCalendarView({
                 type="button"
                 onClick={() => toggleRealNames()}
                 className={`apple-btn ${showRealNames ? 'active' : ''}`}
-                style={{ color: showRealNames ? '#ea4335' : undefined }}
+                style={{ color: showRealNames ? brandColor : undefined }}
                 title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
               >
                 {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
@@ -5412,12 +5414,12 @@ export function ScheduleCalendarView({
                         right: '-4px',
                         top: `${redTopPx}px`,
                         height: '2px',
-                        background: '#ea4335',
+                        background: brandColor,
                         zIndex: 25,
                         pointerEvents: 'none',
                         display: 'flex',
                         alignItems: 'center',
-                        boxShadow: '0 0 8px rgba(234, 67, 53, 0.6)'
+                        boxShadow: `0 0 8px ${brandColor}99`
                       }}
                     >
                       <div
@@ -5425,9 +5427,9 @@ export function ScheduleCalendarView({
                           width: '10px',
                           height: '10px',
                           borderRadius: '50%',
-                          background: '#ea4335',
+                          background: brandColor,
                           marginLeft: '-4px',
-                          boxShadow: '0 0 6px rgba(234, 67, 53, 0.8)'
+                          boxShadow: `0 0 6px ${brandColor}`
                         }}
                       />
                     </div>
@@ -8768,7 +8770,7 @@ return (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button
                 onClick={() => { toggleRealNames(); setShowMobileToolsSheet(false); }}
-                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', background: showRealNames ? '#fef2f2' : '#f8fafc', color: showRealNames ? '#ea4335' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', background: showRealNames ? (isCampus ? '#e6f4ea' : (isGroovelab ? '#fefce8' : '#fef2f2')) : '#f8fafc', color: showRealNames ? brandColor : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
               >
                 {showRealNames ? <Eye size={16} /> : <EyeOff size={16} />}
                 <span>{showRealNames ? 'Vorname N.' : 'Klarnamen'}</span>

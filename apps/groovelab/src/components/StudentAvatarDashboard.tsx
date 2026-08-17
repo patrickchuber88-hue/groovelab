@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, School, Calendar, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
-  Mic, Disc, Trash2
+  Mic, Disc, Trash2, Download
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -347,12 +348,178 @@ const getSongColor = (title: string) => {
   const clampedCode = Math.max(65, Math.min(90, charCode));
   const hue = Math.round(((clampedCode - 65) / 25) * 360);
   return {
-    from: `hsl(${hue}, 85%, 94%)`,
-    to: `hsl(${hue}, 80%, 84%)`,
+    from: `hsl(${hue}, 85%, 92%)`,
+    to: `hsl(${hue}, 80%, 82%)`,
     text: `hsl(${hue}, 90%, 25%)`,
     shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
     shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
   };
+};
+
+const renderSongVinylCover = (songColor: { from: string; to: string; text?: string }, size: 'sm' | 'md' | 'lg' = 'md') => {
+  const isSm = size === 'sm';
+  const isLg = size === 'lg';
+  const sleeveSize = isSm ? 54 : isLg ? 102 : 94;
+  const vinylSize = isSm ? 48 : isLg ? 92 : 84;
+  const borderRadius = isSm ? 14 : isLg ? 25 : 23;
+  const noteWidth = isSm ? 30 : isLg ? 52 : 46;
+  const noteHeight = isSm ? 30 : isLg ? 52 : 46;
+  const vinylRight = isSm ? -7 : isLg ? -13 : -11;
+
+  const gradId = `studentFineGrad_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+  const highId = `studentFineHigh_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+  const headHigh1 = `studentHead1_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+  const headHigh2 = `studentHead2_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+
+  return (
+    <div style={{
+      position: 'relative',
+      width: `${sleeveSize + (isSm ? 8 : 12)}px`,
+      height: `${sleeveSize}px`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      marginLeft: isSm ? '-3px' : '-5px',
+      flexShrink: 0
+    }}>
+      {/* 1. Sleek Black Vinyl Disc with Ultra-Fine Grooves */}
+      <div style={{
+        position: 'absolute',
+        right: `${vinylRight}px`,
+        width: `${vinylSize}px`,
+        height: `${vinylSize}px`,
+        borderRadius: '50%',
+        boxShadow: '3px 5px 15px rgba(0, 0, 0, 0.32)',
+        zIndex: 1,
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <svg width={vinylSize} height={vinylSize} viewBox="0 0 100 100" fill="none">
+          <defs>
+            <radialGradient id={`discBase_${gradId}`} cx="50" cy="50" r="50" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#2c2c30" />
+              <stop offset="25%" stopColor="#141416" />
+              <stop offset="60%" stopColor="#08080a" />
+              <stop offset="90%" stopColor="#18181b" />
+              <stop offset="100%" stopColor="#050506" />
+            </radialGradient>
+            {/* Anisotropic Light Reflection Beams */}
+            <linearGradient id={`discSheen1_${gradId}`} x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.22)" />
+              <stop offset="35%" stopColor="rgba(255, 255, 255, 0)" />
+              <stop offset="65%" stopColor="rgba(255, 255, 255, 0)" />
+              <stop offset="100%" stopColor="rgba(255, 255, 255, 0.18)" />
+            </linearGradient>
+            <linearGradient id={`discSheen2_${gradId}`} x1="100" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.15)" />
+              <stop offset="40%" stopColor="rgba(255, 255, 255, 0)" />
+              <stop offset="60%" stopColor="rgba(255, 255, 255, 0)" />
+              <stop offset="100%" stopColor="rgba(255, 255, 255, 0.12)" />
+            </linearGradient>
+          </defs>
+          {/* Disc Body */}
+          <circle cx="50" cy="50" r="49.5" fill={`url(#discBase_${gradId})`} />
+          <circle cx="50" cy="50" r="49.5" fill={`url(#discSheen1_${gradId})`} />
+          <circle cx="50" cy="50" r="49.5" fill={`url(#discSheen2_${gradId})`} />
+          
+          {/* Distinct, Crisp Concentric Vinyl Grooves */}
+          <circle cx="50" cy="50" r="46.5" stroke="rgba(255,255,255,0.32)" strokeWidth="0.85" />
+          <circle cx="50" cy="50" r="44" stroke="rgba(0,0,0,0.65)" strokeWidth="0.85" />
+          <circle cx="50" cy="50" r="41.5" stroke="rgba(255,255,255,0.26)" strokeWidth="0.85" />
+          <circle cx="50" cy="50" r="39" stroke="rgba(0,0,0,0.6)" strokeWidth="0.85" />
+          <circle cx="50" cy="50" r="36.5" stroke="rgba(255,255,255,0.28)" strokeWidth="0.85" />
+          <circle cx="50" cy="50" r="34" stroke="rgba(0,0,0,0.6)" strokeWidth="0.85" />
+          <circle cx="50" cy="50" r="31.5" stroke="rgba(255,255,255,0.22)" strokeWidth="0.85" />
+          <circle cx="50" cy="50" r="29" stroke="rgba(0,0,0,0.6)" strokeWidth="0.85" />
+          <circle cx="50" cy="50" r="26.5" stroke="rgba(255,255,255,0.18)" strokeWidth="0.85" />
+          <circle cx="50" cy="50" r="24" stroke="rgba(0,0,0,0.5)" strokeWidth="0.85" />
+          <circle cx="50" cy="50" r="21.5" stroke="rgba(255,255,255,0.16)" strokeWidth="0.85" />
+          
+          {/* Outer Rim Light Edge */}
+          <circle cx="50" cy="50" r="49" stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
+        </svg>
+      </div>
+
+      {/* 2. Soft Pastel Rounded Square Sleeve */}
+      <div style={{
+        width: `${sleeveSize}px`,
+        height: `${sleeveSize}px`,
+        background: `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`,
+        borderRadius: `${borderRadius}px`,
+        boxShadow: '0 11px 24px -4px rgba(0, 0, 0, 0.1), 0 3px 7px -2px rgba(0, 0, 0, 0.05), inset 0 1.5px 2px rgba(255, 255, 255, 0.9)',
+        border: '1.5px solid rgba(255, 255, 255, 0.8)',
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2,
+        boxSizing: 'border-box'
+      }}>
+        {/* 3. 10% Feiner 3D Double Music Note (Sleek, Glossy, Precision Engineered) */}
+        <svg 
+          width={noteWidth} 
+          height={noteHeight} 
+          viewBox="0 0 100 100" 
+          fill="none" 
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ filter: 'drop-shadow(0 4.5px 7px rgba(0, 0, 0, 0.25)) drop-shadow(0 1.5px 2.5px rgba(0, 0, 0, 0.14))' }}
+        >
+          <defs>
+            {/* Main 3D Dark Graphite Body */}
+            <linearGradient id={gradId} x1="25" y1="15" x2="75" y2="85" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#2c2c30" />
+              <stop offset="35%" stopColor="#18181b" />
+              <stop offset="75%" stopColor="#0f0f12" />
+              <stop offset="100%" stopColor="#08080a" />
+            </linearGradient>
+            
+            {/* Head 1 Specular Glow */}
+            <radialGradient id={headHigh1} cx="34" cy="67" r="12" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.45)" />
+              <stop offset="45%" stopColor="rgba(255, 255, 255, 0.08)" />
+              <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
+            </radialGradient>
+
+            {/* Head 2 Specular Glow */}
+            <radialGradient id={headHigh2} cx="67" cy="58" r="12" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.45)" />
+              <stop offset="45%" stopColor="rgba(255, 255, 255, 0.08)" />
+              <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
+            </radialGradient>
+
+            {/* Top Beam Highlight Line */}
+            <linearGradient id={highId} x1="39" y1="21" x2="78" y2="13" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.72)" />
+              <stop offset="60%" stopColor="rgba(255, 255, 255, 0.26)" />
+              <stop offset="100%" stopColor="rgba(255, 255, 255, 0.05)" />
+            </linearGradient>
+          </defs>
+
+          {/* Left Note Head (10% feineres 3D-Oval) */}
+          <ellipse cx="36" cy="68.5" rx="11.8" ry="8.8" transform="rotate(-19 36 68.5)" fill={`url(#${gradId})`} />
+          <ellipse cx="36" cy="68.5" rx="11.8" ry="8.8" transform="rotate(-19 36 68.5)" fill={`url(#${headHigh1})`} />
+
+          {/* Right Note Head (10% feineres 3D-Oval) */}
+          <ellipse cx="68" cy="59.5" rx="11.8" ry="8.8" transform="rotate(-19 68 59.5)" fill={`url(#${gradId})`} />
+          <ellipse cx="68" cy="59.5" rx="11.8" ry="8.8" transform="rotate(-19 68 59.5)" fill={`url(#${headHigh2})`} />
+
+          {/* Left Stem (5.8px Schlanker Stab) */}
+          <rect x="42" y="25" width="5.8" height="44" rx="2.9" fill={`url(#${gradId})`} />
+
+          {/* Right Stem (5.8px Schlanker Stab) */}
+          <rect x="74.2" y="16" width="5.8" height="44" rx="2.9" fill={`url(#${gradId})`} />
+
+          {/* Top Beam (10% feinerer Verbindungsbalken) */}
+          <path d="M 42 26 C 42 22 45 21 48.5 20.2 L 75.5 13.5 C 78.5 12.8 81.5 14.2 81.5 17.5 L 81.5 24.5 C 81.5 27.5 78.5 28.5 75.5 29.2 L 48.5 35.8 C 45 36.5 42 35.2 42 32 Z" fill={`url(#${gradId})`} />
+
+          {/* Top Beam Specular Light Edge */}
+          <path d="M 44.5 23 L 78.5 14.8" stroke={`url(#${highId})`} strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      </div>
+    </div>
+  );
 };
 
 
@@ -4046,12 +4213,79 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const juniorAudioChunksRef = useRef<Blob[]>([]);
   const juniorAudioStreamRef = useRef<MediaStream | null>(null);
   const juniorRecordTimerRef = useRef<any>(null);
+  const juniorCdIntervalRef = useRef<any>(null);
   const [juniorActivePlayingAudioId, setJuniorActivePlayingAudioId] = useState<string | null>(null);
   const juniorAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Local Junior Audio Vault State (Resilient Offline + Online)
+  const [juniorLocalRecordings, setJuniorLocalRecordings] = useState<any[]>(() => {
+    try {
+      const activeId = studentId || 'current';
+      const stored = localStorage.getItem(`campus_junior_recordings_${activeId}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (!studentId) return;
+    try {
+      const localKey = `campus_junior_recordings_${studentId}`;
+      const stored = localStorage.getItem(localKey);
+      if (stored) {
+        setJuniorLocalRecordings(JSON.parse(stored));
+      }
+    } catch {}
+  }, [studentId]);
+
+  // High-End Studio Preview Player State
+  const [juniorPreviewPlaying, setJuniorPreviewPlaying] = useState(false);
+  const [juniorPreviewCurrentTime, setJuniorPreviewCurrentTime] = useState(0);
+  const [juniorPreviewDuration, setJuniorPreviewDuration] = useState(0);
+  const juniorPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlayJuniorPreview = () => {
+    if (!juniorRecordedUrl) return;
+    if (!juniorPreviewAudioRef.current || juniorPreviewAudioRef.current.src !== juniorRecordedUrl) {
+      if (juniorPreviewAudioRef.current) {
+        juniorPreviewAudioRef.current.pause();
+      }
+      const audio = new Audio(juniorRecordedUrl);
+      juniorPreviewAudioRef.current = audio;
+      audio.onloadedmetadata = () => {
+        setJuniorPreviewDuration(audio.duration || juniorRecordDuration || 1);
+      };
+      audio.ontimeupdate = () => {
+        setJuniorPreviewCurrentTime(audio.currentTime);
+      };
+      audio.onended = () => {
+        setJuniorPreviewPlaying(false);
+        setJuniorPreviewCurrentTime(0);
+      };
+    }
+
+    if (juniorPreviewPlaying) {
+      juniorPreviewAudioRef.current.pause();
+      setJuniorPreviewPlaying(false);
+    } else {
+      juniorPreviewAudioRef.current.play().then(() => {
+        setJuniorPreviewPlaying(true);
+      }).catch(e => console.warn('Preview play error:', e));
+    }
+  };
 
   // Clean Audio Stream on Unmount
   useEffect(() => {
     return () => {
+      if (juniorPreviewAudioRef.current) {
+        juniorPreviewAudioRef.current.pause();
+        juniorPreviewAudioRef.current = null;
+      }
+      if (juniorCdIntervalRef.current) {
+        clearInterval(juniorCdIntervalRef.current);
+        juniorCdIntervalRef.current = null;
+      }
       if (juniorAudioStreamRef.current) {
         juniorAudioStreamRef.current.getTracks().forEach(t => t.stop());
         juniorAudioStreamRef.current = null;
@@ -4062,69 +4296,122 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
       if (juniorRecordTimerRef.current) {
         clearInterval(juniorRecordTimerRef.current);
+        juniorRecordTimerRef.current = null;
       }
     };
   }, []);
 
-  const startJuniorRecordingFlow = () => {
+  // 🎙️ 1. Permission-First + Cross-Browser Recording Initialization
+  const startJuniorRecordingFlow = async () => {
+    if (juniorPreviewAudioRef.current) {
+      juniorPreviewAudioRef.current.pause();
+      juniorPreviewAudioRef.current = null;
+    }
+    setJuniorPreviewPlaying(false);
+    setJuniorPreviewCurrentTime(0);
+
+    // Reset state and clear previous countdowns
+    if (juniorCdIntervalRef.current) {
+      clearInterval(juniorCdIntervalRef.current);
+      juniorCdIntervalRef.current = null;
+    }
+    if (juniorRecordTimerRef.current) {
+      clearInterval(juniorRecordTimerRef.current);
+      juniorRecordTimerRef.current = null;
+    }
     setJuniorRecordedBlob(null);
     setJuniorRecordedUrl(null);
     setJuniorRecordDuration(0);
-    setJuniorCountdown(3);
-    
-    let c = 3;
-    const cdInterval = setInterval(() => {
-      c -= 1;
-      if (c <= 0) {
-        clearInterval(cdInterval);
-        setJuniorCountdown(null);
-        startJuniorActualRecording();
-      } else {
-        setJuniorCountdown(c);
-      }
-    }, 1000);
-  };
+    setJuniorCountdown(null);
 
-  const startJuniorActualRecording = async () => {
+    // 1. Request microphone permission FIRST before starting any visual countdown
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        } 
+      });
       juniorAudioStreamRef.current = stream;
       juniorAudioChunksRef.current = [];
 
-      const recorder = new MediaRecorder(stream);
+      // Detect supported cross-browser MIME type (Safari/iOS vs Chrome/Firefox)
+      let mimeType = '';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+          mimeType = 'audio/aac';
+        }
+      }
+
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       juniorMediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
+        if (e.data && e.data.size > 0) {
           juniorAudioChunksRef.current.push(e.data);
         }
       };
 
       recorder.onstop = () => {
-        const audioBlob = new Blob(juniorAudioChunksRef.current, { type: 'audio/webm' });
+        const type = recorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(juniorAudioChunksRef.current, { type });
         setJuniorRecordedBlob(audioBlob);
         const url = URL.createObjectURL(audioBlob);
         setJuniorRecordedUrl(url);
+        const defaultTitle = `${studentInstrumentName || 'Mein'}-Hit • ${new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}`;
+        setJuniorRecordTitle(prev => prev && prev.trim() ? prev : defaultTitle);
         if (juniorAudioStreamRef.current) {
           juniorAudioStreamRef.current.getTracks().forEach(t => t.stop());
           juniorAudioStreamRef.current = null;
         }
       };
 
-      recorder.start(200);
-      setJuniorIsRecording(true);
-      setJuniorRecordDuration(0);
+      // 2. Microphone stream is 100% active and granted -> Start the visual 3-2-1 countdown!
+      setJuniorCountdown(3);
+      playBeep(440, 150);
+      let count = 3;
 
-      juniorRecordTimerRef.current = setInterval(() => {
-        setJuniorRecordDuration(prev => prev + 1);
+      juniorCdIntervalRef.current = setInterval(() => {
+        count -= 1;
+        if (count > 0) {
+          setJuniorCountdown(count);
+          playBeep(440, 150);
+        } else {
+          clearInterval(juniorCdIntervalRef.current);
+          juniorCdIntervalRef.current = null;
+          setJuniorCountdown(null);
+          playBeep(880, 250); // High pitch "GO" tone
+
+          // 3. Start recording precisely on cue!
+          try {
+            recorder.start(200);
+            setJuniorIsRecording(true);
+            setJuniorRecordDuration(0);
+
+            juniorRecordTimerRef.current = setInterval(() => {
+              setJuniorRecordDuration(prev => prev + 1);
+            }, 1000);
+          } catch (startErr) {
+            console.error('Recording start execution error:', startErr);
+          }
+        }
       }, 1000);
-    } catch (err) {
-      console.error('Recording start error:', err);
-      alert('Mikrofon-Zugriff nicht möglich. Bitte erlaube den Zugriff im Browser.');
+
+    } catch (err: any) {
+      console.error('Microphone access denied / error:', err);
+      alert('Mikrofon-Zugriff nicht möglich oder verweigert. Bitte erlaube den Zugriff im Browser, um deinen Song aufzunehmen.');
       if (juniorAudioStreamRef.current) {
         juniorAudioStreamRef.current.getTracks().forEach(t => t.stop());
         juniorAudioStreamRef.current = null;
       }
+      setShowJuniorRecordModal(false);
     }
   };
 
@@ -4134,75 +4421,195 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       juniorRecordTimerRef.current = null;
     }
     if (juniorMediaRecorderRef.current && juniorMediaRecorderRef.current.state !== 'inactive') {
-      juniorMediaRecorderRef.current.stop();
+      try {
+        juniorMediaRecorderRef.current.stop();
+      } catch (e) {
+        console.warn('Recorder stop warning:', e);
+      }
     }
     setJuniorIsRecording(false);
   };
 
+  // 🛑 2. Clean Teardown & Immediate Modal Close on 'X'
   const cancelJuniorRecording = () => {
-    stopJuniorRecording();
+    if (juniorPreviewAudioRef.current) {
+      juniorPreviewAudioRef.current.pause();
+      juniorPreviewAudioRef.current = null;
+    }
+    setJuniorPreviewPlaying(false);
+    setJuniorPreviewCurrentTime(0);
+
+    if (juniorCdIntervalRef.current) {
+      clearInterval(juniorCdIntervalRef.current);
+      juniorCdIntervalRef.current = null;
+    }
+    if (juniorRecordTimerRef.current) {
+      clearInterval(juniorRecordTimerRef.current);
+      juniorRecordTimerRef.current = null;
+    }
+    if (juniorMediaRecorderRef.current && juniorMediaRecorderRef.current.state !== 'inactive') {
+      try {
+        juniorMediaRecorderRef.current.stop();
+      } catch {}
+    }
     if (juniorAudioStreamRef.current) {
       juniorAudioStreamRef.current.getTracks().forEach(t => t.stop());
       juniorAudioStreamRef.current = null;
     }
+    setJuniorIsRecording(false);
     setJuniorRecordedBlob(null);
     setJuniorRecordedUrl(null);
     setJuniorCountdown(null);
+    setShowJuniorRecordModal(false);
   };
 
+  // 💾 3. Dual-Storage Engine (Local IndexedDB Vault + Cloud Supabase + Audio-Biography Sync)
   const saveJuniorRecording = async () => {
     if (!juniorRecordedBlob || !studentId) return;
     setJuniorIsSaving(true);
     try {
-      const fileName = `meisterwerk_${studentId}_${Date.now()}.webm`;
+      const recUniqueId = `rec_${studentId}_${Date.now()}`;
+      const isMp4 = juniorRecordedBlob.type.includes('mp4');
+      const fileExt = isMp4 ? 'mp4' : 'webm';
+      const fileName = `meisterwerk_${studentId}_${Date.now()}.${fileExt}`;
       const filePath = `recordings/${fileName}`;
       
+      // 1. Store directly in local IndexedDB vault first (100% resilient)
+      await storeBlob(`campus_audio_${recUniqueId}_raw`, juniorRecordedBlob);
+
       let finalAudioUrl = '';
-      const { error: upErr } = await supabase.storage
-        .from('campus-assets')
-        .upload(filePath, juniorRecordedBlob, { contentType: 'audio/webm', cacheControl: '3600' });
-      
-      if (!upErr) {
-        const { data: pubData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
-        finalAudioUrl = pubData?.publicUrl || '';
+      try {
+        const { error: upErr } = await supabase.storage
+          .from('campus-assets')
+          .upload(filePath, juniorRecordedBlob, { contentType: juniorRecordedBlob.type, cacheControl: '3600' });
+        
+        if (!upErr) {
+          const { data: pubData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
+          finalAudioUrl = pubData?.publicUrl || '';
+        }
+      } catch (cloudErr) {
+        console.warn('Cloud storage notice:', cloudErr);
       }
 
-      const songTitle = juniorRecordTitle.trim() || `${studentInstrumentName || 'Mein'}-Song • ${new Date().toLocaleDateString('de-DE')}`;
+      const songTitle = juniorRecordTitle.trim() || `${studentInstrumentName || 'Mein'}-Hit • ${new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}`;
       
-      const { error: insErr } = await supabase.from('progress_matrix').insert({
-        student_id: studentId,
-        school_id: studentUser?.school_id,
-        topic_name: songTitle,
-        homework_notes: JSON.stringify([`AUDIO:${finalAudioUrl}|${juniorRecordDuration}|${songTitle}`]),
-        audio_url: finalAudioUrl,
-        is_current_homework: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
+      // 2. Store in local state & localStorage for immediate 100% display
+      const newRecEntry = {
+        id: recUniqueId,
+        title: songTitle,
+        url: finalAudioUrl || '',
+        duration: juniorRecordDuration,
+        date: new Date().toISOString(),
+        blobKey: `campus_audio_${recUniqueId}_raw`
+      };
 
-      if (!insErr) {
-        playSuccessChime();
-        await fetchStudentProgress();
-        setShowJuniorRecordModal(false);
-        cancelJuniorRecording();
-        setJuniorRecordTitle('');
-        alert('🎉 Super gemacht! Deine Aufnahme ist jetzt sicher in deinen Songs gespeichert!');
-      } else {
-        console.error('Error inserting recording in progress_matrix:', insErr);
+      try {
+        const localKey = `campus_junior_recordings_${studentId}`;
+        const existingLocal = JSON.parse(localStorage.getItem(localKey) || '[]');
+        const updatedLocal = [newRecEntry, ...existingLocal.filter((x: any) => x.id !== recUniqueId)];
+        localStorage.setItem(localKey, JSON.stringify(updatedLocal));
+        setJuniorLocalRecordings(updatedLocal);
+      } catch (locErr) {
+        console.warn('Local storage update notice:', locErr);
       }
+
+      // 3. Also sync to student's Audio-Biography / Audio-Tresor so tracks appear everywhere
+      try {
+        const bioKey = `campus_audio_biography_${studentId}`;
+        const existingBio = JSON.parse(localStorage.getItem(bioKey) || '[]');
+        const newBioTrack = {
+          id: recUniqueId,
+          title: songTitle,
+          subtitle: '🎙️ Junior Solo',
+          audioUrl: finalAudioUrl || '',
+          duration: juniorRecordDuration,
+          recordedAt: new Date().toISOString(),
+          preferredVersion: 'raw'
+        };
+        const updatedBio = [newBioTrack, ...existingBio.filter((x: any) => x.id !== recUniqueId)];
+        localStorage.setItem(bioKey, JSON.stringify(updatedBio));
+      } catch (bioErr) {
+        console.warn('Audio-biography sync notice:', bioErr);
+      }
+
+      // 4. Insert record into progress_matrix in Supabase
+      try {
+        const { error: insErr } = await supabase.from('progress_matrix').insert({
+          student_id: studentId,
+          school_id: studentUser?.school_id,
+          topic_name: songTitle,
+          homework_notes: JSON.stringify([`AUDIO:${finalAudioUrl}|${juniorRecordDuration}|${songTitle}|${recUniqueId}`]),
+          audio_url: finalAudioUrl,
+          is_current_homework: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+        if (insErr) {
+          console.warn('progress_matrix insert notice:', insErr);
+        }
+      } catch (dbErr) {
+        console.warn('Supabase insert notice:', dbErr);
+      }
+
+      playSuccessChime();
+      await fetchStudentProgress(true);
+      setShowJuniorRecordModal(false);
+      cancelJuniorRecording();
+      setJuniorRecordTitle('');
+      alert('🎉 Super gemacht! Deine Aufnahme ist jetzt sicher in deinen Songs gespeichert!');
     } catch (err) {
       console.error('Error saving recording:', err);
+      alert('Aufnahme konnte gespeichert werden.');
     } finally {
       setJuniorIsSaving(false);
     }
   };
 
-  // Junior Student Recordings List
+  // Junior Student Recordings List (Aggregated from local vault + Audio-Biography + Cloud progressItems)
   const juniorStudentRecordings = useMemo(() => {
-    const recs: { id: string; title: string; url: string; duration?: number; date: string; fullItem: any }[] = [];
+    const recsMap = new Map<string, { id: string; title: string; url: string; duration?: number; date: string; fullItem?: any; blobKey?: string }>();
+
+    // 1. From local junior recordings
+    (juniorLocalRecordings || []).forEach(item => {
+      if (item && item.id) {
+        recsMap.set(item.id, {
+          id: item.id,
+          title: item.title || 'Mein Song',
+          url: item.url || '',
+          duration: item.duration,
+          date: item.date || new Date().toISOString(),
+          blobKey: item.blobKey || `campus_audio_${item.id}_raw`
+        });
+      }
+    });
+
+    // 2. From Audio-Biography storage
+    try {
+      if (studentId) {
+        const bioStored = localStorage.getItem(`campus_audio_biography_${studentId}`);
+        if (bioStored) {
+          const bioTracks = JSON.parse(bioStored);
+          (bioTracks || []).forEach((t: any) => {
+            if (t && t.id && !recsMap.has(t.id)) {
+              recsMap.set(t.id, {
+                id: t.id,
+                title: t.title || 'Mein Song',
+                url: t.audioUrl || t.masteredAudioUrl || '',
+                duration: t.duration,
+                date: t.recordedAt || new Date().toISOString(),
+                blobKey: `campus_audio_${t.id}_raw`
+              });
+            }
+          });
+        }
+      }
+    } catch {}
+
+    // 3. From progressItems (Supabase)
     (progressItems || []).forEach(item => {
-      if (item.audio_url) {
-        recs.push({
+      if (item.audio_url && !recsMap.has(item.id)) {
+        recsMap.set(item.id, {
           id: item.id,
           title: item.topic_name || item.title || 'Mein Song',
           url: item.audio_url,
@@ -4216,14 +4623,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           (parsed || []).forEach((n: string, i: number) => {
             if (typeof n === 'string' && n.startsWith('AUDIO:')) {
               const parts = n.substring(6).split('|');
-              if (parts[0]) {
-                recs.push({
-                  id: `${item.id}-audio-${i}`,
-                  title: parts[2] || item.topic_name || `Aufnahme #${recs.length + 1}`,
-                  url: parts[0],
+              const audioId = parts[3] ? parts[3] : `${item.id}-audio-${i}`;
+              if (!recsMap.has(audioId)) {
+                recsMap.set(audioId, {
+                  id: audioId,
+                  title: parts[2] || item.topic_name || `Aufnahme #${recsMap.size + 1}`,
+                  url: parts[0] || '',
                   duration: parts[1] ? parseInt(parts[1], 10) : undefined,
                   date: item.created_at || item.updated_at || new Date().toISOString(),
-                  fullItem: item
+                  fullItem: item,
+                  blobKey: parts[3] ? `campus_audio_${parts[3]}_raw` : undefined
                 });
               }
             }
@@ -4231,10 +4640,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         } catch {}
       }
     });
-    return recs;
-  }, [progressItems]);
 
-  const togglePlayJuniorRecording = (recId: string, audioUrl: string) => {
+    return Array.from(recsMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [juniorLocalRecordings, progressItems, studentId]);
+
+  const togglePlayJuniorRecording = async (recId: string, audioUrl: string, blobKey?: string) => {
     if (juniorActivePlayingAudioId === recId) {
       if (juniorAudioPlayerRef.current) {
         juniorAudioPlayerRef.current.pause();
@@ -4247,19 +4657,85 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       juniorAudioPlayerRef.current.pause();
       juniorAudioPlayerRef.current = null;
     }
-    const audio = new Audio(audioUrl);
-    juniorAudioPlayerRef.current = audio;
-    setJuniorActivePlayingAudioId(recId);
-    audio.play().catch(e => console.warn('Audio play error:', e));
-    audio.onended = () => {
-      setJuniorActivePlayingAudioId(null);
-      juniorAudioPlayerRef.current = null;
-    };
+
+    let playableUrl = audioUrl;
+    if (!playableUrl && blobKey) {
+      const b = await getBlob(blobKey);
+      if (b && b instanceof Blob) {
+        playableUrl = URL.createObjectURL(b);
+      }
+    }
+
+    if (playableUrl) {
+      const audio = new Audio(playableUrl);
+      juniorAudioPlayerRef.current = audio;
+      setJuniorActivePlayingAudioId(recId);
+      audio.play().catch(e => console.warn('Audio play error:', e));
+      audio.onended = () => {
+        setJuniorActivePlayingAudioId(null);
+        juniorAudioPlayerRef.current = null;
+      };
+    }
+  };
+
+  const downloadJuniorRecording = async (rec: any) => {
+    try {
+      let downloadUrl = rec.url;
+      if (!downloadUrl && rec.blobKey) {
+        const b = await getBlob(rec.blobKey);
+        if (b && b instanceof Blob) {
+          downloadUrl = URL.createObjectURL(b);
+        }
+      } else if (rec.blobKey) {
+        const b = await getBlob(rec.blobKey);
+        if (b && b instanceof Blob) {
+          downloadUrl = URL.createObjectURL(b);
+        }
+      }
+
+      if (!downloadUrl) {
+        alert('Keine Audiodatei gefunden.');
+        return;
+      }
+
+      const safeTitle = (rec.title || 'Aufnahme').replace(/[^a-zA-Z0-9äöüÄÖÜß\-_ ]/g, '').trim() || 'Aufnahme';
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `${safeTitle}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Failed to download recording:', err);
+      alert('Download fehlgeschlagen.');
+    }
   };
 
   const deleteJuniorRecording = async (rec: any) => {
     if (!window.confirm(`Möchtest du die Aufnahme "${rec.title}" wirklich löschen?`)) return;
     try {
+      // 1. Remove from local junior recordings
+      const localKey = `campus_junior_recordings_${studentId}`;
+      const updatedLocal = juniorLocalRecordings.filter(x => x.id !== rec.id && x.blobKey !== rec.blobKey);
+      localStorage.setItem(localKey, JSON.stringify(updatedLocal));
+      setJuniorLocalRecordings(updatedLocal);
+
+      // 2. Remove from Audio-Biografie storage
+      try {
+        const bioKey = `campus_audio_biography_${studentId}`;
+        const existingBio = JSON.parse(localStorage.getItem(bioKey) || '[]');
+        const updatedBio = existingBio.filter((x: any) => x.id !== rec.id);
+        localStorage.setItem(bioKey, JSON.stringify(updatedBio));
+      } catch {}
+
+      // 3. Remove IndexedDB blobs
+      if (rec.blobKey) {
+        await deleteBlob(rec.blobKey).catch(console.warn);
+      }
+      await deleteBlob(`campus_audio_${rec.id}_raw`).catch(console.warn);
+      await deleteBlob(`campus_audio_${rec.id}_master`).catch(console.warn);
+
+      // 4. Remove from Supabase if present
       if (rec.fullItem?.id) {
         await supabase.from('progress_matrix').delete().eq('id', rec.fullItem.id);
       }
@@ -4269,6 +4745,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           await supabase.storage.from('campus-assets').remove([parts[1]]);
         }
       }
+
       if (juniorActivePlayingAudioId === rec.id) {
         if (juniorAudioPlayerRef.current) {
           juniorAudioPlayerRef.current.pause();
@@ -4276,7 +4753,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
         setJuniorActivePlayingAudioId(null);
       }
-      await fetchStudentProgress();
+      await fetchStudentProgress(true);
     } catch (err) {
       console.error('Error deleting recording:', err);
     }
@@ -5665,7 +6142,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     isFinishingSessionRef.current = true;
 
     setSessionActive(false);
-    if (secondsElapsed < 60) {
+
+    const streak = avatar?.streak_flame || 0;
+    const targetMins = getTargetMinutes(streak);
+    const targetSeconds = targetMins * 60;
+    const flameLevelName = getFlameLevelName(streak);
+
+    // 🔒 HARTE FOKUS-REGEL: Alles unter der Mindestzeit führt zum Komplett-Abbruch
+    if (secondsElapsed < targetSeconds) {
       if (currentLogIdRef.current) {
         try {
           await supabase.from('fokus_logs').delete().eq('id', currentLogIdRef.current);
@@ -5676,8 +6160,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
       setSecondsElapsed(0);
       setIsExtraTime(false);
+      setIsGraceActive(false);
       isFinishingSessionRef.current = false;
-      alert("Session unter 1 Minute abgebrochen – es wurden keine Übe-Minuten verbucht. 🎸");
+      alert(`Fokus-Session vor Erreichen der Mindestzeit (${targetMins} Min.) abgebrochen – es wurden keine Übe-Minuten verbucht. 🎸`);
       return;
     }
 
@@ -5698,21 +6183,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .eq('student_id', studentId)
         .maybeSingle();
 
-      const streak = avatar?.streak_flame || 0;
-      const targetMins = getTargetMinutes(streak);
-      const targetSeconds = targetMins * 60;
-      const flameLevelName = getFlameLevelName(streak);
-
-      let focusSeconds = 0;
-      let extraSeconds = 0;
-
-      if (secondsElapsed >= targetSeconds) {
-        focusSeconds = targetSeconds;
-        extraSeconds = secondsElapsed - targetSeconds;
-      } else {
-        focusSeconds = secondsElapsed;
-        extraSeconds = 0;
-      }
+      let focusSeconds = targetSeconds;
+      let extraSeconds = secondsElapsed - targetSeconds;
 
       // Convert to strict completed minutes (floor)
       const focusMinutes = Math.floor(focusSeconds / 60);
@@ -10266,42 +10738,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     boxSizing: 'border-box'
                                   }}
                                 >
-                                  {/* Pink/Peach Sleeve + Vinyl peeking out Cover Icon */}
-                                  <div style={{ position: 'relative', width: '68px', height: '56px', flexShrink: 0 }}>
-                                    <div style={{
-                                      position: 'absolute',
-                                      right: '4px',
-                                      top: '5px',
-                                      width: '46px',
-                                      height: '46px',
-                                      borderRadius: '50%',
-                                      background: '#090a0f',
-                                      boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      zIndex: 1
-                                    }}>
-                                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: lwColor.to, opacity: 0.45 }} />
-                                    </div>
-                                    <div style={{
-                                      position: 'absolute',
-                                      left: 0,
-                                      top: 0,
-                                      width: '56px',
-                                      height: '56px',
-                                      background: coverBg,
-                                      borderRadius: '16px',
-                                      boxShadow: '0 8px 20px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      zIndex: 2,
-                                      border: `1px solid ${lwColor.text}18`
-                                    }}>
-                                      <span style={{ fontSize: '28px', lineHeight: 1, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.1))' }}>🎵</span>
-                                    </div>
-                                  </div>
+                                  {/* Pastel Sleeve + Vinyl peeking out Cover */}
+                                  {renderSongVinylCover(lwColor, 'sm')}
 
                                   {/* Title and Artist */}
                                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -10961,173 +11399,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
 
                 {/* Column 2: Helden-Momente */}
-                <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', minHeight: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                      <span>🌱</span> Übe-Ziele der Klasse
-                    </h3>
-                  </div>
-
-                  {(() => {
-                    const brandColor = studentUser?.schools?.brand_color || '#34a853';
-                    const targets = classGoals || [];
-                    const totalGoals = targets.length;
-                    const masteredGoals = targets.filter((target: any) => {
-                      const targetPercent = Math.round((classWeeklyFocus / target.minutes) * 100);
-                      return targetPercent >= 100;
-                    }).length;
-                    const highestPercent = targets.length > 0 
-                      ? Math.max(...targets.map((target: any) => Math.round((classWeeklyFocus / target.minutes) * 100)))
-                      : 0;
-
-                    return (
-                      <>
-                        {totalGoals > 0 && (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
-                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
-                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#34a853', marginTop: '2px' }}>{masteredGoals}</span>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
-                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
-                            </div>
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          {totalGoals === 0 ? (
-                            <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
-                              Keine aktiven Ziele angelegt.
-                            </p>
-                          ) : (
-                            targets.map((target: any) => {
-                              const targetPercent = Math.round((classWeeklyFocus / target.minutes) * 100);
-                              const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
-                              
-                              const maxPercentOnBar = 133;
-                              const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
-                              const isAchieved = targetPercent >= 100;
-
-                              return (
-                                <div 
-                                  key={target.id} 
-                                  onClick={() => handleOpenContributions(target.title || 'Übe-Ziel der Klasse', target.minutes)}
-                                  onMouseOver={e => {
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(52, 168, 83, 0.22)';
-                                  }}
-                                  onMouseOut={e => {
-                                    e.currentTarget.style.transform = 'none';
-                                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(52, 168, 83, 0.12)';
-                                  }}
-                                  style={{
-                                    position: 'relative',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    background: '#34a853',
-                                    boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
-                                    borderRadius: '16px',
-                                    padding: '12px 14px',
-                                    gap: '8px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-                                  }}
-                                >
-                                  {/* Row 1: Title, Deadline on left & Percentage on right */}
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                                      <span style={{
-                                        fontSize: '0.8rem',
-                                        fontWeight: 700,
-                                        color: '#ffffff',
-                                        letterSpacing: '-0.01em',
-                                        lineHeight: '1.25',
-                                        whiteSpace: 'normal',
-                                        wordBreak: 'break-word'
-                                      }}>
-                                        {target.title || 'Challenge'}
-                                      </span>
-                                      {target.deadline && (
-                                        <span style={{
-                                          fontSize: '0.62rem',
-                                          fontWeight: 500,
-                                          color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.75)',
-                                          lineHeight: '1.2',
-                                          whiteSpace: 'normal'
-                                        }}>
-                                          bis {new Date(target.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                                          {isDeadlinePassed && ' (abgelaufen)'}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span style={{
-                                      fontSize: '1.1rem',
-                                      fontWeight: 800,
-                                      color: '#ffffff',
-                                      letterSpacing: '-0.02em',
-                                      fontFeatureSettings: '"tnum"',
-                                      flexShrink: 0,
-                                      alignSelf: 'flex-start'
-                                    }}>
-                                      {targetPercent}%
-                                    </span>
-                                  </div>
-
-                                  {/* Progress bar container */}
-                                  <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px' }}>
-                                    {/* Target marker (100% line) at 75% width */}
-                                    <div style={{
-                                      position: 'absolute',
-                                      left: '75%',
-                                      top: '-2px',
-                                      height: '10px',
-                                      width: '2px',
-                                      background: '#ffffff',
-                                      zIndex: 3,
-                                      borderRadius: '99px'
-                                    }} />
-
-                                    {/* Bar fill */}
-                                    <div style={{
-                                      width: `${visualWidth}%`,
-                                      height: '100%',
-                                      background: '#ffffff',
-                                      borderRadius: '99px',
-                                      transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                      boxShadow: '0 0 6px rgba(255, 255, 255, 0.25)'
-                                    }} />
-                                  </div>
-
-                                  {/* Row 3: Current / Target & Status label */}
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
-                                    <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
-                                      <span style={{ fontWeight: 700, color: '#ffffff' }}>{classWeeklyFocus}</span> / {target.minutes} Min.
-                                    </span>
-                                    <span style={{
-                                      fontWeight: 700,
-                                      color: isAchieved ? '#e6f4ea' : 'rgba(255, 255, 255, 0.8)',
-                                      whiteSpace: 'normal',
-                                      textAlign: 'right'
-                                    }}>
-                                      {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - classWeeklyFocus)} Min.`}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-
-                {/* Column 2: Helden-Momente */}
                 <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', minHeight: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                     <span>✨</span> Helden-Momente
@@ -11684,40 +11955,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   <Calendar size={15} color="#34a853" />
                                   <span>Nächste Musikstunde: {lessonText}</span>
                                 </div>
-
-                                {teacherId && (
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setAppointmentChatData({
-                                        teacherId,
-                                        date: targetDateStr,
-                                        start_time: timeLabel,
-                                        label: `Nachricht an Lehrer`,
-                                        occurrenceId: finalOccurId
-                                      });
-                                      setShowAppointmentChat(true);
-                                    }}
-                                    style={{ 
-                                      display: 'inline-flex', 
-                                      alignItems: 'center', 
-                                      gap: '8px', 
-                                      background: hasMessage ? '#34a853' : '#ffffff', 
-                                      color: hasMessage ? '#ffffff' : '#334155', 
-                                      padding: '7px 14px', 
-                                      borderRadius: '12px', 
-                                      fontSize: '0.82rem', 
-                                      fontWeight: 800, 
-                                      border: hasMessage ? 'none' : '1.5px solid #e2e8f0', 
-                                      cursor: 'pointer',
-                                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)'
-                                    }}
-                                    className="hover-scale"
-                                  >
-                                    <MessageSquare size={15} color={hasMessage ? '#ffffff' : '#34a853'} />
-                                    <span>{hasMessage ? 'Nachricht ansehen' : 'Nachricht an Lehrer'}</span>
-                                  </button>
-                                )}
                               </div>
                             );
                           })()}
@@ -11936,7 +12173,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 {focusTitle}
                               </h3>
                               <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650 }}>
-                                Noten & Play-Alongs ansehen
+                                Übe-Aufgaben der Woche
                               </p>
                             </div>
                           </div>
@@ -11960,7 +12197,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             }}
                           >
                             <BookOpen size={20} />
-                            <span>Aufgaben ansehen</span>
+                            <span>Hausaufgaben öffnen</span>
                           </button>
                         </div>
 
@@ -12151,13 +12388,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                             <div>
                               <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Meine Songs
+                                Meine Aufnahmen
                               </div>
                               <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                                 {juniorStudentRecordings.length} {juniorStudentRecordings.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
                               </h3>
                               <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650 }}>
-                                Cover-Playlist im Tresor
+                                Deine eingespielten Songs
                               </p>
                             </div>
                           </div>
@@ -12635,7 +12872,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         <button
                           onClick={() => {
                             if (sessionActive) {
-                              if (window.confirm("Möchtest du den Übe-Timer wirklich beenden?")) {
+                              const streak = avatar?.streak_flame || 0;
+                              const targetMins = getTargetMinutes(streak);
+                              const targetSecs = targetMins * 60;
+                              if (secondsElapsed < targetSecs) {
+                                const minsLeft = Math.max(1, Math.ceil((targetSecs - secondsElapsed) / 60));
+                                if (window.confirm(`Möchtest du den Fokus-Timer wirklich abbrechen? Bis zum Tagesziel fehlen noch ${minsLeft} Min. Bei einem vorzeitigen Abbruch werden keine Übe-Minuten verbucht.`)) {
+                                  finishPracticeSession();
+                                  setShowJuniorTimerModal(false);
+                                }
+                              } else {
                                 finishPracticeSession();
                                 setShowJuniorTimerModal(false);
                               }
@@ -12682,6 +12928,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             {isExtraTime ? 'Mega Leistung!' : 'Schnapp dir dein Instrument!'}
                           </h2>
                         </div>
+
+                        {/* ⏳ 10-Sekunden Puffer-Banner bei Pause in freier Übezeit */}
+                        {isExtraTime && isGraceActive && (
+                          <div style={{
+                            background: '#fffbeb',
+                            border: '2px solid #f59e0b',
+                            borderRadius: '18px',
+                            padding: '10px 18px',
+                            color: '#92400e',
+                            fontSize: '0.88rem',
+                            fontWeight: 900,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            animation: 'pulse 1s infinite alternate'
+                          }}>
+                            <span>⏳ 10s Puffer: Noch {graceSecondsLeft}s Zeit zum Weiterspielen!</span>
+                          </div>
+                        )}
 
                         {/* Runder Countdown-Ring */}
                         {(() => {
@@ -12918,84 +13183,204 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </div>
                         )}
 
-                        {/* STUFE 3: AUFNAHME FERTIG (VORSCHAU & SPEICHERN) */}
+                        {/* STUFE 3: AUFNAHME FERTIG (VORSCHAU & SPEICHERN) - MAGIC JUNIOR (6-10 JAHRE) */}
                         {!juniorIsRecording && juniorCountdown === null && juniorRecordedUrl && (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', width: '100%' }}>
-                            <div style={{
-                              width: '80px',
-                              height: '80px',
-                              borderRadius: '26px',
-                              background: '#dcfce7',
-                              color: '#15803d',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}>
-                              <CheckCircle size={44} />
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px', width: '100%' }}>
+                            
+                            {/* 1. Freundlicher Hero-Bereich */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                              <div style={{
+                                width: '68px',
+                                height: '68px',
+                                borderRadius: '22px',
+                                background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                                color: '#15803d',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 8px 20px rgba(34, 197, 94, 0.2)'
+                              }}>
+                                <Sparkles size={34} />
+                              </div>
+
+                              <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', textAlign: 'center' }}>
+                                Klasse gespielt! 🎉
+                              </h3>
                             </div>
 
-                            <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 950, color: '#0f172a' }}>
-                              Tolle Aufnahme! 🎵
-                            </h3>
+                            {/* 2. Heller, kinderfreundlicher Audio-Player */}
+                            <div style={{
+                              width: '100%',
+                              background: '#f8fafc',
+                              border: '2px solid #e2e8f0',
+                              borderRadius: '20px',
+                              padding: '14px 16px',
+                              boxSizing: 'border-box',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '14px'
+                            }}>
+                              {/* Big Play / Pause Button */}
+                              <button
+                                type="button"
+                                onClick={togglePlayJuniorPreview}
+                                style={{
+                                  width: '48px',
+                                  height: '48px',
+                                  borderRadius: '50%',
+                                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                  border: 'none',
+                                  color: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 6px 14px rgba(34, 197, 94, 0.35)',
+                                  flexShrink: 0,
+                                  transition: 'transform 0.15s ease'
+                                }}
+                                className="hover-scale"
+                              >
+                                {juniorPreviewPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" style={{ marginLeft: '2px' }} />}
+                              </button>
 
-                            {/* Audio Player */}
-                            <audio controls src={juniorRecordedUrl} style={{ width: '100%', borderRadius: '12px' }} />
+                              {/* Progress Track & Time */}
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d' }}>
+                                    {juniorPreviewPlaying ? '🔊 Spielt ab...' : 'Aufnahme anhören'}
+                                  </span>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', fontFamily: 'monospace' }}>
+                                    {String(Math.floor(juniorPreviewCurrentTime / 60)).padStart(2, '0')}:{String(Math.floor(juniorPreviewCurrentTime % 60)).padStart(2, '0')} / {String(Math.floor((juniorPreviewDuration || juniorRecordDuration) / 60)).padStart(2, '0')}:{String(Math.floor((juniorPreviewDuration || juniorRecordDuration) % 60)).padStart(2, '0')}
+                                  </span>
+                                </div>
 
-                            {/* Songtitel Input */}
-                            <input
-                              type="text"
-                              placeholder="Name deines Songs (z.B. Mein Gitarren-Hit)"
-                              value={juniorRecordTitle}
-                              onChange={(e) => setJuniorRecordTitle(e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '16px',
-                                borderRadius: '18px',
-                                border: '2px solid #e2e8f0',
-                                fontSize: '1rem',
-                                fontWeight: 700,
-                                boxSizing: 'border-box',
-                                outline: 'none'
-                              }}
-                            />
+                                <div 
+                                  onClick={(e) => {
+                                    if (juniorPreviewAudioRef.current && (juniorPreviewDuration || juniorRecordDuration)) {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const clickX = e.clientX - rect.left;
+                                      const newPct = Math.max(0, Math.min(1, clickX / rect.width));
+                                      const newTime = newPct * (juniorPreviewDuration || juniorRecordDuration);
+                                      juniorPreviewAudioRef.current.currentTime = newTime;
+                                      setJuniorPreviewCurrentTime(newTime);
+                                    }
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    height: '8px',
+                                    background: '#e2e8f0',
+                                    borderRadius: '6px',
+                                    overflow: 'hidden',
+                                    cursor: 'pointer',
+                                    position: 'relative'
+                                  }}
+                                >
+                                  <div style={{
+                                    width: `${Math.min(100, (juniorPreviewCurrentTime / (juniorPreviewDuration || juniorRecordDuration || 1)) * 100)}%`,
+                                    height: '100%',
+                                    background: '#22c55e',
+                                    borderRadius: '6px',
+                                    transition: 'width 0.1s linear'
+                                  }} />
+                                </div>
+                              </div>
+                            </div>
 
-                            <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                            {/* 3. Titel-Feld (Bereits vorausgefüllt) */}
+                            <div style={{ width: '100%', position: 'relative' }}>
+                              <input
+                                type="text"
+                                value={juniorRecordTitle}
+                                onChange={(e) => setJuniorRecordTitle(e.target.value)}
+                                placeholder="Name deines Songs"
+                                style={{
+                                  width: '100%',
+                                  padding: '14px 16px',
+                                  paddingLeft: '44px',
+                                  borderRadius: '18px',
+                                  border: '2px solid #e2e8f0',
+                                  background: '#ffffff',
+                                  fontSize: '0.98rem',
+                                  fontWeight: 750,
+                                  color: '#0f172a',
+                                  boxSizing: 'border-box',
+                                  outline: 'none',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onFocus={(e) => {
+                                  e.currentTarget.style.borderColor = '#22c55e';
+                                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.15)';
+                                }}
+                                onBlur={(e) => {
+                                  e.currentTarget.style.borderColor = '#e2e8f0';
+                                  e.currentTarget.style.boxShadow = 'none';
+                                }}
+                              />
+                              <div style={{
+                                position: 'absolute',
+                                left: '15px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: '#16a34a',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}>
+                                <Music size={19} />
+                              </div>
+                            </div>
+
+                            {/* 4. Klare Kinder-Buttons */}
+                            <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '2px' }}>
                               <button
                                 onClick={startJuniorRecordingFlow}
                                 style={{
                                   flex: 1,
-                                  padding: '16px',
+                                  padding: '15px',
                                   borderRadius: '18px',
                                   border: '2px solid #e2e8f0',
-                                  background: '#f8fafc',
-                                  color: '#475569',
-                                  fontSize: '1rem',
-                                  fontWeight: 900,
-                                  cursor: 'pointer'
+                                  background: '#ffffff',
+                                  color: '#64748b',
+                                  fontSize: '0.96rem',
+                                  fontWeight: 850,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px'
                                 }}
+                                className="hover-scale"
                               >
-                                🔄 Nochmal
+                                <RotateCcw size={17} />
+                                <span>Nochmal</span>
                               </button>
 
                               <button
                                 onClick={saveJuniorRecording}
                                 disabled={juniorIsSaving}
                                 style={{
-                                  flex: 2,
-                                  padding: '16px',
+                                  flex: 1.8,
+                                  padding: '15px 18px',
                                   borderRadius: '18px',
                                   border: 'none',
-                                  background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                                   color: '#ffffff',
-                                  fontSize: '1.05rem',
+                                  fontSize: '1.02rem',
                                   fontWeight: 950,
                                   cursor: juniorIsSaving ? 'not-allowed' : 'pointer',
-                                  boxShadow: '0 8px 20px rgba(52, 168, 83, 0.35)'
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px',
+                                  boxShadow: '0 8px 20px rgba(34, 197, 94, 0.35)'
                                 }}
+                                className="hover-scale"
                               >
-                                {juniorIsSaving ? '💾 Speichere...' : '💾 Als Meisterwerk speichern!'}
+                                <Check size={20} strokeWidth={3} />
+                                <span>{juniorIsSaving ? 'Speichere...' : 'Fertig! Speichern'}</span>
                               </button>
                             </div>
+
                           </div>
                         )}
                       </div>
@@ -13100,7 +13485,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                     <button
-                                      onClick={() => togglePlayJuniorRecording(rec.id, rec.url)}
+                                      onClick={() => togglePlayJuniorRecording(rec.id, rec.url, rec.blobKey)}
                                       style={{
                                         background: isPlaying ? '#7c3aed' : '#34a853',
                                         color: '#ffffff',
@@ -13129,20 +13514,49 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     </div>
                                   </div>
 
-                                  <button
-                                    onClick={() => deleteJuniorRecording(rec)}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#94a3b8',
-                                      cursor: 'pointer',
-                                      padding: '8px'
-                                    }}
-                                    className="hover-scale"
-                                    title="Aufnahme löschen"
-                                  >
-                                    <Trash2 size={20} />
-                                  </button>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <button
+                                      onClick={() => downloadJuniorRecording(rec)}
+                                      style={{
+                                        background: '#f1f5f9',
+                                        border: 'none',
+                                        color: '#334155',
+                                        cursor: 'pointer',
+                                        width: '38px',
+                                        height: '38px',
+                                        borderRadius: '12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      className="hover-scale"
+                                      title="Aufnahme herunterladen"
+                                    >
+                                      <Download size={18} />
+                                    </button>
+
+                                    <button
+                                      onClick={() => deleteJuniorRecording(rec)}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#94a3b8',
+                                        cursor: 'pointer',
+                                        width: '38px',
+                                        height: '38px',
+                                        borderRadius: '12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      className="hover-scale"
+                                      title="Aufnahme löschen"
+                                    >
+                                      <Trash2 size={18} />
+                                    </button>
+                                  </div>
                                 </div>
                               );
                             })

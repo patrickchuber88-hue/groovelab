@@ -538,14 +538,13 @@ export function computeActiveSchoolYears(createdAt?: string): SchoolYearLP[] {
   if (createdAt) {
     const d = new Date(createdAt);
     if (!isNaN(d.getTime())) {
-      // Month < 8 (Jan-Aug) belongs to school year starting in year - 1
-      regStartYear = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
+      // Month < 7 (Jan-Jul) belongs to school year starting in year - 1
+      regStartYear = d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear() - 1;
     }
   }
 
-  const now = new Date();
-  const currentStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-  const maxYear = Math.max(currentStartYear, 2026);
+  const currentStartYear = 2026;
+  const maxYear = currentStartYear;
   const minYear = Math.min(regStartYear, maxYear);
 
   const yearsList: SchoolYearLP[] = [];
@@ -566,25 +565,24 @@ export function computeActiveSchoolYears(createdAt?: string): SchoolYearLP[] {
     totalDurationMin: 0
   });
 
-  const totalYears = maxYear - minYear + 1;
-
   for (let y = maxYear; y >= minYear; y--) {
     const isCurrent = y === maxYear;
-    const volNum = totalYears - (maxYear - y);
+    const volNum = maxYear - y + 1;
     const coverVol = ((volNum - 1) % 10) + 1;
     const coverConfig = SCHOOL_YEAR_COVERS.find(c => c.vol === coverVol) || SCHOOL_YEAR_COVERS[0];
+    const yearString = `${y}/${y + 1}`;
 
     yearsList.push({
       id: `lp_${y}_${y + 1}`,
-      year: `${y}/${y + 1}`,
-      title: `${coverConfig.volLabel} • ${coverConfig.themeTitle}`,
-      subtitle: `${volNum}. Lernjahr (${y}/${y + 1}) • ${isCurrent ? 'Aktuelles Schuljahr' : 'Archiv'}`,
-      accentColor: coverConfig.accentColor,
-      gradient: coverConfig.gradient,
+      year: yearString,
+      title: `Schuljahr ${yearString}`,
+      subtitle: isCurrent ? `Aktuelles Schuljahr (${yearString})` : `Schuljahr ${yearString} • Archiv`,
+      accentColor: coverConfig.accentColor || '#10b981',
+      gradient: coverConfig.gradient || 'linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%)',
       isCurrent,
       volNum,
-      volLabel: coverConfig.volLabel,
-      themeTitle: coverConfig.themeTitle,
+      volLabel: yearString,
+      themeTitle: `SCHULJAHR ${yearString}`,
       tracksCount: 0,
       totalDurationMin: 0
     });
@@ -851,20 +849,73 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [activeReflectionMilestone, setActiveReflectionMilestone] = useState<MilestoneData | null>(null);
   const [reflectionText, setReflectionText] = useState<string>('');
 
+  // Stable deterministic PIN generator based on student ID & storage (Never re-rolls unless user clicks 'PIN neu würfeln')
+  const getOrInitStableSharePin = (id: string, plId?: string | null): string => {
+    try {
+      if (plId) {
+        const plStored = localStorage.getItem(`campus_share_pin_${id}_${plId}`);
+        if (plStored && /^\d{4}$/.test(plStored)) return plStored;
+      }
+      const stored = localStorage.getItem(`campus_share_pin_${id}`);
+      if (stored && /^\d{4}$/.test(stored)) return stored;
+      
+      const currentStored = localStorage.getItem('campus_share_pin_current');
+      if (currentStored && /^\d{4}$/.test(currentStored)) return currentStored;
+
+      // Deterministic 4-digit code based on ID string
+      let hash = 4829;
+      const key = (id && id !== 'anonymous_student') ? id : 'campus_talent_default';
+      for (let i = 0; i < key.length; i++) {
+        hash = ((hash << 5) - hash) + key.charCodeAt(i);
+        hash |= 0;
+      }
+      const derivedPin = (Math.abs(hash) % 9000 + 1000).toString();
+      
+      // Save permanently to prevent unwanted re-rolling
+      localStorage.setItem(`campus_share_pin_${id}`, derivedPin);
+      localStorage.setItem('campus_share_pin_current', derivedPin);
+      localStorage.setItem('campus_share_pin_global', derivedPin);
+      return derivedPin;
+    } catch {
+      return '4829';
+    }
+  };
+
   // Share Modal States
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
   const [sharePin, setSharePin] = useState<string>(() => {
-    try {
-      const stored = localStorage.getItem(`campus_share_pin_${student?.id || studentId}`);
-      if (stored && /^\d{4}$/.test(stored)) return stored;
-    } catch {}
-    return Math.floor(1000 + Math.random() * 9000).toString();
+    return getOrInitStableSharePin(student?.id || studentId);
   });
   const [shareAnonymously, setShareAnonymously] = useState<boolean>(false);
   const [shareAllowApplause, setShareAllowApplause] = useState<boolean>(true);
   const [shareTargetPlaylistId, setShareTargetPlaylistId] = useState<string | null>(null);
+  const [shareDesignTheme, setShareDesignTheme] = useState<'dark' | 'light'>('dark');
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
   const [showShareMessagePreview, setShowShareMessagePreview] = useState<boolean>(false);
+
+  // Sync PIN when student ID or target playlist changes (without re-rolling)
+  useEffect(() => {
+    const sId = student?.id || studentId;
+    if (sId) {
+      const pin = getOrInitStableSharePin(sId, shareTargetPlaylistId);
+      setSharePin(pin);
+    }
+  }, [student?.id, studentId, shareTargetPlaylistId]);
+
+  const savePinToStorage = (newPin: string) => {
+    const sId = student?.id || studentId;
+    setSharePin(newPin);
+    try {
+      if (sId) {
+        localStorage.setItem(`campus_share_pin_${sId}`, newPin);
+        if (shareTargetPlaylistId) {
+          localStorage.setItem(`campus_share_pin_${sId}_${shareTargetPlaylistId}`, newPin);
+        }
+      }
+      localStorage.setItem('campus_share_pin_current', newPin);
+      localStorage.setItem('campus_share_pin_global', newPin);
+    } catch {}
+  };
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -3002,10 +3053,11 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     if (shareTargetPlaylistId) params.set('pl', shareTargetPlaylistId);
     if (shareAnonymously) params.set('anon', '1');
     if (!shareAllowApplause) params.set('appl', '0');
+    if (shareDesignTheme) params.set('theme', shareDesignTheme);
     if (sharePin) params.set('pinh', computePinHash(sharePin));
     const qs = params.toString();
     return `${window.location.origin}/bio/${studentId || 'talent'}${qs ? `?${qs}` : ''}`;
-  }, [studentId, shareTargetPlaylistId, shareAnonymously, shareAllowApplause, sharePin]);
+  }, [studentId, shareTargetPlaylistId, shareAnonymously, shareAllowApplause, shareDesignTheme, sharePin]);
 
   const fullShareText = useMemo(() => {
     return `🎵 Höre dir meine neuesten Songs aus der Musikschule an!\n\n1. Link öffnen: ${effectiveShareUrl}\n2. Familien-PIN eingeben: ${sharePin || '4829'}\n\n🔒 WICHTIGER RECHTSHINWEIS (§ 15 Abs. 3 UrhG):\nDieser Link & PIN sind ausschließlich für den privaten Familienkreis bestimmt. Ein öffentliches Teilen (z. B. auf Social Media, Instagram, TikTok oder Websites) ist urheberrechtlich strengstens untersagt.`;
@@ -3013,14 +3065,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   const handleShareLink = async () => {
     // Save current PIN for this student/playlist
-    try {
-      if (studentId && sharePin) {
-        localStorage.setItem(`campus_share_pin_${studentId}`, sharePin);
-        if (shareTargetPlaylistId) {
-          localStorage.setItem(`campus_share_pin_${studentId}_${shareTargetPlaylistId}`, sharePin);
-        }
-      }
-    } catch {}
+    savePinToStorage(sharePin);
 
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
@@ -3037,15 +3082,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   };
 
   const handleShareWhatsApp = () => {
-    try {
-      if (studentId && sharePin) {
-        localStorage.setItem(`campus_share_pin_${studentId}`, sharePin);
-        if (shareTargetPlaylistId) {
-          localStorage.setItem(`campus_share_pin_${studentId}_${shareTargetPlaylistId}`, sharePin);
-        }
-      }
-    } catch {}
-
+    savePinToStorage(sharePin);
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullShareText)}`;
     window.open(waUrl, '_blank');
   };
@@ -3349,7 +3386,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     );
   };
 
-  // 🟢 Pure Spotify 1:1 Square Card Component
+  // 🟢 Pure Spotify 1:1 Square Card Component (Compact & Modern)
   const renderSpotifyCoverCard = (item: {
     id: string;
     title: string;
@@ -3382,21 +3419,21 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         onClick={item.onOpen}
         style={{
           flex: '0 0 auto',
-          width: isMobileOrSim ? '180px' : '220px',
+          width: isMobileOrSim ? '150px' : '172px',
           scrollSnapAlign: 'start',
-          borderRadius: '16px',
+          borderRadius: '14px',
           background: isLight ? '#ffffff' : 'rgba(30, 41, 59, 0.6)',
           border: `1.5px solid ${isPlaying ? item.accentColor : item.isSeasonFocus ? (item.seasonGlowColor || '#f59e0b') : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)')}`,
-          padding: '12px',
+          padding: '10px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
+          gap: '8px',
           cursor: 'pointer',
           boxShadow: isPlaying 
-            ? `0 12px 30px ${item.accentColor}33` 
+            ? `0 10px 24px ${item.accentColor}33` 
             : item.isSeasonFocus
-              ? `0 0 20px 2px ${item.seasonGlowColor || '#f59e0b'}33, 0 4px 14px rgba(0, 0, 0, 0.06)`
-              : (isLight ? '0 4px 14px rgba(0, 0, 0, 0.04)' : '0 6px 20px rgba(0, 0, 0, 0.3)'),
+              ? `0 0 16px 2px ${item.seasonGlowColor || '#f59e0b'}33, 0 4px 12px rgba(0, 0, 0, 0.06)`
+              : (isLight ? '0 3px 10px rgba(0, 0, 0, 0.04)' : '0 4px 16px rgba(0, 0, 0, 0.25)'),
           position: 'relative',
           boxSizing: 'border-box',
           animation: item.isSeasonFocus && !isPlaying ? 'seasonalGlowPulse 3s ease-in-out infinite' : 'none'
@@ -3408,7 +3445,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           position: 'relative',
           width: '100%',
           aspectRatio: '1 / 1',
-          borderRadius: '12px',
+          borderRadius: '10px',
           overflow: 'hidden'
         }}>
           {renderSpotifyCoverArtwork({
@@ -3443,10 +3480,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             title={item.trackCount === 0 ? "Ersten Song aufnehmen" : isPlaying ? "Wiedergabe pausieren" : "Playlist abspielen"}
             style={{
               position: 'absolute',
-              bottom: '10px',
-              right: '10px',
-              width: '46px',
-              height: '46px',
+              bottom: '8px',
+              right: '8px',
+              width: '38px',
+              height: '38px',
               borderRadius: '50%',
               background: item.trackCount === 0 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#10b981',
               border: 'none',
@@ -3455,28 +3492,28 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.45)',
+              boxShadow: '0 6px 16px rgba(0, 0, 0, 0.4)',
               opacity: isPlaying ? 1 : undefined,
               zIndex: 10
             }}
             className="spotify-play-btn"
           >
             {item.trackCount === 0 ? (
-              <Mic size={18} fill="#ffffff" color="#ffffff" />
+              <Mic size={15} fill="#ffffff" color="#ffffff" />
             ) : isPlaying ? (
-              <Pause size={20} fill="#ffffff" color="#ffffff" />
+              <Pause size={16} fill="#ffffff" color="#ffffff" />
             ) : (
-              <Play size={20} fill="#ffffff" color="#ffffff" style={{ marginLeft: '2px' }} />
+              <Play size={16} fill="#ffffff" color="#ffffff" style={{ marginLeft: '2px' }} />
             )}
           </button>
         </div>
 
         {/* Card Typography & Details */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '6px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '4px' }}>
             <h4 style={{
               margin: 0,
-              fontSize: '0.90rem',
+              fontSize: '0.84rem',
               fontWeight: 900,
               color: isPlaying ? '#10b981' : colors.textPrimary,
               lineHeight: 1.25,
@@ -3486,7 +3523,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               letterSpacing: '-0.01em',
-              minHeight: '2.35em'
+              minHeight: '2.1em'
             }}>
               {item.title}
             </h4>
@@ -3592,26 +3629,55 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     const isMilestonesPlaying = isPlayingPlaylist && (currentAlbumMeta?.title.includes('Meilenstein') || (playbackQueue.length > 0 && playbackQueue[0]?.id.startsWith('ms_')));
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
         {/* 🔥 SEKTION 1: PLAYLISTEN IM LAUFENDEN SCHULJAHR (2026/2027) */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Flame size={18} color="#ef4444" />
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: colors.textPrimary }}>
+              <Flame size={17} color="#ef4444" />
+              <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 900, color: colors.textPrimary }}>
                 1. Playlisten im laufenden Schuljahr (2026/2027)
               </h3>
             </div>
+
+            {nextMilestone && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMilestoneId(nextMilestone.id);
+                  setActiveMainTab('milestones');
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.16)',
+                  border: `1.5px solid ${isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.35)'}`,
+                  color: isLight ? '#b45309' : '#fbbf24',
+                  padding: '4px 10px',
+                  borderRadius: '100px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                className="hover-scale"
+              >
+                <Sparkles size={11} color="#f59e0b" />
+                <span>Nächster Meilenstein: {nextMilestone.title}</span>
+                <ChevronRight size={11} />
+              </button>
+            )}
           </div>
 
           {/* Horizontale Leiste: Nebeneinander platziert */}
           <div style={{
             display: 'flex',
             flexDirection: 'row',
-            gap: '18px',
+            gap: '14px',
             overflowX: 'auto',
-            paddingBottom: '12px',
+            paddingBottom: '6px',
             scrollSnapType: 'x mandatory',
             WebkitOverflowScrolling: 'touch'
           }}>
@@ -3623,19 +3689,19 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               }}
               style={{
                 flex: '0 0 auto',
-                width: isMobileOrSim ? '180px' : '220px',
+                width: isMobileOrSim ? '150px' : '172px',
                 scrollSnapAlign: 'start',
-                borderRadius: '16px',
+                borderRadius: '14px',
                 border: `2px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.25)'}`,
                 background: isLight ? 'rgba(241, 245, 249, 0.5)' : 'rgba(255, 255, 255, 0.03)',
-                padding: '16px',
+                padding: '12px 10px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 textAlign: 'center',
-                gap: '10px',
-                minHeight: isMobileOrSim ? '240px' : '280px',
+                gap: '8px',
+                minHeight: isMobileOrSim ? '200px' : '230px',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
                 boxSizing: 'border-box'
@@ -3643,23 +3709,23 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               className="hover-scale"
             >
               <div style={{
-                width: '50px',
-                height: '50px',
+                width: '42px',
+                height: '42px',
                 borderRadius: '50%',
                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white',
-                boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)'
+                boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)'
               }}>
-                <Plus size={24} strokeWidth={2.8} />
+                <Plus size={20} strokeWidth={2.8} />
               </div>
               <div>
-                <span style={{ fontSize: '0.88rem', fontWeight: 900, color: colors.textPrimary, display: 'block' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: colors.textPrimary, display: 'block' }}>
                   Neue Playlist
                 </span>
-                <span style={{ fontSize: '0.72rem', color: colors.textMuted, marginTop: '2px', display: 'block' }}>
+                <span style={{ fontSize: '0.68rem', color: colors.textMuted, marginTop: '2px', display: 'block' }}>
                   Cover & Songs wählen
                 </span>
               </div>
@@ -3739,27 +3805,27 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           </div>
         </div>
 
-        {/* 📚 SEKTION 2: SCHULJAHRES-ALBEN (10-JAHRES-ROTATION) */}
+        {/* 📚 SEKTION 2: MEIN SCHULJAHR (1 VEREWIGTES MEISTER-ALBUM PRO SCHULJAHR) */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Folder size={18} color="#06b6d4" />
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: colors.textPrimary }}>
-                2. Schuljahr-Highlights & Sammlungen
+              <Folder size={17} color="#06b6d4" />
+              <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 900, color: colors.textPrimary }}>
+                2. Mein Schuljahr
               </h3>
             </div>
-            <span style={{ fontSize: '0.76rem', color: colors.textMuted, fontWeight: 600 }}>
-              Play-Button startet die Jahressammlung • Klick öffnet den Schuljahr-Ordner
+            <span style={{ fontSize: '0.72rem', color: colors.textMuted, fontWeight: 600 }}>
+              Alle Playlisten eines Schuljahres als eine verewigte Meister-LP • 1 Album pro Schuljahr
             </span>
           </div>
 
-          {/* Horizontale Leiste: Nebeneinander platziert */}
+          {/* Horizontale Leiste: 1 verewigte Meister-LP pro Schuljahr */}
           <div style={{
             display: 'flex',
             flexDirection: 'row',
-            gap: '18px',
+            gap: '14px',
             overflowX: 'auto',
-            paddingBottom: '12px',
+            paddingBottom: '6px',
             scrollSnapType: 'x mandatory',
             WebkitOverflowScrolling: 'touch'
           }}>
@@ -3786,7 +3852,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               return renderSpotifyCoverCard({
                 id: lp.id,
                 title: lp.title,
-                subtitle: `${lp.subtitle} (${totalTracks} Tracks)`,
+                subtitle: totalTracks === 0 ? 'Noch keine Songs im Schuljahr' : `${totalTracks} ${totalTracks === 1 ? 'Song' : 'Songs'} • Gesamtes Schuljahr`,
                 badge: lp.volLabel,
                 volLabel: lp.volLabel,
                 trackCount: totalTracks,
@@ -4127,10 +4193,17 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     );
   };
 
-  // 📖 MODAL: DIGITALES LINER-NOTES BOOKLET
+  // 📖 MODAL: DIGITALES LINER-NOTES BOOKLET (WELTKLASSE DIGITAL CD/VINYL COLLECTOR BOOKLET)
   const renderLinerNotesModal = () => {
     if (!activeLinerNotesModal) return null;
     const bk = activeLinerNotesModal;
+
+    const totalDurationCalc = bk.tracks.reduce((acc, t) => acc + (t.duration || 45), 0);
+    const artistName = student?.first_name 
+      ? `${student.first_name}${student.last_name ? ` ${student.last_name.charAt(0)}.` : ''}`
+      : 'Linus';
+    const instrumentName = student?.instrument || student?.main_instrument || 'Gitarre';
+    const effectiveSchoolName = student?.school_name || localStorage.getItem('campus_school_name') || 'Musäk Bad Säckingen';
 
     return (
       <div style={{
@@ -4139,41 +4212,56 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        background: 'rgba(3, 7, 18, 0.88)',
+        backdropFilter: 'blur(28px)',
+        WebkitBackdropFilter: 'blur(28px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 99999,
-        padding: '16px'
+        padding: '20px'
       }}>
         <div style={{
-          background: isLight ? '#ffffff' : '#1e293b',
-          border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-          borderRadius: '28px',
-          padding: '28px',
-          maxWidth: '680px',
+          background: isLight 
+            ? 'linear-gradient(165deg, #ffffff 0%, #fafaf9 100%)' 
+            : 'linear-gradient(165deg, #0f172a 0%, #090d16 100%)',
+          border: isLight ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: '32px',
+          padding: '32px',
+          maxWidth: '760px',
           width: '100%',
-          maxHeight: '88vh',
+          maxHeight: '90vh',
           overflowY: 'auto',
           color: colors.textPrimary,
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px',
-          boxShadow: '0 30px 70px rgba(0, 0, 0, 0.8)'
+          gap: '24px',
+          boxShadow: isLight ? '0 25px 60px rgba(0,0,0,0.12)' : '0 35px 80px rgba(0, 0, 0, 0.9)',
+          position: 'relative'
         }}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          
+          {/* 🌟 1. Top Ribbon & Close */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: isLight ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <BookOpen size={22} color="#10b981" />
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)'
+              }}>
+                <BookOpen size={20} color="#ffffff" />
+              </div>
               <div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>
-                  Digitales CD-Booklet & Liner-Notes
+                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block' }}>
+                  Offizielles Musikschul-Booklet • Liner-Notes
                 </span>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900 }}>
-                  {bk.title}
-                </h3>
+                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: colors.textSecondary }}>
+                  {effectiveSchoolName}
+                </span>
               </div>
             </div>
 
@@ -4181,83 +4269,252 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               type="button"
               onClick={() => setActiveLinerNotesModal(null)}
               style={{
-                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.1)',
-                border: 'none',
+                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)',
+                border: isLight ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.1)',
                 borderRadius: '50%',
-                width: '36px',
-                height: '36px',
+                width: '38px',
+                height: '38px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: colors.textSecondary,
-                cursor: 'pointer'
+                color: colors.textPrimary,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
               }}
+              className="hover-scale"
+              title="Booklet schließen"
             >
               <X size={18} />
             </button>
           </div>
 
-          <p style={{ margin: 0, fontSize: '0.84rem', color: colors.textSecondary, lineHeight: 1.45 }}>
-            {bk.subtitle || 'Persönliche Notizen, didaktische Meilenstein-Erklärungen und Tonstudio-Aufnahmeberichte.'}
-          </p>
+          {/* 🌟 2. Editorial Album Cover Header Spread */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '24px',
+            background: isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.03)',
+            border: isLight ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: '24px',
+            padding: '20px 24px',
+            flexWrap: 'wrap'
+          }}>
+            {/* Square Album Cover */}
+            <div style={{
+              width: '100px',
+              height: '100px',
+              borderRadius: '18px',
+              background: bk.gradient || 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+              position: 'relative',
+              overflow: 'hidden',
+              flexShrink: 0
+            }}>
+              <span style={{ fontSize: '2.2rem', lineHeight: 1 }}>
+                {bk.title.includes('Weihnacht') ? '🎄' : '🎵'}
+              </span>
+              <span style={{ fontSize: '0.58rem', fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>
+                Meisterwerk
+              </span>
+            </div>
 
-          {/* Tracks Liner-Notes List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ flex: 1, minWidth: '240px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{
+                  fontSize: '0.66rem',
+                  fontWeight: 900,
+                  color: '#10b981',
+                  background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.18)',
+                  padding: '2px 8px',
+                  borderRadius: '100px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em'
+                }}>
+                  {bk.tracks.length} {bk.tracks.length === 1 ? 'Titel' : 'Titel'} • {formatSeconds(totalDurationCalc)} Min.
+                </span>
+                <span style={{ fontSize: '0.74rem', color: colors.textSecondary, fontWeight: 700 }}>
+                  Schuljahr 2026/2027
+                </span>
+              </div>
+
+              <h2 style={{ margin: 0, fontSize: '1.65rem', fontWeight: 900, color: colors.textPrimary, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                {bk.title}
+              </h2>
+
+              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: colors.textSecondary }}>
+                von <strong style={{ color: '#10b981' }}>{artistName}</strong> • {instrumentName}
+              </span>
+            </div>
+          </div>
+
+          {/* 🌟 3. Pedagogical Foreword */}
+          <div style={{
+            padding: '14px 18px',
+            borderRadius: '18px',
+            background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.08)',
+            borderLeft: '4px solid #10b981',
+            fontSize: '0.82rem',
+            lineHeight: 1.5,
+            color: isLight ? '#166534' : '#a7f3d0'
+          }}>
+            <strong>Pädagogisches Vorwort:</strong> Dieses digitale Booklet dokumentiert die künstlerische und instrumentale Entwicklung im laufenden Schuljahr. Jeder Song steht für einen gemeisterten Meilenstein, musikalisches Taktgefühl und authentische Spielfreude im Instrumentalunterricht.
+          </div>
+
+          {/* 🌟 4. Track-by-Track Liner Notes Chronicle */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 900, color: colors.textPrimary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Song-Chronik & Meilensteine:
+            </h4>
+
             {bk.tracks.map((t, idx) => (
               <div
                 key={idx}
                 style={{
-                  background: isLight ? '#f8fafc' : 'rgba(15, 23, 42, 0.65)',
-                  border: `1px solid ${colors.panelBorder}`,
-                  borderRadius: '16px',
-                  padding: '14px 16px',
+                  background: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.55)',
+                  border: isLight ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(255, 255, 255, 0.07)',
+                  borderRadius: '20px',
+                  padding: '16px 20px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '6px'
+                  gap: '8px',
+                  boxShadow: isLight ? '0 4px 14px rgba(0,0,0,0.03)' : 'none'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#10b981', background: isLight ? '#dcfce7' : 'rgba(16,185,129,0.15)', padding: '2px 8px', borderRadius: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{
+                      fontSize: '0.78rem',
+                      fontWeight: 900,
+                      color: '#10b981',
+                      background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.16)',
+                      padding: '3px 9px',
+                      borderRadius: '8px',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}>
                       #{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
                     </span>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 900, color: colors.textPrimary }}>
+                    <strong style={{ fontSize: '0.98rem', fontWeight: 900, color: colors.textPrimary }}>
                       {t.title}
-                    </span>
+                    </strong>
                   </div>
-                  {t.schoolYear && (
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: colors.textMuted }}>
-                      {t.schoolYear}
-                    </span>
-                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.74rem', color: colors.textSecondary }}>
+                    <span>{t.recordedAt || '16. Aug. 2026'}</span>
+                    <span>•</span>
+                    <span>{formatSeconds(t.duration || 45)} Min.</span>
+                  </div>
                 </div>
 
+                {/* Subtitle / Description */}
                 {t.subtitle && (
-                  <span style={{ fontSize: '0.76rem', color: colors.textMuted }}>
+                  <span style={{ fontSize: '0.78rem', color: colors.textSecondary }}>
                     {t.subtitle}
                   </span>
                 )}
 
-                {t.personalNote ? (
-                  <div style={{
-                    marginTop: '4px',
-                    padding: '8px 12px',
-                    borderRadius: '10px',
-                    background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.05)',
-                    borderLeft: '3px solid #10b981',
-                    fontSize: '0.78rem',
-                    color: colors.textSecondary,
-                    fontStyle: 'italic'
-                  }}>
-                    💬 "{t.personalNote}"
-                  </div>
-                ) : (
-                  <span style={{ fontSize: '0.74rem', color: colors.textMuted, fontStyle: 'italic', marginTop: '2px' }}>
-                    Noch keine persönliche Notiz hinterlegt.
-                  </span>
-                )}
+                {/* Story / Personal Milestone Note */}
+                <div style={{
+                  marginTop: '4px',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)',
+                  border: isLight ? '1px solid rgba(0, 0, 0, 0.04)' : '1px solid rgba(255, 255, 255, 0.05)',
+                  fontSize: '0.80rem',
+                  lineHeight: 1.45,
+                  color: t.personalNote ? colors.textPrimary : colors.textSecondary,
+                  fontStyle: t.personalNote ? 'normal' : 'italic'
+                }}>
+                  {t.personalNote ? (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                      <span style={{ fontSize: '1rem', lineHeight: 1 }}>💬</span>
+                      <span>„{t.personalNote}“</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Sparkles size={13} color="#10b981" />
+                      <span>Erfolgreich im Instrumentalunterricht eingespielt & als dokumentierter Audio-Meilenstein im Tresor verewigt.</span>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
+          </div>
+
+          {/* 🌟 5. Official Credits & Impressum Box */}
+          <div style={{
+            marginTop: '8px',
+            padding: '16px 20px',
+            borderRadius: '20px',
+            background: isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.03)',
+            border: isLight ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid rgba(255, 255, 255, 0.06)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '12px',
+            fontSize: '0.74rem'
+          }}>
+            <div>
+              <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Interpret:</span>
+              <strong style={{ color: colors.textPrimary }}>{artistName} ({instrumentName})</strong>
+            </div>
+            <div>
+              <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Musikschule:</span>
+              <strong style={{ color: colors.textPrimary }}>{effectiveSchoolName}</strong>
+            </div>
+            <div>
+              <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Plattform & Cloud-Tresor:</span>
+              <strong style={{ color: colors.textPrimary }}>Campus-Groovelab</strong>
+            </div>
+            <div>
+              <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Urheberschutz:</span>
+              <strong style={{ color: colors.textPrimary }}>§§ 15 Abs. 3, 53 UrhG (Privatgebrauch)</strong>
+            </div>
+          </div>
+
+          {/* 🌟 6. Bottom Action Bar */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', paddingTop: '12px', borderTop: isLight ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.08)' }}>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              style={{
+                padding: '10px 18px',
+                borderRadius: '100px',
+                border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.14)',
+                background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.06)',
+                color: colors.textPrimary,
+                fontSize: '0.80rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              className="hover-scale"
+            >
+              <span>🖨️ Drucken / Als PDF speichern</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveLinerNotesModal(null)}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '100px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                fontSize: '0.84rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+              }}
+              className="hover-scale"
+            >
+              <span>Schließen</span>
+            </button>
           </div>
         </div>
       </div>
@@ -5350,11 +5607,11 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     <div style={{
       flex: 1,
       width: '100%',
-      padding: isMobileOrSim ? '16px 12px 100px 12px' : '24px 28px 80px 28px',
+      padding: isMobileOrSim ? '12px 10px 90px 10px' : '16px 24px 40px 24px',
       overflowY: 'auto',
       display: 'flex',
       flexDirection: 'column',
-      gap: '22px',
+      gap: '16px',
       background: colors.bg,
       color: colors.textPrimary,
       fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -5411,112 +5668,230 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         }
       `}} />
 
-      {/* Top Bar: Navigation, Main Tabs, Theme Switcher & Share */}
+      {/* Top Bar: Clean Context-Aware 1-Row Navigation */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <button
-          type="button"
-          onClick={onBackToHub}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
-            border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
-            color: colors.textPrimary,
-            padding: '8px 16px',
-            borderRadius: '100px',
-            fontSize: '0.8rem',
-            fontWeight: 800,
-            cursor: 'pointer',
-            boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
-            transition: 'all 0.2s ease'
-          }}
-          className="hover-scale"
-        >
-          <span>← Zurück zum Aufgabenheft</span>
-        </button>
-
-        {/* 🌟 1. APPLE MAIN SEGMENTED TABS: ÜBERSICHT vs MEILENSTEINE vs PLAYLISTS */}
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          background: isLight ? '#e2e8f0' : 'rgba(0, 0, 0, 0.4)',
-          border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)'}`,
-          borderRadius: '100px',
-          padding: '4px',
-          gap: '4px'
-        }}>
+        {activeMainTab === 'playlists' ? (
           <button
             type="button"
             onClick={() => setActiveMainTab('overview')}
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
+              gap: '8px',
+              background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+              border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
+              color: colors.textPrimary,
+              padding: '8px 16px',
               borderRadius: '100px',
-              border: 'none',
-              background: activeMainTab === 'overview' ? (isLight ? '#ffffff' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') : 'transparent',
-              color: activeMainTab === 'overview' ? (isLight ? '#0f172a' : '#ffffff') : colors.textSecondary,
-              fontSize: '0.78rem',
-              fontWeight: 900,
+              fontSize: '0.8rem',
+              fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: activeMainTab === 'overview' && isLight ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+              boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
               transition: 'all 0.2s ease'
             }}
+            className="hover-scale"
           >
-            <Disc size={14} color={activeMainTab === 'overview' ? (isLight ? '#10b981' : '#ffffff') : undefined} />
-            <span>Übersicht</span>
+            <ArrowLeft size={15} color="#10b981" />
+            <span>Zurück zur Übersicht</span>
           </button>
-
+        ) : (
           <button
             type="button"
-            onClick={() => setActiveMainTab('milestones')}
+            onClick={onBackToHub}
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
+              gap: '8px',
+              background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+              border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
+              color: colors.textPrimary,
+              padding: '8px 16px',
               borderRadius: '100px',
-              border: 'none',
-              background: activeMainTab === 'milestones' ? (isLight ? '#ffffff' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') : 'transparent',
-              color: activeMainTab === 'milestones' ? (isLight ? '#0f172a' : '#ffffff') : colors.textSecondary,
-              fontSize: '0.78rem',
-              fontWeight: 900,
+              fontSize: '0.8rem',
+              fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: activeMainTab === 'milestones' && isLight ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+              boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
               transition: 'all 0.2s ease'
             }}
+            className="hover-scale"
           >
-            <Sparkles size={14} color={activeMainTab === 'milestones' ? '#f59e0b' : undefined} />
-            <span>Meilensteine (9)</span>
+            <span>← Zurück zum Aufgabenheft</span>
           </button>
+        )}
 
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('playlists')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '100px',
-              border: 'none',
-              background: activeMainTab === 'playlists' ? (isLight ? '#ffffff' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') : 'transparent',
-              color: activeMainTab === 'playlists' ? (isLight ? '#0f172a' : '#ffffff') : colors.textSecondary,
-              fontSize: '0.78rem',
-              fontWeight: 900,
-              cursor: 'pointer',
-              boxShadow: activeMainTab === 'playlists' && isLight ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <ListMusic size={14} color="#10b981" />
-            <span>Eigene Playlists ({customPlaylists.length})</span>
-          </button>
-        </div>
+        {/* Center: Switcher Tabs (Overview/Milestones/Playlists in overview mode OR Playlist Pills in playlist mode) */}
+        {activeMainTab === 'playlists' ? (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            overflowX: 'auto',
+            maxWidth: '100%',
+            padding: '2px'
+          }}>
+            {customPlaylists.map(otherPl => {
+              const isCur = activeCustomPlaylist ? otherPl.id === activeCustomPlaylist.id : otherPl.id === customPlaylists[0]?.id;
+              const otherTheme = VIBE_THEMES.find(v => v.id === otherPl.vibeTheme) || VIBE_THEMES[0];
+              return (
+                <button
+                  key={otherPl.id}
+                  type="button"
+                  onClick={() => setSelectedCustomPlaylistId(otherPl.id)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '100px',
+                    border: `1.5px solid ${isCur ? otherTheme.color : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)')}`,
+                    background: isCur ? `${otherTheme.color}22` : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.04)'),
+                    color: isCur ? otherTheme.color : colors.textSecondary,
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {otherPl.title} ({otherPl.tracks.length})
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => {
+                setWizardStep(1);
+                setShowPlaylistWizard(true);
+              }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '100px',
+                border: `1.5px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                background: 'transparent',
+                color: colors.textPrimary,
+                fontSize: '0.76rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                whiteSpace: 'nowrap'
+              }}
+              className="hover-scale"
+            >
+              <Plus size={13} color="#10b981" />
+              <span>Neue</span>
+            </button>
+          </div>
+        ) : (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            background: isLight ? '#e2e8f0' : 'rgba(0, 0, 0, 0.4)',
+            border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)'}`,
+            borderRadius: '100px',
+            padding: '4px',
+            gap: '4px'
+          }}>
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('overview')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '100px',
+                border: 'none',
+                background: activeMainTab === 'overview' ? (isLight ? '#ffffff' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') : 'transparent',
+                color: activeMainTab === 'overview' ? (isLight ? '#0f172a' : '#ffffff') : colors.textSecondary,
+                fontSize: '0.78rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                boxShadow: activeMainTab === 'overview' && isLight ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Disc size={14} color={activeMainTab === 'overview' ? (isLight ? '#10b981' : '#ffffff') : undefined} />
+              <span>Übersicht</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('milestones')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '100px',
+                border: 'none',
+                background: activeMainTab === 'milestones' ? (isLight ? '#ffffff' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') : 'transparent',
+                color: activeMainTab === 'milestones' ? (isLight ? '#0f172a' : '#ffffff') : colors.textSecondary,
+                fontSize: '0.78rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                boxShadow: activeMainTab === 'milestones' && isLight ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Sparkles size={14} color={activeMainTab === 'milestones' ? '#f59e0b' : undefined} />
+              <span>Meilensteine (9)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('playlists')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '100px',
+                border: 'none',
+                background: 'transparent',
+                color: colors.textSecondary,
+                fontSize: '0.78rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <ListMusic size={14} color="#10b981" />
+              <span>Eigene Playlists ({customPlaylists.length})</span>
+            </button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Quick-Create New Playlist Button in Top Bar */}
+          {activeMainTab === 'overview' && (
+            <button
+              type="button"
+              onClick={() => {
+                setWizardStep(1);
+                setShowPlaylistWizard(true);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                color: 'white',
+                padding: '8px 15px',
+                borderRadius: '100px',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                transition: 'all 0.2s ease'
+              }}
+              className="hover-scale"
+            >
+              <Plus size={15} strokeWidth={2.8} />
+              <span>Neue Playlist</span>
+            </button>
+          )}
+
           {/* Apple Segmented Theme Switcher */}
           <div style={{
             display: 'inline-flex',
@@ -5570,291 +5945,32 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             </button>
           </div>
 
-          {/* Share Action */}
-          <button
-            onClick={() => setShowShareModal(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              border: 'none',
-              color: 'white',
-              padding: '8px 16px',
-              borderRadius: '100px',
-              fontSize: '0.8rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
-              transition: 'all 0.2s ease'
-            }}
-            className="hover-scale"
-          >
-            <Share2 size={14} />
-            <span>Teilen</span>
-          </button>
+          {activeMainTab !== 'playlists' && (
+            <button
+              onClick={() => setShowShareModal(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
+                color: colors.textPrimary,
+                padding: '8px 16px',
+                borderRadius: '100px',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+              className="hover-scale"
+            >
+              <Share2 size={14} />
+              <span>Teilen</span>
+            </button>
+          )}
         </div>
       </div>
-
-      {/* HERO SECTION */}
-      {activeMainTab === 'overview' ? (
-        <div style={{
-          background: isLight ? '#ffffff' : 'linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)',
-          border: `1px solid ${colors.cardBorder}`,
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: '22px',
-          padding: isMobileOrSim ? '16px 18px' : '18px 24px',
-          display: 'flex',
-          flexDirection: isMobileOrSim ? 'column' : 'row',
-          alignItems: isMobileOrSim ? 'flex-start' : 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-          boxShadow: colors.shadow
-        }}>
-          {/* Left: Icon, Title & 1-line Subtitle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0, flex: 1 }}>
-            <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.18)',
-              border: `1px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.4)'}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <Disc size={22} color="#10b981" />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <h2 style={{
-                margin: 0,
-                fontSize: isMobileOrSim ? '1.18rem' : '1.35rem',
-                fontWeight: 900,
-                letterSpacing: '-0.02em',
-                color: colors.textPrimary,
-                lineHeight: 1.2
-              }}>
-                Meine Audio-Biografie – Playlists & Songs
-              </h2>
-              <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: colors.textSecondary, fontWeight: 500, lineHeight: 1.4 }}>
-                Playlists, Schuljahr-Highlights & Songs – mit automatischem Studio-Mastering (-14 LUFS).
-              </p>
-            </div>
-          </div>
-
-          {/* Right: Quick Stats & Quick-Create Button */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            flexWrap: 'wrap',
-            alignSelf: isMobileOrSim ? 'stretch' : 'center',
-            justifyContent: isMobileOrSim ? 'space-between' : 'flex-end',
-            flexShrink: 0
-          }}>
-            <span style={{
-              fontSize: '0.76rem',
-              fontWeight: 800,
-              padding: '6px 12px',
-              borderRadius: '100px',
-              background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)',
-              border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)'}`,
-              color: colors.textSecondary
-            }}>
-              {customPlaylists.length + activeSchoolYears.length} Playlists & Sammlungen
-            </span>
-
-            <button
-              type="button"
-              onClick={() => {
-                setWizardStep(1);
-                setShowPlaylistWizard(true);
-              }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 14px',
-                borderRadius: '100px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-                color: '#ffffff',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                boxShadow: '0 3px 12px rgba(16, 185, 129, 0.3)',
-                transition: 'all 0.2s ease'
-              }}
-              className="hover-scale"
-            >
-              <Plus size={15} strokeWidth={2.8} />
-              <span>Neue Playlist</span>
-            </button>
-          </div>
-        </div>
-      ) : activeMainTab === 'milestones' ? (
-        <div style={{
-          background: isLight ? '#ffffff' : 'linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)',
-          border: `1px solid ${colors.cardBorder}`,
-          backdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          padding: '22px 26px',
-          display: 'flex',
-          flexDirection: isMobileOrSim ? 'column' : 'row',
-          alignItems: isMobileOrSim ? 'flex-start' : 'center',
-          justifyContent: 'space-between',
-          gap: '20px',
-          boxShadow: colors.shadow
-        }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-              <div style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
-                background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.18)',
-                border: `1px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.4)'}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Disc size={24} color="#10b981" />
-              </div>
-              <h2 style={{
-                margin: 0,
-                fontSize: isMobileOrSim ? '1.25rem' : '1.5rem',
-                fontWeight: 900,
-                letterSpacing: '-0.02em',
-                color: colors.textPrimary
-              }}>
-                Meine Audio-Biografie & Meilenstein-Chronik
-              </h2>
-            </div>
-            <p style={{ margin: 0, fontSize: '0.86rem', color: colors.textSecondary, maxWidth: '640px', lineHeight: 1.45, fontWeight: 500 }}>
-              Deine musikalische Heldenreise in 9 Stationen – mit automatischem Studio Audio-Processing (-14 LUFS Klassik & Jazz Referenz).
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      {/* 🌟 SMART NUDGE CTA: NÄCHSTER OFFENER MEILENSTEIN */}
-      {activeMainTab === 'overview' && nextMilestone && !isNudgeDismissed && (
-        <div style={{
-          background: isLight 
-            ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' 
-            : 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.18) 100%)',
-          border: `1.5px solid ${isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.35)'}`,
-          borderRadius: '18px',
-          padding: isMobileOrSim ? '12px 14px' : '12px 20px',
-          display: 'flex',
-          flexDirection: isMobileOrSim ? 'column' : 'row',
-          alignItems: isMobileOrSim ? 'flex-start' : 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
-          boxShadow: isLight ? '0 4px 16px rgba(245, 158, 11, 0.08)' : '0 4px 20px rgba(0, 0, 0, 0.2)'
-        }}>
-          {/* Left: Sparkles Icon & Milestone Details */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.35)'
-            }}>
-              <Sparkles size={18} />
-            </div>
-
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '2px' }}>
-                <span style={{
-                  fontSize: '0.68rem',
-                  fontWeight: 900,
-                  color: '#b45309',
-                  background: isLight ? 'rgba(255, 255, 255, 0.85)' : 'rgba(245, 158, 11, 0.25)',
-                  padding: '2px 8px',
-                  borderRadius: '100px',
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  border: `1px solid ${isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.4)'}`
-                }}>
-                  Nächster Meilenstein • Station {nextMilestone.stepNumber < 10 ? `0${nextMilestone.stepNumber}` : nextMilestone.stepNumber}
-                </span>
-                <span style={{ fontSize: '0.84rem', fontWeight: 800, color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {nextMilestone.title}
-                </span>
-              </div>
-              <p style={{ margin: 0, fontSize: '0.76rem', color: isLight ? '#78350f' : '#cbd5e1', fontWeight: 500, lineHeight: 1.3 }}>
-                {nextMilestone.subtitle || 'Vervollständige deine musikalische Heldenreise mit dieser Schlüssel-Aufnahme.'}
-              </p>
-            </div>
-          </div>
-
-          {/* Right: CTA Button & Dismiss 'X' */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', alignSelf: isMobileOrSim ? 'flex-end' : 'center', flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedMilestoneId(nextMilestone.id);
-                setActiveMainTab('milestones');
-              }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                border: 'none',
-                color: '#ffffff',
-                padding: '7px 14px',
-                borderRadius: '100px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                boxShadow: '0 2px 10px rgba(245, 158, 11, 0.35)',
-                transition: 'all 0.2s ease'
-              }}
-              className="hover-scale"
-            >
-              <span>Station aufnehmen</span>
-              <ChevronRight size={14} strokeWidth={2.8} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsNudgeDismissed(true);
-                try {
-                  sessionStorage.setItem('cg_milestone_nudge_dismissed', 'true');
-                } catch {}
-              }}
-              title="Hinweis für diese Sitzung schließen"
-              style={{
-                background: isLight ? 'rgba(255, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.08)',
-                border: `1px solid ${isLight ? '#fde68a' : 'rgba(255, 255, 255, 0.15)'}`,
-                color: isLight ? '#92400e' : '#94a3b8',
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-      )}
 
 
 
@@ -6355,142 +6471,113 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                                 (seasonalFocus.type === 'favorites' && isFavoritesPl);
 
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* Top Navigation Bar: Breadcrumb + Playlist Switcher Pills */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px',
-                borderBottom: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
-                paddingBottom: '14px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveMainTab('overview')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 16px',
-                    borderRadius: '100px',
-                    border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
-                    background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.05)',
-                    color: colors.textPrimary,
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: isLight ? '0 2px 6px rgba(0,0,0,0.04)' : 'none'
-                  }}
-                  className="hover-scale"
-                >
-                  <ArrowLeft size={16} color="#10b981" />
-                  <span>Zurück zur Übersicht</span>
-                </button>
-
-                {/* Switcher Pills for all Custom Playlists */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  overflowX: 'auto',
-                  maxWidth: '100%',
-                  padding: '2px'
-                }}>
-                  {customPlaylists.map(otherPl => {
-                    const isCur = otherPl.id === pl.id;
-                    const otherTheme = VIBE_THEMES.find(v => v.id === otherPl.vibeTheme) || VIBE_THEMES[0];
-                    return (
-                      <button
-                        key={otherPl.id}
-                        type="button"
-                        onClick={() => setSelectedCustomPlaylistId(otherPl.id)}
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: '100px',
-                          border: `1.5px solid ${isCur ? otherTheme.color : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)')}`,
-                          background: isCur ? `${otherTheme.color}22` : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.04)'),
-                          color: isCur ? otherTheme.color : colors.textSecondary,
-                          fontSize: '0.76rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        {otherPl.title} ({otherPl.tracks.length})
-                      </button>
-                    );
-                  })}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setWizardStep(1);
-                      setShowPlaylistWizard(true);
-                    }}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '100px',
-                      border: `1.5px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-                      background: 'transparent',
-                      color: colors.textPrimary,
-                      fontSize: '0.76rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      whiteSpace: 'nowrap'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Plus size={13} color="#10b981" />
-                    <span>Neue</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Immersive Hero Header (Spotify Album Page Style) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* 🌟 Immersive Hero Header with 3D Animated Vinyl Stage */}
               <div style={{
                 background: isLight 
-                  ? `linear-gradient(135deg, ${effectiveAccent}12 0%, #ffffff 100%)` 
-                  : `linear-gradient(135deg, ${effectiveAccent}25 0%, rgba(30, 41, 59, 0.7) 100%)`,
+                  ? `linear-gradient(135deg, ${effectiveAccent}14 0%, #ffffff 100%)` 
+                  : `linear-gradient(135deg, ${effectiveAccent}28 0%, rgba(30, 41, 59, 0.75) 100%)`,
                 border: `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
                 borderRadius: '24px',
-                padding: isMobileOrSim ? '20px' : '28px',
+                padding: isMobileOrSim ? '20px' : '26px 30px',
                 display: 'flex',
                 flexDirection: isMobileOrSim ? 'column' : 'row',
-                gap: '24px',
-                alignItems: isMobileOrSim ? 'center' : 'flex-start',
+                gap: isMobileOrSim ? '20px' : '32px',
+                alignItems: isMobileOrSim ? 'center' : 'center',
                 boxShadow: isLight ? '0 10px 30px rgba(0, 0, 0, 0.05)' : '0 12px 35px rgba(0, 0, 0, 0.35)',
                 position: 'relative',
                 overflow: 'hidden'
               }}>
-                {/* 1:1 Large Spotify Cover (175px) */}
+                {/* 3D Modern Vinyl & Sleeve Hero Artwork */}
                 <div style={{
-                  width: isMobileOrSim ? '160px' : '185px',
-                  height: isMobileOrSim ? '160px' : '185px',
+                  position: 'relative',
+                  width: isMobileOrSim ? '180px' : '220px',
+                  height: isMobileOrSim ? '135px' : '155px',
                   flexShrink: 0,
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  boxShadow: `0 12px 30px ${effectiveAccent}44`
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start'
                 }}>
-                  {renderSpotifyCoverArtwork({
-                    gradient: effectiveGradient,
-                    accentColor: effectiveAccent,
-                    badge: isSeasonFocus ? seasonalFocus.badge : (pl.tracks.length === 0 ? '0 TRACKS • BEREIT' : `${pl.tracks.length} TRACKS`),
-                    title: pl.title,
-                    subtitle: pl.description,
-                    iconName: presetConfig?.iconName || pl.iconName,
-                    emoji: presetConfig?.emoji || (pl.iconName === 'gift' ? '🎄' : pl.iconName === 'sun' ? '☀️' : pl.iconName === 'heart' ? '⭐' : '🎵'),
-                    isSeasonFocus,
-                    seasonBadgeText: seasonalFocus.badge,
-                    seasonGlowColor: seasonalFocus.glowColor,
-                    trackCount: pl.tracks.length,
-                    isEmpty: pl.tracks.length === 0
-                  })}
+                  {/* 3D Vinyl Sleeve (Papphülle) */}
+                  <div style={{
+                    position: 'absolute',
+                    left: '0px',
+                    width: isMobileOrSim ? '120px' : '140px',
+                    height: isMobileOrSim ? '120px' : '140px',
+                    borderRadius: '16px',
+                    background: effectiveGradient,
+                    boxShadow: `0 12px 30px ${effectiveAccent}55`,
+                    border: '1.5px solid rgba(255, 255, 255, 0.3)',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxSizing: 'border-box',
+                    zIndex: 2,
+                    transform: 'rotate(-3deg)',
+                    transition: 'transform 0.3s ease'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Disc size={15} color="white" />
+                      <span style={{ fontSize: '0.60rem', fontWeight: 900, color: 'rgba(255, 255, 255, 0.95)', background: 'rgba(0,0,0,0.25)', padding: '1px 6px', borderRadius: '6px' }}>
+                        {pl.tracks.length} {pl.tracks.length === 1 ? 'TRACK' : 'TRACKS'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobileOrSim ? '1.8rem' : '2.2rem' }}>
+                      {presetConfig?.emoji || (pl.iconName === 'gift' ? '🎄' : pl.iconName === 'sun' ? '☀️' : pl.iconName === 'heart' ? '⭐' : '🎵')}
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.70rem', fontWeight: 900, color: 'white', display: 'block', lineHeight: 1.1, textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+                        {student?.first_name || 'Campus'}
+                      </span>
+                      <span style={{ fontSize: '0.56rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 700 }}>
+                        {student?.instrument || 'Meister-Album'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Rotating Vinyl Disc Sliding out of Sleeve */}
+                  <div style={{
+                    position: 'absolute',
+                    left: isMobileOrSim ? '55px' : '70px',
+                    width: isMobileOrSim ? '120px' : '140px',
+                    height: isMobileOrSim ? '120px' : '140px',
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle, #1c1917 25%, #0c0a09 60%, #000000 100%)',
+                    border: '3.5px solid #292524',
+                    boxShadow: isPlayingThisAlbum ? `0 0 30px ${effectiveAccent}99` : '0 10px 26px rgba(0, 0, 0, 0.65)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    animation: isPlayingThisAlbum ? 'vinylSpin 3.5s linear infinite' : 'none',
+                    transition: 'all 0.3s ease',
+                    zIndex: 1
+                  }}>
+                    {/* Vinyl Grooves Texture */}
+                    <div style={{
+                      width: isMobileOrSim ? '85px' : '100px',
+                      height: isMobileOrSim ? '85px' : '100px',
+                      borderRadius: '50%',
+                      border: '1px dashed rgba(255,255,255,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {/* Center Label */}
+                      <div style={{
+                        width: isMobileOrSim ? '44px' : '50px',
+                        height: isMobileOrSim ? '44px' : '50px',
+                        borderRadius: '50%',
+                        background: effectiveGradient,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.6)'
+                      }}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#09090b' }} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Right: Album Metadata & Hero Actions */}
@@ -6552,7 +6639,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   {/* Title & Description */}
                   <div>
                     <h2 style={{
-                      margin: '0 0 6px 0',
+                      margin: '0 0 4px 0',
                       fontSize: isMobileOrSim ? '1.4rem' : '1.85rem',
                       fontWeight: 900,
                       color: colors.textPrimary,
@@ -6563,7 +6650,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     </h2>
                     <p style={{
                       margin: 0,
-                      fontSize: '0.88rem',
+                      fontSize: '0.86rem',
                       color: colors.textSecondary,
                       lineHeight: 1.4
                     }}>
@@ -6590,6 +6677,17 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                         <span>{calcTracksDurationFormatted(pl.tracks)} Spielzeit</span>
                       </>
                     )}
+                    <span>•</span>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      color: isLight ? '#059669' : '#34d399',
+                      fontWeight: 800
+                    }}>
+                      <Heart size={12} fill={isLight ? '#059669' : '#34d399'} />
+                      <span>Familien-Echo: Im privaten Kreis geteilt</span>
+                    </span>
                   </div>
 
                   {/* Hero Action Bar */}
@@ -6598,7 +6696,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     alignItems: 'center',
                     gap: '10px',
                     flexWrap: 'wrap',
-                    marginTop: '6px',
+                    marginTop: '4px',
                     justifyContent: isMobileOrSim ? 'center' : 'flex-start'
                   }}>
                     {/* Play All Button */}
@@ -6756,121 +6854,117 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 </div>
               </div>
 
-              {/* Main Content: Tracklist or Didactic Empty State */}
+              {/* 🎶 Main Content: Full-Width Spotify Tracklist (No duplicate sidebar!) */}
               <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobileOrSim ? '1fr' : 'minmax(0, 1fr) 340px',
-                gap: '24px',
-                alignItems: 'start'
+                background: colors.cardBg,
+                border: `1.5px solid ${colors.cardBorder}`,
+                borderRadius: '24px',
+                padding: isMobileOrSim ? '18px' : '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: colors.shadow
               }}>
-                {/* Left: Tracks Container */}
-                <div style={{
-                  background: colors.cardBg,
-                  border: `1.5px solid ${colors.cardBorder}`,
-                  borderRadius: '24px',
-                  padding: '24px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  boxShadow: colors.shadow
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: colors.textPrimary }}>
-                      Trackliste ({pl.tracks.length} {pl.tracks.length === 1 ? 'Song' : 'Songs'})
-                    </h3>
-                    <span style={{ fontSize: '0.74rem', color: colors.textSecondary }}>
-                      Automatisches Studio Mastering (-14 LUFS)
-                    </span>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: colors.textPrimary }}>
+                    Trackliste ({pl.tracks.length} {pl.tracks.length === 1 ? 'Song' : 'Songs'})
+                  </h3>
+                  <span style={{ fontSize: '0.74rem', color: colors.textSecondary }}>
+                    Automatisches Studio Mastering (-14 LUFS)
+                  </span>
+                </div>
 
-                  {pl.tracks.length === 0 ? (
+                {pl.tracks.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '40px 24px',
+                    background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: '20px',
+                    border: `2px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '16px'
+                  }}>
                     <div style={{
-                      textAlign: 'center',
-                      padding: '40px 24px',
-                      background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
-                      borderRadius: '20px',
-                      border: `2px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
+                      width: '60px',
+                      height: '60px',
+                      borderRadius: '50%',
+                      background: `${effectiveAccent}18`,
+                      border: `1.5px solid ${effectiveAccent}44`,
                       display: 'flex',
-                      flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '16px'
+                      justifyContent: 'center',
+                      color: effectiveAccent,
+                      boxShadow: `0 8px 20px ${effectiveAccent}25`
                     }}>
-                      <div style={{
-                        width: '60px',
-                        height: '60px',
-                        borderRadius: '50%',
-                        background: `${effectiveAccent}18`,
-                        border: `1.5px solid ${effectiveAccent}44`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: effectiveAccent,
-                        boxShadow: `0 8px 20px ${effectiveAccent}25`
-                      }}>
-                        <Mic size={28} />
-                      </div>
-                      <div style={{ maxWidth: '440px' }}>
-                        <h4 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 900, color: colors.textPrimary }}>
-                          Dieses Album wartet auf deinen 1. Song!
-                        </h4>
-                        <p style={{ margin: 0, fontSize: '0.84rem', color: colors.textSecondary, lineHeight: 1.5 }}>
-                          Nimm dein Stück direkt über die Studio-Mikrofonaufnahme auf. Dein Klang wird automatisch studio-gemastert (-14 LUFS) und dauerhaft im Album archiviert.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveUploadModalMilestone(null);
-                          setRecordingPlaylistId(pl.id);
-                        }}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '12px 26px',
-                          borderRadius: '100px',
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                          border: 'none',
-                          color: '#ffffff',
-                          fontSize: '0.88rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 18px rgba(16, 185, 129, 0.45)',
-                          marginTop: '6px'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Mic size={16} />
-                        <span>Jetzt ersten Song für dieses Album aufnehmen</span>
-                      </button>
+                      <Mic size={28} />
                     </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {pl.tracks.map((t, idx) => {
-                        const isPlaying = activePlayingId === t.id;
-                        const isMaster = t.preferredVersion !== 'raw';
+                    <div style={{ maxWidth: '440px' }}>
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 900, color: colors.textPrimary }}>
+                        Dieses Album wartet auf deinen 1. Song!
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.84rem', color: colors.textSecondary, lineHeight: 1.5 }}>
+                        Nimm dein Stück direkt über die Studio-Mikrofonaufnahme auf. Dein Klang wird automatisch studio-gemastert (-14 LUFS) und dauerhaft im Album archiviert.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveUploadModalMilestone(null);
+                        setRecordingPlaylistId(pl.id);
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 26px',
+                        borderRadius: '100px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        border: 'none',
+                        color: '#ffffff',
+                        fontSize: '0.88rem',
+                        fontWeight: 900,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 18px rgba(16, 185, 129, 0.45)',
+                        marginTop: '6px'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Mic size={16} />
+                      <span>Jetzt ersten Song für dieses Album aufnehmen</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {pl.tracks.map((t, idx) => {
+                      const isPlaying = activePlayingId === t.id;
+                      const isMaster = t.preferredVersion !== 'raw';
 
-                        return (
-                          <div
-                            key={t.id}
-                            style={{
-                              padding: '12px 16px',
-                              borderRadius: '14px',
-                              background: isPlaying ? (isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.2)') : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)'),
-                              border: `1px solid ${isPlaying ? '#10b981' : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)')}`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: '12px'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      return (
+                        <div
+                          key={t.id}
+                          style={{
+                            padding: '12px 18px',
+                            borderRadius: '16px',
+                            background: isPlaying ? (isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.2)') : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)'),
+                            border: `1px solid ${isPlaying ? '#10b981' : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)')}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
                               <button
                                 type="button"
                                 onClick={() => handlePlayToggle(t.audioUrl, t.masteredAudioUrl, t.id)}
                                 style={{
                                   width: '38px',
                                   height: '38px',
+                                  flexShrink: 0,
                                   borderRadius: '50%',
                                   border: 'none',
                                   background: isPlaying ? '#10b981' : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'),
@@ -6878,66 +6972,58 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  cursor: 'pointer'
+                                  cursor: 'pointer',
+                                  boxShadow: isPlaying ? '0 3px 10px rgba(16, 185, 129, 0.4)' : 'none'
                                 }}
                               >
                                 {isPlaying ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: '2px' }} />}
                               </button>
 
-                              <div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '0.76rem', fontWeight: 900, color: themeObj.color }}>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 900, color: themeObj.color }}>
                                     #{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
                                   </span>
-                                  <span style={{ fontSize: '0.90rem', fontWeight: 800, color: isPlaying ? '#10b981' : colors.textPrimary }}>
+                                  <span style={{
+                                    fontSize: '0.92rem',
+                                    fontWeight: 800,
+                                    color: isPlaying ? '#10b981' : colors.textPrimary,
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
+                                  }}>
                                     {t.title}
                                   </span>
 
-                                  {isMaster ? (
-                                    <span style={{
-                                      fontSize: '0.66rem',
-                                      fontWeight: 900,
-                                      color: '#15803d',
-                                      background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.2)',
-                                      border: '1px solid rgba(16, 185, 129, 0.4)',
-                                      padding: '1px 6px',
-                                      borderRadius: '6px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '3px'
-                                    }}>
-                                      <Sparkles size={10} />
-                                      <span>Studio Master</span>
-                                    </span>
-                                  ) : (
-                                    <span style={{
-                                      fontSize: '0.66rem',
-                                      fontWeight: 900,
-                                      color: '#b45309',
-                                      background: isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.2)',
-                                      border: '1px solid rgba(245, 158, 11, 0.4)',
-                                      padding: '1px 6px',
-                                      borderRadius: '6px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '3px'
-                                    }}>
-                                      <Mic size={10} />
-                                      <span>Pure RAW</span>
-                                    </span>
+                                  {/* Animated Equalizer bars when playing */}
+                                  {isPlaying && (
+                                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '14px', paddingBottom: '1px' }}>
+                                      {[0.8, 1.4, 0.6, 1.1].map((h, i) => (
+                                        <div
+                                          key={i}
+                                          style={{
+                                            width: '2.5px',
+                                            height: `${h * 9}px`,
+                                            background: '#10b981',
+                                            borderRadius: '2px',
+                                            animation: `pulse 0.${6 + i * 2}s ease-in-out infinite alternate`
+                                          }}
+                                        />
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
-                                <span style={{ fontSize: '0.74rem', color: colors.textSecondary }}>
-                                  {t.subtitle || (isMaster ? 'Studio-Processing (-14 LUFS)' : 'Pure RAW Direct')} • {t.recordedAt}
+                                <span style={{ fontSize: '0.74rem', color: colors.textSecondary, marginTop: '2px', display: 'block' }}>
+                                  {t.subtitle ? `${t.subtitle} • ` : ''}{t.recordedAt || 'Aufnahme aus dem Unterricht'}
                                 </span>
                               </div>
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                               <button
                                 type="button"
                                 onClick={() => openEditTrackModal(pl.id, t)}
-                                title="Song bearbeiten (Hall, Master/RAW & Notizen)"
+                                title="Song bearbeiten (Hall, Notizen & Version)"
                                 style={{
                                   width: '32px',
                                   height: '32px',
@@ -6998,42 +7084,89 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                               </button>
                             </div>
                           </div>
-                        );
-                      })}
 
-                      {/* Add Track Action Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveUploadModalMilestone(null);
-                          setRecordingPlaylistId(pl.id);
-                        }}
-                        style={{
-                          padding: '12px',
-                          borderRadius: '14px',
-                          border: `1.5px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-                          background: 'transparent',
-                          color: colors.textPrimary,
-                          fontSize: '0.82rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          marginTop: '6px'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Plus size={15} color="#10b981" />
-                        <span>+ Weiteren Song für dieses Album aufnehmen</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                          {/* 🎵 Interactive Audio Progress Scrubber for the playing track (Vor & Zurückspulen) */}
+                          {isPlaying && (
+                            <div 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const clickPos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                                const trackDuration = t.duration || audioDuration || 45;
+                                const targetTime = clickPos * trackDuration;
+                                seekMiniPlayer(targetTime);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '4px 0 2px 0',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <div style={{
+                                width: '100%',
+                                height: '6px',
+                                borderRadius: '3px',
+                                background: isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.14)',
+                                position: 'relative',
+                                overflow: 'hidden'
+                              }}>
+                                <div style={{
+                                  width: `${(t.duration || audioDuration || 45) > 0 ? (audioCurrentTime / (t.duration || audioDuration || 45)) * 100 : 0}%`,
+                                  height: '100%',
+                                  background: '#10b981',
+                                  borderRadius: '3px',
+                                  transition: 'width 0.1s linear'
+                                }} />
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginTop: '4px',
+                                fontSize: '0.70rem',
+                                fontWeight: 700,
+                                color: colors.textSecondary,
+                                fontVariantNumeric: 'tabular-nums'
+                              }}>
+                                <span>{formatSeconds(audioCurrentTime)}</span>
+                                <span style={{ fontSize: '0.66rem', color: '#10b981', fontWeight: 800 }}>Klicken zum Spulen</span>
+                                <span>{formatSeconds(t.duration || audioDuration || 45)}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
 
-                {/* Right Side: Vinyl Shelf Component */}
-                {renderVinylShelf()}
+                    {/* Add Track Action Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveUploadModalMilestone(null);
+                        setRecordingPlaylistId(pl.id);
+                      }}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '14px',
+                        border: `1.5px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                        background: 'transparent',
+                        color: colors.textPrimary,
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        marginTop: '6px'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Plus size={15} color="#10b981" />
+                      <span>+ Weiteren Song für dieses Album aufnehmen</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -7083,7 +7216,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 </div>
                 <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900 }}>
                   {wizardStep === 1 && '1. Playlist-Name & Thema'}
-                  {wizardStep === 2 && '2. Spotify Playlist-Cover wählen'}
+                  {wizardStep === 2 && '2. Playlist-Cover wählen'}
                   {wizardStep === 3 && '3. Tracks zusammenstellen'}
                 </h3>
               </div>
@@ -7219,18 +7352,18 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   }}
                   className="hover-scale"
                 >
-                  <span>Weiter: Spotify-Cover wählen</span>
+                  <span>Weiter: Playlist-Cover wählen</span>
                   <ChevronRight size={16} />
                 </button>
               </div>
             )}
 
-            {/* STEP 2: 20 UNIVERSAL SPOTIFY COVERS (5x4 GRID WITH CATEGORY TABS) */}
+            {/* STEP 2: 20 CURATED COVERS (5x4 GRID WITH CATEGORY TABS) */}
             {wizardStep === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                   <span style={{ fontSize: '0.82rem', color: colors.textSecondary }}>
-                    Wähle aus 20 universellen Spotify-Covern für jedes Alter & Musikgenre:
+                    Wähle aus 20 kuratierten Cover-Designs für jedes Musikgenre:
                   </span>
 
                   {/* 🏷️ Category Filter Tabs */}
@@ -8715,6 +8848,66 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               </div>
             )}
 
+            {/* 🎨 Design-Auswahl für die geteilte Playlist: Spotify Dark vs. Apple Music Light */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.74rem', color: colors.textSecondary, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Design der Playlist wählen
+              </label>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '8px',
+                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.05)',
+                padding: '4px',
+                borderRadius: '14px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setShareDesignTheme('dark')}
+                  style={{
+                    padding: '9px 12px',
+                    borderRadius: '10px',
+                    border: shareDesignTheme === 'dark' ? '1.5px solid #10b981' : '1px solid transparent',
+                    background: shareDesignTheme === 'dark' ? (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
+                    color: colors.textPrimary,
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: shareDesignTheme === 'dark' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>🌙 Dunkel</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShareDesignTheme('light')}
+                  style={{
+                    padding: '9px 12px',
+                    borderRadius: '10px',
+                    border: shareDesignTheme === 'light' ? '1.5px solid #10b981' : '1px solid transparent',
+                    background: shareDesignTheme === 'light' ? (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
+                    color: colors.textPrimary,
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: shareDesignTheme === 'light' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>☀️ Hell</span>
+                </button>
+              </div>
+            </div>
+
             {/* Apple PIN Passcode Widget */}
             <div style={{
               background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
@@ -8736,13 +8929,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   type="button"
                   onClick={() => {
                     const newPin = Math.floor(1000 + Math.random() * 9000).toString();
-                    setSharePin(newPin);
-                    try {
-                      localStorage.setItem(`campus_share_pin_${student?.id || studentId}`, newPin);
-                      if (shareTargetPlaylistId) {
-                        localStorage.setItem(`campus_share_pin_${student?.id || studentId}_${shareTargetPlaylistId}`, newPin);
-                      }
-                    } catch {}
+                    savePinToStorage(newPin);
                   }}
                   style={{
                     background: 'transparent',
@@ -8774,13 +8961,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     value={sharePin}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                      setSharePin(val);
-                      try {
-                        localStorage.setItem(`campus_share_pin_${student?.id || studentId}`, val);
-                        if (shareTargetPlaylistId) {
-                          localStorage.setItem(`campus_share_pin_${student?.id || studentId}_${shareTargetPlaylistId}`, val);
-                        }
-                      } catch {}
+                      savePinToStorage(val);
                     }}
                     style={{
                       position: 'absolute',
@@ -8988,7 +9169,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px' }}>
                 <button
                   type="button"
-                  onClick={() => window.open(effectiveShareUrl, '_blank')}
+                  onClick={() => {
+                    savePinToStorage(sharePin);
+                    window.open(effectiveShareUrl, '_blank');
+                  }}
                   style={{
                     background: 'transparent',
                     border: 'none',

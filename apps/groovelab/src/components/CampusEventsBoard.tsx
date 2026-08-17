@@ -5337,13 +5337,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             dateBlockBorder = '1.5px dashed #eab308';
                                           }
                                         }
-                                      } else if (isGroupOcc) {
-                                        textColor = '#0369a1';
-                                        subColor = '#0284c7';
-                                        dateBlockBg = '#e0f2fe';
-                                        rowBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
-                                        rowBorder = '2px solid #0284c7';
-                                        dateBlockBorder = '1.5px solid #0284c7';
                                       } else if (isPendingReview) {
                                         rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
                                         rowBorder = '1px dashed #eab308';
@@ -5414,9 +5407,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                                 <span style={{
                                                   fontSize: '9.5px',
                                                   fontWeight: 800,
-                                                  background: '#e0f2fe',
-                                                  color: '#0369a1',
-                                                  border: '1px solid #bae6fd',
+                                                  background: '#eff6ff',
+                                                  color: '#1d4ed8',
+                                                  border: '1px solid #bfdbfe',
                                                   padding: '1px 6px',
                                                   borderRadius: '6px',
                                                   display: 'inline-flex',

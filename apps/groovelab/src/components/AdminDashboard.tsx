@@ -1436,12 +1436,178 @@ export function AdminDashboard({
     const clampedCode = Math.max(65, Math.min(90, charCode));
     const hue = Math.round(((clampedCode - 65) / 25) * 360);
     return {
-      from: `hsl(${hue}, 85%, 94%)`,
-      to: `hsl(${hue}, 80%, 84%)`,
+      from: `hsl(${hue}, 85%, 92%)`,
+      to: `hsl(${hue}, 80%, 82%)`,
       text: `hsl(${hue}, 90%, 25%)`,
       shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
       shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
     };
+  };
+
+  const renderSongVinylCover = (songColor: { from: string; to: string; text?: string }, size: 'sm' | 'md' | 'lg' = 'md') => {
+    const isSm = size === 'sm';
+    const isLg = size === 'lg';
+    const sleeveSize = isSm ? 54 : isLg ? 102 : 94;
+    const vinylSize = isSm ? 48 : isLg ? 92 : 84;
+    const borderRadius = isSm ? 14 : isLg ? 25 : 23;
+    const noteWidth = isSm ? 30 : isLg ? 52 : 46;
+    const noteHeight = isSm ? 30 : isLg ? 52 : 46;
+    const vinylRight = isSm ? -7 : isLg ? -13 : -11;
+
+    const gradId = `adminFineGrad_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+    const highId = `adminFineHigh_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+    const headHigh1 = `adminHead1_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+    const headHigh2 = `adminHead2_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+
+    return (
+      <div style={{
+        position: 'relative',
+        width: `${sleeveSize + (isSm ? 8 : 12)}px`,
+        height: `${sleeveSize}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        marginLeft: isSm ? '-3px' : '-5px',
+        flexShrink: 0
+      }}>
+        {/* 1. Sleek Black Vinyl Disc with Ultra-Fine Grooves */}
+        <div style={{
+          position: 'absolute',
+          right: `${vinylRight}px`,
+          width: `${vinylSize}px`,
+          height: `${vinylSize}px`,
+          borderRadius: '50%',
+          boxShadow: '3px 5px 15px rgba(0, 0, 0, 0.32)',
+          zIndex: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <svg width={vinylSize} height={vinylSize} viewBox="0 0 100 100" fill="none">
+            <defs>
+              <radialGradient id={`discBase_${gradId}`} cx="50" cy="50" r="50" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#2c2c30" />
+                <stop offset="25%" stopColor="#141416" />
+                <stop offset="60%" stopColor="#08080a" />
+                <stop offset="90%" stopColor="#18181b" />
+                <stop offset="100%" stopColor="#050506" />
+              </radialGradient>
+              {/* Anisotropic Light Reflection Beams */}
+              <linearGradient id={`discSheen1_${gradId}`} x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.22)" />
+                <stop offset="35%" stopColor="rgba(255, 255, 255, 0)" />
+                <stop offset="65%" stopColor="rgba(255, 255, 255, 0)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0.18)" />
+              </linearGradient>
+              <linearGradient id={`discSheen2_${gradId}`} x1="100" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.15)" />
+                <stop offset="40%" stopColor="rgba(255, 255, 255, 0)" />
+                <stop offset="60%" stopColor="rgba(255, 255, 255, 0)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0.12)" />
+              </linearGradient>
+            </defs>
+            {/* Disc Body */}
+            <circle cx="50" cy="50" r="49.5" fill={`url(#discBase_${gradId})`} />
+            <circle cx="50" cy="50" r="49.5" fill={`url(#discSheen1_${gradId})`} />
+            <circle cx="50" cy="50" r="49.5" fill={`url(#discSheen2_${gradId})`} />
+            
+            {/* Distinct, Crisp Concentric Vinyl Grooves */}
+            <circle cx="50" cy="50" r="46.5" stroke="rgba(255,255,255,0.32)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="44" stroke="rgba(0,0,0,0.65)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="41.5" stroke="rgba(255,255,255,0.26)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="39" stroke="rgba(0,0,0,0.6)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="36.5" stroke="rgba(255,255,255,0.28)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="34" stroke="rgba(0,0,0,0.6)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="31.5" stroke="rgba(255,255,255,0.22)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="29" stroke="rgba(0,0,0,0.6)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="26.5" stroke="rgba(255,255,255,0.18)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="24" stroke="rgba(0,0,0,0.5)" strokeWidth="0.85" />
+            <circle cx="50" cy="50" r="21.5" stroke="rgba(255,255,255,0.16)" strokeWidth="0.85" />
+            
+            {/* Outer Rim Light Edge */}
+            <circle cx="50" cy="50" r="49" stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
+          </svg>
+        </div>
+
+        {/* 2. Soft Pastel Rounded Square Sleeve */}
+        <div style={{
+          width: `${sleeveSize}px`,
+          height: `${sleeveSize}px`,
+          background: `linear-gradient(135deg, ${songColor.from} 0%, ${songColor.to} 100%)`,
+          borderRadius: `${borderRadius}px`,
+          boxShadow: '0 11px 24px -4px rgba(0, 0, 0, 0.1), 0 3px 7px -2px rgba(0, 0, 0, 0.05), inset 0 1.5px 2px rgba(255, 255, 255, 0.9)',
+          border: '1.5px solid rgba(255, 255, 255, 0.8)',
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2,
+          boxSizing: 'border-box'
+        }}>
+          {/* 3. 10% Feiner 3D Double Music Note (Sleek, Glossy, Precision Engineered) */}
+          <svg 
+            width={noteWidth} 
+            height={noteHeight} 
+            viewBox="0 0 100 100" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ filter: 'drop-shadow(0 4.5px 7px rgba(0, 0, 0, 0.25)) drop-shadow(0 1.5px 2.5px rgba(0, 0, 0, 0.14))' }}
+          >
+            <defs>
+              {/* Main 3D Dark Graphite Body */}
+              <linearGradient id={gradId} x1="25" y1="15" x2="75" y2="85" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#2c2c30" />
+                <stop offset="35%" stopColor="#18181b" />
+                <stop offset="75%" stopColor="#0f0f12" />
+                <stop offset="100%" stopColor="#08080a" />
+              </linearGradient>
+              
+              {/* Head 1 Specular Glow */}
+              <radialGradient id={headHigh1} cx="34" cy="67" r="12" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.45)" />
+                <stop offset="45%" stopColor="rgba(255, 255, 255, 0.08)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
+              </radialGradient>
+
+              {/* Head 2 Specular Glow */}
+              <radialGradient id={headHigh2} cx="67" cy="58" r="12" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.45)" />
+                <stop offset="45%" stopColor="rgba(255, 255, 255, 0.08)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
+              </radialGradient>
+
+              {/* Top Beam Highlight Line */}
+              <linearGradient id={highId} x1="39" y1="21" x2="78" y2="13" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.72)" />
+                <stop offset="60%" stopColor="rgba(255, 255, 255, 0.26)" />
+                <stop offset="100%" stopColor="rgba(255, 255, 255, 0.05)" />
+              </linearGradient>
+            </defs>
+
+            {/* Left Note Head (10% feineres 3D-Oval) */}
+            <ellipse cx="36" cy="68.5" rx="11.8" ry="8.8" transform="rotate(-19 36 68.5)" fill={`url(#${gradId})`} />
+            <ellipse cx="36" cy="68.5" rx="11.8" ry="8.8" transform="rotate(-19 36 68.5)" fill={`url(#${headHigh1})`} />
+
+            {/* Right Note Head (10% feineres 3D-Oval) */}
+            <ellipse cx="68" cy="59.5" rx="11.8" ry="8.8" transform="rotate(-19 68 59.5)" fill={`url(#${gradId})`} />
+            <ellipse cx="68" cy="59.5" rx="11.8" ry="8.8" transform="rotate(-19 68 59.5)" fill={`url(#${headHigh2})`} />
+
+            {/* Left Stem (5.8px Schlanker Stab) */}
+            <rect x="42" y="25" width="5.8" height="44" rx="2.9" fill={`url(#${gradId})`} />
+
+            {/* Right Stem (5.8px Schlanker Stab) */}
+            <rect x="74.2" y="16" width="5.8" height="44" rx="2.9" fill={`url(#${gradId})`} />
+
+            {/* Top Beam (10% feinerer Verbindungsbalken) */}
+            <path d="M 42 26 C 42 22 45 21 48.5 20.2 L 75.5 13.5 C 78.5 12.8 81.5 14.2 81.5 17.5 L 81.5 24.5 C 81.5 27.5 78.5 28.5 75.5 29.2 L 48.5 35.8 C 45 36.5 42 35.2 42 32 Z" fill={`url(#${gradId})`} />
+
+            {/* Top Beam Specular Light Edge */}
+            <path d="M 44.5 23 L 78.5 14.8" stroke={`url(#${highId})`} strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
+    );
   };
   const [dragOverStationId, setDragOverStationId] = useState<string | null>(null);
 
@@ -12025,45 +12191,8 @@ export function AdminDashboard({
                         cursor: 'pointer'
                       }}
                     >
-                      {/* Pink/Peach Sleeve + Vinyl peeking out Cover Icon */}
-                      <div style={{ position: 'relative', width: '68px', height: '56px', flexShrink: 0 }}>
-                        {/* Vinyl record peeking out from the right */}
-                        <div style={{
-                          position: 'absolute',
-                          right: '4px',
-                          top: '5px',
-                          width: '46px',
-                          height: '46px',
-                          borderRadius: '50%',
-                          background: '#090a0f',
-                          boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          zIndex: 1
-                        }}>
-                          {/* Center hole/label */}
-                          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: lwColor.to, opacity: 0.45 }} />
-                        </div>
-                        {/* Cover Sleeve */}
-                        <div style={{
-                          position: 'absolute',
-                          left: 0,
-                          top: 0,
-                          width: '56px',
-                          height: '56px',
-                          background: coverBg,
-                          borderRadius: '16px',
-                          boxShadow: '0 8px 20px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          zIndex: 2,
-                          border: `1px solid ${lwColor.text}18`
-                        }}>
-                          <span style={{ fontSize: '28px', lineHeight: 1, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.1))' }}>🎵</span>
-                        </div>
-                      </div>
+                      {/* Pastel Sleeve + Vinyl peeking out Cover */}
+                      {renderSongVinylCover(lwColor, 'sm')}
 
                       {/* Title and Artist */}
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -12635,179 +12764,6 @@ export function AdminDashboard({
             
             {/* Column 1: Übe-Ziele der Klasse */}
             <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                  <span>🌱</span> Übe-Ziele der Klasse
-                </h3>
-                <button 
-                  onClick={() => setShowAddGoalForm(!showAddGoalForm)}
-                  style={{ background: brandColor, color: 'white', border: 'none', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  className="hover-scale"
-                >
-                  <span>{showAddGoalForm ? 'Abbrechen' : '+ Ziel'}</span>
-                </button>
-              </div>
-
-              {showAddGoalForm && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Neues Ziel erstellen</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Ziels</label>
-                    <input 
-                      type="text" 
-                      value={newGoalTitle} 
-                      onChange={(e) => setNewGoalTitle(e.target.value)} 
-                      placeholder="z.B. Wochenziel, Ferien-Challenge"
-                      style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
-                    />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Ziel (Minuten)</label>
-                      <input 
-                        type="number" 
-                        min="1"
-                        value={newGoalMinutes} 
-                        onChange={(e) => setNewGoalMinutes(e.target.value)} 
-                        style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 700 }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Deadline (optional)</label>
-                      <input 
-                        type="date" 
-                        value={newGoalDeadline} 
-                        onChange={(e) => setNewGoalDeadline(e.target.value)} 
-                        style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
-                      />
-                    </div>
-                  </div>
-                  <button 
-                    onClick={handleAddGoal}
-                    style={{ background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', marginTop: '4px' }}
-                  >
-                    Ziel hinzufügen
-                  </button>
-                </div>
-              )}
-
-              {(() => {
-                const targets = stats?.weeklyTargets || [];
-                const totalGoals = targets.length;
-                const masteredGoals = targets.filter((target: any) => {
-                  const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
-                  return targetPercent >= 100;
-                }).length;
-                const highestPercent = targets.length > 0 
-                  ? Math.max(...targets.map((target: any) => Math.round((classWeeklyMins / target.minutes) * 100)))
-                  : 0;
-
-                return (
-                  <>
-                    {totalGoals > 0 && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
-                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
-                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
-                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#34a853', marginTop: '2px' }}>{masteredGoals}</span>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
-                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {totalGoals === 0 ? (
-                        <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
-                          Keine aktiven Ziele angelegt.
-                        </p>
-                      ) : (
-                        targets.map((target: any) => {
-                          const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
-                          const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
-                          
-                          const maxPercentOnBar = 133;
-                          const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
-                          const isAchieved = targetPercent >= 100;
-
-                          return (
-                            <div key={target.id} style={{
-                              position: 'relative',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              background: '#34a853',
-                              boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
-                              borderRadius: '16px',
-                              padding: '12px 14px',
-                              gap: '8px'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em', lineHeight: '1.25' }}>
-                                    {target.title || 'Challenge'}
-                                  </span>
-                                  {target.deadline && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 500, color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.75)', lineHeight: '1.2' }}>
-                                      bis {new Date(target.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                                      {isDeadlinePassed && ' (abgelaufen)'}
-                                    </span>
-                                  )}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                  <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFeatureSettings: '"tnum"' }}>
-                                    {targetPercent}%
-                                  </span>
-                                  <button 
-                                    onClick={() => handleDeleteGoal(target.id)}
-                                    style={{ background: 'rgba(255, 255, 255, 0.15)', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '4px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                    title="Ziel löschen"
-                                  >
-                                    <X size={12} strokeWidth={2.5} />
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px' }}>
-                                <div style={{
-                                  width: `${visualWidth}%`,
-                                  height: '100%',
-                                  background: '#ffffff',
-                                  borderRadius: '99px',
-                                  transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                  boxShadow: '0 0 6px rgba(255, 255, 255, 0.25)'
-                                }} />
-                              </div>
-
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
-                                <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
-                                  <span style={{ fontWeight: 700, color: '#ffffff' }}>{formatMins(classWeeklyMins)}</span> von {target.minutes} Min.
-                                </span>
-                                <span style={{
-                                  fontWeight: 700,
-                                  color: isAchieved ? '#e6f4ea' : 'rgba(255, 255, 255, 0.8)',
-                                  whiteSpace: 'normal',
-                                  textAlign: 'right'
-                                }}>
-                                  {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - classWeeklyMins)} Min.`}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-
-            {/* Column 2: Helden-Momente */}
-            <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', minHeight: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                   <span>🌱</span> Übe-Ziele der Klasse

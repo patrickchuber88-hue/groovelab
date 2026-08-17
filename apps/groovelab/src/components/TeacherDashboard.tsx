@@ -40,6 +40,75 @@ const getSimulatedNow = (): Date => {
   return new Date(baseSim.getTime() + elapsedMinutes * 60000);
 };
 
+const splitAndNormalizeStudents = (studentsList: any[], allStudentsList: any[] = []): any[] => {
+  if (!studentsList || studentsList.length === 0) return [];
+  const result: any[] = [];
+  
+  studentsList.forEach((stud: any) => {
+    if (!stud) return;
+    const rawName = String(stud.name || stud.first_name || '').trim();
+    if (rawName.includes('&') || rawName.includes(',') || /\bund\b/i.test(rawName)) {
+      const parts = rawName.split(/&|,|\bund\b/i).map((p: string) => p.trim().replace(/\.+$/, '')).filter(Boolean);
+      parts.forEach((partName: string, pIdx: number) => {
+        const pFn = partName.split(' ')[0];
+        const pLn = partName.split(' ').slice(1).join(' ');
+        const found = allStudentsList.find((s: any) => 
+          (s.first_name && s.first_name.toLowerCase() === pFn.toLowerCase()) ||
+          (s.name && s.name.toLowerCase().startsWith(pFn.toLowerCase()))
+        );
+        const resolvedStudent = {
+          ...stud,
+          id: found?.id || `${stud.id || 'group'}-part-${pIdx}`,
+          name: found ? `${found.first_name} ${found.last_name || ''}`.trim() : partName,
+          first_name: found?.first_name || pFn,
+          last_name: found?.last_name || pLn
+        };
+        
+        const fnLower = (resolvedStudent.first_name || pFn).toLowerCase();
+        const existingIdx = result.findIndex((r: any) => {
+          if (r.id && resolvedStudent.id && r.id === resolvedStudent.id) return true;
+          const rFn = (r.first_name || r.name?.split(' ')[0] || '').toLowerCase().trim();
+          return rFn && fnLower && rFn === fnLower;
+        });
+        if (existingIdx === -1) {
+          result.push(resolvedStudent);
+        } else if (!result[existingIdx].last_name && resolvedStudent.last_name) {
+          result[existingIdx] = { ...result[existingIdx], ...resolvedStudent };
+        }
+      });
+    } else {
+      const found = allStudentsList.find((s: any) => 
+        (s.id && stud.id && s.id === stud.id) ||
+        (stud.first_name && s.first_name && s.first_name.toLowerCase() === stud.first_name.toLowerCase()) ||
+        (stud.name && s.name && s.name.toLowerCase() === stud.name.toLowerCase())
+      );
+      const fn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
+      const ln = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
+      const resolvedStudent = {
+        ...stud,
+        id: found?.id || stud.id,
+        first_name: fn,
+        last_name: ln,
+        name: (fn || ln) ? `${fn} ${ln}`.trim() : stud.name
+      };
+
+      const fnLower = fn.toLowerCase().trim();
+      const existingIdx = result.findIndex((r: any) => {
+        if (r.id && resolvedStudent.id && r.id === resolvedStudent.id) return true;
+        const rFn = (r.first_name || r.name?.split(' ')[0] || '').toLowerCase().trim();
+        return rFn && fnLower && rFn === fnLower;
+      });
+      if (existingIdx === -1) {
+        result.push(resolvedStudent);
+      } else {
+        result[existingIdx] = { ...result[existingIdx], ...resolvedStudent };
+      }
+    }
+  });
+
+  return result;
+};
+
 const adjustPositions = (stations: any[], containerWidth: number = 364) => {
   const items = stations.map(s => ({
     ...s,
@@ -2873,30 +2942,30 @@ export function TeacherDashboard({
       } else if (normDate === todayStr && formattedItemTime) {
         const existingIdx = findIdx();
         const isFromMyBookings = myBookings.some((b: any) => String(b.id) === String(item.id) || (itemStudentId && String(b.studentId) === String(itemStudentId)));
+        const isPendingResched = item.status === 'rescheduled_pending' || item.status === 'pending_reschedule';
         if (existingIdx !== -1) {
           updatedTimeline[existingIdx] = {
             ...updatedTimeline[existingIdx],
             timeSlot: formattedItemTime,
-            status: item.status || 'pending_reschedule',
+            status: item.status || 'scheduled',
             room: item.roomName || item.room || updatedTimeline[existingIdx].room,
             student_acknowledged: item.student_acknowledged ?? item.studentAcknowledged ?? false,
             is_room_booking: Boolean(item.is_room_booking || item.isRoomBooking || item.room_override_id || item.roomOverrideId || item.is_room_changed || item.isRoomChanged || isFromMyBookings),
-            isRescheduledPending: true
+            isRescheduledPending: isPendingResched
           };
         } else if (itemStudentFirstName && itemStudentFirstName !== 'schüler' && itemStudentFirstName !== 'unterricht') {
-          const isFromMyBookings = myBookings.some((b: any) => String(b.id) === String(item.id) || (itemStudentId && String(b.studentId) === String(itemStudentId)));
           updatedTimeline.push({
             id: item.id || `changed-${Math.random()}`,
             scheduleId: item.scheduleId || item.id,
             date: todayStr,
             timeSlot: formattedItemTime,
             duration: item.duration || 45,
-            status: item.status || 'pending_reschedule',
+            status: item.status || 'scheduled',
             room: item.roomName || item.room || 'Hauptraum',
             instrument: item.instrument || 'Klavier',
             student_acknowledged: item.student_acknowledged ?? item.studentAcknowledged ?? false,
             is_room_booking: Boolean(item.is_room_booking || item.isRoomBooking || item.room_override_id || item.roomOverrideId || item.is_room_changed || item.isRoomChanged || isFromMyBookings),
-            isRescheduledPending: true,
+            isRescheduledPending: isPendingResched,
             student: {
               id: itemStudentId || `temp-${itemStudentFirstName}`,
               name: cleanName || 'Schüler',
@@ -3061,6 +3130,8 @@ export function TeacherDashboard({
   const [dismissedBanners, setDismissedBanners] = useState<Record<string, boolean>>({});
 
   const lastSickUntilRef = useRef<string | undefined>(undefined);
+  const activeTimelineSlotRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     if (teacher?.sick_until) {
       if (teacher.sick_until !== lastSickUntilRef.current) {
@@ -3528,6 +3599,15 @@ export function TeacherDashboard({
     const now = getSimulatedNow();
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   });
+
+  useEffect(() => {
+    if (activeTimelineSlotRef.current) {
+      const timer = setTimeout(() => {
+        activeTimelineSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [currentTimeStr, briefingData]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -6622,45 +6702,61 @@ export function TeacherDashboard({
                 )) 
               : [];
 
+            const otherReschedules = briefingData?.rescheduledReminders?.filter((rem: any) => 
+              !dailyChanges.some((dc: any) => dc.student?.name === rem.studentName)
+            ) || [];
+
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', fontFamily: "'Inter', sans-serif" }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: "'Inter', sans-serif", flex: 1, minHeight: 0 }}>
                 {/* Title Section: borderless, simple, calm */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Calendar size={18} color="#475569" style={{ opacity: 0.8 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                  <Calendar size={16} color="#475569" style={{ opacity: 0.8 }} />
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
                       Vorbereitung
                     </h4>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, marginTop: '1px' }}>Fahrplan &amp; Änderungen</div>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500 }}>Fahrplan &amp; Änderungen</div>
                   </div>
                 </div>
 
-                {/* Unified Info Flow Container */}
+                {/* Unified Compact Info Container */}
                 <div style={{
                   background: '#fafafa',
-                  borderRadius: '20px',
-                  padding: '24px',
+                  borderRadius: '16px',
+                  padding: '16px 20px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '20px'
+                  gap: '12px',
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: 'auto'
                 }}>
-                  {/* 1. Lessons count summary */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <Activity size={16} color="#64748b" style={{ marginTop: '2px', flexShrink: 0 }} />
-                    <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.4 }}>
-                      Heute stehen <span style={{ fontWeight: 700, color: '#0f172a' }}>{activeLessonsCount} Termine</span> auf dem Fahrplan.
+                  {/* 1. Key Facts: Lessons count & Start Time */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.84rem', color: '#334155' }}>
+                      <Activity size={15} color="#64748b" style={{ flexShrink: 0 }} />
+                      <span>
+                        Heute stehen <strong style={{ color: '#0f172a' }}>{activeLessonsCount} Termine</strong> auf dem Fahrplan.
+                      </span>
                     </div>
+
+                    {firstSlotStartStr && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.84rem', color: '#334155' }}>
+                        <Clock size={15} color="#64748b" style={{ flexShrink: 0 }} />
+                        <span>
+                          Erster Unterricht beginnt um <strong style={{ color: '#0f172a' }}>{firstSlotStartStr} Uhr</strong>.
+                        </span>
+                      </div>
+                    )}
                   </div>
 
-                  <div style={{ height: '1px', background: '#f1f5f9' }} />
-
-                  {/* 2. Daily Changes */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      Änderungen &amp; Ausfälle heute
-                    </span>
-                    {dailyChanges.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* 2. Daily Changes (Nur dynamisch anzeigen, wenn wirklich ein Ausfall oder eine Verschiebung vorliegt) */}
+                  {dailyChanges.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Änderungen &amp; Ausfälle heute
+                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {dailyChanges.map((slot: any, idx: number) => {
                           const isCanceled = slot.status !== 'rescheduled_away';
                           const labelColor = isCanceled ? '#ef4444' : '#f59e0b';
@@ -6674,31 +6770,35 @@ export function TeacherDashboard({
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'space-between',
-                              fontSize: '0.84rem',
+                              fontSize: '0.82rem',
                               color: '#475569'
                             }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                                <span style={{ fontWeight: 600, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
+                                <span style={{ fontWeight: 700, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {slot.student?.name}
                                 </span>
-                                <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>
+                                <span style={{ color: '#94a3b8', fontSize: '0.74rem' }}>
                                   ({slot.timeSlot || slot.start_time?.substring(0, 5)} Uhr)
                                 </span>
                                 {!isCanceled && matchRem && (
                                   <span style={{ 
                                     color: '#f59e0b', 
-                                    fontSize: '0.76rem', 
-                                    fontWeight: 600, 
-                                    marginLeft: '6px'
+                                    fontSize: '0.74rem', 
+                                    fontWeight: 700, 
+                                    marginLeft: '4px'
                                   }}>
                                     ➔ {matchRem.weekdayShort}. {matchRem.dateStr}.
                                   </span>
                                 )}
                               </div>
                               <span style={{
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                color: labelColor
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                color: labelColor,
+                                background: isCanceled ? '#fef2f2' : '#fffbeb',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                border: `1px solid ${isCanceled ? '#fecaca' : '#fde68a'}`
                               }}>
                                 {labelText}
                               </span>
@@ -6706,69 +6806,38 @@ export function TeacherDashboard({
                           );
                         })}
                       </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.84rem', color: '#475569' }}>
-                        <CheckCircle size={16} color="#64748b" style={{ flexShrink: 0 }} />
-                        <span>Alles läuft nach Plan. Keine heutigen Ausfälle.</span>
-                      </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* Other weekly rescheduled appointments */}
-                    {(() => {
-                      const otherReschedules = briefingData.rescheduledReminders?.filter((rem: any) => 
-                        !dailyChanges.some((dc: any) => dc.student?.name === rem.studentName)
-                      ) || [];
-                      
-                      if (otherReschedules.length === 0) return null;
-                      
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                            Weitere Änderungen diese Woche
-                          </span>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {otherReschedules.map((rem: any) => (
-                              <div key={rem.id} style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                fontSize: '0.84rem',
-                                color: '#475569'
-                              }}>
-                                <span style={{ fontWeight: 600, color: '#334155' }}>
-                                  {rem.studentName}
-                                </span>
-                                <span style={{ 
-                                  fontSize: '0.76rem', 
-                                  fontWeight: 600, 
-                                  color: '#475569'
-                                }}>
-                                  {rem.weekdayShort}. {rem.dateStr}., {rem.time.replace(':', '.')} Uhr
-                                </span>
-                              </div>
-                            ))}
+                  {/* 3. Other weekly rescheduled appointments (Nur dynamisch anzeigen, wenn vorhanden) */}
+                  {otherReschedules.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Weitere Änderungen diese Woche
+                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {otherReschedules.map((rem: any) => (
+                          <div key={rem.id} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            fontSize: '0.82rem',
+                            color: '#475569'
+                          }}>
+                            <span style={{ fontWeight: 700, color: '#334155' }}>
+                              {rem.studentName}
+                            </span>
+                            <span style={{ 
+                              fontSize: '0.74rem', 
+                              fontWeight: 700, 
+                              color: '#64748b'
+                            }}>
+                              {rem.weekdayShort}. {rem.dateStr}., {rem.time.replace(':', '.')} Uhr
+                            </span>
                           </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {firstSlotStartStr && (
-                    <>
-                      <div style={{ height: '1px', background: '#f1f5f9' }} />
-                      {/* 3. First Lesson starting time & notes automatic activation */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                        <Clock size={16} color="#64748b" style={{ marginTop: '2px', flexShrink: 0 }} />
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <div style={{ fontSize: '0.86rem', color: '#334155' }}>
-                            Erster Unterricht beginnt um <span style={{ fontWeight: 700, color: '#0f172a' }}>{firstSlotStartStr} Uhr</span>.
-                          </div>
-                          <div style={{ fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.4 }}>
-                            Das Schüler-Notizwidget aktiviert sich automatisch um {prepCutoffTimeStr} Uhr (15 Min. vorher).
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
@@ -6861,19 +6930,11 @@ export function TeacherDashboard({
             const formattedCurrentWeekItems = groupAndFormatItems(prep.currentWeekItems);
 
             return (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                  <div style={{ background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Award size={18} />
-                  </div>
-                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {activeStudent?.id === prep.studentId ? 'Aktuelle Hausaufgaben' : 'Aktuelle Hausaufgaben (Nächste)'}
-                  </h4>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Header: Student Info & Profile Ghost Button */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                   <div 
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0, flex: 1 }}
                     onClick={() => {
                       const foundStud = allStudents.find(s => s.id === prep.studentId);
                       setDocStudent({
@@ -6891,345 +6952,318 @@ export function TeacherDashboard({
                     }}
                   >
                     <div style={{
-                      width: '42px',
-                      height: '42px',
+                      width: '36px',
+                      height: '36px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
+                      background: 'linear-gradient(135deg, #34a853 0%, #2e944b 100%)',
                       color: 'white',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.1rem',
+                      fontSize: '0.95rem',
                       fontWeight: 800,
-                      boxShadow: '0 2px 8px rgba(52, 168, 83, 0.15)'
+                      boxShadow: '0 2px 6px rgba(52, 168, 83, 0.18)',
+                      flexShrink: 0
                     }}>
                       {prep.studentName.charAt(0)}
                     </div>
-                    <div>
-                      <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.92rem' }}>{prep.studentName}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.92rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                        {prep.studentName}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                        {activeStudent?.id === prep.studentId ? 'Aktueller Schüler' : 'Nächster Schüler'}
+                      </div>
                     </div>
                   </div>
 
-                  {prep.streakCount > 0 && (
-                    <div style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      background: 'rgba(245, 158, 11, 0.08)', 
-                      border: '1px solid rgba(245, 158, 11, 0.15)', 
-                      padding: '6px 12px', 
-                      borderRadius: '100px', 
-                      color: '#b45309', 
-                      fontSize: '0.75rem', 
+                  <button
+                    onClick={() => {
+                      setSelectedStudentProfile({
+                        id: prep.studentId,
+                        first_name: prep.studentName.split(' ')[0],
+                        last_name: prep.studentName.split(' ').slice(1).join(' '),
+                        photo_url: '/avatar_ghost.jpg'
+                      });
+                    }}
+                    style={{
+                      background: '#f8fafc',
+                      color: '#475569',
+                      border: '1px solid #e2e8f0',
+                      padding: '6px 10px',
+                      borderRadius: '8px',
+                      fontSize: '0.72rem',
                       fontWeight: 750,
-                      alignSelf: 'flex-start'
-                    }}>
-                      <Flame size={14} fill="#f59e0b" color="#f59e0b" />
-                      <span>Premium Flammen-Streak: {prep.streakCount} Tage!</span>
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      flexShrink: 0,
+                      transition: 'all 0.2s'
+                    }}
+                    className="hover-scale"
+                    title="Schüler-Profil öffnen"
+                  >
+                    <User size={13} />
+                    <span>Profil</span>
+                  </button>
+                </div>
+
+                {prep.streakCount > 0 && (
+                  <div style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    background: 'rgba(245, 158, 11, 0.08)', 
+                    border: '1px solid rgba(245, 158, 11, 0.15)', 
+                    padding: '4px 10px', 
+                    borderRadius: '100px', 
+                    color: '#b45309', 
+                    fontSize: '0.72rem', 
+                    fontWeight: 750,
+                    alignSelf: 'flex-start'
+                  }}>
+                    <Flame size={13} fill="#f59e0b" color="#f59e0b" />
+                    <span>Flammen-Streak: {prep.streakCount} Tage!</span>
+                  </div>
+                )}
+
+                {/* KW Vorwoche */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    KW {prep.prevWeekNum || '?'} (Vorwoche)
+                  </div>
+                  {((formattedPrevWeekItems && formattedPrevWeekItems.length > 0) || (prep.prevWeekNotes && prep.prevWeekNotes.length > 0)) ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {formattedPrevWeekItems && formattedPrevWeekItems.map((item: any, idx: number) => {
+                        const isBook = item.isBook;
+                        return (
+                          <div key={`prev-item-${idx}`} style={{
+                            background: '#f8fafc',
+                            padding: '8px 10px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(0, 0, 0, 0.03)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                            opacity: 0.85
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                              {isBook ? <BookOpen size={13} color="#64748b" /> : <Music size={13} color="#64748b" />}
+                              <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                {item.title}
+                              </span>
+                            </div>
+                            {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                              <span style={{
+                                background: 'rgba(52, 168, 83, 0.08)',
+                                color: '#34a853',
+                                fontSize: '0.62rem',
+                                fontWeight: 800,
+                                borderRadius: '100px',
+                                padding: '2px 6px',
+                                textTransform: 'uppercase',
+                                flexShrink: 0
+                              }}>
+                                Erledigt
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {prep.prevWeekNotes && prep.prevWeekNotes
+                        .filter((note: string) => !note.startsWith("STICKER:") && !note.startsWith("LATENCY:") && !note.startsWith("LATENCY_CALIBRATION:") && !note.startsWith("SYSTEM:"))
+                        .map((note: string, idx: number) => {
+                        const isLoop = note.startsWith("LOOP:");
+                        const isAudio = note.startsWith("AUDIO:");
+                        if (isLoop) {
+                          const parts = note.substring(5).split('|');
+                          const label = parts[3] || 'Loop-Mix';
+                          const duration = parts[1] || '8';
+                          return (
+                            <div key={`prev-note-${idx}`}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
+                                🎵 Loop-Mix: "{label}" ({duration}s)
+                              </span>
+                            </div>
+                          );
+                        }
+                        if (isAudio) {
+                          const parts = note.substring(6).split('|');
+                          const label = parts[3] || 'Aufnahme';
+                          const duration = parts[1] || '60';
+                          const role = parts[4] || 'teacher';
+                          return (
+                            <div key={`prev-note-${idx}`}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
+                                🎙️ {role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)
+                              </span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={`prev-note-${idx}`} style={{ 
+                            fontSize: '0.74rem', 
+                            color: '#64748b', 
+                            fontWeight: 500, 
+                            fontStyle: 'italic', 
+                            borderLeft: '2.5px solid #cbd5e1', 
+                            paddingLeft: '8px', 
+                            margin: '2px 0',
+                            lineHeight: 1.3,
+                            opacity: 0.85
+                          }}>
+                            {note}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic', padding: '2px 0' }}>
+                      Keine Hausaufgaben erfasst.
                     </div>
                   )}
-
-                  {/* Hausaufgaben der Vorwoche */}
-                  <div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-                      Hausaufgaben der Vorwoche (KW {prep.prevWeekNum || '?'})
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {((formattedPrevWeekItems && formattedPrevWeekItems.length > 0) || (prep.prevWeekNotes && prep.prevWeekNotes.length > 0)) ? (
-                        <>
-                          {formattedPrevWeekItems && formattedPrevWeekItems.map((item: any, idx: number) => {
-                            const isBook = item.isBook;
-                            return (
-                              <div key={`prev-item-${idx}`} style={{
-                                background: '#f8fafc',
-                                padding: '10px 12px',
-                                borderRadius: '12px',
-                                border: '1px solid rgba(0, 0, 0, 0.03)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '8px',
-                                opacity: 0.85
-                              }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                                  {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
-                                  <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                    {item.title}
-                                  </span>
-                                </div>
-                                {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
-                                  <span style={{
-                                    background: 'rgba(52, 168, 83, 0.08)',
-                                    color: '#34a853',
-                                    fontSize: '0.64rem',
-                                    fontWeight: 800,
-                                    borderRadius: '100px',
-                                    padding: '2px 8px',
-                                    textTransform: 'uppercase',
-                                    flexShrink: 0
-                                  }}>
-                                    Erledigt
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                          {prep.prevWeekNotes && prep.prevWeekNotes
-                            .filter((note: string) => !note.startsWith("STICKER:") && !note.startsWith("LATENCY:") && !note.startsWith("LATENCY_CALIBRATION:") && !note.startsWith("SYSTEM:"))
-                            .map((note: string, idx: number) => {
-                            const isLoop = note.startsWith("LOOP:");
-                            const isAudio = note.startsWith("AUDIO:");
-                            if (isLoop) {
-                              const parts = note.substring(5).split('|');
-                              const label = parts[3] || 'Loop-Mix';
-                              const duration = parts[1] || '8';
-                              return (
-                                <div key={`prev-note-${idx}`} style={{ margin: '2px 4px' }}>
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
-                                    🎵 Loop-Mix: "{label}" ({duration}s)
-                                  </span>
-                                </div>
-                              );
-                            }
-                            if (isAudio) {
-                              const parts = note.substring(6).split('|');
-                              const label = parts[3] || 'Aufnahme';
-                              const duration = parts[1] || '60';
-                              const role = parts[4] || 'teacher';
-                              return (
-                                <div key={`prev-note-${idx}`} style={{ margin: '2px 4px' }}>
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
-                                    🎙️ {role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)
-                                  </span>
-                                </div>
-                              );
-                            }
-                            return (
-                              <div key={`prev-note-${idx}`} style={{ 
-                                fontSize: '0.75rem', 
-                                color: '#64748b', 
-                                fontWeight: 500, 
-                                fontStyle: 'italic', 
-                                borderLeft: '2.5px solid #cbd5e1', 
-                                paddingLeft: '8px', 
-                                margin: '2px 4px',
-                                lineHeight: 1.3,
-                                opacity: 0.85
-                              }}>
-                                {note}
-                              </div>
-                            );
-                          })}
-                        </>
-                      ) : (
-                        <div style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          gap: '6px', 
-                          padding: '14px 0', 
-                          background: '#f8fafc',
-                          borderRadius: '12px',
-                          border: '1px dashed #e2e8f0',
-                          fontSize: '0.74rem',
-                          color: '#94a3b8',
-                          fontWeight: 550
-                        }}>
-                          <BookOpen size={14} />
-                          <span>Keine Hausaufgaben erfasst.</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Hausaufgaben dieser Woche */}
-                  <div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-                      Hausaufgaben dieser Woche (KW {prep.currentWeekNum || '?'})
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {((formattedCurrentWeekItems && formattedCurrentWeekItems.length > 0) || (prep.currentWeekNotes && prep.currentWeekNotes.length > 0)) ? (
-                        <>
-                          {formattedCurrentWeekItems && formattedCurrentWeekItems.map((item: any, idx: number) => {
-                            const isBook = item.isBook;
-                            return (
-                              <div key={`curr-item-${idx}`} style={{
-                                background: '#f8fafc',
-                                padding: '10px 12px',
-                                borderRadius: '12px',
-                                border: '1px solid rgba(0, 0, 0, 0.03)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '8px'
-                              }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                                  {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
-                                  <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.8rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                    {item.title}
-                                  </span>
-                                </div>
-                                {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
-                                  <span style={{
-                                    background: 'rgba(52, 168, 83, 0.08)',
-                                    color: '#34a853',
-                                    fontSize: '0.64rem',
-                                    fontWeight: 800,
-                                    borderRadius: '100px',
-                                    padding: '2px 8px',
-                                    textTransform: 'uppercase',
-                                    flexShrink: 0
-                                  }}>
-                                    Erledigt
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                          {prep.currentWeekNotes && prep.currentWeekNotes
-                            .filter((note: string) => !note.startsWith("STICKER:") && !note.startsWith("LATENCY:") && !note.startsWith("LATENCY_CALIBRATION:") && !note.startsWith("SYSTEM:"))
-                            .map((note: string, idx: number) => {
-                            const isLoop = note.startsWith("LOOP:");
-                            const isAudio = note.startsWith("AUDIO:");
-                            if (isLoop) {
-                              const parts = note.substring(5).split('|');
-                              const label = parts[3] || 'Loop-Mix';
-                              const duration = parts[1] || '8';
-                              return (
-                                <div key={`curr-note-${idx}`} style={{ margin: '2px 4px' }}>
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
-                                    🎵 Loop-Mix: "{label}" ({duration}s)
-                                  </span>
-                                </div>
-                              );
-                            }
-                            if (isAudio) {
-                              const parts = note.substring(6).split('|');
-                              const label = parts[3] || 'Aufnahme';
-                              const duration = parts[1] || '60';
-                              const role = parts[4] || 'teacher';
-                              return (
-                                <div key={`curr-note-${idx}`} style={{ margin: '2px 4px' }}>
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
-                                    🎙️ {role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)
-                                  </span>
-                                </div>
-                              );
-                            }
-                            return (
-                              <div key={`curr-note-${idx}`} style={{ 
-                                fontSize: '0.75rem', 
-                                color: '#475569', 
-                                fontWeight: 500, 
-                                fontStyle: 'italic', 
-                                borderLeft: '2.5px solid #34a853', 
-                                paddingLeft: '8px', 
-                                margin: '2px 4px',
-                                lineHeight: 1.3
-                              }}>
-                                {note}
-                              </div>
-                            );
-                          })}
-                        </>
-                      ) : (
-                        <div style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          gap: '6px', 
-                          padding: '14px 0', 
-                          background: '#f8fafc',
-                          borderRadius: '12px',
-                          border: '1px dashed #e2e8f0',
-                          fontSize: '0.74rem',
-                          color: '#94a3b8',
-                          fontWeight: 550
-                        }}>
-                          <BookOpen size={14} />
-                          <span>Keine Hausaufgaben erfasst.</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* Premium Quick Actions */}
-                  <div style={{ 
-                    marginTop: '12px', 
-                    paddingTop: '16px', 
-                    borderTop: '1px solid #f1f5f9', 
-                    display: 'flex', 
-                    gap: '10px' 
-                  }}>
-                    <button
-                      onClick={() => {
-                        const foundStud = allStudents.find(s => s.id === prep.studentId);
-                        setDocStudent({
-                          ...(foundStud || {}),
-                          id: prep.studentId,
-                          first_name: prep.studentName.split(' ')[0],
-                          last_name: prep.studentName.split(' ').slice(1).join(' '),
-                          photo_url: '/avatar_ghost.jpg',
-                          is_campus_active: foundStud ? foundStud.is_campus_active : false,
-                          school_id: foundStud?.school_id || teacher?.school_id,
-                          schoolId: foundStud?.school_id || teacher?.school_id,
-                          schools: foundStud?.schools || (teacher as any)?.schools,
-                          school_name: foundStud?.schools?.name || foundStud?.school_name
-                        });
-                      }}
-                      style={{
-                        flex: 1,
-                        background: '#34a853',
-                        color: 'white',
-                        border: 'none',
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
-                        transition: 'all 0.2s'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Edit3 size={14} />
-                      <span>Hausaufgabe / Notiz</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedStudentProfile({
-                          id: prep.studentId,
-                          first_name: prep.studentName.split(' ')[0],
-                          last_name: prep.studentName.split(' ').slice(1).join(' '),
-                          photo_url: '/avatar_ghost.jpg'
-                        });
-                      }}
-                      style={{
-                        background: '#fdf6e2',
-                        color: '#b45309',
-                        border: '1px solid rgba(180, 83, 9, 0.1)',
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s'
-                      }}
-                      className="hover-scale"
-                    >
-                      <User size={14} />
-                      <span>Profil</span>
-                    </button>
-                  </div>
                 </div>
-              </>
+
+                {/* KW Diese Woche */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    KW {prep.currentWeekNum || '?'} (Heute / Diese Woche)
+                  </div>
+                  {((formattedCurrentWeekItems && formattedCurrentWeekItems.length > 0) || (prep.currentWeekNotes && prep.currentWeekNotes.length > 0)) ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {formattedCurrentWeekItems && formattedCurrentWeekItems.map((item: any, idx: number) => {
+                        const isBook = item.isBook;
+                        return (
+                          <div key={`curr-item-${idx}`} style={{
+                            background: '#f8fafc',
+                            padding: '8px 10px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(0, 0, 0, 0.03)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                              {isBook ? <BookOpen size={13} color="#64748b" /> : <Music size={13} color="#64748b" />}
+                              <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.78rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                {item.title}
+                              </span>
+                            </div>
+                            {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                              <span style={{
+                                background: 'rgba(52, 168, 83, 0.08)',
+                                color: '#34a853',
+                                fontSize: '0.62rem',
+                                fontWeight: 800,
+                                borderRadius: '100px',
+                                padding: '2px 6px',
+                                textTransform: 'uppercase',
+                                flexShrink: 0
+                              }}>
+                                Erledigt
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {prep.currentWeekNotes && prep.currentWeekNotes
+                        .filter((note: string) => !note.startsWith("STICKER:") && !note.startsWith("LATENCY:") && !note.startsWith("LATENCY_CALIBRATION:") && !note.startsWith("SYSTEM:"))
+                        .map((note: string, idx: number) => {
+                        const isLoop = note.startsWith("LOOP:");
+                        const isAudio = note.startsWith("AUDIO:");
+                        if (isLoop) {
+                          const parts = note.substring(5).split('|');
+                          const label = parts[3] || 'Loop-Mix';
+                          const duration = parts[1] || '8';
+                          return (
+                            <div key={`curr-note-${idx}`}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
+                                🎵 Loop-Mix: "{label}" ({duration}s)
+                              </span>
+                            </div>
+                          );
+                        }
+                        if (isAudio) {
+                          const parts = note.substring(6).split('|');
+                          const label = parts[3] || 'Aufnahme';
+                          const duration = parts[1] || '60';
+                          const role = parts[4] || 'teacher';
+                          return (
+                            <div key={`curr-note-${idx}`}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
+                                🎙️ {role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)
+                              </span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={`curr-note-${idx}`} style={{ 
+                            fontSize: '0.74rem', 
+                            color: '#475569', 
+                            fontWeight: 500, 
+                            fontStyle: 'italic', 
+                            borderLeft: '2.5px solid #34a853', 
+                            paddingLeft: '8px', 
+                            margin: '2px 0',
+                            lineHeight: 1.3
+                          }}>
+                            {note}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic', padding: '2px 0' }}>
+                      Noch keine Hausaufgaben erfasst.
+                    </div>
+                  )}
+                </div>
+
+                {/* Primary Action */}
+                <div style={{ marginTop: '4px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                  <button
+                    onClick={() => {
+                      const foundStud = allStudents.find(s => s.id === prep.studentId);
+                      setDocStudent({
+                        ...(foundStud || {}),
+                        id: prep.studentId,
+                        first_name: prep.studentName.split(' ')[0],
+                        last_name: prep.studentName.split(' ').slice(1).join(' '),
+                        photo_url: '/avatar_ghost.jpg',
+                        is_campus_active: foundStud ? foundStud.is_campus_active : false,
+                        school_id: foundStud?.school_id || teacher?.school_id,
+                        schoolId: foundStud?.school_id || teacher?.school_id,
+                        schools: foundStud?.schools || (teacher as any)?.schools,
+                        school_name: foundStud?.schools?.name || foundStud?.school_name
+                      });
+                    }}
+                    style={{
+                      width: '100%',
+                      background: '#34a853',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(52, 168, 83, 0.18)',
+                      transition: 'all 0.2s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Edit3 size={15} />
+                    <span>Hausaufgabe / Notiz erfassen</span>
+                  </button>
+                </div>
+              </div>
             );
           }
 
@@ -7579,18 +7613,38 @@ export function TeacherDashboard({
                         !item.isBreak && 
                         item.timeSlot === slot.timeSlot
                       );
+                      const subStudents = splitAndNormalizeStudents([slot.student], allStudents);
                       if (existing) {
-                        if (existing.students && !existing.students.some((s: any) => s.id === slot.student.id)) {
-                          existing.students.push(slot.student);
-                          existing.slots.push(slot);
+                        existing.slots.push(slot);
+                        subStudents.forEach(st => {
+                          const stFn = (st.first_name || st.name?.split(' ')[0] || '').toLowerCase().trim();
+                          const alreadyHas = existing.students.some((s: any) => {
+                            if (s.id && st.id && s.id === st.id) return true;
+                            const sFn = (s.first_name || s.name?.split(' ')[0] || '').toLowerCase().trim();
+                            return sFn && stFn && sFn === stFn;
+                          });
+                          if (!alreadyHas) {
+                            existing.students.push(st);
+                          } else {
+                            const matchIdx = existing.students.findIndex((s: any) => {
+                              if (s.id && st.id && s.id === st.id) return true;
+                              const sFn = (s.first_name || s.name?.split(' ')[0] || '').toLowerCase().trim();
+                              return sFn && stFn && sFn === stFn;
+                            });
+                            if (matchIdx !== -1 && (st.last_name || st.id)) {
+                              existing.students[matchIdx] = { ...existing.students[matchIdx], ...st };
+                            }
+                          }
+                        });
+                        if (existing.students.length > 1 || slot.isGroup) {
                           existing.isGroup = true;
                         }
                       } else {
                         groupedTimeline.push({
                           ...slot,
                           isBreak: false,
-                          isGroup: false,
-                          students: [slot.student],
+                          isGroup: subStudents.length > 1 || Boolean(slot.isGroup),
+                          students: [...subStudents],
                           slots: [slot]
                         });
                       }
@@ -7633,23 +7687,19 @@ export function TeacherDashboard({
                     const isFinished = currentTimeStr >= slotEnd && !isCanceled && !isRescheduledAway;
                     const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
                     const isRescheduledPending = activeSlots.some((s: any) => 
-                       s.isRescheduledPending || 
-                       s.is_moved || 
-                       s.isMoved || 
                        s.status === 'rescheduled_pending' || 
-                       s.status === 'pending' || 
                        s.status === 'pending_reschedule' || 
-                       (s.original_date && s.original_date !== s.date)
+                       s.isRescheduledPending === true
                      );
                     const isRescheduledConfirmed = !isRescheduledPending && activeSlots.every((s: any) => s.status === 'rescheduled_confirmed');
-                    const isResetPending = activeSlots.some((s: any) => s.status === 'scheduled' && s.original_date && s.student_acknowledged === false);
-                    const isResetAcknowledged = !isResetPending && activeSlots.every((s: any) => s.status === 'scheduled' && s.original_date && s.student_acknowledged === true);
+                    const isResetPending = activeSlots.some((s: any) => s.status === 'scheduled' && s.original_date && s.date && String(s.original_date) !== String(s.date) && s.student_acknowledged === false);
+                    const isResetAcknowledged = !isResetPending && activeSlots.every((s: any) => s.status === 'scheduled' && s.original_date && s.date && String(s.original_date) !== String(s.date) && s.student_acknowledged === true);
                     const isBirthday = !slot.isGroup && slot.student && isStudentBirthdayToday(slot.student);
 
                     let slotBg = '#ffffff';
                     let slotBorder = '1.5px solid #e2e8f0';
-                    let slotBorderLeft = 'none';
-                    let titleColor = '#1e293b';
+                    let slotBorderLeft = '5px solid #cbd5e1';
+                    let titleColor = '#0f172a';
                     let dotComponent = null;
 
                     if (isBreak) {
@@ -7688,13 +7738,8 @@ export function TeacherDashboard({
                         }} />
                       );
                     } else if (isCanceled || isRescheduledAway) {
-                      const isSlotAck = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
-                      slotBg = isSlotAck 
-                        ? '#ffffff' 
-                        : (isRescheduledAway ? 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)' : 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)');
-                      slotBorder = isSlotAck 
-                        ? (isRescheduledAway ? '1.5px solid #fef3c7' : '1.5px solid #fee2e2') 
-                        : (isRescheduledAway ? '2px dashed #eab308' : '2px dashed #ef4444');
+                      slotBg = '#ffffff';
+                      slotBorder = isRescheduledAway ? '1.5px solid #fef3c7' : '1.5px solid #fee2e2';
                       slotBorderLeft = isRescheduledAway ? '5px solid #fbbc05' : '5px solid #ef4444';
                       titleColor = '#a1a1aa';
                       dotComponent = isCurrentSlot ? (
@@ -7768,32 +7813,17 @@ export function TeacherDashboard({
                           boxSizing: 'border-box'
                         }} />
                       );
-                    } else if (slot.isGroup) {
+                    } else if (isRescheduledPending) {
                       slotBg = '#ffffff';
-                      slotBorder = '1.5px solid #e2e8f0';
-                      slotBorderLeft = '5px solid #cbd5e1';
-                      titleColor = '#0f172a';
-                      dotComponent = (
-                        <div style={{
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          border: '3px solid #cbd5e1',
-                          background: '#ffffff',
-                          boxSizing: 'border-box'
-                        }} />
-                      );
-                    } else {
-                      slotBg = '#ffffff';
-                      slotBorder = '1.5px solid #e2e8f0';
-                      slotBorderLeft = '5px solid #cbd5e1';
-                      titleColor = '#0f172a';
+                      slotBorder = '1.5px solid #fef3c7';
+                      slotBorderLeft = '5px solid #fbbc05';
+                      titleColor = '#8e8e93';
                       dotComponent = isCurrentSlot ? (
                         <div style={{
                           width: '20px',
                           height: '20px',
                           borderRadius: '50%',
-                          border: '3px solid #cbd5e1',
+                          border: '3px solid #fbbc05',
                           background: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
@@ -7805,10 +7835,25 @@ export function TeacherDashboard({
                             width: '8px',
                             height: '8px',
                             borderRadius: '50%',
-                            background: '#cbd5e1'
+                            background: '#fbbc05'
                           }} />
                         </div>
                       ) : (
+                        <div style={{
+                          width: '12px',
+                          height: '12px',
+                          borderRadius: '50%',
+                          border: '3px solid #fbbc05',
+                          background: isFinished ? '#fbbc05' : '#ffffff',
+                          boxSizing: 'border-box'
+                        }} />
+                      );
+                    } else {
+                      slotBg = '#ffffff';
+                      slotBorder = '1.5px solid #e2e8f0';
+                      slotBorderLeft = '5px solid #cbd5e1';
+                      titleColor = '#0f172a';
+                      dotComponent = (
                         <div style={{
                           width: '12px',
                           height: '12px',
@@ -7855,6 +7900,11 @@ export function TeacherDashboard({
                              setSickUntilDate(todayStr);
                              setIsSickWidgetExpanded(true);
                            }}
+                           ref={el => {
+                             if (isCurrentSlot || (idx === prepIndex && !isFinished)) {
+                               activeTimelineSlotRef.current = el;
+                             }
+                           }}
                            style={{
                              flex: 1,
                              display: 'flex',
@@ -7862,7 +7912,7 @@ export function TeacherDashboard({
                              alignItems: isMobileDevice ? 'flex-start' : 'center',
                              justifyContent: 'space-between',
                              gap: isMobileDevice ? '4px' : '12px',
-                             padding: isMobileDevice ? '10px 12px' : '12px 16px',
+                             padding: isMobileDevice ? '10px 12px' : '8px 14px',
                              background: isCurrentSlot ? '#e6f4ea' : slotBg,
                              borderRadius: '12px',
                              border: slotBorder,
@@ -8041,13 +8091,16 @@ export function TeacherDashboard({
                               {slot.isGroup ? (
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
                                   {slot.students.map((stud: any, sIdx: number) => {
-                                    const originalSlot = slot.slots[sIdx];
+                                    const originalSlot = slot.slots?.[sIdx] || slot.slots?.[0] || slot;
                                     const isRescheduled = Boolean(
-                                      originalSlot?.original_date || 
+                                      (originalSlot?.original_date && originalSlot?.date && String(originalSlot.original_date) !== String(originalSlot.date)) || 
                                       originalSlot?.is_rescheduled || 
                                       originalSlot?.status === 'rescheduled_confirmed' || 
                                       originalSlot?.status === 'rescheduled' ||
-                                      originalSlot?.status === 'rescheduled_away'
+                                      originalSlot?.status === 'rescheduled_away' ||
+                                      slot?.is_rescheduled ||
+                                      slot?.status === 'rescheduled_confirmed' ||
+                                      slot?.status === 'rescheduled'
                                     );
                                     const ack = originalSlot?.student_acknowledged;
                                     const isBirthday = isStudentBirthdayToday(stud);
@@ -8070,12 +8123,14 @@ export function TeacherDashboard({
                                       >
                                         {isBirthday ? '🎂 ' : ''}{(() => {
                                           const found = allStudents.find(s => s.id === stud.id);
-                                          const fn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
-                                          const ln = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
-                                          if (fn || ln) {
-                                            return `${fn} ${maskLastName(ln, showRealNames)}`.trim();
+                                          const rawFn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
+                                          const cleanFn = rawFn.replace(/&.*/, '').trim() || 'Schüler';
+                                          const rawLn = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
+                                          const cleanLn = rawLn.replace(/&.*/, '').trim();
+                                          if (cleanFn || cleanLn) {
+                                            return `${cleanFn} ${maskLastName(cleanLn, showRealNames)}`.trim();
                                           }
-                                          return stud.name;
+                                          return stud.name || 'Schüler';
                                         })()}
                                         {isRescheduled && (
                                           <span style={{ fontSize: '0.62rem', opacity: 0.8 }}>
@@ -10369,7 +10424,15 @@ export function TeacherDashboard({
                   <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'stretch', width: '100%' }}>
                     
                     {/* LEFT COLUMN: Greeting Banner & Schüler Notizen */}
-                    <div id="tour-teacher-briefing" style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: (isWeekend || isFreeDay) ? '1 1 100%' : '1 1 350px', minWidth: '300px' }}>
+                    <div id="tour-teacher-briefing" style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '20px', 
+                      flex: (isWeekend || isFreeDay) ? '1 1 100%' : '1 1 350px', 
+                      minWidth: '300px',
+                      maxHeight: windowWidth >= 768 ? '700px' : undefined,
+                      boxSizing: 'border-box'
+                    }}>
                       {/* Premium Greeting Banner with Avatar & Wave Design */}
                       {(!teacher?.sick_until || bypassSickView) && (
                         <div style={{
@@ -10519,9 +10582,10 @@ export function TeacherDashboard({
                         boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
                         background: 'white', 
                         boxSizing: 'border-box',
-                        maxHeight: '620px',
                         display: 'flex',
-                        flexDirection: 'column'
+                        flexDirection: 'column',
+                        height: '100%',
+                        maxHeight: windowWidth >= 768 ? '700px' : undefined
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
@@ -10563,14 +10627,15 @@ export function TeacherDashboard({
                           </div>
                         </div>
   
-<div style={{ 
+                        <div style={{ 
                           display: 'flex', 
                           flexDirection: 'column', 
                           gap: '8px', 
                           position: 'relative',
                           overflowY: 'auto',
                           paddingRight: '6px',
-                          maxHeight: '520px'
+                          flex: 1,
+                          minHeight: 0
                         }}>
                           <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '9px', width: '2px', background: '#e2e8f0' }} />
                           {briefingData.timeline && briefingData.timeline.length > 0 ? (() => {
@@ -10585,18 +10650,38 @@ export function TeacherDashboard({
                                 !item.isBreak && 
                                 item.timeSlot === slot.timeSlot
                               );
+                              const subStudents = splitAndNormalizeStudents([slot.student], allStudents);
                               if (existing) {
-                                if (existing.students && !existing.students.some((s: any) => s.id === slot.student.id)) {
-                                  existing.students.push(slot.student);
-                                  existing.slots.push(slot);
+                                existing.slots.push(slot);
+                                subStudents.forEach(st => {
+                                  const stFn = (st.first_name || st.name?.split(' ')[0] || '').toLowerCase().trim();
+                                  const alreadyHas = existing.students.some((s: any) => {
+                                    if (s.id && st.id && s.id === st.id) return true;
+                                    const sFn = (s.first_name || s.name?.split(' ')[0] || '').toLowerCase().trim();
+                                    return sFn && stFn && sFn === stFn;
+                                  });
+                                  if (!alreadyHas) {
+                                    existing.students.push(st);
+                                  } else {
+                                    const matchIdx = existing.students.findIndex((s: any) => {
+                                      if (s.id && st.id && s.id === st.id) return true;
+                                      const sFn = (s.first_name || s.name?.split(' ')[0] || '').toLowerCase().trim();
+                                      return sFn && stFn && sFn === stFn;
+                                    });
+                                    if (matchIdx !== -1 && (st.last_name || st.id)) {
+                                      existing.students[matchIdx] = { ...existing.students[matchIdx], ...st };
+                                    }
+                                  }
+                                });
+                                if (existing.students.length > 1 || slot.isGroup) {
                                   existing.isGroup = true;
                                 }
                               } else {
                                 groupedTimeline.push({
                                   ...slot,
                                   isBreak: false,
-                                  isGroup: false,
-                                  students: [slot.student],
+                                  isGroup: subStudents.length > 1 || Boolean(slot.isGroup),
+                                  students: [...subStudents],
                                   slots: [slot]
                                 });
                               }
@@ -10640,25 +10725,21 @@ export function TeacherDashboard({
                             const isFinished = currentTimeStr >= slotEnd && !isCanceled && !isRescheduledAway;
                             const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
                             const isRescheduledPending = activeSlots.some((s: any) => 
-                               s.isRescheduledPending || 
-                               s.is_moved || 
-                               s.isMoved || 
                                s.status === 'rescheduled_pending' || 
-                               s.status === 'pending' || 
                                s.status === 'pending_reschedule' || 
-                               (s.original_date && s.original_date !== s.date)
+                               s.isRescheduledPending === true
                              );
                             const isRescheduledConfirmed = !isRescheduledPending && activeSlots.every((s: any) => s.status === 'rescheduled_confirmed');
-                            const isResetPending = activeSlots.some((s: any) => s.status === 'scheduled' && s.original_date && s.student_acknowledged === false);
-                            const isResetAcknowledged = !isResetPending && activeSlots.every((s: any) => s.status === 'scheduled' && s.original_date && s.student_acknowledged === true);
+                            const isResetPending = activeSlots.some((s: any) => s.status === 'scheduled' && s.original_date && s.date && String(s.original_date) !== String(s.date) && s.student_acknowledged === false);
+                            const isResetAcknowledged = !isResetPending && activeSlots.every((s: any) => s.status === 'scheduled' && s.original_date && s.date && String(s.original_date) !== String(s.date) && s.student_acknowledged === true);
                             const isBirthday = !slot.isGroup && slot.student && isStudentBirthdayToday(slot.student);
- 
+
                             let slotBg = '#ffffff';
                             let slotBorder = '1.5px solid #e2e8f0';
-                            let slotBorderLeft = 'none';
-                            let titleColor = '#1e293b';
+                            let slotBorderLeft = '5px solid #cbd5e1';
+                            let titleColor = '#0f172a';
                             let dotComponent = null;
- 
+
                             if (isBreak) {
                               slotBg = '#fffbeb';
                               slotBorder = '1.5px dashed rgba(245, 158, 11, 0.25)';
@@ -10695,13 +10776,8 @@ export function TeacherDashboard({
                                 }} />
                               );
                             } else if (isCanceled || isRescheduledAway) {
-                              const isSlotAck = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
-                              slotBg = isSlotAck 
-                                ? '#ffffff' 
-                                : (isRescheduledAway ? 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)' : 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)');
-                              slotBorder = isSlotAck 
-                                ? (isRescheduledAway ? '1.5px solid #fef3c7' : '1.5px solid #fee2e2') 
-                                : (isRescheduledAway ? '2px dashed #eab308' : '2px dashed #ef4444');
+                              slotBg = '#ffffff';
+                              slotBorder = isRescheduledAway ? '1.5px solid #fef3c7' : '1.5px solid #fee2e2';
                               slotBorderLeft = isRescheduledAway ? '5px solid #fbbc05' : '5px solid #ef4444';
                               titleColor = '#a1a1aa';
                               dotComponent = isCurrentSlot ? (
@@ -10775,92 +10851,7 @@ export function TeacherDashboard({
                                   boxSizing: 'border-box'
                                 }} />
                               );
-                            } else if (slot.isGroup) {
-                              slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #e2e8f0';
-                              slotBorderLeft = '5px solid #cbd5e1';
-                              titleColor = '#0f172a';
-                              dotComponent = (
-                                <div style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  boxSizing: 'border-box'
-                                }} />
-                              );
-                            } else if (isRescheduledConfirmed) {
-                              slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #e2e8f0';
-                              slotBorderLeft = '5px solid #cbd5e1';
-                              titleColor = '#0f172a';
-                              dotComponent = isCurrentSlot ? (
-                                <div style={{
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxSizing: 'border-box',
-                                  animation: 'pulse 1.5s infinite'
-                                }}>
-                                  <div style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: '#cbd5e1'
-                                  }} />
-                                </div>
-                              ) : (
-                                <div style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  boxSizing: 'border-box'
-                                }} />
-                              );
                             } else if (isRescheduledPending) {
-                              const isReschAck = activeSlots.every((s: any) => s.student_acknowledged === true || s.status === 'rescheduled_confirmed');
-                              slotBg = isReschAck ? '#ffffff' : 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-                              slotBorder = isReschAck ? '1.5px solid #fef3c7' : '2px dashed #eab308';
-                              slotBorderLeft = '5px solid #fbbc05';
-                              titleColor = '#0f172a';
-                              dotComponent = isCurrentSlot ? (
-                                <div style={{
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #fbbc05',
-                                  background: isFinished ? '#fbbc05' : '#ffffff',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxSizing: 'border-box'
-                                }}>
-                                  <div style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: '#fbbc05'
-                                  }} />
-                                </div>
-                              ) : (
-                                <div style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #fbbc05',
-                                  background: isFinished ? '#fbbc05' : '#ffffff',
-                                  boxSizing: 'border-box'
-                                }} />
-                              );
-                            } else if (isResetPending) {
                               slotBg = '#ffffff';
                               slotBorder = '1.5px solid #fef3c7';
                               slotBorderLeft = '5px solid #fbbc05';
@@ -10895,67 +10886,12 @@ export function TeacherDashboard({
                                   boxSizing: 'border-box'
                                 }} />
                               );
-                            } else if (isResetAcknowledged) {
-                              slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #e2e8f0';
-                              slotBorderLeft = '5px solid #cbd5e1';
-                              titleColor = '#0f172a';
-                              dotComponent = isCurrentSlot ? (
-                                <div style={{
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxSizing: 'border-box',
-                                  animation: 'pulse 1.5s infinite'
-                                }}>
-                                  <div style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: '#cbd5e1'
-                                  }} />
-                                </div>
-                              ) : (
-                                <div style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  boxSizing: 'border-box'
-                                }} />
-                              );
                             } else {
                               slotBg = '#ffffff';
                               slotBorder = '1.5px solid #e2e8f0';
                               slotBorderLeft = '5px solid #cbd5e1';
                               titleColor = '#0f172a';
-                              dotComponent = isCurrentSlot ? (
-                                <div style={{
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '50%',
-                                  border: '3px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxSizing: 'border-box',
-                                  animation: 'pulse 1.5s infinite'
-                                }}>
-                                  <div style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: '#cbd5e1'
-                                  }} />
-                                </div>
-                              ) : (
+                              dotComponent = (
                                 <div style={{
                                   width: '12px',
                                   height: '12px',
@@ -11003,12 +10939,17 @@ export function TeacherDashboard({
                                      setSickUntilDate(todayStr);
                                      setIsSickWidgetExpanded(true);
                                    }}
+                                   ref={el => {
+                                     if (isCurrentSlot || (idx === prepIndex && !isFinished)) {
+                                       activeTimelineSlotRef.current = el;
+                                     }
+                                   }}
                                    style={{
                                      flex: 1,
                                      display: 'flex',
                                      alignItems: 'center',
                                      gap: '12px',
-                                     padding: '12px 16px',
+                                     padding: '8px 14px',
                                      background: isCurrentSlot ? '#e6f4ea' : slotBg,
                                      borderRadius: '12px',
                                      border: slotBorder,
@@ -11123,13 +11064,16 @@ export function TeacherDashboard({
                                       {slot.isGroup ? (
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', marginLeft: 'auto' }}>
                                           {slot.students.map((stud: any, sIdx: number) => {
-                                            const originalSlot = slot.slots[sIdx];
+                                            const originalSlot = slot.slots?.[sIdx] || slot.slots?.[0] || slot;
                                             const isRescheduled = Boolean(
-                                              originalSlot?.original_date || 
+                                              (originalSlot?.original_date && originalSlot?.date && String(originalSlot.original_date) !== String(originalSlot.date)) || 
                                               originalSlot?.is_rescheduled || 
                                               originalSlot?.status === 'rescheduled_confirmed' || 
                                               originalSlot?.status === 'rescheduled' ||
-                                              originalSlot?.status === 'rescheduled_away'
+                                              originalSlot?.status === 'rescheduled_away' ||
+                                              slot?.is_rescheduled ||
+                                              slot?.status === 'rescheduled_confirmed' ||
+                                              slot?.status === 'rescheduled'
                                             );
                                             const ack = originalSlot?.student_acknowledged;
                                             const isBirthday = isStudentBirthdayToday(stud);
@@ -11152,12 +11096,14 @@ export function TeacherDashboard({
                                               >
                                                 {isBirthday ? '🎂 ' : ''}{(() => {
                                                   const found = allStudents.find(s => s.id === stud.id);
-                                                  const fn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
-                                                  const ln = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
-                                                  if (fn || ln) {
-                                                    return `${fn} ${maskLastName(ln, showRealNames)}`.trim();
+                                                  const rawFn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
+                                                  const cleanFn = rawFn.replace(/&.*/, '').trim() || 'Schüler';
+                                                  const rawLn = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
+                                                  const cleanLn = rawLn.replace(/&.*/, '').trim();
+                                                  if (cleanFn || cleanLn) {
+                                                    return `${cleanFn} ${maskLastName(cleanLn, showRealNames)}`.trim();
                                                   }
-                                                  return stud.name;
+                                                  return stud.name || 'Schüler';
                                                 })()}
                                                 {isRescheduled && (
                                                   <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>

@@ -67,7 +67,7 @@ export function TrustSafetyTab() {
         id: 'DSA-TAKEDOWN-20260815-4B87',
         studentId: 'demo_student',
         studentName: 'Amelia H. (Demo)',
-        schoolName: 'Musik Bad Säckingen',
+        schoolName: 'Musäk Bad Säckingen',
         playlistId: 'pl_sommer_2026',
         playlistTitle: 'Mein Sommerkonzert 2026',
         reportedUrl: 'https://app.campus-groovelab.de/bio/demo_student?pl=pl_sommer_2026&anon=1',
@@ -158,7 +158,7 @@ export function TrustSafetyTab() {
 
       let resolvedName = 'Unbekannter Schüler';
       let resolvedInstrument = 'Gitarre';
-      let resolvedSchool = 'Musik Bad Säckingen';
+      let resolvedSchool = 'Musäk Bad Säckingen';
       let resolvedSchoolId = '';
       let playlistTitle = extractedPl ? `Playlist: ${extractedPl}` : 'Komplette Audio-Biografie';
 
