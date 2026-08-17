@@ -81,6 +81,11 @@
 
 ## Schüler-Protokoll & Hausaufgabenheft Rules
 - **Universal Uniformity**: All changes in the Schüler-Protokoll (student protocol) must always be applied for all users. The Schüler-Protokoll/Hausaufgabenheft (homework book) layout, headers, first name display, and design selections must look identical across all modules and user accounts.
+- **Master Blueprint for Student Homework Representation (Verbindliche Blaupause für Hausaufgaben-Darstellung)**:
+  - **Hero-Card & Pure White Stage**: Die Schülervorschau / das Hausaufgabenheft muss immer als reinweiße (`#ffffff`), erhabene Karte mit 20px Apple Squircle-Radius und sanftem 3D-Diffusionsschatten (`0 8px 24px -4px rgba(0,0,0,0.06)`) auf einem ruhigen Hellgrau-Canvas (`#f8fafc`) schweben.
+  - **Editorial Flow (Keine Querstreifen-Balken)**: Innerhalb der Schülervorschau dürfen Notizen und Fahrpläne NIEMALS in vollflächig farbigen Hintergrundbalken (wie Rosa-, Blau- oder Grün-Streifen) oder doppelten Kasten-in-Kasten-Rahmen gerendert werden. Sie fließen immer als offene, saubere Magazin-Typografie auf dem weißen Grund mit `36px` Einrückung unter dem jeweiligen Titel.
+  - **Farbige Badges & Icons**: Buchcover-Gradienten und Song-Icons bleiben lebendig und farbenfroh. Seitenzahlen werden als grüne Pillen (`S. 1`, `S. 2`) dargestellt.
+  - **Stage & Toolbox Separation**: Eingabe-Werkzeuge für Lehrkräfte (*Play-Along Studio*, *Zusätzliche Hausaufgaben-Bemerkungen*, *Interne Notiz*) müssen immer in der zusammenhängenden, matten Werkzeugbank (`#f1f5f9` / `rgba(241, 245, 249, 0.8)`) dezent unterhalb der Hero-Card angeordnet sein.
 
 ## Loopstation Rules
 - **Looping Pause**: Es wird eine zwingende 4-Takte-Pause zwischen den Aufnahme-Spuren verwendet (Variante 1), um eine 100% sample-genaue Synchronität (kein Swallowed Attack) sicherzustellen.
