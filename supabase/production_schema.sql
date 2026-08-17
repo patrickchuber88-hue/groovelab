@@ -437,40 +437,50 @@ CREATE POLICY "Band members vote" ON band_proposal_votes FOR ALL USING (
 
 -- END: 15_band_features.sql
 
--- START: 16_fix_songs_rls.sql
--- Fix RLS for songs table to allow admins to manage the catalog
-ALTER TABLE songs ENABLE ROW LEVEL SECURITY;
+-- START: 275_fix_songs_and_mediathek_rls.sql
+-- Fix RLS for songs table to allow teachers, admins, and secretaries to manage the catalog
+ALTER TABLE public.songs ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.songs TO authenticated;
+GRANT ALL ON public.songs TO anon;
+GRANT ALL ON public.songs TO service_role;
 
--- 1. Allow admins full access (INSERT, UPDATE, DELETE, SELECT)
-DROP POLICY IF EXISTS "Admins can manage songs" ON songs;
-CREATE POLICY "Admins can manage songs"
-ON songs
-FOR ALL
-TO authenticated
+DROP POLICY IF EXISTS "Admins can manage songs" ON public.songs;
+DROP POLICY IF EXISTS "Teachers can manage own songs" ON public.songs;
+DROP POLICY IF EXISTS "Teachers see only own songs" ON public.songs;
+DROP POLICY IF EXISTS "Authenticated users can view songs" ON public.songs;
+DROP POLICY IF EXISTS "Anyone in school can see songs" ON public.songs;
+DROP POLICY IF EXISTS "songs_select" ON public.songs;
+DROP POLICY IF EXISTS "songs_modify" ON public.songs;
+DROP POLICY IF EXISTS "songs_select_public" ON public.songs;
+DROP POLICY IF EXISTS "songs_mutation_school" ON public.songs;
+DROP POLICY IF EXISTS "songs_all" ON public.songs;
+
+CREATE POLICY "songs_select" ON public.songs
+FOR SELECT TO authenticated, anon
 USING (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE users.id = auth.uid()
-    AND users.role = 'admin'
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE users.id = auth.uid()
-    AND users.role = 'admin'
-  )
+  public.is_master_admin()
+  OR public.check_school_access(school_id)
+  OR school_id = public.get_user_school_id()
+  OR public.get_user_school_id() IS NULL
 );
 
--- 2. Allow all authenticated users to view songs
-DROP POLICY IF EXISTS "Authenticated users can view songs" ON songs;
-CREATE POLICY "Authenticated users can view songs"
-ON songs
-FOR SELECT
-TO authenticated
-USING (true);
-
--- END: 16_fix_songs_rls.sql
+CREATE POLICY "songs_modify" ON public.songs
+FOR ALL TO authenticated, anon
+USING (
+  public.is_master_admin()
+  OR (public.check_school_access(school_id) AND public.is_teacher_or_admin())
+  OR (school_id = public.get_user_school_id() AND public.is_teacher_or_admin())
+  OR teacher_id = public.get_current_user_id()
+  OR teacher_id = auth.uid()
+)
+WITH CHECK (
+  public.is_master_admin()
+  OR (public.check_school_access(school_id) AND public.is_teacher_or_admin())
+  OR (school_id = public.get_user_school_id() AND public.is_teacher_or_admin())
+  OR teacher_id = public.get_current_user_id()
+  OR teacher_id = auth.uid()
+);
+-- END: 275_fix_songs_and_mediathek_rls.sql
 
 -- START: 18_add_user_last_seen.sql
 -- Add last_seen to users table to track online presence for all roles
@@ -1000,5 +1010,46 @@ CREATE INDEX IF NOT EXISTS idx_lehrwerke_teacher_id ON public.lehrwerke(teacher_
 
 ALTER TABLE public.lehrwerke DISABLE ROW LEVEL SECURITY;
 -- END: 111_create_lehrwerke_table.sql
+
+-- START: 276_comprehensive_rls_hardening.sql
+-- Comprehensive Platform-Wide RLS & Data-Saving Hardening
+CREATE OR REPLACE FUNCTION public.get_current_user_school_id()
+RETURNS UUID
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET row_security = off
+SET search_path = public, pg_catalog, pg_temp
+AS $$
+DECLARE
+    v_uid uuid;
+    v_school_id uuid;
+BEGIN
+    BEGIN
+        v_uid := auth.uid();
+    EXCEPTION WHEN OTHERS THEN
+        v_uid := NULL;
+    END;
+
+    IF v_uid IS NOT NULL THEN
+        SELECT school_id INTO v_school_id FROM public.users_raw WHERE id = v_uid;
+        IF v_school_id IS NOT NULL THEN
+            RETURN v_school_id;
+        END IF;
+    END IF;
+
+    v_uid := public.get_current_user_id();
+    IF v_uid IS NOT NULL THEN
+        SELECT school_id INTO v_school_id FROM public.users_raw WHERE id = v_uid;
+        IF v_school_id IS NOT NULL THEN
+            RETURN v_school_id;
+        END IF;
+    END IF;
+
+    RETURN public.get_user_school_id();
+EXCEPTION WHEN OTHERS THEN
+    RETURN NULL;
+END;
+$$;
+-- END: 276_comprehensive_rls_hardening.sql
 
 

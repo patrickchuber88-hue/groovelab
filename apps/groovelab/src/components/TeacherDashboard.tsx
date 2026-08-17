@@ -6910,6 +6910,8 @@ export function TeacherDashboard({
                 const formattedPages = formatPageNumbers(info.pages);
                 const allDone = info.statuses.every(status => status === 'MASTERED' || status === 'THEORY_DONE');
                 return {
+                  bookTitle,
+                  formattedPages,
                   title: `${bookTitle}: ${formattedPages}`,
                   status: allDone ? 'MASTERED' : 'IN_PROGRESS',
                   isBook: true
@@ -6930,7 +6932,7 @@ export function TeacherDashboard({
             const formattedCurrentWeekItems = groupAndFormatItems(prep.currentWeekItems);
 
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {/* Header: Student Info & Profile Ghost Button */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                   <div 
@@ -6952,15 +6954,15 @@ export function TeacherDashboard({
                     }}
                   >
                     <div style={{
-                      width: '36px',
-                      height: '36px',
+                      width: '38px',
+                      height: '38px',
                       borderRadius: '50%',
                       background: 'linear-gradient(135deg, #34a853 0%, #2e944b 100%)',
                       color: 'white',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.95rem',
+                      fontSize: '1.0rem',
                       fontWeight: 800,
                       boxShadow: '0 2px 6px rgba(52, 168, 83, 0.18)',
                       flexShrink: 0
@@ -6968,10 +6970,10 @@ export function TeacherDashboard({
                       {prep.studentName.charAt(0)}
                     </div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.92rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                      <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.96rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                         {prep.studentName}
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
                         {activeStudent?.id === prep.studentId ? 'Aktueller Schüler' : 'Nächster Schüler'}
                       </div>
                     </div>
@@ -6990,9 +6992,9 @@ export function TeacherDashboard({
                       background: '#f8fafc',
                       color: '#475569',
                       border: '1px solid #e2e8f0',
-                      padding: '6px 10px',
-                      borderRadius: '8px',
-                      fontSize: '0.72rem',
+                      padding: '6px 12px',
+                      borderRadius: '10px',
+                      fontSize: '0.76rem',
                       fontWeight: 750,
                       cursor: 'pointer',
                       display: 'flex',
@@ -7016,21 +7018,21 @@ export function TeacherDashboard({
                     gap: '6px', 
                     background: 'rgba(245, 158, 11, 0.08)', 
                     border: '1px solid rgba(245, 158, 11, 0.15)', 
-                    padding: '4px 10px', 
+                    padding: '4px 12px', 
                     borderRadius: '100px', 
                     color: '#b45309', 
-                    fontSize: '0.72rem', 
+                    fontSize: '0.76rem', 
                     fontWeight: 750,
                     alignSelf: 'flex-start'
                   }}>
-                    <Flame size={13} fill="#f59e0b" color="#f59e0b" />
+                    <Flame size={14} fill="#f59e0b" color="#f59e0b" />
                     <span>Flammen-Streak: {prep.streakCount} Tage!</span>
                   </div>
                 )}
 
                 {/* KW Vorwoche */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     KW {prep.prevWeekNum || '?'} (Vorwoche)
                   </div>
                   {((formattedPrevWeekItems && formattedPrevWeekItems.length > 0) || (prep.prevWeekNotes && prep.prevWeekNotes.length > 0)) ? (
@@ -7040,9 +7042,8 @@ export function TeacherDashboard({
                         return (
                           <div key={`prev-item-${idx}`} style={{
                             background: '#f8fafc',
-                            padding: '8px 10px',
-                            borderRadius: '10px',
-                            border: '1px solid rgba(0, 0, 0, 0.03)',
+                            padding: '10px 12px',
+                            borderRadius: '12px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
@@ -7050,25 +7051,38 @@ export function TeacherDashboard({
                             opacity: 0.85
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                              {isBook ? <BookOpen size={13} color="#64748b" /> : <Music size={13} color="#64748b" />}
-                              <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.78rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                {item.title}
+                              {isBook ? <BookOpen size={14} color="#64748b" /> : <Music size={14} color="#64748b" />}
+                              <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.84rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                {item.bookTitle || item.title}
                               </span>
                             </div>
-                            {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
-                              <span style={{
-                                background: 'rgba(52, 168, 83, 0.08)',
-                                color: '#34a853',
-                                fontSize: '0.62rem',
-                                fontWeight: 800,
-                                borderRadius: '100px',
-                                padding: '2px 6px',
-                                textTransform: 'uppercase',
-                                flexShrink: 0
-                              }}>
-                                Erledigt
-                              </span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                              {item.formattedPages && (
+                                <span style={{
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  color: '#15803d',
+                                  background: '#dcfce7',
+                                  padding: '2px 6px',
+                                  borderRadius: '6px'
+                                }}>
+                                  {item.formattedPages}
+                                </span>
+                              )}
+                              {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                                <span style={{
+                                  background: 'rgba(52, 168, 83, 0.08)',
+                                  color: '#34a853',
+                                  fontSize: '0.66rem',
+                                  fontWeight: 800,
+                                  borderRadius: '100px',
+                                  padding: '2px 8px',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  Erledigt
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -7083,7 +7097,7 @@ export function TeacherDashboard({
                           const duration = parts[1] || '8';
                           return (
                             <div key={`prev-note-${idx}`}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
                                 🎵 Loop-Mix: "{label}" ({duration}s)
                               </span>
                             </div>
@@ -7096,7 +7110,7 @@ export function TeacherDashboard({
                           const role = parts[4] || 'teacher';
                           return (
                             <div key={`prev-note-${idx}`}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
                                 🎙️ {role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)
                               </span>
                             </div>
@@ -7104,14 +7118,14 @@ export function TeacherDashboard({
                         }
                         return (
                           <div key={`prev-note-${idx}`} style={{ 
-                            fontSize: '0.74rem', 
+                            fontSize: '0.80rem', 
                             color: '#64748b', 
-                            fontWeight: 500, 
+                            fontWeight: 550, 
                             fontStyle: 'italic', 
                             borderLeft: '2.5px solid #cbd5e1', 
                             paddingLeft: '8px', 
                             margin: '2px 0',
-                            lineHeight: 1.3,
+                            lineHeight: 1.35,
                             opacity: 0.85
                           }}>
                             {note}
@@ -7120,52 +7134,90 @@ export function TeacherDashboard({
                       })}
                     </div>
                   ) : (
-                    <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic', padding: '2px 0' }}>
+                    <div style={{ fontSize: '0.80rem', color: '#94a3b8', fontStyle: 'italic', padding: '2px 0' }}>
                       Keine Hausaufgaben erfasst.
                     </div>
                   )}
                 </div>
 
                 {/* KW Diese Woche */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     KW {prep.currentWeekNum || '?'} (Heute / Diese Woche)
                   </div>
                   {((formattedCurrentWeekItems && formattedCurrentWeekItems.length > 0) || (prep.currentWeekNotes && prep.currentWeekNotes.length > 0)) ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {formattedCurrentWeekItems && formattedCurrentWeekItems.map((item: any, idx: number) => {
                         const isBook = item.isBook;
                         return (
                           <div key={`curr-item-${idx}`} style={{
                             background: '#f8fafc',
-                            padding: '8px 10px',
-                            borderRadius: '10px',
-                            border: '1px solid rgba(0, 0, 0, 0.03)',
+                            padding: '10px 14px',
+                            borderRadius: '14px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            gap: '8px'
+                            gap: '10px'
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                              {isBook ? <BookOpen size={13} color="#64748b" /> : <Music size={13} color="#64748b" />}
-                              <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.78rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                {item.title}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                              {isBook ? (
+                                <div style={{
+                                  width: '24px',
+                                  height: '30px',
+                                  borderRadius: '5px',
+                                  background: 'linear-gradient(135deg, #e2e8f0, #cbd5e1)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <BookOpen size={13} color="#475569" />
+                                </div>
+                              ) : (
+                                <div style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '6px',
+                                  background: '#e0e7ff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <Music size={13} color="#4338ca" />
+                                </div>
+                              )}
+                              <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.92rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                {item.bookTitle || item.title}
                               </span>
                             </div>
-                            {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
-                              <span style={{
-                                background: 'rgba(52, 168, 83, 0.08)',
-                                color: '#34a853',
-                                fontSize: '0.62rem',
-                                fontWeight: 800,
-                                borderRadius: '100px',
-                                padding: '2px 6px',
-                                textTransform: 'uppercase',
-                                flexShrink: 0
-                              }}>
-                                Erledigt
-                              </span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                              {item.formattedPages && (
+                                <span style={{
+                                  fontSize: '0.82rem',
+                                  fontWeight: 850,
+                                  color: '#15803d',
+                                  background: '#dcfce7',
+                                  padding: '3px 8px',
+                                  borderRadius: '8px'
+                                }}>
+                                  {item.formattedPages}
+                                </span>
+                              )}
+                              {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
+                                <span style={{
+                                  background: 'rgba(52, 168, 83, 0.08)',
+                                  color: '#34a853',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  borderRadius: '100px',
+                                  padding: '2px 8px',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  Erledigt
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -7180,7 +7232,7 @@ export function TeacherDashboard({
                           const duration = parts[1] || '8';
                           return (
                             <div key={`curr-note-${idx}`}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
                                 🎵 Loop-Mix: "{label}" ({duration}s)
                               </span>
                             </div>
@@ -7193,7 +7245,7 @@ export function TeacherDashboard({
                           const role = parts[4] || 'teacher';
                           return (
                             <div key={`curr-note-${idx}`}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
                                 🎙️ {role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)
                               </span>
                             </div>
@@ -7201,14 +7253,14 @@ export function TeacherDashboard({
                         }
                         return (
                           <div key={`curr-note-${idx}`} style={{ 
-                            fontSize: '0.74rem', 
+                            fontSize: '0.84rem', 
                             color: '#475569', 
-                            fontWeight: 500, 
+                            fontWeight: 550, 
                             fontStyle: 'italic', 
                             borderLeft: '2.5px solid #34a853', 
-                            paddingLeft: '8px', 
-                            margin: '2px 0',
-                            lineHeight: 1.3
+                            paddingLeft: '10px', 
+                            margin: '3px 0',
+                            lineHeight: 1.4
                           }}>
                             {note}
                           </div>
@@ -7216,7 +7268,7 @@ export function TeacherDashboard({
                       })}
                     </div>
                   ) : (
-                    <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic', padding: '2px 0' }}>
+                    <div style={{ fontSize: '0.80rem', color: '#94a3b8', fontStyle: 'italic', padding: '2px 0' }}>
                       Noch keine Hausaufgaben erfasst.
                     </div>
                   )}
@@ -7245,9 +7297,9 @@ export function TeacherDashboard({
                       background: '#34a853',
                       color: 'white',
                       border: 'none',
-                      padding: '10px 14px',
-                      borderRadius: '12px',
-                      fontSize: '0.82rem',
+                      padding: '12px 16px',
+                      borderRadius: '14px',
+                      fontSize: '0.88rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
@@ -7259,7 +7311,7 @@ export function TeacherDashboard({
                     }}
                     className="hover-scale"
                   >
-                    <Edit3 size={15} />
+                    <Edit3 size={16} />
                     <span>Hausaufgabe / Notiz erfassen</span>
                   </button>
                 </div>

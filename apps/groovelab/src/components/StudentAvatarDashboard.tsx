@@ -5,9 +5,9 @@ import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
-  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, School, Calendar, Check, CheckCircle, Target, MessageSquare, Send,
+  Pause, RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
-  Mic, Disc, Trash2, Download
+  Mic, Disc, Trash2, Download, Key, Delete
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -24,6 +24,7 @@ import { CampusLevelSwitcher, CampusUiLevel } from './campus/CampusLevelSwitcher
 import { CampusJuniorDashboard } from './campus/CampusJuniorDashboard';
 import { CampusTeenDashboard } from './campus/CampusTeenDashboard';
 import { CampusLevelSelectModal } from './campus/CampusLevelSelectModal';
+import { AudioTrackCarousel } from './AudioTrackCarousel';
 
 const showMissionsFeature = false;
 
@@ -917,7 +918,7 @@ function MobileBriefingView({
 
             const getHomeworkNotes = (): string[] => {
               const notes: string[] = [];
-              const weekItems = progressItems.filter(item => getItemWeek(item) === latestWeek);
+              const weekItems = progressItems.filter(item => getItemWeek(item) === latestWeek || item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
               for (const item of weekItems) {
                 if (item.homework_notes && item.homework_notes.trim()) {
                   try {
@@ -948,6 +949,26 @@ function MobileBriefingView({
                   }
                 }
               }
+
+              // LocalStorage fallback cache (homework notes only, strictly no internal teacher notes)
+              try {
+                const cachedHwStr = localStorage.getItem(`campus_homework_notes_${studentId}`);
+                if (cachedHwStr) {
+                  if (cachedHwStr.startsWith('[') && cachedHwStr.endsWith(']')) {
+                    const parsed = JSON.parse(cachedHwStr);
+                    if (Array.isArray(parsed)) {
+                      parsed.forEach((n: string) => {
+                        if (n && n.trim() && !notes.includes(n.trim())) {
+                          notes.push(n.trim());
+                        }
+                      });
+                    }
+                  } else if (!notes.includes(cachedHwStr.trim())) {
+                    notes.push(cachedHwStr.trim());
+                  }
+                }
+              } catch {}
+
               return notes;
             };
             const notesList = getHomeworkNotes();
@@ -1083,19 +1104,48 @@ function MobileBriefingView({
                       .join('; ');
 
                     return (
-                      <div key={title} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                          <span style={{ fontSize: '1rem', flexShrink: 0 }}>📖</span>
-                          <div style={{ overflow: 'hidden' }}>
-                            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{title}</div>
-                            <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 650, marginTop: '2px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                              <strong>{formattedPages}</strong>
-                              {textNotes ? ` • ${textNotes}` : ''}
-                            </div>
+                      <div key={title} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: '#f8fafc',
+                        padding: '10px 14px',
+                        borderRadius: '14px',
+                        gap: '12px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden', flex: 1 }}>
+                          <div style={{
+                            width: '24px',
+                            height: '30px',
+                            borderRadius: '5px',
+                            background: 'linear-gradient(135deg, #e2e8f0, #cbd5e1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <BookOpen size={13} color="#475569" />
+                          </div>
+                          <div style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{title}</div>
+                            {textNotes ? (
+                              <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 550, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                {textNotes}
+                              </div>
+                            ) : null}
                           </div>
                         </div>
-                        <div style={{ background: '#e6f4ea', color: '#34a853', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Check size={12} strokeWidth={3} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                          <span style={{
+                            fontSize: '0.80rem',
+                            fontWeight: 850,
+                            color: '#15803d',
+                            background: '#dcfce7',
+                            padding: '3px 8px',
+                            borderRadius: '8px'
+                          }}>
+                            {formattedPages}
+                          </span>
                         </div>
                       </div>
                     );
@@ -1107,7 +1157,7 @@ function MobileBriefingView({
                       {otherHWs.map((item, idx) => (
                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '12px' }}>
                           <span style={{ fontSize: '0.75rem', color: '#334155', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {item.topic_name} {item.teacher_notes ? ` - ${item.teacher_notes}` : ''}
+                            {item.topic_name} {item.homework_notes ? ` - ${cleanHomeworkNotesText(item.homework_notes)}` : ''}
                           </span>
                           <div style={{ background: '#e6f4ea', color: '#34a853', borderRadius: '4px', padding: '2px 4px', flexShrink: 0 }}>
                             <Check size={10} strokeWidth={3} />
@@ -1118,23 +1168,28 @@ function MobileBriefingView({
                   )}
 
                   {notesList.length > 0 && (() => {
-                    let audioCount = 0;
-                    const filteredNotes = notesList.filter((note: string) => !note.startsWith("STICKER:"));
-                    if (filteredNotes.length === 0) return null;
+                    const audioNotes = notesList.filter((note: string) => note.startsWith("AUDIO:"));
+                    const textNotes = notesList.filter((note: string) => !note.startsWith("STICKER:") && !note.startsWith("AUDIO:"));
+                    if (audioNotes.length === 0 && textNotes.length === 0) return null;
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
-                        {filteredNotes.map((note: string, nIdx: number) => {
-                          const isAudio = note.startsWith("AUDIO:");
-                          if (isAudio) {
-                            audioCount++;
-                            const parts = note.substring(6).split('|');
-                            return (
-                              <div key={nIdx} style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
-                                <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along #${audioCount}`} />
-                              </div>
-                            );
-                          }
-                          
+                        {audioNotes.length > 0 && (
+                          <div style={{ padding: '2px 0' }}>
+                            <AudioTrackCarousel
+                              tracks={audioNotes.map((note: string, aIdx: number) => {
+                                const parts = note.substring(6).split('|');
+                                return {
+                                  url: parts[0],
+                                  duration: parseInt(parts[1] || '0', 10),
+                                  label: parts[3] || `Play-Along #${aIdx + 1}`,
+                                  idx: aIdx
+                                };
+                              })}
+                              readOnly={true}
+                            />
+                          </div>
+                        )}
+                        {textNotes.map((note: string, nIdx: number) => {
                           const trimmedNote = (note || '').trim();
                           const isStudentNotePublic = trimmedNote.includes('STUDENT_NOTE_PUBLIC:');
                           const isStudentNotePrivate = trimmedNote.includes('STUDENT_NOTE_PRIVATE:');
@@ -1163,8 +1218,8 @@ function MobileBriefingView({
                                 padding: '5px 10px',
                                 borderRadius: '8px'
                               }}>
-                                <span style={{ fontSize: '0.85rem' }}>{isStudentNotePrivate ? '🔒' : '💬'}</span>
-                                <span>{isStudentNotePrivate ? 'Notiz:' : 'Frage:'} {cleanQuestionText}</span>
+                                <span>{isStudentNotePrivate ? '🔒' : '💬'}</span>
+                                <span>{cleanQuestionText}</span>
                               </div>
                             );
                           }
@@ -2775,6 +2830,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [pinFormError, setPinFormError] = useState('');
   const [pinFormSuccess, setPinFormSuccess] = useState('');
   const [isSavingPin, setIsSavingPin] = useState(false);
+  const [firstPinActiveField, setFirstPinActiveField] = useState<'new' | 'confirm'>('new');
+  const [firstPinShowMask, setFirstPinShowMask] = useState<boolean>(false);
+  const [firstPinSavedSuccess, setFirstPinSavedSuccess] = useState<boolean>(false);
 
   const [isAppUser, setIsAppUser] = useState(false);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
@@ -4200,6 +4258,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [juniorStickerCategory, setJuniorStickerCategory] = useState<'all' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial'>('all');
   const [juniorAwardedStickerToCelebrate, setJuniorAwardedStickerToCelebrate] = useState<any | null>(null);
   const [juniorSelectedPreviewSticker, setJuniorSelectedPreviewSticker] = useState<any | null>(null);
+  const [juniorCheckedPages, setJuniorCheckedPages] = useState<Record<string, boolean>>({});
 
   // Junior Audio Recording State
   const [juniorIsRecording, setJuniorIsRecording] = useState(false);
@@ -4328,6 +4387,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
+          channelCount: 1, // Force centered mono capture to avoid left-ear-only panning on audio interfaces / stereo mics
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false
@@ -4373,36 +4433,50 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
       };
 
-      // 2. Microphone stream is 100% active and granted -> Start the visual 3-2-1 countdown!
+      // 2. Pre-warm and ensure AudioContext is active for instantaneous latency-free beeps
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume().catch(() => {});
+      }
+
+      // 3. Start high-precision drift-free 3-2-1 countdown
       setJuniorCountdown(3);
-      playBeep(440, 150);
-      let count = 3;
+      playBeep(440, 120);
+      
+      const countdownStart = performance.now();
+      let currentShown = 3;
 
       juniorCdIntervalRef.current = setInterval(() => {
-        count -= 1;
-        if (count > 0) {
-          setJuniorCountdown(count);
-          playBeep(440, 150);
-        } else {
-          clearInterval(juniorCdIntervalRef.current);
-          juniorCdIntervalRef.current = null;
-          setJuniorCountdown(null);
-          playBeep(880, 250); // High pitch "GO" tone
+        const elapsed = performance.now() - countdownStart;
+        const targetNumber = 3 - Math.floor(elapsed / 1000);
 
-          // 3. Start recording precisely on cue!
-          try {
-            recorder.start(200);
-            setJuniorIsRecording(true);
-            setJuniorRecordDuration(0);
+        if (targetNumber < currentShown) {
+          currentShown = targetNumber;
+          if (currentShown > 0) {
+            setJuniorCountdown(currentShown);
+            playBeep(440, 120);
+          } else {
+            clearInterval(juniorCdIntervalRef.current);
+            juniorCdIntervalRef.current = null;
+            setJuniorCountdown(null);
 
-            juniorRecordTimerRef.current = setInterval(() => {
-              setJuniorRecordDuration(prev => prev + 1);
-            }, 1000);
-          } catch (startErr) {
-            console.error('Recording start execution error:', startErr);
+            // Start recording precisely at 3.000s!
+            try {
+              recorder.start(200);
+              setJuniorIsRecording(true);
+              setJuniorRecordDuration(0);
+
+              juniorRecordTimerRef.current = setInterval(() => {
+                setJuniorRecordDuration(prev => prev + 1);
+              }, 1000);
+            } catch (startErr) {
+              console.error('Recording start execution error:', startErr);
+            }
           }
         }
-      }, 1000);
+      }, 25); // 25ms high-frequency polling ensures <25ms timing accuracy
 
     } catch (err: any) {
       console.error('Microphone access denied / error:', err);
@@ -4532,13 +4606,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         console.warn('Audio-biography sync notice:', bioErr);
       }
 
+      const audioMetaStr = `AUDIO:${finalAudioUrl}|${juniorRecordDuration}|${new Date().toISOString()}|${songTitle}|student|private|${recUniqueId}`;
+
       // 4. Insert record into progress_matrix in Supabase
       try {
         const { error: insErr } = await supabase.from('progress_matrix').insert({
           student_id: studentId,
           school_id: studentUser?.school_id,
           topic_name: songTitle,
-          homework_notes: JSON.stringify([`AUDIO:${finalAudioUrl}|${juniorRecordDuration}|${songTitle}|${recUniqueId}`]),
+          homework_notes: JSON.stringify([audioMetaStr]),
           audio_url: finalAudioUrl,
           is_current_homework: false,
           created_at: new Date().toISOString(),
@@ -4550,6 +4626,50 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
       } catch (dbErr) {
         console.warn('Supabase insert notice:', dbErr);
+      }
+
+      // 5. Append to student's current weekly progress_item / homework_notes so it's in Hausaufgabenheft Tab "Aufnahmen"
+      try {
+        const activeHwItem = (progressItems || []).find(item => item.is_current_homework || item.topic_name?.startsWith('Hausaufgabe KW '));
+        if (activeHwItem && activeHwItem.id) {
+          let existingNotes: string[] = [];
+          if (activeHwItem.homework_notes) {
+            try {
+              if (activeHwItem.homework_notes.startsWith('[') && activeHwItem.homework_notes.endsWith(']')) {
+                existingNotes = JSON.parse(activeHwItem.homework_notes);
+              } else {
+                existingNotes = [activeHwItem.homework_notes];
+              }
+            } catch {
+              existingNotes = [activeHwItem.homework_notes];
+            }
+          }
+          const updatedNotes = [...existingNotes, audioMetaStr];
+          await supabase.from('progress_items').update({
+            homework_notes: JSON.stringify(updatedNotes),
+            updated_at: new Date().toISOString()
+          }).eq('id', activeHwItem.id);
+        }
+
+        // Also update local cache for homework notes
+        const hwNotesKey = `campus_homework_notes_${studentId}`;
+        const cachedHW = localStorage.getItem(hwNotesKey);
+        let cachedNotesList: string[] = [];
+        if (cachedHW) {
+          try {
+            if (cachedHW.startsWith('[') && cachedHW.endsWith(']')) {
+              cachedNotesList = JSON.parse(cachedHW);
+            } else {
+              cachedNotesList = [cachedHW];
+            }
+          } catch {
+            cachedNotesList = [cachedHW];
+          }
+        }
+        cachedNotesList.push(audioMetaStr);
+        localStorage.setItem(hwNotesKey, JSON.stringify(cachedNotesList));
+      } catch (hwNotesErr) {
+        console.warn('Hausaufgabenheft notes sync notice:', hwNotesErr);
       }
 
       playSuccessChime();
@@ -4566,11 +4686,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   };
 
-  // Junior Student Recordings List (Aggregated from local vault + Audio-Biography + Cloud progressItems)
+  // Junior Student Recordings List (Exclusively containing recorded songs from Box 3 "Aufnahme starten")
   const juniorStudentRecordings = useMemo(() => {
     const recsMap = new Map<string, { id: string; title: string; url: string; duration?: number; date: string; fullItem?: any; blobKey?: string }>();
 
-    // 1. From local junior recordings
+    // Exclusively from Box 3 local junior recordings
     (juniorLocalRecordings || []).forEach(item => {
       if (item && item.id) {
         recsMap.set(item.id, {
@@ -4584,65 +4704,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
     });
 
-    // 2. From Audio-Biography storage
-    try {
-      if (studentId) {
-        const bioStored = localStorage.getItem(`campus_audio_biography_${studentId}`);
-        if (bioStored) {
-          const bioTracks = JSON.parse(bioStored);
-          (bioTracks || []).forEach((t: any) => {
-            if (t && t.id && !recsMap.has(t.id)) {
-              recsMap.set(t.id, {
-                id: t.id,
-                title: t.title || 'Mein Song',
-                url: t.audioUrl || t.masteredAudioUrl || '',
-                duration: t.duration,
-                date: t.recordedAt || new Date().toISOString(),
-                blobKey: `campus_audio_${t.id}_raw`
-              });
-            }
-          });
-        }
-      }
-    } catch {}
-
-    // 3. From progressItems (Supabase)
-    (progressItems || []).forEach(item => {
-      if (item.audio_url && !recsMap.has(item.id)) {
-        recsMap.set(item.id, {
-          id: item.id,
-          title: item.topic_name || item.title || 'Mein Song',
-          url: item.audio_url,
-          date: item.created_at || item.updated_at || new Date().toISOString(),
-          fullItem: item
-        });
-      }
-      if (item.homework_notes) {
-        try {
-          const parsed = typeof item.homework_notes === 'string' && item.homework_notes.startsWith('[') ? JSON.parse(item.homework_notes) : [item.homework_notes];
-          (parsed || []).forEach((n: string, i: number) => {
-            if (typeof n === 'string' && n.startsWith('AUDIO:')) {
-              const parts = n.substring(6).split('|');
-              const audioId = parts[3] ? parts[3] : `${item.id}-audio-${i}`;
-              if (!recsMap.has(audioId)) {
-                recsMap.set(audioId, {
-                  id: audioId,
-                  title: parts[2] || item.topic_name || `Aufnahme #${recsMap.size + 1}`,
-                  url: parts[0] || '',
-                  duration: parts[1] ? parseInt(parts[1], 10) : undefined,
-                  date: item.created_at || item.updated_at || new Date().toISOString(),
-                  fullItem: item,
-                  blobKey: parts[3] ? `campus_audio_${parts[3]}_raw` : undefined
-                });
-              }
-            }
-          });
-        } catch {}
-      }
-    });
-
     return Array.from(recsMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [juniorLocalRecordings, progressItems, studentId]);
+  }, [juniorLocalRecordings]);
 
   const togglePlayJuniorRecording = async (recId: string, audioUrl: string, blobKey?: string) => {
     if (juniorActivePlayingAudioId === recId) {
@@ -4762,12 +4825,65 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   // First-Login PIN Prompt Check
   useEffect(() => {
     if (studentUser && studentId) {
-      const hasPinInStorage = localStorage.getItem(`groovelab_user_pin_${studentId}`);
-      if (!studentUser.personal_pin && !studentUser.parent_pin && !studentUser.is_pin_activated && !hasPinInStorage) {
+      const hasPinInStorage = Boolean(
+        localStorage.getItem(`groovelab_user_pin_${studentId}`) ||
+        localStorage.getItem(`groovelab_student_pin_${studentId}`) ||
+        sessionStorage.getItem(`groovelab_user_pin_${studentId}`)
+      );
+      // In the database view `users`, personal_pin & parent_pin are NULL (GDPR), while has_personal_pin & is_pin_activated reflect actual state.
+      const hasPinInDb = Boolean(
+        studentUser.is_pin_activated ||
+        studentUser.has_personal_pin ||
+        studentUser.has_parent_pin ||
+        studentUser.personal_pin ||
+        studentUser.parent_pin
+      );
+      if (!hasPinInDb && !hasPinInStorage) {
         setShowFirstLoginPinModal(true);
+      } else {
+        setShowFirstLoginPinModal(false);
       }
     }
   }, [studentUser, studentId]);
+
+  // Hardware Keyboard listener for First-Login PIN modal
+  useEffect(() => {
+    if (!showFirstLoginPinModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'text') return;
+
+      if (['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) {
+        setPinFormError('');
+        if (firstPinActiveField === 'new') {
+          if (pinFormNew.length < 4) {
+            const next = pinFormNew + e.key;
+            setPinFormNew(next);
+            if (next.length === 4) {
+              setFirstPinActiveField('confirm');
+            }
+          }
+        } else {
+          if (pinFormConfirm.length < 4) {
+            setPinFormConfirm(prev => prev + e.key);
+          }
+        }
+      } else if (e.key === 'Backspace') {
+        setPinFormError('');
+        if (firstPinActiveField === 'new') {
+          setPinFormNew(prev => prev.slice(0, -1));
+        } else {
+          if (pinFormConfirm.length === 0) {
+            setFirstPinActiveField('new');
+          } else {
+            setPinFormConfirm(prev => prev.slice(0, -1));
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showFirstLoginPinModal, firstPinActiveField, pinFormNew, pinFormConfirm]);
 
   const [preStartCountdown, setPreStartCountdown] = useState<number | null>(null);
   const preStartCountdownRef = useRef(preStartCountdown);
@@ -6557,15 +6673,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
       const ctx = audioContextRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + (duration / 1000));
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + (duration / 1000));
+      osc.start(now);
+      osc.stop(now + (duration / 1000));
     } catch (e) {
       console.warn("AudioContext warning beep failed:", e);
     }
@@ -12476,24 +12597,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           <X size={24} />
                         </button>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                           <div style={{
-                            background: '#dcfce7',
+                            background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
                             color: '#15803d',
-                            width: '56px',
-                            height: '56px',
-                            borderRadius: '20px',
+                            width: '52px',
+                            height: '52px',
+                            borderRadius: '18px',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)'
                           }}>
-                            <BookOpen size={30} />
+                            <BookOpen size={26} strokeWidth={2.4} />
                           </div>
                           <div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 950, color: '#15803d', textTransform: 'uppercase' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                               Mein Aufgabenheft
                             </span>
-                            <h2 style={{ margin: '2px 0 0 0', fontSize: '1.6rem', fontWeight: 950, color: '#0f172a' }}>
+                            <h2 style={{ margin: '2px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em' }}>
                               Deine aktuellen Aufgaben 🎵
                             </h2>
                           </div>
@@ -12540,7 +12662,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     activeJuniorBooksMap[book.title] = { pages: [] };
                                   }
                                   if (!activeJuniorBooksMap[book.title].pages.some(p => p.num === pageNum)) {
-                                    let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || pState.teacher_notes || '';
+                                    let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
                                     if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
                                       try {
                                         const parsed = JSON.parse(cleanNote);
@@ -12575,7 +12697,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   activeJuniorBooksMap[bookTitle] = { pages: [] };
                                 }
                                 if (!isNaN(pageNum) && !activeJuniorBooksMap[bookTitle].pages.some(p => p.num === pageNum)) {
-                                  let cleanNote = item.homework_notes || item.teacher_notes || '';
+                                  let cleanNote = item.homework_notes || '';
                                   if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
                                     try {
                                       const parsed = JSON.parse(cleanNote);
@@ -12649,18 +12771,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         const bookGradient = getLehrwerkColor(bookItem.title, lehrwerke);
                                         return (
                                           <div key={`j-modal-book-${idx}`} style={{
-                                            background: '#ffffff',
-                                            padding: '20px 22px',
-                                            borderRadius: '24px',
-                                            border: '2px solid #fef08a',
-                                            boxShadow: '0 6px 20px rgba(250, 204, 21, 0.15)',
+                                            background: '#f8fafc',
+                                            padding: '18px 20px',
+                                            borderRadius: '20px',
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            gap: '14px'
+                                            gap: '10px'
                                           }}>
                                             {/* Book Header */}
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                                                 <div style={{
                                                   width: '32px',
                                                   height: '38px',
@@ -12671,63 +12791,39 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                                   justifyContent: 'center',
                                                   color: bookGradient.text,
                                                   flexShrink: 0,
-                                                  boxShadow: '0 3px 10px rgba(0,0,0,0.12)'
+                                                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
                                                 }}>
                                                   <BookOpen size={16} />
                                                 </div>
-                                                <div>
-                                                  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                                    {bookItem.title}
-                                                  </h3>
-                                                  <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#15803d' }}>
-                                                    {bookItem.formattedPages}
-                                                  </span>
-                                                </div>
+                                                <span style={{ fontSize: '1.12rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                                  {bookItem.title}
+                                                </span>
                                               </div>
-                                              <span style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.72rem', fontWeight: 900, padding: '4px 12px', borderRadius: '100px', border: '1px solid #bbf7d0' }}>
-                                                Aufgabe aktiv 🎯
+                                              <span style={{
+                                                background: '#dcfce7',
+                                                color: '#15803d',
+                                                fontSize: '0.88rem',
+                                                fontWeight: 900,
+                                                padding: '4px 12px',
+                                                borderRadius: '10px',
+                                                flexShrink: 0
+                                              }}>
+                                                {bookItem.formattedPages}
                                               </span>
                                             </div>
 
-                                            {/* Playful Page Chips */}
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                              {bookItem.pageNums.map(p => (
-                                                <div key={`j-page-${p}`} style={{
-                                                  background: '#fef08a',
-                                                  color: '#854d0e',
-                                                  border: '2px solid #facc15',
-                                                  borderRadius: '999px',
-                                                  padding: '6px 16px',
-                                                  fontSize: '0.92rem',
-                                                  fontWeight: 950,
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  gap: '6px',
-                                                  boxShadow: '0 3px 8px rgba(250, 204, 21, 0.25)'
-                                                }}>
-                                                  <span>📄 Seite {p}</span>
-                                                </div>
-                                              ))}
-                                            </div>
-
-                                            {/* Notes Speech Bubbles */}
+                                            {/* Friendly Direct Notes */}
                                             {bookItem.notesList.length > 0 && (
                                               <div style={{
-                                                background: '#fffbeb',
-                                                border: '2px dashed #fcd34d',
-                                                borderRadius: '18px',
-                                                padding: '14px 18px',
                                                 display: 'flex',
                                                 flexDirection: 'column',
-                                                gap: '8px'
+                                                gap: '6px',
+                                                paddingLeft: '44px'
                                               }}>
-                                                <div style={{ fontSize: '0.78rem', fontWeight: 950, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                  <span>💬</span>
-                                                  <span>Hinweise deiner Lehrkraft</span>
-                                                </div>
                                                 {bookItem.notesList.map((n, nIdx) => (
-                                                  <div key={`j-n-${nIdx}`} style={{ fontSize: '0.92rem', color: '#92400e', fontWeight: 800, lineHeight: 1.45, paddingLeft: '4px' }}>
-                                                    <strong>Tipp zu Seite {n.num}:</strong> „{n.text}“
+                                                  <div key={`j-n-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.92rem', color: '#475569', fontWeight: 600, lineHeight: 1.45 }}>
+                                                    <span style={{ color: '#d97706' }}>💬</span>
+                                                    <span><strong style={{ color: '#1e293b' }}>Tipp zu S. {n.num}:</strong> {n.text}</span>
                                                   </div>
                                                 ))}
                                               </div>
@@ -12741,57 +12837,72 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   {/* Songs Liste */}
                                   {otherActiveSongs.length > 0 && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                      <div style={{ fontSize: '0.88rem', fontWeight: 950, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                        🎵 Deine Songs & Stücke:
-                                      </div>
-                                      {otherActiveSongs.map((item, idx) => (
-                                        <div key={idx} style={{
-                                          background: '#f8fafc',
-                                          padding: '16px 20px',
-                                          borderRadius: '20px',
-                                          border: '1.5px solid #e2e8f0',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '12px',
-                                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                                        }}>
-                                          <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Music size={18} />
-                                          </div>
-                                          <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
-                                            {cleanTitle(item.topic_name || item.title)}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
+                                      {otherActiveSongs.map((item, idx) => {
+                                        let cleanNote = item.homework_notes || '';
+                                        if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
+                                          try {
+                                            const parsed = JSON.parse(cleanNote);
+                                            if (Array.isArray(parsed)) {
+                                              cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                            }
+                                          } catch {}
+                                        }
+                                        cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
 
-                                  {/* Play-Alongs */}
-                                  {audioNotes.length > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                      <div style={{ fontSize: '0.88rem', fontWeight: 950, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                        🎧 Play-Along Mitspielen:
-                                      </div>
-                                      {audioNotes.map((note, idx) => {
-                                        const parts = note.substring(6).split('|');
                                         return (
-                                          <div key={idx} style={{ background: '#f0fdf4', padding: '12px 16px', borderRadius: '18px', border: '1.5px solid #bbf7d0' }}>
-                                            <InlineAudioPlayer url={parts[0]} label={parts[3] || `🎵 Play-Along Track #${idx + 1}`} />
+                                          <div key={`student-song-${idx}`} style={{
+                                            background: '#f8fafc',
+                                            padding: '16px 20px',
+                                            borderRadius: '20px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '8px'
+                                          }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                              <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                <Music size={16} />
+                                              </div>
+                                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                                                {cleanTitle(item.topic_name || item.title)}
+                                              </span>
+                                            </div>
+
+                                            {cleanNote ? (
+                                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.90rem', color: '#475569', paddingTop: '6px', borderTop: '1px solid #f1f5f9' }}>
+                                                <span style={{ fontWeight: 800, color: '#0f172a' }}>📌 Übe-Fahrplan:</span>
+                                                <span style={{ fontWeight: 600, color: '#334155', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{cleanNote}</span>
+                                              </div>
+                                            ) : null}
                                           </div>
                                         );
                                       })}
                                     </div>
                                   )}
+                                   {/* Play-Alongs (Single-line infinite loop carousel) */}
+                                   {audioNotes.length > 0 && (
+                                     <div style={{ background: '#f0fdf4', padding: '6px 10px', borderRadius: '14px', width: '100%', boxSizing: 'border-box' }}>
+                                       <AudioTrackCarousel
+                                         tracks={audioNotes.map((note, idx) => {
+                                           const parts = note.substring(6).split('|');
+                                           return {
+                                             url: parts[0],
+                                             duration: parseInt(parts[1] || '0', 10),
+                                             label: parts[3] || `🎵 Play-Along Track #${idx + 1}`,
+                                             idx
+                                           };
+                                         })}
+                                         readOnly={true}
+                                       />
+                                     </div>
+                                   )}
 
                                   {/* Allgemeine Notizen der Lehrkraft */}
                                   {cleanNotes.length > 0 && (
-                                    <div style={{ background: '#fffbeb', padding: '16px 20px', borderRadius: '20px', border: '1.5px solid #fde68a' }}>
-                                      <div style={{ fontSize: '0.82rem', fontWeight: 950, color: '#d97706', marginBottom: '6px', textTransform: 'uppercase' }}>
-                                        💡 Wochen-Tipp deiner Lehrkraft:
-                                      </div>
+                                    <div style={{ background: '#f0fdf4', padding: '14px 18px', borderRadius: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                       {cleanNotes.map((note, idx) => (
-                                        <div key={idx} style={{ fontSize: '0.92rem', color: '#92400e', fontWeight: 700, lineHeight: 1.45 }}>
-                                          {cleanHomeworkNotesText(note)}
+                                        <div key={idx} style={{ fontSize: '0.92rem', color: '#166534', fontWeight: 700, lineHeight: 1.45, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <span>⭐</span>
+                                          <span>{cleanHomeworkNotesText(note)}</span>
                                         </div>
                                       ))}
                                     </div>
@@ -13113,20 +13224,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                         {/* STUFE 1: 3-2-1 COUNTDOWN */}
                         {juniorCountdown !== null && (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', padding: '30px 0' }}>
-                            <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#ef4444', textTransform: 'uppercase' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '24px 0' }}>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 950, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                               Mach dich bereit! 🎸
                             </span>
-                            <div style={{
-                              fontSize: '6rem',
-                              fontWeight: 950,
-                              color: '#ef4444',
-                              fontFamily: "'Plus Jakarta Sans', sans-serif",
-                              animation: 'pulse 1s infinite'
-                            }}>
+                            <div
+                              key={`cd-${juniorCountdown}`}
+                              style={{
+                                fontSize: '6.5rem',
+                                fontWeight: 950,
+                                color: '#ef4444',
+                                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                lineHeight: 1,
+                                animation: 'countdownPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                              }}
+                            >
                               {juniorCountdown}
                             </div>
-                            <span style={{ fontSize: '0.95rem', color: '#64748b', fontWeight: 700 }}>
+                            <span style={{ fontSize: '0.92rem', color: '#64748b', fontWeight: 700 }}>
                               Aufnahme startet gleich...
                             </span>
                           </div>
@@ -13287,47 +13402,84 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               </div>
                             </div>
 
-                            {/* 3. Titel-Feld (Bereits vorausgefüllt) */}
-                            <div style={{ width: '100%', position: 'relative' }}>
-                              <input
-                                type="text"
-                                value={juniorRecordTitle}
-                                onChange={(e) => setJuniorRecordTitle(e.target.value)}
-                                placeholder="Name deines Songs"
-                                style={{
-                                  width: '100%',
-                                  padding: '14px 16px',
-                                  paddingLeft: '44px',
-                                  borderRadius: '18px',
-                                  border: '2px solid #e2e8f0',
-                                  background: '#ffffff',
-                                  fontSize: '0.98rem',
-                                  fontWeight: 750,
-                                  color: '#0f172a',
-                                  boxSizing: 'border-box',
-                                  outline: 'none',
-                                  transition: 'all 0.2s ease'
-                                }}
-                                onFocus={(e) => {
-                                  e.currentTarget.style.borderColor = '#22c55e';
-                                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.15)';
-                                }}
-                                onBlur={(e) => {
-                                  e.currentTarget.style.borderColor = '#e2e8f0';
-                                  e.currentTarget.style.boxShadow = 'none';
-                                }}
-                              />
-                              <div style={{
-                                position: 'absolute',
-                                left: '15px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                color: '#16a34a',
-                                display: 'flex',
-                                alignItems: 'center'
-                              }}>
-                                <Music size={19} />
+                            {/* 3. Titel-Feld (Mit klarem Label & kinderleichter Editierbarkeit) */}
+                            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                              <label style={{ fontSize: '0.80rem', fontWeight: 900, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                <Pencil size={14} color="#16a34a" /> Name deiner Aufnahme:
+                              </label>
+                              <div style={{ width: '100%', position: 'relative' }}>
+                                <input
+                                  type="text"
+                                  value={juniorRecordTitle}
+                                  onChange={(e) => setJuniorRecordTitle(e.target.value)}
+                                  placeholder="z. B. Mein Gitarren-Solo"
+                                  style={{
+                                    width: '100%',
+                                    padding: '14px 16px',
+                                    paddingLeft: '44px',
+                                    paddingRight: juniorRecordTitle ? '40px' : '16px',
+                                    borderRadius: '16px',
+                                    border: '2px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    fontSize: '1.02rem',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    boxSizing: 'border-box',
+                                    outline: 'none',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                  onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = '#22c55e';
+                                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(34, 197, 94, 0.15)';
+                                  }}
+                                  onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = '#cbd5e1';
+                                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.03)';
+                                  }}
+                                />
+                                <div style={{
+                                  position: 'absolute',
+                                  left: '15px',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  color: '#16a34a',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}>
+                                  <Music size={19} />
+                                </div>
+                                {juniorRecordTitle && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setJuniorRecordTitle('')}
+                                    title="Titel leeren"
+                                    style={{
+                                      position: 'absolute',
+                                      right: '12px',
+                                      top: '50%',
+                                      transform: 'translateY(-50%)',
+                                      background: '#f1f5f9',
+                                      border: 'none',
+                                      borderRadius: '50%',
+                                      width: '24px',
+                                      height: '24px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      color: '#64748b',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 900
+                                    }}
+                                  >
+                                    ✕
+                                  </button>
+                                )}
                               </div>
+                              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                                💡 Tippe in das Feld, um deiner Aufnahme einen eigenen Namen zu geben.
+                              </span>
                             </div>
 
                             {/* 4. Klare Kinder-Buttons */}
@@ -14694,7 +14846,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               activeLehrwerkeMap[bookTitle] = { pages: [] };
                             }
                             if (!isNaN(pageNum) && !activeLehrwerkeMap[bookTitle].pages.some(p => p.num === pageNum)) {
-                              let cleanNote = item.homework_notes || item.teacher_notes || '';
+                              let cleanNote = item.homework_notes || '';
                               if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
                                 try {
                                   const parsed = JSON.parse(cleanNote);
@@ -14790,59 +14942,50 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     return (
                                       <div key={`teen-book-${idx}`} style={{
                                         background: '#f8fafc',
-                                        padding: '12px 14px',
+                                        padding: '14px 16px',
                                         borderRadius: '14px',
-                                        border: '1px solid rgba(0, 0, 0, 0.04)',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: '8px'
+                                        gap: '6px'
                                       }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                                             <div style={{
-                                              width: '16px',
-                                              height: '20px',
+                                              width: '24px',
+                                              height: '30px',
                                               background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                              borderRadius: '3px',
+                                              borderRadius: '5px',
                                               display: 'flex',
                                               alignItems: 'center',
                                               justifyContent: 'center',
                                               color: bookGradient.text,
                                               flexShrink: 0
                                             }}>
-                                              <BookOpen size={9} />
+                                              <BookOpen size={13} />
                                             </div>
-                                            <span style={{ fontWeight: 850, color: '#1e293b', fontSize: '0.85rem' }}>
-                                              {item.title} <span style={{ color: '#4f46e5', fontWeight: 750 }}>· {item.formattedPages}</span>
+                                            <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.96rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                              {item.title}
                                             </span>
                                           </div>
-                                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f46e5', animation: 'pulse 1.5s infinite' }} />
+                                          <span style={{
+                                            fontSize: '0.84rem',
+                                            fontWeight: 850,
+                                            color: '#15803d',
+                                            background: '#dcfce7',
+                                            padding: '3px 10px',
+                                            borderRadius: '8px',
+                                            flexShrink: 0
+                                          }}>
+                                            {item.formattedPages}
+                                          </span>
                                         </div>
 
-                                        {/* Teen Badge Chips */}
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginLeft: '24px' }}>
-                                          {item.pageNums.map(p => (
-                                            <span key={`teen-p-${p}`} style={{
-                                              background: '#ffffff',
-                                              color: '#475569',
-                                              border: '1px solid #cbd5e1',
-                                              borderRadius: '999px',
-                                              padding: '2px 8px',
-                                              fontSize: '0.72rem',
-                                              fontWeight: 800
-                                            }}>
-                                              📄 S. {p}
-                                            </span>
-                                          ))}
-                                        </div>
-
-                                        {/* Notes Inlay */}
+                                        {/* Notes Direct Flow */}
                                         {item.notesList && item.notesList.length > 0 && (
-                                          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '6px 10px', marginLeft: '24px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '34px' }}>
                                             {item.notesList.map((n, nIdx) => (
-                                              <div key={`teen-note-${nIdx}`} style={{ fontSize: '0.73rem', color: '#475569', fontWeight: 650, display: 'flex', gap: '6px' }}>
-                                                <span style={{ color: '#4f46e5', fontWeight: 800 }}>S. {n.num}:</span>
-                                                <span>{n.text}</span>
+                                              <div key={`teen-note-${nIdx}`} style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
+                                                <strong style={{ color: '#1e293b' }}>Tipp zu S. {n.num}:</strong> {n.text}
                                               </div>
                                             ))}
                                           </div>
@@ -14856,19 +14999,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       background: '#f8fafc',
                                       padding: '12px 14px',
                                       borderRadius: '14px',
-                                      border: '1px solid rgba(0, 0, 0, 0.04)',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      gap: '8px'
+                                      gap: '10px'
                                     }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Music size={14} color="#4f46e5" />
-                                        <span style={{ fontWeight: 850, color: '#1e293b', fontSize: '0.85rem' }}>
-                                          {cleanTitle(item.title || item.topic_name)}
-                                        </span>
+                                      <div style={{
+                                        width: '24px',
+                                        height: '24px',
+                                        borderRadius: '6px',
+                                        background: '#e0e7ff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0
+                                      }}>
+                                        <Music size={13} color="#4338ca" />
                                       </div>
-                                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f46e5', animation: 'pulse 1.5s infinite' }} />
+                                      <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.94rem' }}>
+                                        {cleanTitle(item.title || item.topic_name)}
+                                      </span>
                                     </div>
                                   ))}
 
@@ -14877,7 +15026,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     if (note.startsWith("AUDIO:")) {
                                       const parts = note.substring(6).split('|');
                                       return (
-                                        <div key={`teen-audio-${idx}`} style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', borderLeft: '3px solid #4f46e5' }}>
+                                        <div key={`teen-audio-${idx}`} style={{ background: '#f0fdf4', padding: '10px 14px', borderRadius: '12px' }}>
                                           <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along Track #${idx + 1}`} />
                                         </div>
                                       );
@@ -14885,8 +15034,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     const cleanText = note.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
                                     if (!cleanText) return null;
                                     return (
-                                      <div key={`teen-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#475569', fontWeight: 650, borderLeft: '3px solid #4f46e5', background: '#f8fafc', padding: '5px 10px', borderRadius: '0 8px 8px 0' }}>
-                                        <FileText size={12} style={{ color: '#4f46e5', flexShrink: 0 }} />
+                                      <div key={`teen-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', color: '#166534', fontWeight: 650, background: '#f0fdf4', padding: '8px 12px', borderRadius: '10px' }}>
+                                        <FileText size={14} style={{ color: '#166534', flexShrink: 0 }} />
                                         <span>{cleanText}</span>
                                       </div>
                                     );
@@ -15575,7 +15724,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               activeLehrwerkeMap[bookTitle] = { pages: [] };
                             }
                             if (!isNaN(pageNum) && !activeLehrwerkeMap[bookTitle].pages.some(p => p.num === pageNum)) {
-                              let cleanNote = item.homework_notes || item.teacher_notes || '';
+                              let cleanNote = item.homework_notes || '';
                               if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
                                 try {
                                   const parsed = JSON.parse(cleanNote);
@@ -15675,22 +15824,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     return (
                                       <div key={`junior-book-${idx}`} style={{
                                         background: '#ffffff',
-                                        padding: '14px 16px',
-                                        borderRadius: '18px',
-                                        border: '1.5px solid #fef08a',
+                                        padding: '16px 18px',
+                                        borderRadius: '20px',
                                         boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
                                         display: 'flex',
                                         flexDirection: 'column',
                                         gap: '10px'
                                       }}>
                                         {/* Book Title & Cover Badge */}
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                                             <div style={{
-                                              width: '20px',
-                                              height: '24px',
+                                              width: '26px',
+                                              height: '32px',
                                               background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                              borderRadius: '4px',
+                                              borderRadius: '6px',
                                               display: 'flex',
                                               alignItems: 'center',
                                               justifyContent: 'center',
@@ -15698,53 +15846,29 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                               flexShrink: 0,
                                               boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
                                             }}>
-                                              <BookOpen size={11} />
+                                              <BookOpen size={13} />
                                             </div>
-                                            <span style={{ fontWeight: 950, color: '#1e293b', fontSize: '0.92rem', letterSpacing: '-0.02em' }}>
+                                            <span style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.02rem', letterSpacing: '-0.02em', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                                               {item.title}
                                             </span>
                                           </div>
-                                          <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '8px' }}>
+                                          <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', background: '#dcfce7', padding: '3px 10px', borderRadius: '10px', flexShrink: 0 }}>
                                             {item.formattedPages}
                                           </span>
                                         </div>
 
-                                        {/* Large Playful Page Chips */}
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                          {item.pageNums.map((p) => (
-                                            <div key={`p-chip-${p}`} style={{
-                                              background: '#fef08a',
-                                              color: '#854d0e',
-                                              border: '1.5px solid #facc15',
-                                              borderRadius: '999px',
-                                              padding: '4px 12px',
-                                              fontSize: '0.78rem',
-                                              fontWeight: 900,
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '4px',
-                                              boxShadow: '0 2px 6px rgba(250, 204, 21, 0.2)'
-                                            }}>
-                                              <span>📄 Seite {p}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-
-                                        {/* Friendly Speech Bubble for Notes */}
+                                        {/* Friendly Notes Direct */}
                                         {item.notesList && item.notesList.length > 0 && (
                                           <div style={{
-                                            background: '#fffbeb',
-                                            border: '1.5px dashed #fcd34d',
-                                            borderRadius: '14px',
-                                            padding: '8px 12px',
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            gap: '4px'
+                                            gap: '4px',
+                                            paddingLeft: '36px'
                                           }}>
                                             {item.notesList.map((n, nIdx) => (
-                                              <div key={`n-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.76rem', color: '#92400e', fontWeight: 700, lineHeight: '1.35' }}>
-                                                <span>💬</span>
-                                                <span><strong>Tipp zu S. {n.num}:</strong> {n.text}</span>
+                                              <div key={`n-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: '1.4' }}>
+                                                <span style={{ color: '#d97706' }}>💬</span>
+                                                <span><strong style={{ color: '#1e293b' }}>Tipp zu S. {n.num}:</strong> {n.text}</span>
                                               </div>
                                             ))}
                                           </div>
@@ -15757,15 +15881,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   {otherActiveHWItems.map((item, idx) => (
                                     <div key={`junior-song-${idx}`} style={{
                                       background: '#ffffff',
-                                      padding: '12px 14px',
-                                      borderRadius: '16px',
-                                      border: '1.5px solid #e0e7ff',
+                                      padding: '14px 16px',
+                                      borderRadius: '18px',
+                                      boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '8px'
+                                      gap: '10px'
                                     }}>
-                                      <Music size={16} color="#6366f1" />
-                                      <span style={{ fontWeight: 900, fontSize: '0.85rem', color: '#1e293b' }}>{cleanTitle(item.topic_name)}</span>
+                                      <div style={{
+                                        width: '28px',
+                                        height: '28px',
+                                        borderRadius: '8px',
+                                        background: '#e0e7ff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0
+                                      }}>
+                                        <Music size={14} color="#6366f1" />
+                                      </div>
+                                      <span style={{ fontWeight: 900, fontSize: '0.96rem', color: '#1e293b' }}>{cleanTitle(item.topic_name)}</span>
                                     </div>
                                   ))}
 
@@ -15774,7 +15909,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     if (note.startsWith("AUDIO:")) {
                                       const parts = note.substring(6).split('|');
                                       return (
-                                        <div key={`junior-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0fdf4', padding: '8px 12px', borderRadius: '14px', border: '1.5px solid #bbf7d0' }}>
+                                        <div key={`junior-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0fdf4', padding: '10px 14px', borderRadius: '16px' }}>
                                           <InlineAudioPlayer url={parts[0]} label={parts[3] || `🎵 Play-Along Track`} />
                                         </div>
                                       );
@@ -15782,7 +15917,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     const cleanText = note.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
                                     if (!cleanText) return null;
                                     return (
-                                      <div key={`junior-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#15803d', fontWeight: 800, background: '#f0fdf4', border: '1.5px solid #bbf7d0', padding: '8px 12px', borderRadius: '14px' }}>
+                                      <div key={`junior-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', color: '#15803d', fontWeight: 800, background: '#f0fdf4', padding: '10px 14px', borderRadius: '16px' }}>
                                         <span>⭐</span>
                                         <span>{cleanText}</span>
                                       </div>
@@ -15790,7 +15925,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   })}
                                 </>
                               ) : (
-                                <div style={{ padding: '20px 10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic' }}>
+                                <div style={{ padding: '20px 10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem', fontStyle: 'italic' }}>
                                   🎉 Aktuell keine Hausaufgaben eingetragen. Du hast frei oder kannst frei üben!
                                 </div>
                               )}
@@ -15802,12 +15937,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               style={{
                                 marginTop: 'auto',
                                 width: '100%',
-                                padding: '11px 16px',
+                                padding: '12px 16px',
                                 borderRadius: '16px',
                                 border: 'none',
                                 background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                                 color: '#ffffff',
-                                fontSize: '0.82rem',
+                                fontSize: '0.90rem',
                                 fontWeight: 950,
                                 cursor: 'pointer',
                                 display: 'flex',
@@ -15869,60 +16004,49 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     return (
                                       <div key={`teen-book-${idx}`} style={{
                                         background: '#f8fafc',
-                                        padding: '12px 14px',
-                                        borderRadius: '16px',
-                                        border: '1px solid #e2e8f0',
+                                        padding: '16px 18px',
+                                        borderRadius: '18px',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: '8px'
+                                        gap: '10px'
                                       }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                                             <div style={{
-                                              width: '16px',
-                                              height: '20px',
+                                              width: '26px',
+                                              height: '32px',
                                               background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                              borderRadius: '3px',
+                                              borderRadius: '6px',
                                               display: 'flex',
                                               alignItems: 'center',
                                               justifyContent: 'center',
                                               color: bookGradient.text,
                                               flexShrink: 0
                                             }}>
-                                              <BookOpen size={9} />
+                                              <BookOpen size={13} />
                                             </div>
-                                            <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.88rem' }}>
+                                            <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.0rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                                               {item.title}
                                             </span>
-                                            <span style={{ color: '#0284c7', fontWeight: 800, fontSize: '0.82rem' }}>
-                                              · {item.formattedPages}
-                                            </span>
                                           </div>
-                                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853' }} />
+                                          <span style={{
+                                            fontSize: '0.84rem',
+                                            fontWeight: 850,
+                                            color: '#15803d',
+                                            background: '#dcfce7',
+                                            padding: '3px 10px',
+                                            borderRadius: '8px',
+                                            flexShrink: 0
+                                          }}>
+                                            {item.formattedPages}
+                                          </span>
                                         </div>
 
-                                        {/* Teen Badge Chips */}
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                                          {item.pageNums.map(p => (
-                                            <div key={`teen-p-${p}`} style={{
-                                              background: '#ffffff',
-                                              color: '#475569',
-                                              border: '1px solid #cbd5e1',
-                                              borderRadius: '999px',
-                                              padding: '3px 10px',
-                                              fontSize: '0.74rem',
-                                              fontWeight: 800
-                                            }}>
-                                              📄 S. {p}
-                                            </div>
-                                          ))}
-                                        </div>
-
-                                        {/* Notes Inlay */}
+                                        {/* Notes */}
                                         {item.notesList && item.notesList.length > 0 && (
-                                          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '36px' }}>
                                             {item.notesList.map((n, nIdx) => (
-                                              <div key={`teen-note-${nIdx}`} style={{ fontSize: '0.73rem', color: '#475569', fontWeight: 650, display: 'flex', gap: '6px' }}>
+                                              <div key={`teen-note-${nIdx}`} style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 600, display: 'flex', gap: '6px', lineHeight: '1.4' }}>
                                                 <span style={{ color: '#0284c7', fontWeight: 800 }}>S. {n.num}:</span>
                                                 <span>{n.text}</span>
                                               </div>
@@ -15934,9 +16058,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   })}
 
                                   {otherActiveHWItems.map((item, idx) => (
-                                    <div key={`teen-song-${idx}`} style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <Music size={14} color="#0284c7" />
-                                      <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#1e293b' }}>{cleanTitle(item.topic_name)}</span>
+                                    <div key={`teen-song-${idx}`} style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      <div style={{
+                                        width: '26px',
+                                        height: '26px',
+                                        borderRadius: '6px',
+                                        background: '#e0f2fe',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0
+                                      }}>
+                                        <Music size={13} color="#0284c7" />
+                                      </div>
+                                      <span style={{ fontWeight: 850, fontSize: '0.90rem', color: '#1e293b' }}>{cleanTitle(item.topic_name)}</span>
                                     </div>
                                   ))}
 
@@ -15944,7 +16079,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     if (note.startsWith("AUDIO:")) {
                                       const parts = note.substring(6).split('|');
                                       return (
-                                        <div key={`teen-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '6px 10px', borderRadius: '12px', borderLeft: '3px solid #0284c7' }}>
+                                        <div key={`teen-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '8px 12px', borderRadius: '14px' }}>
                                           <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along Track`} />
                                         </div>
                                       );
@@ -15952,15 +16087,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     const cleanText = note.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
                                     if (!cleanText) return null;
                                     return (
-                                      <div key={`teen-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#475569', fontWeight: 650, borderLeft: '3px solid #0284c7', background: '#f8fafc', padding: '5px 10px', borderRadius: '0 8px 8px 0' }}>
-                                        <FileText size={12} style={{ color: '#0284c7', flexShrink: 0 }} />
+                                      <div key={`teen-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#475569', fontWeight: 650, background: '#f8fafc', padding: '8px 12px', borderRadius: '12px' }}>
+                                        <FileText size={13} style={{ color: '#0284c7', flexShrink: 0 }} />
                                         <span>{cleanText}</span>
                                       </div>
                                     );
                                   })}
                                 </>
                               ) : (
-                                <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
                                   Noch keine Aufgaben für diese Woche eingetragen
                                 </div>
                               )}
@@ -15990,12 +16125,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               style={{
                                 marginTop: 'auto',
                                 width: '100%',
-                                padding: '9px 12px',
+                                padding: '10px 14px',
                                 borderRadius: '14px',
                                 border: '1.5px solid #e2e8f0',
                                 background: '#f8fafc',
                                 color: '#0f172a',
-                                fontSize: '0.75rem',
+                                fontSize: '0.82rem',
                                 fontWeight: 900,
                                 cursor: 'pointer',
                                 display: 'flex',
@@ -16059,51 +16194,53 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       const bookGradient = getLehrwerkColor(item.title, lehrwerke);
                                       return (
                                         <div key={`pro-book-${idx}`} style={{
-                                          background: item.isDone ? 'rgba(52, 168, 83, 0.02)' : '#ffffff',
-                                          padding: '10px 12px',
-                                          borderRadius: '12px',
-                                          border: item.isDone ? '1.5px solid rgba(52, 168, 83, 0.2)' : '1px solid rgba(0, 0, 0, 0.05)',
+                                          background: item.isDone ? 'rgba(52, 168, 83, 0.02)' : '#f8fafc',
+                                          padding: '14px 16px',
+                                          borderRadius: '16px',
                                           display: 'flex',
                                           flexDirection: 'column',
-                                          gap: '6px'
+                                          gap: '8px'
                                         }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden', flex: 1 }}>
                                               <div style={{
-                                                width: '14px',
-                                                height: '18px',
+                                                width: '24px',
+                                                height: '30px',
                                                 background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                                borderRadius: '3px',
+                                                borderRadius: '5px',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 color: bookGradient.text,
                                                 flexShrink: 0
                                               }}>
-                                                <BookOpen size={8} />
+                                                <BookOpen size={12} />
                                               </div>
-                                              <span style={{ fontWeight: 850, color: item.isDone ? '#94a3b8' : '#1e293b', fontSize: '0.78rem', textDecoration: item.isDone ? 'line-through' : 'none' }}>
-                                                {item.title} <span style={{ color: '#4b5563', fontWeight: 700 }}>· {item.formattedPages}</span>
+                                              <span style={{ fontWeight: 900, color: item.isDone ? '#94a3b8' : '#0f172a', fontSize: '0.96rem', textDecoration: item.isDone ? 'line-through' : 'none', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                                {item.title}
                                               </span>
                                             </div>
-                                            {item.isDone ? <span style={{ color: '#34a853' }}><Check size={12} strokeWidth={3} /></span> : <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f46e5', animation: 'pulse 1.5s infinite' }} />}
-                                          </div>
-
-                                          {/* Badges */}
-                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginLeft: '22px' }}>
-                                            {item.pageNums.map(p => (
-                                              <span key={`p-${p}`} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.7rem', fontWeight: 800, padding: '1px 7px', borderRadius: '999px' }}>
-                                                📄 S. {p}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                              <span style={{
+                                                fontSize: '0.82rem',
+                                                fontWeight: 850,
+                                                color: '#15803d',
+                                                background: '#dcfce7',
+                                                padding: '2px 8px',
+                                                borderRadius: '8px'
+                                              }}>
+                                                {item.formattedPages}
                                               </span>
-                                            ))}
+                                              {item.isDone && <Check size={14} color="#34a853" strokeWidth={3} />}
+                                            </div>
                                           </div>
 
                                           {/* Pro Notes */}
                                           {item.notesList && item.notesList.length > 0 && (
-                                            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650, marginLeft: '22px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                            <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600, paddingLeft: '34px', display: 'flex', flexDirection: 'column', gap: '3px', lineHeight: '1.4' }}>
                                               {item.notesList.map((n, nIdx) => (
                                                 <div key={`n-${nIdx}`}>
-                                                  <strong style={{ color: '#34a853' }}>S. {n.num}:</strong> {n.text}
+                                                  <strong style={{ color: '#15803d' }}>S. {n.num}:</strong> {n.text}
                                                 </div>
                                               ))}
                                             </div>
@@ -16114,16 +16251,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                                     {otherActiveHWItems.map((item, idx) => (
                                       <div key={`pro-song-${idx}`} style={{
-                                        background: '#ffffff',
-                                        padding: '10px 12px',
-                                        borderRadius: '12px',
-                                        border: '1px solid rgba(0, 0, 0, 0.05)',
+                                        background: '#f8fafc',
+                                        padding: '12px 14px',
+                                        borderRadius: '14px',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '8px'
+                                        gap: '10px'
                                       }}>
-                                        <Music size={12} color="#34a853" />
-                                        <span style={{ fontWeight: 850, fontSize: '0.78rem', color: '#1e293b' }}>{cleanTitle(item.topic_name)}</span>
+                                        <div style={{
+                                          width: '24px',
+                                          height: '24px',
+                                          borderRadius: '6px',
+                                          background: '#e0e7ff',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          flexShrink: 0
+                                        }}>
+                                          <Music size={13} color="#4338ca" />
+                                        </div>
+                                        <span style={{ fontWeight: 850, fontSize: '0.90rem', color: '#1e293b' }}>{cleanTitle(item.topic_name)}</span>
                                       </div>
                                     ))}
 
@@ -16131,7 +16278,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       if (note.startsWith("AUDIO:")) {
                                         const parts = note.substring(6).split('|');
                                         return (
-                                          <div key={`curr-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '6px 10px', borderRadius: '12px', borderLeft: '3px solid #34a853', margin: '2px 4px' }}>
+                                          <div key={`curr-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '8px 12px', borderRadius: '14px' }}>
                                             <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along Track`} />
                                           </div>
                                         );
@@ -16139,15 +16286,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       const cleanText = note.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
                                       if (!cleanText) return null;
                                       return (
-                                        <div key={`curr-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#475569', fontWeight: 650, borderLeft: '3px solid #34a853', background: '#f8fafc', padding: '5px 10px', borderRadius: '0 8px 8px 0', margin: '2px 0' }}>
-                                          <FileText size={12} style={{ color: '#34a853', flexShrink: 0 }} />
+                                        <div key={`curr-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#475569', fontWeight: 650, background: '#f8fafc', padding: '8px 12px', borderRadius: '12px' }}>
+                                          <FileText size={13} style={{ color: '#34a853', flexShrink: 0 }} />
                                           <span>{cleanText}</span>
                                         </div>
                                       );
                                     })}
                                   </>
                                 ) : (
-                                  <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
                                     Noch keine Aufgaben für diese Woche eingetragen
                                   </div>
                                 )}
@@ -18771,19 +18918,30 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             setPinFormError('');
 
                             try {
+                              if (studentId) {
+                                sessionStorage.setItem('groovelab_user_id', studentId);
+                                localStorage.setItem('groovelab_user_id', studentId);
+                                const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
+                                if (authQrToken) {
+                                  sessionStorage.setItem('groovelab_qr_token', authQrToken);
+                                }
+                              }
+
                               try {
                                 await supabase.from('students').update({
                                   personal_pin: pinFormNew,
                                   parent_pin: pinFormNew,
                                   onboarding_pin: pinFormNew,
-                                  is_pin_activated: true
+                                  is_pin_activated: true,
+                                  is_campus_active: true
                                 }).eq('id', studentId);
 
                                 await supabase.from('pending_students').update({
                                   personal_pin: pinFormNew,
                                   parent_pin: pinFormNew,
                                   onboarding_pin: pinFormNew,
-                                  is_pin_activated: true
+                                  is_pin_activated: true,
+                                  is_campus_active: true
                                 }).eq('id', studentId);
                               } catch (e) {}
 
@@ -18792,7 +18950,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   personal_pin: pinFormNew,
                                   parent_pin: pinFormNew,
                                   onboarding_pin: pinFormNew,
-                                  is_pin_activated: true
+                                  is_pin_activated: true,
+                                  is_campus_active: true
                                 }).eq('id', studentId);
                               } catch (e) {}
 
@@ -18800,7 +18959,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 personal_pin: pinFormNew,
                                 parent_pin: pinFormNew,
                                 onboarding_pin: pinFormNew,
-                                is_pin_activated: true
+                                is_pin_activated: true,
+                                is_campus_active: true
                               };
                               let { error } = await supabase
                                 .from('users')
@@ -18822,11 +18982,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               }
 
                               localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
+                              localStorage.setItem(`groovelab_student_pin_${studentId}`, pinFormNew);
+                              sessionStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
 
                               if (error) {
                                 setPinFormError('Fehler beim Speichern der PIN: ' + error.message);
                               } else {
                                 setPinFormSuccess('Deine 4-stellige PIN wurde erfolgreich gespeichert! 🔒');
+                                setStudentUser((prev: any) => prev ? {
+                                  ...prev,
+                                  is_pin_activated: true,
+                                  has_personal_pin: true,
+                                  has_parent_pin: true,
+                                  personal_pin: pinFormNew,
+                                  parent_pin: pinFormNew
+                                } : prev);
+                                if (onProfileUpdate) {
+                                  try { onProfileUpdate({ is_pin_activated: true, personal_pin: pinFormNew }); } catch (e) {}
+                                }
                                 setPinFormNew('');
                                 setPinFormConfirm('');
                               }
@@ -19569,111 +19742,316 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(15, 23, 42, 0.85)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          background: 'rgba(15, 23, 42, 0.80)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           zIndex: 10005,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '20px'
+          padding: '20px',
+          overflowY: 'auto'
         }}>
           <div style={{
             background: '#ffffff',
-            borderRadius: '24px',
-            padding: '30px 24px',
-            maxWidth: '380px',
+            borderRadius: '28px',
+            padding: '28px 24px',
+            maxWidth: '390px',
             width: '100%',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px',
-            textAlign: 'center'
+            gap: '18px',
+            textAlign: 'center',
+            position: 'relative'
           }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
-              <Shield size={32} color="#15803d" />
+            {/* Header Icon */}
+            <div style={{
+              width: '68px',
+              height: '68px',
+              borderRadius: '22px',
+              background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+              border: '1.5px solid #86efac',
+              boxShadow: '0 8px 20px rgba(34, 197, 94, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto'
+            }}>
+              <ShieldCheck size={36} color="#15803d" />
             </div>
 
+            {/* Title & Subtitle */}
             <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 6px 0' }}>Erster Login: Profil-PIN 🔑</h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0, lineHeight: 1.45 }}>
-                Lege jetzt deine persönliche 4-stellige Profil-PIN fest, um dein Profil &amp; deine Einstellungen abzusichern:
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
+                Dein persönlicher Profil-PIN 🔑
+              </h3>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0, lineHeight: 1.45, fontWeight: 500 }}>
+                Wähle eine persönliche 4-stellige PIN, um dein Profil, deine Übe-Fortschritte und Notizen zu schützen:
               </p>
             </div>
 
+            {/* Error / Success Badges */}
             {pinFormError && (
-              <div style={{ padding: '10px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '12px', color: '#dc2626', fontSize: '0.78rem', fontWeight: 700 }}>
-                {pinFormError}
+              <div style={{
+                padding: '10px 14px',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '14px',
+                color: '#dc2626',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}>
+                <AlertTriangle size={16} />
+                <span>{pinFormError}</span>
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <input
-                type="password"
-                maxLength={4}
-                pattern="[0-9]*"
-                inputMode="numeric"
-                placeholder="Neue 4-stellige PIN"
-                value={pinFormNew}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                  setPinFormNew(val);
-                  setPinFormError('');
-                }}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '14px',
-                  border: '1.5px solid #cbd5e1',
-                  fontSize: '1.2rem',
-                  fontWeight: 800,
-                  letterSpacing: '0.25em',
-                  textAlign: 'center',
-                  background: '#f8fafc',
-                  color: '#0f172a',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
+            {firstPinSavedSuccess && (
+              <div style={{
+                padding: '10px 14px',
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '14px',
+                color: '#15803d',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}>
+                <CheckCircle size={18} />
+                <span>PIN erfolgreich gespeichert! 🚀</span>
+              </div>
+            )}
 
-              <input
-                type="password"
-                maxLength={4}
-                pattern="[0-9]*"
-                inputMode="numeric"
-                placeholder="PIN wiederholen"
-                value={pinFormConfirm}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                  setPinFormConfirm(val);
-                  setPinFormError('');
-                }}
+            {/* Two Pin Display Cards */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Field 1: Neue PIN */}
+              <div 
+                onClick={() => setFirstPinActiveField('new')}
                 style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '14px',
-                  border: '1.5px solid #cbd5e1',
-                  fontSize: '1.2rem',
-                  fontWeight: 800,
-                  letterSpacing: '0.25em',
-                  textAlign: 'center',
-                  background: '#f8fafc',
-                  color: '#0f172a',
-                  outline: 'none',
-                  boxSizing: 'border-box'
+                  padding: '12px 14px',
+                  borderRadius: '16px',
+                  border: firstPinActiveField === 'new' ? '2px solid #15803d' : '1.5px solid #e2e8f0',
+                  background: firstPinActiveField === 'new' ? '#f0fdf4' : '#f8fafc',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textAlign: 'left'
                 }}
-              />
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: firstPinActiveField === 'new' ? '#15803d' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    1. Neue 4-stellige PIN
+                  </span>
+                  {pinFormNew.length === 4 && (
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Check size={13} strokeWidth={3} /> 4 Ziffern
+                    </span>
+                  )}
+                </div>
+
+                {/* 4 Dots / Numbers Display */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', padding: '4px 0' }}>
+                  {[0, 1, 2, 3].map((idx) => {
+                    const char = pinFormNew[idx];
+                    const isFilled = Boolean(char);
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          width: '42px',
+                          height: '46px',
+                          borderRadius: '12px',
+                          border: isFilled ? '2px solid #15803d' : (firstPinActiveField === 'new' && pinFormNew.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
+                          background: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.25rem',
+                          fontWeight: 900,
+                          color: '#0f172a',
+                          boxShadow: isFilled ? '0 2px 6px rgba(21, 128, 61, 0.15)' : 'none',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {isFilled ? (firstPinShowMask ? char : '●') : ''}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Field 2: PIN Bestätigen */}
+              <div 
+                onClick={() => setFirstPinActiveField('confirm')}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '16px',
+                  border: firstPinActiveField === 'confirm' ? '2px solid #15803d' : '1.5px solid #e2e8f0',
+                  background: firstPinActiveField === 'confirm' ? '#f0fdf4' : '#f8fafc',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textAlign: 'left'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: firstPinActiveField === 'confirm' ? '#15803d' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    2. PIN wiederholen
+                  </span>
+                  {pinFormConfirm.length === 4 && (
+                    pinFormNew === pinFormConfirm ? (
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <CheckCheck size={14} strokeWidth={2.5} /> Stimmt überein
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#dc2626' }}>
+                        Stimmt nicht überein
+                      </span>
+                    )
+                  )}
+                </div>
+
+                {/* 4 Dots / Numbers Display */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', padding: '4px 0' }}>
+                  {[0, 1, 2, 3].map((idx) => {
+                    const char = pinFormConfirm[idx];
+                    const isFilled = Boolean(char);
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          width: '42px',
+                          height: '46px',
+                          borderRadius: '12px',
+                          border: isFilled ? (pinFormNew === pinFormConfirm && pinFormConfirm.length === 4 ? '2px solid #15803d' : '2px solid #64748b') : (firstPinActiveField === 'confirm' && pinFormConfirm.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
+                          background: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.25rem',
+                          fontWeight: 900,
+                          color: '#0f172a',
+                          boxShadow: isFilled ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {isFilled ? (firstPinShowMask ? char : '●') : ''}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
+            {/* Toggle show/hide numbers */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', margin: '-6px 0 0 0' }}>
+              <button
+                type="button"
+                onClick={() => setFirstPinShowMask(!firstPinShowMask)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '2px 4px'
+                }}
+              >
+                {firstPinShowMask ? <EyeOff size={14} /> : <Eye size={14} />}
+                <span>{firstPinShowMask ? 'Ziffern verbergen' : 'Ziffern anzeigen'}</span>
+              </button>
+            </div>
+
+            {/* On-Screen Touch Keypad */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '8px',
+              width: '100%'
+            }}>
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
+                const isClear = key === 'C';
+                const isBack = key === 'back';
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setPinFormError('');
+                      if (firstPinActiveField === 'new') {
+                        if (isClear) {
+                          setPinFormNew('');
+                        } else if (isBack) {
+                          setPinFormNew(prev => prev.slice(0, -1));
+                        } else if (pinFormNew.length < 4) {
+                          const nextVal = pinFormNew + key;
+                          setPinFormNew(nextVal);
+                          if (nextVal.length === 4) {
+                            setFirstPinActiveField('confirm');
+                          }
+                        }
+                      } else {
+                        if (isClear) {
+                          setPinFormConfirm('');
+                        } else if (isBack) {
+                          if (pinFormConfirm.length === 0) {
+                            setFirstPinActiveField('new');
+                          } else {
+                            setPinFormConfirm(prev => prev.slice(0, -1));
+                          }
+                        } else if (pinFormConfirm.length < 4) {
+                          setPinFormConfirm(prev => prev + key);
+                        }
+                      }
+                    }}
+                    style={{
+                      padding: '12px 0',
+                      borderRadius: '14px',
+                      border: '1px solid #e2e8f0',
+                      background: (isClear || isBack) ? '#f1f5f9' : '#ffffff',
+                      color: '#0f172a',
+                      fontSize: (isClear || isBack) ? '0.85rem' : '1.25rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.03)',
+                      transition: 'all 0.1s ease',
+                      userSelect: 'none'
+                    }}
+                    onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.96)'; e.currentTarget.style.background = '#e2e8f0'; }}
+                    onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = (isClear || isBack) ? '#f1f5f9' : '#ffffff'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = (isClear || isBack) ? '#f1f5f9' : '#ffffff'; }}
+                  >
+                    {isBack ? <Delete size={18} color="#475569" /> : (isClear ? 'Löschen' : key)}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Submit Action Button */}
             <button
               disabled={isSavingPin || pinFormNew.length !== 4 || pinFormConfirm.length !== 4}
               onClick={async () => {
                 if (pinFormNew.length !== 4) {
-                  setPinFormError('Bitte gib eine 4-stellige PIN ein.');
+                  setPinFormError('Bitte gib eine vollständige 4-stellige PIN ein.');
+                  setFirstPinActiveField('new');
                   return;
                 }
                 if (pinFormNew !== pinFormConfirm) {
-                  setPinFormError('Die PINs stimmen nicht überein.');
+                  setPinFormError('Die beiden PINs stimmen nicht überein.');
+                  setFirstPinActiveField('confirm');
                   return;
                 }
 
@@ -19688,36 +20066,56 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 setPinFormError('');
 
                 try {
-                  await supabase.from('students').update({
-                    personal_pin: pinFormNew,
-                    parent_pin: pinFormNew,
-                    onboarding_pin: pinFormNew,
-                    is_pin_activated: true
-                  }).eq('id', studentId);
+                  // Ensure security session tokens are set so RLS authorizes the update
+                  if (studentId) {
+                    sessionStorage.setItem('groovelab_user_id', studentId);
+                    localStorage.setItem('groovelab_user_id', studentId);
+                    const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
+                    if (authQrToken) {
+                      sessionStorage.setItem('groovelab_qr_token', authQrToken);
+                    }
+                  }
 
-                  await supabase.from('pending_students').update({
-                    personal_pin: pinFormNew,
-                    parent_pin: pinFormNew,
-                    onboarding_pin: pinFormNew,
-                    is_pin_activated: true
-                  }).eq('id', studentId);
-                } catch (e) {}
+                  // 1. Update students table
+                  try {
+                    await supabase.from('students').update({
+                      personal_pin: pinFormNew,
+                      parent_pin: pinFormNew,
+                      onboarding_pin: pinFormNew,
+                      is_pin_activated: true,
+                      is_campus_active: true
+                    }).eq('id', studentId);
+                  } catch (e) {}
 
-                try {
-                  await supabase.from('users_raw').update({
-                    personal_pin: pinFormNew,
-                    parent_pin: pinFormNew,
-                    onboarding_pin: pinFormNew,
-                    is_pin_activated: true
-                  }).eq('id', studentId);
-                } catch (e) {}
+                  // 2. Update pending_students table
+                  try {
+                    await supabase.from('pending_students').update({
+                      personal_pin: pinFormNew,
+                      parent_pin: pinFormNew,
+                      onboarding_pin: pinFormNew,
+                      is_pin_activated: true,
+                      is_campus_active: true
+                    }).eq('id', studentId);
+                  } catch (e) {}
 
-                try {
+                  // 3. Update users_raw
+                  try {
+                    await supabase.from('users_raw').update({
+                      personal_pin: pinFormNew,
+                      parent_pin: pinFormNew,
+                      onboarding_pin: pinFormNew,
+                      is_pin_activated: true,
+                      is_campus_active: true
+                    }).eq('id', studentId);
+                  } catch (e) {}
+
+                  // 4. Update users view
                   const payload: any = {
                     personal_pin: pinFormNew,
                     parent_pin: pinFormNew,
                     onboarding_pin: pinFormNew,
-                    is_pin_activated: true
+                    is_pin_activated: true,
+                    is_campus_active: true
                   };
                   let { error } = await supabase
                     .from('users')
@@ -19731,18 +20129,38 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   }
 
                   if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                    console.warn('[StudentAvatarDashboard] users view trigger warning ignored because student table was updated:', error);
+                    console.warn('[StudentAvatarDashboard] users view trigger warning ignored:', error);
                     error = null;
                   }
 
+                  // Save in local & session storages
                   localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
+                  localStorage.setItem(`groovelab_student_pin_${studentId}`, pinFormNew);
+                  sessionStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
 
                   if (error) {
-                    setPinFormError('Fehler: ' + error.message);
+                    setPinFormError('Fehler beim Speichern: ' + error.message);
                   } else {
-                    setShowFirstLoginPinModal(false);
-                    setPinFormNew('');
-                    setPinFormConfirm('');
+                    setFirstPinSavedSuccess(true);
+                    setStudentUser((prev: any) => prev ? {
+                      ...prev,
+                      is_pin_activated: true,
+                      has_personal_pin: true,
+                      has_parent_pin: true,
+                      personal_pin: pinFormNew,
+                      parent_pin: pinFormNew
+                    } : prev);
+                    
+                    if (onProfileUpdate) {
+                      try { onProfileUpdate({ is_pin_activated: true, personal_pin: pinFormNew }); } catch (e) {}
+                    }
+
+                    setTimeout(() => {
+                      setShowFirstLoginPinModal(false);
+                      setFirstPinSavedSuccess(false);
+                      setPinFormNew('');
+                      setPinFormConfirm('');
+                    }, 800);
                   }
                 } catch (err: any) {
                   setPinFormError('Fehler: ' + (err?.message || 'Speichern fehlgeschlagen.'));
@@ -19751,19 +20169,44 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 }
               }}
               style={{
-                padding: '14px',
-                borderRadius: '14px',
-                background: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#15803d' : '#cbd5e1',
+                padding: '15px',
+                borderRadius: '16px',
+                background: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && pinFormNew === pinFormConfirm) 
+                  ? 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)' 
+                  : '#cbd5e1',
                 color: '#ffffff',
                 border: 'none',
-                fontSize: '0.85rem',
+                fontSize: '0.88rem',
                 fontWeight: 900,
-                cursor: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? 'pointer' : 'not-allowed',
-                boxShadow: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '0 4px 15px rgba(21, 128, 61, 0.25)' : 'none',
-                transition: 'all 0.2s'
+                cursor: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && pinFormNew === pinFormConfirm && !isSavingPin) ? 'pointer' : 'not-allowed',
+                boxShadow: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && pinFormNew === pinFormConfirm) 
+                  ? '0 6px 20px rgba(21, 128, 61, 0.35)' 
+                  : 'none',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
               }}
             >
-              {isSavingPin ? 'Wird gespeichert...' : 'PIN jetzt festlegen & Konto aktivieren'}
+              {isSavingPin ? (
+                <>
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderTopColor: '#ffffff',
+                    animation: 'spin 0.8s linear infinite'
+                  }} />
+                  <span>Wird gespeichert...</span>
+                </>
+              ) : (
+                <>
+                  <Lock size={18} />
+                  <span>PIN jetzt festlegen &amp; Profil sichern</span>
+                </>
+              )}
             </button>
           </div>
         </div>,

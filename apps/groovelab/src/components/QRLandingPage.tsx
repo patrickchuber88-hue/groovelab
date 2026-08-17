@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText } from '../utils/nameHelper';
 import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
 import { validateNewPin } from '../utils/pinValidation';
+import { AudioTrackCarousel } from './AudioTrackCarousel';
 
 import { useMasterPricing } from '../context/MasterPricingContext';
 
@@ -351,6 +352,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // Multi-Mode specific states
   const [progressItems, setProgressItems] = useState<any[]>([]);
+  const [lehrwerke, setLehrwerke] = useState<any[]>([]);
+  const [localProgress, setLocalProgress] = useState<any[]>(() => {
+    try {
+      const stored = localStorage.getItem('campus_lehrwerke_progress');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [activeTab, setActiveTab] = useState<'action' | 'homework' | 'lessons'>('action');
 
   // Auto-switch to Hausaufgaben tab if Campus module is not booked
@@ -1493,7 +1503,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         msgRes,
         bookingsRes,
         roomsRes,
-        teachersRes
+        teachersRes,
+        lehrwerkeRes
       ] = await Promise.all([
         supabase
           .from('schedules')
@@ -1546,7 +1557,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           .from('users')
           .select('id, first_name, last_name, planned_boards, campus_räume, groovelab_räume')
           .eq('school_id', profile.school_id)
-          .eq('role', 'teacher')
+          .eq('role', 'teacher'),
+        supabase
+          .from('lehrwerke')
+          .select('*')
+          .eq('school_id', profile.school_id)
       ]);
 
       const roomMap = new Map<string, string>();
@@ -1732,6 +1747,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       setStats(statsData || null);
       setAvatar(avatarData || null);
       setProgressItems(deduplicatedMatrixItems);
+      setLehrwerke(lehrwerkeRes?.data || []);
+      try {
+        const storedLP = localStorage.getItem('campus_lehrwerke_progress');
+        if (storedLP) setLocalProgress(JSON.parse(storedLP));
+      } catch {}
 
       if (statsData && statsData.last_practice_date === todayStr) {
         setPracticeLoggedToday(true);
@@ -4303,35 +4323,136 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   const renderHomeworkWidget = (compressed = false) => {
-    const lessonDay = schedules.length > 0 ? schedules[0].day_of_week : 1;
-    const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
-    const latestWeek = latestItem ? getItemWeek(latestItem) : getISOWeek(undefined, lessonDay);
-    const notesList = compressed ? [] : getHomeworkNotes(latestWeek);
-    const activeHWs = progressItems.filter(item => 
-      item.is_current_homework && 
-      !item.topic_name.startsWith('Hausaufgabe KW ')
-    );
-    
-    const groupedLehrwerke: Record<string, { num: number; notes: string }[]> = {};
-    const otherHWs: any[] = [];
+    // 1. Gather all active Lehrwerk books & pages from localProgress & progressItems
+    const activeBooksMap: Record<string, { num: number; notes: string; status: string }[]> = {};
 
-    activeHWs.forEach(item => {
-      if (item.topic_name.includes(' - Seite ')) {
-        const parts = item.topic_name.split(' - Seite ');
+    // 1a. From localProgress (offline/cached assignments)
+    (localProgress || []).forEach((assignment: any) => {
+      const assignStdId = String(assignment.studentId || assignment.student_id || '');
+      if (assignStdId !== String(profile?.id) || !assignment.pageStates) return;
+      const assignBookId = String(assignment.lehrwerkId || assignment.lehrwerk_id || '');
+      const book = lehrwerke.find(g => String(g.id) === assignBookId);
+      if (!book) return;
+
+      Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
+        if (pState?.status === 'homework' || pState?.isCurrentHomework || pState?.is_current_homework) {
+          const pageNum = parseInt(pNumStr, 10);
+          if (!isNaN(pageNum)) {
+            if (!activeBooksMap[book.title]) {
+              activeBooksMap[book.title] = [];
+            }
+            if (!activeBooksMap[book.title].some(p => p.num === pageNum)) {
+              let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
+              if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
+                try {
+                  const parsed = JSON.parse(cleanNote);
+                  if (Array.isArray(parsed)) {
+                    cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                  }
+                } catch {}
+              }
+              cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+              activeBooksMap[book.title].push({
+                num: pageNum,
+                notes: cleanNote,
+                status: pState.status || 'homework'
+              });
+            }
+          }
+        }
+      });
+    });
+
+    // 1b. From progressItems (Supabase database rows)
+    const otherHWs: any[] = [];
+    (progressItems || []).forEach(item => {
+      if (!item) return;
+      const tName = item.topic_name || '';
+      if (tName.startsWith('Hausaufgabe KW ')) return;
+
+      if (tName.includes(' - Seite ')) {
+        const parts = tName.split(' - Seite ');
         const bookTitle = parts[0].trim();
         const pageNum = parseInt(parts[1], 10);
-        if (!groupedLehrwerke[bookTitle]) {
-          groupedLehrwerke[bookTitle] = [];
+        if (!activeBooksMap[bookTitle]) {
+          activeBooksMap[bookTitle] = [];
         }
-        if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].some(p => p.num === pageNum)) {
-          groupedLehrwerke[bookTitle].push({ num: pageNum, notes: item.teacher_notes || '' });
+        if (!isNaN(pageNum) && !activeBooksMap[bookTitle].some(p => p.num === pageNum)) {
+          let cleanNote = item.homework_notes || '';
+          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
+            try {
+              const parsed = JSON.parse(cleanNote);
+              if (Array.isArray(parsed)) {
+                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+              }
+            } catch {}
+          }
+          activeBooksMap[bookTitle].push({
+            num: pageNum,
+            notes: cleanNote,
+            status: item.status || 'homework'
+          });
         }
-      } else {
+      } else if (item.is_current_homework || item.status === 'in_progress' || item.status === 'homework') {
         otherHWs.push(item);
       }
     });
 
-    const activeBooks = Object.entries(groupedLehrwerke);
+    const activeBooks = Object.entries(activeBooksMap);
+
+    // 2. Gather all Homework Text Notes & Audio Play-Alongs across all sources
+    const allNotesList: string[] = [];
+
+    // 2a. From progressItems
+    (progressItems || []).forEach(item => {
+      if (item.homework_notes && item.homework_notes.trim()) {
+        try {
+          const raw = item.homework_notes;
+          if (raw.startsWith('[') && raw.endsWith(']')) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((n: string) => {
+                if (n && n.trim() && !allNotesList.includes(n.trim())) {
+                  allNotesList.push(n.trim());
+                }
+              });
+            }
+          } else {
+            const lines = raw.split('\n').filter(Boolean);
+            lines.forEach((l: string) => {
+              if (l && !allNotesList.includes(l.trim())) {
+                allNotesList.push(l.trim());
+              }
+            });
+          }
+        } catch {}
+      }
+    });
+
+    // 2b. From localStorage fallback caches (homework notes only)
+    try {
+      if (profile?.id) {
+        const cachedHwStr = localStorage.getItem(`campus_homework_notes_${profile.id}`);
+        if (cachedHwStr) {
+          if (cachedHwStr.startsWith('[') && cachedHwStr.endsWith(']')) {
+            const parsed = JSON.parse(cachedHwStr);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((n: string) => {
+                if (n && n.trim() && !allNotesList.includes(n.trim())) {
+                  allNotesList.push(n.trim());
+                }
+              });
+            }
+          } else {
+            if (!allNotesList.includes(cachedHwStr.trim())) {
+              allNotesList.push(cachedHwStr.trim());
+            }
+          }
+        }
+      }
+    } catch {}
+
+    const notesList = compressed ? [] : allNotesList;
 
     if (activeBooks.length === 0 && otherHWs.length === 0 && notesList.length === 0) {
       return (
@@ -4372,17 +4493,48 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               const formattedPages = formatPageNumbers(pages.map(p => p.num));
               const textNotes = compressed ? '' : cleanHomeworkNotesText(pages.map(p => p.notes).filter(Boolean).join('\n'));
               return (
-                <div key={bookTitle} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                    <BookOpen size={15} color="#64748b" style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'middle' }} /> {bookTitle}
-                  </span>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#34a853', marginLeft: '22px' }}>
-                    {formattedPages}
-                  </span>
-                  {!compressed && textNotes && (
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginLeft: '22px' }}>
-                      Bemerkung: {textNotes}
+                <div key={bookTitle} style={{
+                  background: '#f8fafc',
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                      <div style={{
+                        width: '24px',
+                        height: '30px',
+                        borderRadius: '5px',
+                        background: 'linear-gradient(135deg, #e2e8f0, #cbd5e1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <BookOpen size={13} color="#475569" />
+                      </div>
+                      <span style={{ fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                        {bookTitle}
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: '0.84rem',
+                      fontWeight: 850,
+                      color: '#15803d',
+                      background: '#dcfce7',
+                      padding: '3px 10px',
+                      borderRadius: '8px',
+                      flexShrink: 0
+                    }}>
+                      {formattedPages}
                     </span>
+                  </div>
+                  {!compressed && textNotes && (
+                    <div style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 600, paddingLeft: '34px', lineHeight: '1.4' }}>
+                      {textNotes}
+                    </div>
                   )}
                 </div>
               );
@@ -4391,18 +4543,39 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         )}
 
         {otherHWs.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: activeBooks.length > 0 ? '1px solid #f1f5f9' : 'none', paddingTop: activeBooks.length > 0 ? '12px' : 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {otherHWs.map((item, idx) => {
-              const cleanedOtherNote = cleanHomeworkNotesText(item.teacher_notes);
+              const cleanedOtherNote = cleanHomeworkNotesText(item.homework_notes);
               return (
-                <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                    <Music size={15} color="#64748b" style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'middle' }} /> {item.topic_name}
-                  </span>
-                  {!compressed && cleanedOtherNote && (
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginLeft: '22px' }}>
-                      Bemerkung: {cleanedOtherNote}
+                <div key={idx} style={{
+                  background: '#f8fafc',
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '6px',
+                      background: '#e0e7ff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <Music size={13} color="#4338ca" />
+                    </div>
+                    <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+                      {item.topic_name}
                     </span>
+                  </div>
+                  {!compressed && cleanedOtherNote && (
+                    <div style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 600, paddingLeft: '34px', lineHeight: '1.4' }}>
+                      {cleanedOtherNote}
+                    </div>
                   )}
                 </div>
               );
@@ -4426,17 +4599,30 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               borderTop: hasAnyHWItems ? '1px solid #f1f5f9' : 'none',
               paddingTop: hasAnyHWItems ? '10px' : 0
             }}>
-              {filteredNotes.map((note, idx) => {
+              {/* Play-Alongs (Single-line infinite loop carousel) */}
+              {(() => {
+                const audioNotes = filteredNotes.filter(note => (note || '').trim().startsWith("AUDIO:"));
+                if (audioNotes.length === 0) return null;
+                return (
+                  <div style={{ padding: '2px 0', width: '100%', boxSizing: 'border-box' }}>
+                    <AudioTrackCarousel
+                      tracks={audioNotes.map((note, aIdx) => {
+                        const parts = (note || '').trim().substring(6).split('|');
+                        return {
+                          url: parts[0],
+                          duration: parseInt(parts[1] || '0', 10),
+                          label: parts[3] || `Play-Along #${aIdx + 1}`,
+                          idx: aIdx
+                        };
+                      })}
+                      readOnly={true}
+                    />
+                  </div>
+                );
+              })()}
+
+              {filteredNotes.filter(note => !(note || '').trim().startsWith("AUDIO:")).map((note, idx) => {
                 const trimmed = (note || '').trim();
-                if (trimmed.startsWith("AUDIO:")) {
-                  audioCount++;
-                  const parts = trimmed.substring(6).split('|');
-                  return (
-                    <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along #${audioCount}`} />
-                    </div>
-                  );
-                }
 
                 const isPublic = trimmed.includes('STUDENT_NOTE_PUBLIC:');
                 const isPrivate = trimmed.includes('STUDENT_NOTE_PRIVATE:');
@@ -8257,7 +8443,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 )}</> : (
                   <>
                     {!timerRunning && renderSegmentedControl()}
-                    {activeTab === 'lessons' ? renderLessonsWidget() : renderHomeworkWidget(true)}
+                    {activeTab === 'lessons' ? renderLessonsWidget() : renderHomeworkWidget(false)}
                   </>
                 )}
 

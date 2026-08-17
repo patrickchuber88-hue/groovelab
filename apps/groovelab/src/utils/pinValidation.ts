@@ -1,15 +1,18 @@
 /**
- * Campus-Groovelab Enterprise PIN Validation Engine
+ * Campus-Groovelab Ideal Security & Simplicity PIN Validation Engine
  * 
- * Enforces high entropy and security for 4-digit user PINs while maintaining
- * frictionless UX and child-friendly design.
+ * Sets the optimal balance between high usability for kids/teens/students
+ * and essential baseline security:
+ * - Requires exactly 4 numeric digits.
+ * - Blocks only trivial repetitive sequences (0000, 1111, ..., 1234, 4321).
+ * - Allows all other personal combinations (years, favorite numbers, memorable dates) freely.
  */
 
-// Top global insecure/trivial 4-digit PINs
+// Essential trivial blacklist (all same digits or direct 4-step runs)
 const TRIVIAL_PINS = new Set([
   '0000', '1111', '2222', '3333', '4444',
   '5555', '6666', '7777', '8888', '9999',
-  '1234', '4321', '2580', '1212', '6969'
+  '1234', '4321'
 ]);
 
 export interface PinValidationResult {
@@ -18,15 +21,15 @@ export interface PinValidationResult {
 }
 
 /**
- * Validates a proposed 4-digit PIN against trivial sequences and biographic birthday patterns.
+ * Validates a proposed 4-digit PIN for format and baseline security.
  * 
  * @param pin The 4-digit string to validate
- * @param dayOfBirth Optional day of birth (1-31) of the user
+ * @param _dayOfBirth Optional (maintained for backward compatibility)
  */
-export function validateNewPin(pin: string, dayOfBirth?: number | string | null): PinValidationResult {
+export function validateNewPin(pin: string, _dayOfBirth?: number | string | null): PinValidationResult {
   const cleanPin = String(pin || '').trim();
 
-  // 1. Length & Format Check
+  // 1. Length & Numeric Format Check
   if (!/^\d{4}$/.test(cleanPin)) {
     return {
       isValid: false,
@@ -34,30 +37,12 @@ export function validateNewPin(pin: string, dayOfBirth?: number | string | null)
     };
   }
 
-  // 2. Trivial & Pattern Blacklist
+  // 2. Baseline Trivial Sequences Block
   if (TRIVIAL_PINS.has(cleanPin)) {
     return {
       isValid: false,
-      error: 'Diese PIN ist zu einfach zu erraten. Bitte wähle eine sicherere Zahlenfolge.'
+      error: 'Diese PIN ist zu einfach zu erraten (bitte keine Folgen wie 1234 oder 0000 wählen).'
     };
-  }
-
-  // 3. DACH Birthday Heuristic (DDMM)
-  // Only blocks when PIN starts with the user's birth day (DD) followed by a valid month (01-12).
-  if (dayOfBirth !== undefined && dayOfBirth !== null && String(dayOfBirth).trim() !== '') {
-    const dayNum = parseInt(String(dayOfBirth), 10);
-    if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
-      const dd = String(dayNum).padStart(2, '0');
-      if (cleanPin.startsWith(dd)) {
-        const potentialMonth = parseInt(cleanPin.slice(2, 4), 10);
-        if (potentialMonth >= 1 && potentialMonth <= 12) {
-          return {
-            isValid: false,
-            error: 'Bitte verwende aus Sicherheitsgründen nicht deinen Geburtstag (Tag + Monat) als PIN.'
-          };
-        }
-      }
-    }
   }
 
   return { isValid: true };

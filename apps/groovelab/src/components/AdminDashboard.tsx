@@ -4468,13 +4468,18 @@ export function AdminDashboard({
 
   const handleAddSong = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!admin?.school_id) return;
+    const resolvedSchoolId = admin?.school_id || (admin?.schools as any)?.id;
+    if (!resolvedSchoolId) {
+      alert('Schul-ID nicht gefunden.');
+      return;
+    }
+
+    const resolvedTeacherId = (admin?.role === 'teacher' ? admin?.id : null) || userId || admin?.id;
+    const isCampus = (activePlatform === 'campus');
 
     if (bulkModeSongs) {
       const lines = bulkTextSongs.split('\n').map(l => l.trim()).filter(Boolean);
       if (lines.length === 0) return;
-
-      // Check limits - BYPASSED (Song limit not enforced)
 
       const insertPayloads = lines.map(line => {
         let artist = 'Unbekannt';
@@ -4485,7 +4490,7 @@ export function AdminDashboard({
           title = parts.slice(1).join(' - ').trim();
         }
         return {
-          school_id: admin.school_id, 
+          school_id: resolvedSchoolId, 
           artist, 
           title, 
           level: 1, 
@@ -4500,10 +4505,10 @@ export function AdminDashboard({
           pdf_keys_url: '',
           playalong_url: '',
           bypass_wlan_check: false,
-          instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 },
-          is_campus_active: activePlatform === 'campus',
-          is_groovelab_active: activePlatform !== 'campus',
-          teacher_id: userId
+          instrumentation: isCampus ? {} : { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 },
+          is_campus_active: isCampus,
+          is_groovelab_active: !isCampus,
+          teacher_id: resolvedTeacherId
         };
       });
 
@@ -4519,36 +4524,34 @@ export function AdminDashboard({
 
       if (error) alert('Fehler: ' + error.message);
       else if (data) {
-        setSongs([...songs, ...data]);
+        setSongs(prev => [...prev, ...data]);
         setShowAddSong(false);
         setBulkModeSongs(false);
         setBulkTextSongs('');
       }
       return;
     }
-
-    // Check limits - BYPASSED (Song limit not enforced)
     
     const insertPayload: any = {
-      school_id: admin.school_id, 
-      artist: newSong.artist, 
-      title: newSong.title, 
-      level: newSong.level, 
-      media_link: newSong.media_link,
-      tomplay_url: newSong.tomplay_url,
-      pdf_folder_url: newSong.pdf_folder_url || '',
-      guitar_pro_url: newSong.guitar_pro_url || '',
-      pdf_drums_url: newSong.pdf_drums_url || '',
-      pdf_guitar_url: newSong.pdf_guitar_url || '',
-      pdf_bass_url: newSong.pdf_bass_url || '',
-      pdf_vocals_url: newSong.pdf_vocals_url || '',
-      pdf_keys_url: newSong.pdf_keys_url || '',
-      playalong_url: newSong.playalong_url || '',
+      school_id: resolvedSchoolId, 
+      artist: newSong.artist?.trim() || 'Unbekannt', 
+      title: newSong.title?.trim() || 'Unbenannter Song', 
+      level: newSong.level || 1, 
+      media_link: newSong.media_link || '',
+      tomplay_url: newSong.tomplay_url || '',
+      pdf_folder_url: '',
+      guitar_pro_url: '',
+      pdf_drums_url: '',
+      pdf_guitar_url: '',
+      pdf_bass_url: '',
+      pdf_vocals_url: '',
+      pdf_keys_url: '',
+      playalong_url: '',
       bypass_wlan_check: !!newSong.bypass_wlan_check,
-      instrumentation: newSong.instrumentation,
-      is_campus_active: activePlatform === 'campus',
-      is_groovelab_active: activePlatform !== 'campus',
-      teacher_id: userId
+      instrumentation: isCampus ? {} : (newSong.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 }),
+      is_campus_active: isCampus,
+      is_groovelab_active: !isCampus,
+      teacher_id: resolvedTeacherId
     };
 
     let { data, error } = await supabase.from('songs').insert(insertPayload).select().single();
@@ -4563,7 +4566,7 @@ export function AdminDashboard({
 
     if (error) alert('Fehler: ' + error.message);
     else if (data) { 
-      setSongs([...songs, data]); 
+      setSongs(prev => [...prev, data]); 
       setShowAddSong(false); 
       setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', playalong_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } }); 
     }
@@ -11732,17 +11735,6 @@ export function AdminDashboard({
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>PDF Ordner / Link</label>
-                          <input placeholder="https://..." value={newSong.pdf_folder_url || ''} onChange={e => setNewSong({...newSong, pdf_folder_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Noten (GP / Link)</label>
-                          <input placeholder="https://..." value={newSong.guitar_pro_url || ''} onChange={e => setNewSong({...newSong, guitar_pro_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                        </div>
-                      </div>
-
                       {activePlatform !== 'campus' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrangement (Benötigte Instrumente)</label>
@@ -11956,16 +11948,7 @@ export function AdminDashboard({
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>PDF Ordner / Link</label>
-                      <input placeholder="https://..." value={editingSong.pdf_folder_url || ''} onChange={e => setEditingSong({...editingSong, pdf_folder_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Noten (GP / Link)</label>
-                      <input placeholder="https://..." value={editingSong.guitar_pro_url || ''} onChange={e => setEditingSong({...editingSong, guitar_pro_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
-                    </div>
-                  </div>
+
 
                   {activePlatform !== 'campus' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -12141,8 +12124,14 @@ export function AdminDashboard({
                 </form>
               )}
 
-              {/* Songs List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Songs List Grid (3-4 columns responsive) */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                gap: '14px',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}>
                 {songs.filter(song => {
                   const matchesSearch = songSearch === '' || 
                     song.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
@@ -12174,19 +12163,19 @@ export function AdminDashboard({
                         setShowAddSong(false);
                       }}
                       style={{ 
-                        padding: '16px 20px', 
+                        padding: '14px 16px', 
                         display: 'flex', 
-                        gap: '16px',
+                        gap: '12px',
                         alignItems: 'center', 
                         background: 'white', 
-                        borderRadius: '20px', 
+                        borderRadius: '18px', 
                         border: editingSong?.id === song.id ? `2px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)', 
                         borderLeft: `5px solid ${lwColor.from}`,
                         boxShadow: editingSong?.id === song.id 
                           ? `0 10px 25px -5px ${brandColor}20` 
                           : '0 8px 30px -10px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.01)', 
                         transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                        minHeight: '92px',
+                        minHeight: '88px',
                         boxSizing: 'border-box',
                         cursor: 'pointer'
                       }}
@@ -12196,12 +12185,12 @@ export function AdminDashboard({
 
                       {/* Title and Artist */}
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.15rem', letterSpacing: '-0.02em', lineHeight: '1.2' }}>{song.title}</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>von {song.artist}</div>
+                        <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.02rem', letterSpacing: '-0.02em', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {song.artist}</div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '16px' }}>
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteSong(song.id); }} style={{ background: '#fff1f2', border: '1px solid #fecaca', width: '44px', height: '44px', borderRadius: '12px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
+                      <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteSong(song.id); }} style={{ background: '#fff1f2', border: '1px solid #fecaca', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={16} /></button>
                       </div>
                     </div>
                   );
@@ -12332,8 +12321,14 @@ export function AdminDashboard({
                   </form>
                 )}
 
-                {/* Lehrwerke List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Lehrwerke List Grid (3-4 columns responsive) */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                  gap: '14px',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
                   {filteredLehrwerke.map(item => {
                     const gradient = getLehrwerkColor(item.title);
                     return (
@@ -12345,12 +12340,12 @@ export function AdminDashboard({
                           setShowAddLehrwerk(false);
                         }}
                         style={{ 
-                          padding: '16px 20px', 
+                          padding: '14px 16px', 
                           background: 'white', 
                           display: 'flex', 
-                          gap: '16px', 
+                          gap: '12px', 
                           alignItems: 'center', 
-                          borderRadius: '20px', 
+                          borderRadius: '18px', 
                           border: editingLehrwerk?.id === item.id ? `2px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)', 
                           borderLeft: `5px solid ${gradient.from}`,
                           boxShadow: editingLehrwerk?.id === item.id 
@@ -12359,19 +12354,19 @@ export function AdminDashboard({
                           position: 'relative',
                           cursor: 'pointer',
                           transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                          minHeight: '92px',
+                          minHeight: '88px',
                           boxSizing: 'border-box'
                         }}
                       >
                         {/* Book Pages peeking out + Book Cover Icon */}
-                        <div style={{ position: 'relative', width: '68px', height: '56px', flexShrink: 0 }}>
+                        <div style={{ position: 'relative', width: '60px', height: '50px', flexShrink: 0 }}>
                           {/* Pages peeking out from the right */}
                           <div style={{
                             position: 'absolute',
-                            right: '4px',
-                            top: '5px',
-                            width: '46px',
-                            height: '46px',
+                            right: '2px',
+                            top: '4px',
+                            width: '40px',
+                            height: '40px',
                             borderRadius: '8px',
                             background: '#f8fafc',
                             border: '1px solid #e2e8f0',
@@ -12381,17 +12376,17 @@ export function AdminDashboard({
                             justifyContent: 'center',
                             zIndex: 1
                           }}>
-                            <span style={{ fontSize: '0.75rem' }}>📖</span>
+                            <span style={{ fontSize: '0.7rem' }}>📖</span>
                           </div>
                           {/* Book Cover Sleeve */}
                           <div style={{
                             position: 'absolute',
                             left: 0,
                             top: 0,
-                            width: '56px',
-                            height: '56px',
+                            width: '50px',
+                            height: '50px',
                             background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
-                            borderRadius: '16px',
+                            borderRadius: '14px',
                             boxShadow: '0 8px 20px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
                             display: 'flex',
                             alignItems: 'center',
@@ -12399,19 +12394,19 @@ export function AdminDashboard({
                             zIndex: 2,
                             border: `1px solid ${gradient.text}18`
                           }}>
-                            <BookOpen size={24} color={gradient.text} />
+                            <BookOpen size={20} color={gradient.text} />
                           </div>
                         </div>
 
                         {/* Title and Author / Pages */}
                         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.15rem', letterSpacing: '-0.02em', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.02rem', letterSpacing: '-0.02em', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {item.author ? `von ${item.author} • ` : ''}📖 {item.totalPages || 50} Seiten
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '16px' }}>
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
                           <button 
                             type="button"
                             onClick={(e) => {
@@ -12421,9 +12416,9 @@ export function AdminDashboard({
                             style={{ 
                               background: '#fff1f2', 
                               border: '1px solid #fecaca', 
-                              width: '44px', 
-                              height: '44px', 
-                              borderRadius: '12px', 
+                              width: '38px', 
+                              height: '38px', 
+                              borderRadius: '10px', 
                               display: 'flex', 
                               alignItems: 'center', 
                               justifyContent: 'center', 
@@ -12432,7 +12427,7 @@ export function AdminDashboard({
                               transition: 'all 0.2s' 
                             }}
                           >
-                            <Trash2 size={18} />
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </div>

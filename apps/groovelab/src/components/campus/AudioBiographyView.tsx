@@ -3508,23 +3508,21 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           </button>
         </div>
 
-        {/* Card Typography & Details */}
+        {/* Card Typography & Details: 2 clean minimalist Spotify-style lines */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
             <h4 style={{
               margin: 0,
               fontSize: '0.84rem',
               fontWeight: 900,
               color: isPlaying ? '#10b981' : colors.textPrimary,
               lineHeight: 1.25,
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
+              whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               letterSpacing: '-0.01em',
-              minHeight: '2.1em'
-            }}>
+              flex: 1
+            }} title={item.title}>
               {item.title}
             </h4>
 
@@ -3545,59 +3543,39 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 }}
                 className="hover-scale"
               >
-                <BookOpen size={14} />
+                <BookOpen size={13} />
               </button>
             )}
           </div>
 
-          {item.trackCount === 0 ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
             <span style={{
-              fontSize: '0.74rem',
-              color: isLight ? '#059669' : '#34d399',
+              fontSize: '0.70rem',
               fontWeight: 700,
+              color: item.trackCount === 0 ? (isLight ? '#059669' : '#34d399') : colors.textMuted,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}>
-              ✨ Bereit für deinen 1. Song
+              {item.trackCount === 0 
+                ? '0 Tracks • Bereit' 
+                : `${item.trackCount} ${item.trackCount === 1 ? 'Track' : 'Tracks'}${item.totalDurationMin ? ` • ${item.totalDurationMin} Min.` : ''}`}
             </span>
-          ) : (
-            <span style={{
-              fontSize: '0.74rem',
-              color: colors.textSecondary,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              fontWeight: 500
-            }}>
-              {item.subtitle}
-            </span>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{
-                fontSize: '0.66rem',
-                fontWeight: 800,
-                color: item.trackCount === 0 ? (isLight ? '#059669' : '#34d399') : colors.textMuted
-              }}>
-                {item.trackCount === 0 ? '0 Songs • Jetzt aufnehmen' : `${item.trackCount} ${item.trackCount === 1 ? 'Track' : 'Tracks'}${item.totalDurationMin ? ` • ${item.totalDurationMin} Min.` : ''}`}
-              </span>
-            </div>
 
             {item.isBoxsetFolder && (
               <span style={{
-                fontSize: '0.66rem',
+                fontSize: '0.62rem',
                 fontWeight: 800,
                 color: '#06b6d4',
                 background: isLight ? '#e0f2fe' : 'rgba(6, 182, 212, 0.15)',
-                padding: '2px 6px',
+                padding: '2px 5px',
                 borderRadius: '4px',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '3px'
+                gap: '3px',
+                flexShrink: 0
               }}>
-                <Folder size={10} />
+                <Folder size={9} />
                 Ordner
               </span>
             )}
@@ -3631,13 +3609,13 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-        {/* 🔥 SEKTION 1: PLAYLISTEN IM LAUFENDEN SCHULJAHR (2026/2027) */}
+        {/* 🔥 SEKTION 1: PLAYLISTEN IM LAUFENDEN SCHULJAHR */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Flame size={17} color="#ef4444" />
               <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 900, color: colors.textPrimary }}>
-                1. Playlisten im laufenden Schuljahr (2026/2027)
+                Laufendes Schuljahr (2026/2027)
               </h3>
             </div>
 
@@ -3671,13 +3649,14 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             )}
           </div>
 
-          {/* Horizontale Leiste: Nebeneinander platziert */}
+          {/* Horizontale Leiste: Nebeneinander platziert mit Headroom gegen Hover-Clipping */}
           <div style={{
             display: 'flex',
             flexDirection: 'row',
             gap: '14px',
             overflowX: 'auto',
-            paddingBottom: '6px',
+            padding: '12px 6px 12px 6px',
+            margin: '-8px -6px -6px -6px',
             scrollSnapType: 'x mandatory',
             WebkitOverflowScrolling: 'touch'
           }}>
@@ -3805,27 +3784,28 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           </div>
         </div>
 
-        {/* 📚 SEKTION 2: MEIN SCHULJAHR (1 VEREWIGTES MEISTER-ALBUM PRO SCHULJAHR) */}
+        {/* 📚 SEKTION 2: SCHULJAHRE-ARCHIV */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Folder size={17} color="#06b6d4" />
               <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 900, color: colors.textPrimary }}>
-                2. Mein Schuljahr
+                Schuljahre-Archiv
               </h3>
             </div>
             <span style={{ fontSize: '0.72rem', color: colors.textMuted, fontWeight: 600 }}>
-              Alle Playlisten eines Schuljahres als eine verewigte Meister-LP • 1 Album pro Schuljahr
+              Alle Playlisten eines Schuljahres als verewigte Meister-LP • 1 Album pro Schuljahr
             </span>
           </div>
 
-          {/* Horizontale Leiste: 1 verewigte Meister-LP pro Schuljahr */}
+          {/* Horizontale Leiste: 1 verewigte Meister-LP pro Schuljahr mit Headroom */}
           <div style={{
             display: 'flex',
             flexDirection: 'row',
             gap: '14px',
             overflowX: 'auto',
-            paddingBottom: '6px',
+            padding: '12px 6px 12px 6px',
+            margin: '-8px -6px -6px -6px',
             scrollSnapType: 'x mandatory',
             WebkitOverflowScrolling: 'touch'
           }}>
