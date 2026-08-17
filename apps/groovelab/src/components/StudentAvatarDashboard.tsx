@@ -7,7 +7,7 @@ import {
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
-  Mic, Disc, Trash2, Download, Key, Delete
+  Mic, Disc, Trash2, Download, Key, Delete, Headphones
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -24,7 +24,7 @@ import { CampusLevelSwitcher, CampusUiLevel } from './campus/CampusLevelSwitcher
 import { CampusJuniorDashboard } from './campus/CampusJuniorDashboard';
 import { CampusTeenDashboard } from './campus/CampusTeenDashboard';
 import { CampusLevelSelectModal } from './campus/CampusLevelSelectModal';
-import { AudioTrackCarousel } from './AudioTrackCarousel';
+import { AudioTrackCarousel, AudioTrackItem } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 
 const showMissionsFeature = false;
@@ -1266,7 +1266,7 @@ function MobileBriefingView({
               </div>
             </div>
             <button 
-              onClick={() => setActiveTab('practice_board')}
+              onClick={() => handleTabChangeLocal('practice_board')}
               style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: 'white', border: 'none', borderRadius: '12px', padding: '10px 14px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(79, 70, 229, 0.15)' }}>
               <Play size={14} fill="currentColor" /> Üben starten
             </button>
@@ -5523,6 +5523,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [classmateIds, setClassmateIds] = useState<string[]>([]);
   const [lehrwerke, setLehrwerke] = useState<any[]>([]);
   const [songs, setSongs] = useState<any[]>([]);
+  const [activeSongSkills, setActiveSongSkills] = useState<any[]>([]);
   const songStats = useMemo(() => {
     const assigned = songs.filter(song => {
       const isAssigned = progressItems.some(item => 
@@ -5640,6 +5641,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
     } catch (err) {
       console.error('Error fetching songs:', err);
+    }
+
+    try {
+      const { data: skillsData } = await supabase
+        .from('user_song_skills')
+        .select('*, songs(*)')
+        .eq('user_id', studentId);
+      if (skillsData) {
+        const filteredSkills = skillsData.filter((skill: any) => {
+          if (!skill.songs) return false;
+          return skill.songs.is_campus_active === true;
+        });
+        setActiveSongSkills(filteredSkills);
+      }
+    } catch (err) {
+      console.error('Error fetching user_song_skills:', err);
     }
 
     try {
@@ -8316,7 +8333,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <button
                     onClick={() => {
                       setHomeworkBookTab('stickeralbum');
-                      setActiveTab('homework_book');
+                      handleTabChangeLocal('homework_book');
                     }}
                     style={{
                       background: 'rgba(255, 255, 255, 0.2)',
@@ -12865,10 +12882,52 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   });
                                 }
                               }
-                            } else if (item.is_current_homework || (item.updated_at && getItemWeek(item) === currentWeekStr && item.status !== 'MASTERED')) {
-                              const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                              if (!otherActiveSongs.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                                otherActiveSongs.push(item);
+                            } else {
+                              const isSongHw = (() => {
+                                const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+                                                (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                                if (localHw === 'false') return false;
+                                if (localHw === 'true') return true;
+                                if (!item.is_current_homework || item.status === 'MASTERED') return false;
+                                if (item.updated_at) {
+                                  const itemWeek = getItemWeek(item);
+                                  if (itemWeek && itemWeek !== currentWeekStr) return false;
+                                }
+                                return true;
+                              })();
+                              if (isSongHw) {
+                                const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
+                                if (!otherActiveSongs.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                                  otherActiveSongs.push(item);
+                                }
+                              }
+                            }
+                          });
+
+                          // Also incorporate student's activeSongSkills (exact 1:1 match with MeisterwerkDocumentationModal)
+                          (activeSongSkills || []).forEach((skill: any) => {
+                            const localHw = localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
+                                            (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
+                                            (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null);
+
+                            const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
+
+                            if (isHw && skill.progress_percent !== 100 && !skill.is_stage_ready && skill.status !== 'MASTERED') {
+                              const songArtist = skill.songs?.artist || skill.artist || '';
+                              const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                              const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
+                              const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+                              const cleanT = cleanTitle(fullTitle);
+
+                              if (!otherActiveSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                                otherActiveSongs.push({
+                                  id: skill.id,
+                                  song_id: skill.song_id || skill.songs?.id,
+                                  topic_name: fullTitle,
+                                  title: fullTitle,
+                                  is_current_homework: true,
+                                  status: 'IN_PROGRESS'
+                                });
                               }
                             }
                           });
@@ -14895,37 +14954,101 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     {/* Spalte 1: Active Tracks & Lehrwerke 🎧 (Level 2: Teen) */}
                     {(() => {
                       const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
-                      const currentWeekStr = latestItem ? getItemWeek(latestItem) : getISOWeekRaw(new Date(), 1);
+                      const currentWeekStr = latestItem && latestItem.updated_at ? getItemWeek(latestItem) : getISOWeek(new Date());
                       const currentWeekNum = currentWeekStr.split('-W')[1] || '';
 
-                      const parseHomeworkNotes = (rawNotes: string): string[] => {
-                        if (!rawNotes || rawNotes.trim() === '') return [];
-                        try {
-                          let parsed: string[] = [];
-                          if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
-                            parsed = JSON.parse(rawNotes);
-                          } else {
-                            parsed = [rawNotes];
-                          }
-                          return parsed.map((n: string) => typeof n === 'string' ? n.trim() : '').filter((n: string) => n.length > 0);
-                        } catch {
-                          return [rawNotes.trim()];
+                      const parseHomeworkNotes = (rawNotes: any): string[] => {
+                        if (!rawNotes) return [];
+                        if (Array.isArray(rawNotes)) {
+                          const res: string[] = [];
+                          rawNotes.forEach(r => {
+                            parseHomeworkNotes(r).forEach(x => res.push(x));
+                          });
+                          return res;
                         }
+                        if (typeof rawNotes !== 'string') return [String(rawNotes).trim()];
+                        const trimmed = rawNotes.trim();
+                        if (!trimmed) return [];
+                        if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || trimmed.startsWith('"{') || trimmed.startsWith('"[') || trimmed.startsWith('{')) {
+                          try {
+                            const parsed = JSON.parse(trimmed);
+                            if (Array.isArray(parsed)) {
+                              const res: string[] = [];
+                              parsed.forEach(r => {
+                                parseHomeworkNotes(r).forEach(x => res.push(x));
+                              });
+                              return res;
+                            }
+                            if (typeof parsed === 'string' && parsed !== trimmed) {
+                              return parseHomeworkNotes(parsed);
+                            }
+                          } catch {}
+                        }
+                        return [trimmed];
                       };
 
                       const getNotesForWeek = (weekStr: string): string[] => {
                         const notes: string[] = [];
-                        progressItems.filter(item => getItemWeek(item) === weekStr).forEach(item => {
-                          if (item.homework_notes && item.homework_notes.trim()) {
+                        (progressItems || []).forEach(item => {
+                          const itemW = getItemWeek(item);
+                          const isActive = item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW ') || itemW === weekStr;
+                          if (isActive && item.homework_notes && item.homework_notes.trim()) {
                             parseHomeworkNotes(item.homework_notes).forEach(n => {
                               if (n && n.trim() && !notes.includes(n.trim())) notes.push(n.trim());
                             });
                           }
                         });
+
+                        try {
+                          const localGenNotes = localStorage.getItem(`campus_homework_notes_${studentId}`);
+                          if (localGenNotes && localGenNotes.trim()) {
+                            parseHomeworkNotes(localGenNotes).forEach(n => {
+                              if (n && n.trim() && !notes.includes(n.trim())) notes.push(n.trim());
+                            });
+                          }
+                        } catch {}
+
                         return notes;
                       };
 
                       const currentWeekNotes = getNotesForWeek(currentWeekStr);
+                      const audioTracks: AudioTrackItem[] = [];
+                      currentWeekNotes.forEach((n, idx) => {
+                        if (n.startsWith('AUDIO:')) {
+                          const parts = n.substring(6).split('|');
+                          audioTracks.push({
+                            url: parts[0],
+                            duration: parseFloat(parts[1]) || 0,
+                            label: parts[3] || `Aufnahme #${audioTracks.length + 1}`,
+                            idx
+                          });
+                        }
+                      });
+
+                      const cleanGeneralNote = (text: string) => {
+                        if (!text) return '';
+                        let clean = text;
+                        if (clean.startsWith('[') || clean.startsWith('{') || clean.startsWith('"')) {
+                          try {
+                            const p = JSON.parse(clean);
+                            if (Array.isArray(p)) {
+                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                            } else if (typeof p === 'string') {
+                              clean = p;
+                            }
+                          } catch {}
+                        }
+                        return clean
+                          .replace(/\["AUDIO:[^"]*"\]/g, '')
+                          .replace(/AUDIO:[^\s,|]+/g, '')
+                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                          .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
+                          .trim();
+                      };
+
+                      const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'));
+                      const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
+
                       const cleanTitle = (t: string) => t.replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                       const formatPageNumbers = (pages: number[]): string => {
@@ -14983,7 +15106,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         });
                       });
 
-                      // 2. Also incorporate items from progressItems (songs, theory, database rows)
+                      // 2. Also incorporate items from progressItems (songs, theory, database rows) and songs state
                       const otherActiveHWItems: any[] = [];
                       (progressItems || []).forEach(item => {
                         if (item.topic_name.startsWith('Hausaufgabe KW ')) return;
@@ -15014,10 +15137,83 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               });
                             }
                           }
-                        } else if (item.is_current_homework || (item.updated_at && getItemWeek(item) === currentWeekStr && item.status !== 'MASTERED')) {
-                          const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                          if (!otherActiveHWItems.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                            otherActiveHWItems.push(item);
+                          const isSongHw = (() => {
+                            const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+                                            (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                            if (localHw === 'false') return false;
+                            if (localHw === 'true') return true;
+                            if (!item.is_current_homework || item.status === 'MASTERED') return false;
+                            if (item.updated_at) {
+                              const itemWeek = getItemWeek(item);
+                              if (itemWeek && itemWeek !== currentWeekStr) return false;
+                            }
+                            return true;
+                          })();
+
+                          if (isSongHw) {
+                            const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
+                            if (!otherActiveHWItems.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                              let cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
+                                               localStorage.getItem(`song_note_${studentId}_${item.song_id}`) ||
+                                               item.homework_notes || '';
+                              if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
+                                try {
+                                  const parsed = JSON.parse(cachedNote);
+                                  if (Array.isArray(parsed)) {
+                                    cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                  }
+                                } catch {}
+                              }
+                              cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                              otherActiveHWItems.push({
+                                ...item,
+                                homework_notes: cachedNote
+                              });
+                            }
+                          }
+                        }
+                      });
+
+                      // Also incorporate student's activeSongSkills (exact 1:1 match with MeisterwerkDocumentationModal)
+                      (activeSongSkills || []).forEach((skill: any) => {
+                        const localHw = localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
+                                        (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
+                                        (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null);
+
+                        const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
+
+                        if (isHw && skill.progress_percent !== 100 && !skill.is_stage_ready && skill.status !== 'MASTERED') {
+                          const songArtist = skill.songs?.artist || skill.artist || '';
+                          const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                          const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
+                          const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+                          const cleanT = cleanTitle(fullTitle);
+
+                          if (!otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                            let cachedNote = localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
+                                             (skill.song_id ? localStorage.getItem(`song_note_${studentId}_${skill.song_id}`) : '') ||
+                                             (skill.songs?.id ? localStorage.getItem(`song_note_${studentId}_${skill.songs.id}`) : '') ||
+                                             skill.homework_notes || '';
+                            if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
+                              try {
+                                const parsed = JSON.parse(cachedNote);
+                                if (Array.isArray(parsed)) {
+                                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                }
+                              } catch {}
+                            }
+                            cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                            otherActiveHWItems.push({
+                              id: skill.id,
+                              song_id: skill.song_id || skill.songs?.id,
+                              topic_name: fullTitle,
+                              title: fullTitle,
+                              is_current_homework: true,
+                              status: 'IN_PROGRESS',
+                              homework_notes: cachedNote
+                            });
                           }
                         }
                       });
@@ -15060,8 +15256,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div style={{ 
-                                  background: 'rgba(99, 102, 241, 0.08)', 
-                                  color: '#4f46e5', 
+                                  background: 'rgba(52, 168, 83, 0.08)', 
+                                  color: '#34a853', 
                                   width: '34px', 
                                   height: '34px', 
                                   borderRadius: '10px', 
@@ -15073,16 +15269,43 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 </div>
                                 <div>
                                   <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    Tracks & Übungen 🎧
+                                    Hausaufgaben
                                   </h4>
                                   <span style={{ fontSize: '0.65rem', fontWeight: 850, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    KW {currentWeekNum} · Aktuelle Session
+                                    KW {currentWeekNum} · Deine Wochenziele
                                   </span>
                                 </div>
                               </div>
-                              <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '0.6rem', fontWeight: 900, padding: '3px 9px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
-                                Aktiv
-                              </span>
+                              
+                              {/* Audio Indicator Pill beside Title */}
+                              {audioTracks.length > 0 ? (
+                                <div
+                                  onClick={() => handleTabChangeLocal('homework_book')}
+                                  style={{
+                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                                    border: '1px solid #bbf7d0',
+                                    borderRadius: '100px',
+                                    padding: '4px 10px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="hover-scale"
+                                  title="Unterrichtsaufnahmen im Aufgabenheft anhören"
+                                >
+                                  <Headphones size={13} color="#15803d" />
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d' }}>
+                                    {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '0.6rem', fontWeight: 900, padding: '3px 9px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                                  Aktiv
+                                </span>
+                              )}
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -15092,55 +15315,46 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     const bookGradient = getLehrwerkColor(item.title, lehrwerke);
                                     return (
                                       <div key={`teen-book-${idx}`} style={{
-                                        background: '#f8fafc',
-                                        padding: '14px 16px',
-                                        borderRadius: '14px',
                                         display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '6px'
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '8px',
+                                        padding: '10px 12px',
+                                        background: '#f8fafc',
+                                        borderRadius: '12px'
                                       }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                            <div style={{
-                                              width: '24px',
-                                              height: '30px',
-                                              background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                              borderRadius: '5px',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              color: bookGradient.text,
-                                              flexShrink: 0
-                                            }}>
-                                              <BookOpen size={13} />
-                                            </div>
-                                            <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.96rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                              {item.title}
-                                            </span>
-                                          </div>
-                                          <span style={{
-                                            fontSize: '0.84rem',
-                                            fontWeight: 850,
-                                            color: '#15803d',
-                                            background: '#dcfce7',
-                                            padding: '3px 10px',
-                                            borderRadius: '8px',
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                          <div style={{
+                                            width: '22px',
+                                            height: '26px',
+                                            background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
+                                            borderRadius: '5px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: bookGradient.text,
                                             flexShrink: 0
                                           }}>
-                                            {item.formattedPages}
+                                            <BookOpen size={11} />
+                                          </div>
+                                          <span style={{ fontWeight: 850, color: '#0f172a', fontSize: '0.92rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                            {item.title}
                                           </span>
                                         </div>
-
-                                        {/* Notes Direct Flow */}
-                                        {item.notesList && item.notesList.length > 0 && (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '34px' }}>
-                                            {item.notesList.map((n, nIdx) => (
-                                              <div key={`teen-note-${nIdx}`} style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
-                                                <strong style={{ color: '#1e293b' }}>Tipp zu S. {n.num}:</strong> {n.text}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
+                                          {item.pageNums.map((pNum: number, pIdx: number) => (
+                                            <span key={`teen-p-${pIdx}`} style={{
+                                              fontSize: '0.72rem',
+                                              fontWeight: 800,
+                                              color: '#15803d',
+                                              background: '#dcfce7',
+                                              padding: '2px 8px',
+                                              borderRadius: '6px'
+                                            }}>
+                                              S. {pNum}
+                                            </span>
+                                          ))}
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -15148,15 +15362,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   {otherActiveHWItems.map((item, idx) => (
                                     <div key={`teen-song-${idx}`} style={{
                                       background: '#f8fafc',
-                                      padding: '12px 14px',
-                                      borderRadius: '14px',
+                                      padding: '10px 12px',
+                                      borderRadius: '12px',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '10px'
+                                      gap: '8px'
                                     }}>
                                       <div style={{
-                                        width: '24px',
-                                        height: '24px',
+                                        width: '22px',
+                                        height: '22px',
                                         borderRadius: '6px',
                                         background: '#e0e7ff',
                                         display: 'flex',
@@ -15164,33 +15378,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         justifyContent: 'center',
                                         flexShrink: 0
                                       }}>
-                                        <Music size={13} color="#4338ca" />
+                                        <Music size={12} color="#4338ca" />
                                       </div>
-                                      <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.94rem' }}>
+                                      <span style={{ fontWeight: 850, color: '#0f172a', fontSize: '0.90rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {cleanTitle(item.title || item.topic_name)}
                                       </span>
                                     </div>
                                   ))}
 
-                                  {/* Play-Alongs */}
-                                  {currentWeekNotes && currentWeekNotes.filter((n: string) => !n.startsWith("STICKER:") && !n.startsWith("LATENCY:")).map((note: string, idx: number) => {
-                                    if (note.startsWith("AUDIO:")) {
-                                      const parts = note.substring(6).split('|');
-                                      return (
-                                        <div key={`teen-audio-${idx}`} style={{ background: '#f0fdf4', padding: '10px 14px', borderRadius: '12px' }}>
-                                          <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along Track #${idx + 1}`} />
-                                        </div>
-                                      );
-                                    }
-                                    const cleanText = note.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                                    if (!cleanText) return null;
-                                    return (
-                                      <div key={`teen-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', color: '#166534', fontWeight: 650, background: '#f0fdf4', padding: '8px 12px', borderRadius: '10px' }}>
-                                        <FileText size={14} style={{ color: '#166534', flexShrink: 0 }} />
-                                        <span>{cleanText}</span>
-                                      </div>
-                                    );
-                                  })}
+                                  {/* Zusätzliche Bemerkung */}
+                                  {generalNote && (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                      <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                      <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                                    </div>
+                                  )}
                                 </>
                               ) : (
                                 <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
@@ -15201,15 +15404,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </div>
 
                           <button
-                            onClick={() => setActiveTab('homework_book')}
+                            onClick={() => handleTabChangeLocal('homework_book')}
                             style={{
                               width: '100%',
-                              padding: '12px 16px',
+                              padding: '10px 14px',
                               borderRadius: '14px',
                               border: '1.5px solid #e2e8f0',
                               background: '#f8fafc',
                               color: '#0f172a',
-                              fontSize: '0.82rem',
+                              fontSize: '0.80rem',
                               fontWeight: 900,
                               cursor: 'pointer',
                               display: 'flex',
@@ -15220,8 +15423,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             }}
                             className="hover-scale"
                           >
-                            <BookOpen size={15} color="#4f46e5" />
-                            <span>Song- & Aufgabenheft öffnen →</span>
+                            <BookOpen size={14} color="#34a853" />
+                            <span>Hausaufgabenheft öffnen →</span>
                           </button>
                         </div>
                       );
@@ -15776,34 +15979,98 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       const currentWeekNum = currentWeekStr.split('-W')[1] || '';
                       const prevWeekNum = prevWeekStr.split('-W')[1] || '';
 
-                      const parseHomeworkNotes = (rawNotes: string): string[] => {
-                        if (!rawNotes || rawNotes.trim() === '') return [];
-                        try {
-                          let parsed: string[] = [];
-                          if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
-                            parsed = JSON.parse(rawNotes);
-                          } else {
-                            parsed = [rawNotes];
-                          }
-                          return parsed.map((n: string) => typeof n === 'string' ? n.trim() : '').filter((n: string) => n.length > 0);
-                        } catch {
-                          return [rawNotes.trim()];
+                      const parseHomeworkNotes = (rawNotes: any): string[] => {
+                        if (!rawNotes) return [];
+                        if (Array.isArray(rawNotes)) {
+                          const res: string[] = [];
+                          rawNotes.forEach(r => {
+                            parseHomeworkNotes(r).forEach(x => res.push(x));
+                          });
+                          return res;
                         }
+                        if (typeof rawNotes !== 'string') return [String(rawNotes).trim()];
+                        const trimmed = rawNotes.trim();
+                        if (!trimmed) return [];
+                        if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || trimmed.startsWith('"{') || trimmed.startsWith('"[') || trimmed.startsWith('{')) {
+                          try {
+                            const parsed = JSON.parse(trimmed);
+                            if (Array.isArray(parsed)) {
+                              const res: string[] = [];
+                              parsed.forEach(r => {
+                                parseHomeworkNotes(r).forEach(x => res.push(x));
+                              });
+                              return res;
+                            }
+                            if (typeof parsed === 'string' && parsed !== trimmed) {
+                              return parseHomeworkNotes(parsed);
+                            }
+                          } catch {}
+                        }
+                        return [trimmed];
                       };
 
                       const getNotesForWeek = (weekStr: string): string[] => {
                         const notes: string[] = [];
-                        progressItems.filter(item => getItemWeek(item) === weekStr).forEach(item => {
-                          if (item.homework_notes && item.homework_notes.trim()) {
+                        (progressItems || []).forEach(item => {
+                          const itemW = getItemWeek(item);
+                          const isActive = item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW ') || itemW === weekStr;
+                          if (isActive && item.homework_notes && item.homework_notes.trim()) {
                             parseHomeworkNotes(item.homework_notes).forEach(n => {
                               if (n && n.trim() && !notes.includes(n.trim())) notes.push(n.trim());
                             });
                           }
                         });
+
+                        try {
+                          const localGenNotes = localStorage.getItem(`campus_homework_notes_${studentId}`);
+                          if (localGenNotes && localGenNotes.trim()) {
+                            parseHomeworkNotes(localGenNotes).forEach(n => {
+                              if (n && n.trim() && !notes.includes(n.trim())) notes.push(n.trim());
+                            });
+                          }
+                        } catch {}
+
                         return notes;
                       };
 
                       const currentWeekNotes = getNotesForWeek(currentWeekStr);
+                      const audioTracks: AudioTrackItem[] = [];
+                      currentWeekNotes.forEach((n, idx) => {
+                        if (n.startsWith('AUDIO:')) {
+                          const parts = n.substring(6).split('|');
+                          audioTracks.push({
+                            url: parts[0],
+                            duration: parseFloat(parts[1]) || 0,
+                            label: parts[3] || `Aufnahme #${audioTracks.length + 1}`,
+                            idx
+                          });
+                        }
+                      });
+
+                      const cleanGeneralNote = (text: string) => {
+                        if (!text) return '';
+                        let clean = text;
+                        if (clean.startsWith('[') || clean.startsWith('{') || clean.startsWith('"')) {
+                          try {
+                            const p = JSON.parse(clean);
+                            if (Array.isArray(p)) {
+                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                            } else if (typeof p === 'string') {
+                              clean = p;
+                            }
+                          } catch {}
+                        }
+                        return clean
+                          .replace(/\["AUDIO:[^"]*"\]/g, '')
+                          .replace(/AUDIO:[^\s,|]+/g, '')
+                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                          .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
+                          .trim();
+                      };
+
+                      const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'));
+                      const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
+
                       const cleanTitle = (t: string) => t.replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                       const formatPageNumbers = (pages: number[]): string => {
@@ -15861,7 +16128,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         });
                       });
 
-                      // 2. Also incorporate items from progressItems (songs, theory, database rows)
+                      // 2. Also incorporate items from progressItems (songs, theory, database rows) and songs state
                       const otherActiveHWItems: any[] = [];
                       (progressItems || []).forEach(item => {
                         if (item.topic_name.startsWith('Hausaufgabe KW ')) return;
@@ -15892,10 +16159,84 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               });
                             }
                           }
-                        } else if (item.is_current_homework || (item.updated_at && getItemWeek(item) === currentWeekStr && item.status !== 'MASTERED')) {
-                          const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                          if (!otherActiveHWItems.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                            otherActiveHWItems.push(item);
+                        } else {
+                          const isSongHw = (() => {
+                            const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+                                            (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                            if (localHw === 'false') return false;
+                            if (localHw === 'true') return true;
+                            if (!item.is_current_homework || item.status === 'MASTERED') return false;
+                            if (item.updated_at) {
+                              const itemWeek = getItemWeek(item);
+                              if (itemWeek && itemWeek !== currentWeekStr) return false;
+                            }
+                            return true;
+                          })();
+
+                          if (isSongHw) {
+                            const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
+                            if (!otherActiveHWItems.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                              let cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
+                                               localStorage.getItem(`song_note_${studentId}_${item.song_id}`) ||
+                                               item.homework_notes || '';
+                              if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
+                                try {
+                                  const parsed = JSON.parse(cachedNote);
+                                  if (Array.isArray(parsed)) {
+                                    cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                  }
+                                } catch {}
+                              }
+                              cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                              otherActiveHWItems.push({
+                                ...item,
+                                homework_notes: cachedNote
+                              });
+                            }
+                          }
+                        }
+                      });
+
+                      // Also incorporate student's activeSongSkills (exact 1:1 match with MeisterwerkDocumentationModal)
+                      (activeSongSkills || []).forEach((skill: any) => {
+                        const localHw = localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
+                                        (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
+                                        (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null);
+
+                        const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
+
+                        if (isHw && skill.progress_percent !== 100 && !skill.is_stage_ready && skill.status !== 'MASTERED') {
+                          const songArtist = skill.songs?.artist || skill.artist || '';
+                          const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                          const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
+                          const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+                          const cleanT = cleanTitle(fullTitle);
+
+                          if (!otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                            let cachedNote = localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
+                                             (skill.song_id ? localStorage.getItem(`song_note_${studentId}_${skill.song_id}`) : '') ||
+                                             (skill.songs?.id ? localStorage.getItem(`song_note_${studentId}_${skill.songs.id}`) : '') ||
+                                             skill.homework_notes || '';
+                            if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
+                              try {
+                                const parsed = JSON.parse(cachedNote);
+                                if (Array.isArray(parsed)) {
+                                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                }
+                              } catch {}
+                            }
+                            cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                            otherActiveHWItems.push({
+                              id: skill.id,
+                              song_id: skill.song_id || skill.songs?.id,
+                              topic_name: fullTitle,
+                              title: fullTitle,
+                              is_current_homework: true,
+                              status: 'IN_PROGRESS',
+                              homework_notes: cachedNote
+                            });
                           }
                         }
                       });
@@ -15920,13 +16261,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         };
                       });
 
-                      // Vorwoche Items
-                      const prevWeekItems = (progressItems || []).filter(item => 
-                        !item.topic_name.startsWith('Hausaufgabe KW ') && 
-                        item.status !== 'MASTERED' && 
-                        item.status !== 'THEORY_DONE' && 
-                        getItemWeek(item) === prevWeekStr
-                      );
+                      const prevWeekItems = (progressItems || []).filter(item => {
+                        const itemW = getItemWeek(item);
+                        return itemW === prevWeekStr && !item.topic_name.startsWith('Hausaufgabe KW ');
+                      });
 
                       const hasActiveHomework = formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0 || currentWeekNotes.length > 0;
                       const activeUiLevel = (studentUiLevel as string) || 'junior';
@@ -15954,20 +16292,45 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 </div>
                                 <div>
                                   <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    Deine Wochen-Mission
+                                    Hausaufgaben
                                   </h4>
                                   <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                    Woche {currentWeekNum} ⭐ Mach dein Instrument bereit!
+                                    Woche {currentWeekNum} ⭐ Deine Wochen-Mission
                                   </span>
                                 </div>
                               </div>
-                              <span style={{ background: '#22c55e', color: '#ffffff', fontSize: '0.62rem', fontWeight: 900, padding: '3px 10px', borderRadius: '999px', boxShadow: '0 2px 8px rgba(34, 197, 94, 0.3)' }}>
-                                Aktiv 🎯
-                              </span>
+                              {audioTracks.length > 0 ? (
+                                <div
+                                  onClick={() => handleTabChangeLocal('homework_book')}
+                                  style={{
+                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                                    border: '1px solid #bbf7d0',
+                                    borderRadius: '100px',
+                                    padding: '4px 10px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="hover-scale"
+                                  title="Unterrichtsaufnahmen im Aufgabenheft anhören"
+                                >
+                                  <Headphones size={13} color="#15803d" />
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d' }}>
+                                    {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span style={{ background: '#22c55e', color: '#ffffff', fontSize: '0.62rem', fontWeight: 900, padding: '3px 10px', borderRadius: '999px', boxShadow: '0 2px 8px rgba(34, 197, 94, 0.3)' }}>
+                                  Aktiv 🎯
+                                </span>
+                              )}
                             </div>
 
-                            {/* Junior Content */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, overflowY: 'auto' }}>
+                            {/* Junior Content (Komprimiert ohne Bemerkungen) */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, overflowY: 'auto' }}>
                               {hasActiveHomework ? (
                                 <>
                                   {formattedActiveBooks.map((item, idx) => {
@@ -15975,105 +16338,86 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     return (
                                       <div key={`junior-book-${idx}`} style={{
                                         background: '#ffffff',
-                                        padding: '16px 18px',
-                                        borderRadius: '20px',
-                                        boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+                                        padding: '12px 14px',
+                                        borderRadius: '16px',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                                         display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '10px'
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '8px'
                                       }}>
-                                        {/* Book Title & Cover Badge */}
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                            <div style={{
-                                              width: '26px',
-                                              height: '32px',
-                                              background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                              borderRadius: '6px',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              color: bookGradient.text,
-                                              flexShrink: 0,
-                                              boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                                            }}>
-                                              <BookOpen size={13} />
-                                            </div>
-                                            <span style={{ fontWeight: 950, color: '#1e293b', fontSize: '1.02rem', letterSpacing: '-0.02em', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                              {item.title}
-                                            </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                          <div style={{
+                                            width: '22px',
+                                            height: '26px',
+                                            background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
+                                            borderRadius: '5px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: bookGradient.text,
+                                            flexShrink: 0
+                                          }}>
+                                            <BookOpen size={11} />
                                           </div>
-                                          <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', background: '#dcfce7', padding: '3px 10px', borderRadius: '10px', flexShrink: 0 }}>
-                                            {item.formattedPages}
+                                          <span style={{ fontWeight: 950, color: '#1e293b', fontSize: '0.94rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                            {item.title}
                                           </span>
                                         </div>
-
-                                        {/* Friendly Notes Direct */}
-                                        {item.notesList && item.notesList.length > 0 && (
-                                          <div style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '4px',
-                                            paddingLeft: '36px'
-                                          }}>
-                                            {item.notesList.map((n, nIdx) => (
-                                              <div key={`n-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: '1.4' }}>
-                                                <span style={{ color: '#d97706' }}>💬</span>
-                                                <span><strong style={{ color: '#1e293b' }}>Tipp zu S. {n.num}:</strong> {n.text}</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
+                                          {item.pageNums.map((pNum: number, pIdx: number) => (
+                                            <span key={`junior-p-${pIdx}`} style={{
+                                              fontSize: '0.72rem',
+                                              fontWeight: 900,
+                                              color: '#15803d',
+                                              background: '#dcfce7',
+                                              padding: '2px 8px',
+                                              borderRadius: '6px'
+                                            }}>
+                                              S. {pNum}
+                                            </span>
+                                          ))}
+                                        </div>
                                       </div>
                                     );
                                   })}
 
-                                  {/* Songs and other items */}
                                   {otherActiveHWItems.map((item, idx) => (
                                     <div key={`junior-song-${idx}`} style={{
                                       background: '#ffffff',
-                                      padding: '14px 16px',
-                                      borderRadius: '18px',
-                                      boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+                                      padding: '12px 14px',
+                                      borderRadius: '16px',
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '10px'
+                                      gap: '8px'
                                     }}>
                                       <div style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '8px',
+                                        width: '22px',
+                                        height: '22px',
+                                        borderRadius: '6px',
                                         background: '#e0e7ff',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         flexShrink: 0
                                       }}>
-                                        <Music size={14} color="#6366f1" />
+                                        <Music size={12} color="#6366f1" />
                                       </div>
-                                      <span style={{ fontWeight: 900, fontSize: '0.96rem', color: '#1e293b' }}>{cleanTitle(item.topic_name)}</span>
+                                      <span style={{ fontWeight: 900, fontSize: '0.92rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {cleanTitle(item.topic_name || item.title)}
+                                      </span>
                                     </div>
                                   ))}
 
-                                  {/* General notes & audio */}
-                                  {currentWeekNotes && currentWeekNotes.filter((n: string) => !n.startsWith("STICKER:") && !n.startsWith("LATENCY:")).map((note: string, idx: number) => {
-                                    if (note.startsWith("AUDIO:")) {
-                                      const parts = note.substring(6).split('|');
-                                      return (
-                                        <div key={`junior-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0fdf4', padding: '10px 14px', borderRadius: '16px' }}>
-                                          <InlineAudioPlayer url={parts[0]} label={parts[3] || `🎵 Play-Along Track`} />
-                                        </div>
-                                      );
-                                    }
-                                    const cleanText = note.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                                    if (!cleanText) return null;
-                                    return (
-                                      <div key={`junior-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', color: '#15803d', fontWeight: 800, background: '#f0fdf4', padding: '10px 14px', borderRadius: '16px' }}>
-                                        <span>⭐</span>
-                                        <span>{cleanText}</span>
-                                      </div>
-                                    );
-                                  })}
+                                  {/* Zusätzliche Bemerkung */}
+                                  {generalNote && (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                      <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                      <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                                    </div>
+                                  )}
                                 </>
                               ) : (
                                 <div style={{ padding: '20px 10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem', fontStyle: 'italic' }}>
@@ -16084,7 +16428,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                             {/* Junior Action Button */}
                             <button
-                              onClick={() => setActiveTab('homework_book')}
+                              onClick={() => handleTabChangeLocal('homework_book')}
                               style={{
                                 marginTop: 'auto',
                                 width: '100%',
@@ -16093,7 +16437,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 border: 'none',
                                 background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                                 color: '#ffffff',
-                                fontSize: '0.90rem',
+                                fontSize: '0.88rem',
                                 fontWeight: 950,
                                 cursor: 'pointer',
                                 display: 'flex',
@@ -16128,91 +16472,114 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           }}>
                             {/* Teen Header */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div style={{ background: 'linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%)', color: '#0284c7', width: '34px', height: '34px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', width: '34px', height: '34px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <BookOpen size={16} />
                                 </div>
                                 <div>
                                   <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    Wochen-Fokus & Repertoire
+                                    Hausaufgaben
                                   </h4>
                                   <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    KW {currentWeekNum} · Aktuelle Aufgaben
+                                    KW {currentWeekNum} · Deine Wochenziele
                                   </span>
                                 </div>
                               </div>
-                              <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '0.6rem', fontWeight: 900, padding: '3px 9px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
-                                Aktiv
-                              </span>
+                              {audioTracks.length > 0 ? (
+                                <div
+                                  onClick={() => handleTabChangeLocal('homework_book')}
+                                  style={{
+                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                                    border: '1px solid #bbf7d0',
+                                    borderRadius: '100px',
+                                    padding: '4px 10px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="hover-scale"
+                                  title="Unterrichtsaufnahmen im Aufgabenheft anhören"
+                                >
+                                  <Headphones size={13} color="#15803d" />
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d' }}>
+                                    {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '0.6rem', fontWeight: 900, padding: '3px 9px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                                  Aktiv
+                                </span>
+                              )}
                             </div>
 
-                            {/* Teen Content */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, overflowY: 'auto' }}>
+                            {/* Teen Content (Komprimiert ohne Bemerkungen) */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
                               {hasActiveHomework ? (
                                 <>
                                   {formattedActiveBooks.map((item, idx) => {
                                     const bookGradient = getLehrwerkColor(item.title, lehrwerke);
                                     return (
                                       <div key={`teen-book-${idx}`} style={{
-                                        background: '#f8fafc',
-                                        padding: '16px 18px',
-                                        borderRadius: '18px',
                                         display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '10px'
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '8px',
+                                        padding: '10px 12px',
+                                        background: '#f8fafc',
+                                        borderRadius: '12px'
                                       }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                            <div style={{
-                                              width: '26px',
-                                              height: '32px',
-                                              background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                              borderRadius: '6px',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              color: bookGradient.text,
-                                              flexShrink: 0
-                                            }}>
-                                              <BookOpen size={13} />
-                                            </div>
-                                            <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.0rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                              {item.title}
-                                            </span>
-                                          </div>
-                                          <span style={{
-                                            fontSize: '0.84rem',
-                                            fontWeight: 850,
-                                            color: '#15803d',
-                                            background: '#dcfce7',
-                                            padding: '3px 10px',
-                                            borderRadius: '8px',
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                          <div style={{
+                                            width: '22px',
+                                            height: '26px',
+                                            background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
+                                            borderRadius: '5px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: bookGradient.text,
                                             flexShrink: 0
                                           }}>
-                                            {item.formattedPages}
+                                            <BookOpen size={11} />
+                                          </div>
+                                          <span style={{ fontWeight: 850, color: item.isDone ? '#94a3b8' : '#0f172a', fontSize: '0.92rem', textDecoration: item.isDone ? 'line-through' : 'none', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                            {item.title}
                                           </span>
                                         </div>
-
-                                        {/* Notes */}
-                                        {item.notesList && item.notesList.length > 0 && (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '36px' }}>
-                                            {item.notesList.map((n, nIdx) => (
-                                              <div key={`teen-note-${nIdx}`} style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 600, display: 'flex', gap: '6px', lineHeight: '1.4' }}>
-                                                <span style={{ color: '#0284c7', fontWeight: 800 }}>S. {n.num}:</span>
-                                                <span>{n.text}</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
+                                          {item.pageNums.map((pNum: number, pIdx: number) => (
+                                            <span key={`teen-p-${pIdx}`} style={{
+                                              fontSize: '0.72rem',
+                                              fontWeight: 800,
+                                              color: '#15803d',
+                                              background: '#dcfce7',
+                                              padding: '2px 8px',
+                                              borderRadius: '6px'
+                                            }}>
+                                              S. {pNum}
+                                            </span>
+                                          ))}
+                                          {item.isDone && <Check size={14} color="#34a853" strokeWidth={3} />}
+                                        </div>
                                       </div>
                                     );
                                   })}
 
                                   {otherActiveHWItems.map((item, idx) => (
-                                    <div key={`teen-song-${idx}`} style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div key={`teen-song-${idx}`} style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      padding: '10px 12px',
+                                      background: '#f8fafc',
+                                      borderRadius: '12px'
+                                    }}>
                                       <div style={{
-                                        width: '26px',
-                                        height: '26px',
+                                        width: '22px',
+                                        height: '22px',
                                         borderRadius: '6px',
                                         background: '#e0f2fe',
                                         display: 'flex',
@@ -16220,30 +16587,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         justifyContent: 'center',
                                         flexShrink: 0
                                       }}>
-                                        <Music size={13} color="#0284c7" />
+                                        <Music size={12} color="#0284c7" />
                                       </div>
-                                      <span style={{ fontWeight: 850, fontSize: '0.90rem', color: '#1e293b' }}>{cleanTitle(item.topic_name)}</span>
+                                      <span style={{ fontWeight: 850, fontSize: '0.90rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {cleanTitle(item.topic_name || item.title)}
+                                      </span>
                                     </div>
                                   ))}
 
-                                  {currentWeekNotes && currentWeekNotes.filter((n: string) => !n.startsWith("STICKER:") && !n.startsWith("LATENCY:")).map((note: string, idx: number) => {
-                                    if (note.startsWith("AUDIO:")) {
-                                      const parts = note.substring(6).split('|');
-                                      return (
-                                        <div key={`teen-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '8px 12px', borderRadius: '14px' }}>
-                                          <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along Track`} />
-                                        </div>
-                                      );
-                                    }
-                                    const cleanText = note.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                                    if (!cleanText) return null;
-                                    return (
-                                      <div key={`teen-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#475569', fontWeight: 650, background: '#f8fafc', padding: '8px 12px', borderRadius: '12px' }}>
-                                        <FileText size={13} style={{ color: '#0284c7', flexShrink: 0 }} />
-                                        <span>{cleanText}</span>
-                                      </div>
-                                    );
-                                  })}
+                                  {/* Zusätzliche Bemerkung */}
+                                  {generalNote && (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                      <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                      <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                                    </div>
+                                  )}
                                 </>
                               ) : (
                                 <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
@@ -16272,7 +16631,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             </div>
 
                             <button
-                              onClick={() => setActiveTab('homework_book')}
+                              onClick={() => handleTabChangeLocal('homework_book')}
                               style={{
                                 marginTop: 'auto',
                                 width: '100%',
@@ -16281,7 +16640,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 border: '1.5px solid #e2e8f0',
                                 background: '#f8fafc',
                                 color: '#0f172a',
-                                fontSize: '0.82rem',
+                                fontSize: '0.80rem',
                                 fontWeight: 900,
                                 cursor: 'pointer',
                                 display: 'flex',
@@ -16313,18 +16672,48 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           flexDirection: 'column',
                           gap: '16px'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <BookOpen size={16} />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <BookOpen size={16} />
+                              </div>
+                              <div>
+                                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  Hausaufgaben
+                                </h4>
+                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                  Deine Wochenziele
+                                </span>
+                              </div>
                             </div>
-                            <div>
-                              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                Hausaufgaben
-                              </h4>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Deine Wochenziele
+                            {audioTracks.length > 0 ? (
+                              <div
+                                onClick={() => handleTabChangeLocal('homework_book')}
+                                style={{
+                                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                                  border: '1px solid #bbf7d0',
+                                  borderRadius: '100px',
+                                  padding: '4px 10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                className="hover-scale"
+                                title="Unterrichtsaufnahmen im Aufgabenheft anhören"
+                              >
+                                <Headphones size={13} color="#15803d" />
+                                <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d' }}>
+                                  {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
+                                </span>
+                              </div>
+                            ) : (
+                              <span style={{ background: '#e6f4ea', color: '#34a853', fontSize: '0.58rem', fontWeight: 900, padding: '2px 8px', borderRadius: '6px' }}>
+                                Aktiv
                               </span>
-                            </div>
+                            )}
                           </div>
 
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto' }}>
@@ -16332,9 +16721,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                 <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                   Aktuell (KW {currentWeekNum || '?'})
-                                </span>
-                                <span style={{ background: '#e6f4ea', color: '#34a853', fontSize: '0.58rem', fontWeight: 900, padding: '2px 8px', borderRadius: '6px' }}>
-                                  Aktiv
                                 </span>
                               </div>
                               
@@ -16345,73 +16731,63 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       const bookGradient = getLehrwerkColor(item.title, lehrwerke);
                                       return (
                                         <div key={`pro-book-${idx}`} style={{
-                                          background: item.isDone ? 'rgba(52, 168, 83, 0.02)' : '#f8fafc',
-                                          padding: '14px 16px',
-                                          borderRadius: '16px',
                                           display: 'flex',
-                                          flexDirection: 'column',
-                                          gap: '8px'
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          gap: '8px',
+                                          padding: '10px 12px',
+                                          background: '#f8fafc',
+                                          borderRadius: '12px'
                                         }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden', flex: 1 }}>
-                                              <div style={{
-                                                width: '24px',
-                                                height: '30px',
-                                                background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                                borderRadius: '5px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: bookGradient.text,
-                                                flexShrink: 0
-                                              }}>
-                                                <BookOpen size={12} />
-                                              </div>
-                                              <span style={{ fontWeight: 900, color: item.isDone ? '#94a3b8' : '#0f172a', fontSize: '0.96rem', textDecoration: item.isDone ? 'line-through' : 'none', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                                {item.title}
-                                              </span>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                                            <div style={{
+                                              width: '22px',
+                                              height: '26px',
+                                              background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
+                                              borderRadius: '5px',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              color: bookGradient.text,
+                                              flexShrink: 0
+                                            }}>
+                                              <BookOpen size={11} />
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                              <span style={{
-                                                fontSize: '0.82rem',
-                                                fontWeight: 850,
+                                            <span style={{ fontWeight: 850, color: item.isDone ? '#94a3b8' : '#0f172a', fontSize: '0.92rem', textDecoration: item.isDone ? 'line-through' : 'none', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                              {item.title}
+                                            </span>
+                                          </div>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
+                                            {item.pageNums.map((pNum: number, pIdx: number) => (
+                                              <span key={`pro-p-${pIdx}`} style={{
+                                                fontSize: '0.72rem',
+                                                fontWeight: 800,
                                                 color: '#15803d',
                                                 background: '#dcfce7',
                                                 padding: '2px 8px',
-                                                borderRadius: '8px'
+                                                borderRadius: '6px'
                                               }}>
-                                                {item.formattedPages}
+                                                S. {pNum}
                                               </span>
-                                              {item.isDone && <Check size={14} color="#34a853" strokeWidth={3} />}
-                                            </div>
+                                            ))}
+                                            {item.isDone && <Check size={14} color="#34a853" strokeWidth={3} />}
                                           </div>
-
-                                          {/* Pro Notes */}
-                                          {item.notesList && item.notesList.length > 0 && (
-                                            <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600, paddingLeft: '34px', display: 'flex', flexDirection: 'column', gap: '3px', lineHeight: '1.4' }}>
-                                              {item.notesList.map((n, nIdx) => (
-                                                <div key={`n-${nIdx}`}>
-                                                  <strong style={{ color: '#15803d' }}>S. {n.num}:</strong> {n.text}
-                                                </div>
-                                              ))}
-                                            </div>
-                                          )}
                                         </div>
                                       );
                                     })}
 
                                     {otherActiveHWItems.map((item, idx) => (
                                       <div key={`pro-song-${idx}`} style={{
-                                        background: '#f8fafc',
-                                        padding: '12px 14px',
-                                        borderRadius: '14px',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '10px'
+                                        gap: '8px',
+                                        padding: '10px 12px',
+                                        background: '#f8fafc',
+                                        borderRadius: '12px'
                                       }}>
                                         <div style={{
-                                          width: '24px',
-                                          height: '24px',
+                                          width: '22px',
+                                          height: '22px',
                                           borderRadius: '6px',
                                           background: '#e0e7ff',
                                           display: 'flex',
@@ -16419,30 +16795,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                           justifyContent: 'center',
                                           flexShrink: 0
                                         }}>
-                                          <Music size={13} color="#4338ca" />
+                                          <Music size={12} color="#4338ca" />
                                         </div>
-                                        <span style={{ fontWeight: 850, fontSize: '0.90rem', color: '#1e293b' }}>{cleanTitle(item.topic_name)}</span>
+                                        <span style={{ fontWeight: 850, fontSize: '0.90rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {cleanTitle(item.topic_name || item.title)}
+                                        </span>
                                       </div>
                                     ))}
 
-                                    {currentWeekNotes && currentWeekNotes.filter((n: string) => !n.startsWith("STICKER:") && !n.startsWith("LATENCY:")).map((note: string, idx: number) => {
-                                      if (note.startsWith("AUDIO:")) {
-                                        const parts = note.substring(6).split('|');
-                                        return (
-                                          <div key={`curr-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '8px 12px', borderRadius: '14px' }}>
-                                            <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along Track`} />
-                                          </div>
-                                        );
-                                      }
-                                      const cleanText = note.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                                      if (!cleanText) return null;
-                                      return (
-                                        <div key={`curr-note-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#475569', fontWeight: 650, background: '#f8fafc', padding: '8px 12px', borderRadius: '12px' }}>
-                                          <FileText size={13} style={{ color: '#34a853', flexShrink: 0 }} />
-                                          <span>{cleanText}</span>
-                                        </div>
-                                      );
-                                    })}
+                                    {/* Zusätzliche Bemerkung */}
+                                    {generalNote && (
+                                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                        <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                        <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                                      </div>
+                                    )}
                                   </>
                                 ) : (
                                   <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
@@ -16476,7 +16844,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             </div>
 
                             <button
-                              onClick={() => setActiveTab('homework_book')}
+                              onClick={() => handleTabChangeLocal('homework_book')}
                               style={{
                                 marginTop: 'auto',
                                 width: '100%',
@@ -16553,7 +16921,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             </div>
 
                             <button 
-                              onClick={() => setActiveTab('practice_board')}
+                              onClick={() => handleTabChangeLocal('practice_board')}
                               style={{ 
                                 background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
                                 color: 'white', 

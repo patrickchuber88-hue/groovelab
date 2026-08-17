@@ -86,6 +86,7 @@
   - **Editorial Flow (Keine Querstreifen-Balken)**: Innerhalb der Schülervorschau dürfen Notizen und Fahrpläne NIEMALS in vollflächig farbigen Hintergrundbalken (wie Rosa-, Blau- oder Grün-Streifen) oder doppelten Kasten-in-Kasten-Rahmen gerendert werden. Sie fließen immer als offene, saubere Magazin-Typografie auf dem weißen Grund mit `36px` Einrückung unter dem jeweiligen Titel.
   - **Farbige Badges & Icons**: Buchcover-Gradienten und Song-Icons bleiben lebendig und farbenfroh. Seitenzahlen werden als grüne Pillen (`S. 1`, `S. 2`) dargestellt.
   - **Stage & Toolbox Separation**: Eingabe-Werkzeuge für Lehrkräfte (*Play-Along Studio*, *Zusätzliche Hausaufgaben-Bemerkungen*, *Interne Notiz*) müssen immer in der zusammenhängenden, matten Werkzeugbank (`#f1f5f9` / `rgba(241, 245, 249, 0.8)`) dezent unterhalb der Hero-Card angeordnet sein.
+- **Menü-Synchronisation (Aufgaben-Reiter)**: Wenn im Schüler-Dashboard das Aufgabenheft geladen oder geöffnet wird (z. B. via `activeTab === 'homework_book'`), MUSS auch immer der Hauptmenü-Punkt "Aufgaben" (`activeStudentTab === 'homework_book'`) synchron aktiviert sein.
 
 ## Loopstation Rules
 - **Looping Pause**: Es wird eine zwingende 4-Takte-Pause zwischen den Aufnahme-Spuren verwendet (Variante 1), um eine 100% sample-genaue Synchronität (kein Swallowed Attack) sicherzustellen.
