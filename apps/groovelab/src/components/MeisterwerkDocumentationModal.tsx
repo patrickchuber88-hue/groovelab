@@ -11,6 +11,7 @@ import { AudioBiographyView, CustomPlaylist, CustomPlaylistTrack } from './campu
 import { processPureRawBlob, processStudioMastering } from '../utils/audioMasteringEngine';
 import { storeBlob, getBlob } from '../utils/blobStorage';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
+import { MeisterOhrSticker } from './MeisterOhrSticker';
 
 
 export const ALL_STICKERS = [
@@ -95,6 +96,12 @@ interface ProgressItem {
   teacher_notes: string;
   homework_notes?: string;
   updated_at?: string;
+  student_rating?: number | null;
+  is_match_mode_enabled?: boolean;
+  last_matched_at?: string | null;
+  last_matched_teacher_percent?: number | null;
+  last_matched_student_percent?: number | null;
+  is_match_successful?: boolean | null;
 }
 
 const getISOWeekRaw = (dateInput?: string | Date, lessonDay: number = 1): string => {
@@ -280,14 +287,11 @@ export const formatStudentNoteDisplay = (note: string): { isStudentNote: boolean
 };
 
 const SKILL_TAGS = [
-  { key: 'tempo', label: 'Tempo', icon: '⏱', category: 'technical' },
-  { key: 'rhythmus', label: 'Rhythmus', icon: '🥁', category: 'technical' },
-  { key: 'intonation', label: 'Töne / Intonation', icon: '🎵', category: 'technical' },
-  { key: 'fingersatz', label: 'Fingersatz', icon: '🖖', category: 'technical' },
-  { key: 'ausdruck', label: 'Ausdruck', icon: '🎭', category: 'technical' },
-  { key: 'auswendig', label: 'Auswendig', icon: '📖', category: 'technical' },
-  { key: 'kontinuitaet', label: 'Übe-Regelmäßigkeit', icon: '🔄', category: 'practice' },
-  { key: 'selbststaendigkeit', label: 'Selbstständiges Arbeiten', icon: '🧩', category: 'practice' },
+  { key: 'rhythmus', label: 'Rhythmus & Timing', shortLabel: 'Rhythmus', icon: '🥁', category: 'musical' },
+  { key: 'technik', label: 'Spieltechnik & Motorik', shortLabel: 'Technik', icon: '⚡', category: 'musical' },
+  { key: 'intonation', label: 'Klang & Intonation', shortLabel: 'Klang', icon: '🎵', category: 'musical' },
+  { key: 'ausdruck', label: 'Ausdruck & Dynamik', shortLabel: 'Ausdruck', icon: '🎭', category: 'musical' },
+  { key: 'repertoire', label: 'Repertoire & Performance', shortLabel: 'Repertoire', icon: '🌟', category: 'musical' },
 ];
 
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, initialViewMode, initialModalTab, onProfileClick, readOnly = false, isEmbed = false, isTeacherTools = false, uiLevel = 'pro' }) => {
@@ -487,6 +491,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [activeSubView, setActiveSubView] = useState<'hub' | 'lehrwerk' | 'song' | 'history'>('hub');
   const [selectedHistoryWeek, setSelectedHistoryWeek] = useState<string | null>(null);
   const [songProgressPercent, setSongProgressPercent] = useState<number>(25);
+
+  // Dual-Metacognition Match Model State
+  const [studentRating, setStudentRating] = useState<number | null>(null);
+  const [isMatchModeEnabled, setIsMatchModeEnabled] = useState<boolean>(true);
+  const [lastMatchedAt, setLastMatchedAt] = useState<string | null>(null);
+  const [lastMatchedTeacherPercent, setLastMatchedTeacherPercent] = useState<number | null>(null);
+  const [lastMatchedStudentPercent, setLastMatchedStudentPercent] = useState<number | null>(null);
+  const [isMatchSuccessful, setIsMatchSuccessful] = useState<boolean | null>(null);
+  const [isMatchRevealed, setIsMatchRevealed] = useState<boolean>(false);
+  const [showMatchConfetti, setShowMatchConfetti] = useState<boolean>(false);
+  const [matchFeedbackToast, setMatchFeedbackToast] = useState<string | null>(null);
+  const [isStudentRatingCommitted, setIsStudentRatingCommitted] = useState<boolean>(false);
+  const [studentRatingUpdatedAt, setStudentRatingUpdatedAt] = useState<string | null>(null);
+  const [matchHistory, setMatchHistory] = useState<Array<{
+    matched_at: string;
+    teacher_percent: number;
+    student_percent: number;
+    xp_amount: number;
+    tier: 'tier1' | 'tier2' | 'tier3';
+  }>>([]);
+  const [showdownState, setShowdownState] = useState<{
+    isRunning: boolean;
+    teacherTarget: number;
+    studentTarget: number;
+    currentTeacherVal: number;
+    currentStudentVal: number;
+    tier: 'tier1' | 'tier2' | 'tier3';
+    xpAmount: number;
+    matchedAt: string;
+  } | null>(null);
 
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [newCustomTagInput, setNewCustomTagInput] = useState<string>('');
@@ -885,38 +919,52 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     });
   };
 
-  // Helper for 2-Tier Auto-Detection of Custom Textbausteine to Skill-Radar Tags
-  const detectSkillTagFromText = (label: string, text: string, category?: string): string => {
-    const combined = ((label || '') + ' ' + (text || '')).toLowerCase();
+  const handleTriggerSkillQuest = (tagKey: string) => {
+    setSkillOverrides(prev => {
+      const currentOffset = prev[tagKey] ?? 0;
+      const updated = { ...prev, [tagKey]: currentOffset + 1 };
+      try {
+        localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
 
-    if (combined.includes('metronom') || combined.includes('bpm') || combined.includes('tempo') || combined.includes('entschleunig') || combined.includes('schnecke')) {
-      return 'tempo';
-    }
-    if (combined.includes('rhythmus') || combined.includes('takt') || combined.includes('puls') || combined.includes('groove') || combined.includes('timing') || combined.includes('einzählen')) {
+  const handleMasterAllSkills = () => {
+    const updated: { [k: string]: number } = {};
+    SKILL_TAGS.forEach(t => {
+      updated[t.key] = -10; // Guarantees Stufe 5 (100% Souverän Meister-Level)
+    });
+    setSkillOverrides(updated);
+    try {
+      localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
+    } catch (e) {}
+  };
+
+  // Helper for 2-Tier Auto-Detection of Custom Textbausteine to Skill-Radar Tags
+  const detectSkillTagFromText = (label: string, text: string, category?: string): string | null => {
+    const combined = ((label || '') + ' ' + (text || '')).trim().toLowerCase();
+    if (!combined) return null;
+
+    if (combined.includes('metronom') || combined.includes('bpm') || combined.includes('tempo') || combined.includes('entschleunig') || combined.includes('schnecke') || combined.includes('rhythmus') || combined.includes('takt') || combined.includes('puls') || combined.includes('groove') || combined.includes('timing') || combined.includes('einzählen')) {
       return 'rhythmus';
     }
-    if (combined.includes('klang') || combined.includes('ton') || combined.includes('intonation') || combined.includes('sauber') || combined.includes('artikulation') || combined.includes('staccato') || combined.includes('legato')) {
+    if (combined.includes('finger') || combined.includes('hand') || combined.includes('griff') || combined.includes('haltung') || combined.includes('lockerheit') || combined.includes('technik') || combined.includes('motorik') || combined.includes('ansatz') || combined.includes('bogen') || combined.includes('stick')) {
+      return 'technik';
+    }
+    if (combined.includes('klang') || combined.includes('ton') || combined.includes('intonation') || combined.includes('sauber') || combined.includes('artikulation') || combined.includes('staccato') || combined.includes('legato') || combined.includes('rein')) {
       return 'intonation';
     }
-    if (combined.includes('finger') || combined.includes('hand') || combined.includes('griff') || combined.includes('haltung') || combined.includes('lockerheit')) {
-      return 'fingersatz';
-    }
-    if (combined.includes('ausdruck') || combined.includes('dynamik') || combined.includes('gefühl') || combined.includes('lautstärke') || combined.includes('phrasierung') || combined.includes('blind-flug')) {
+    if (combined.includes('ausdruck') || combined.includes('dynamik') || combined.includes('gefühl') || combined.includes('lautstärke') || combined.includes('phrasierung') || combined.includes('blind-flug') || combined.includes('emotion')) {
       return 'ausdruck';
     }
-    if (combined.includes('auswendig') || combined.includes('blatt') || combined.includes('gedächtnis') || combined.includes('ohne noten')) {
-      return 'auswendig';
-    }
-    if (combined.includes('täglich') || combined.includes('routine') || combined.includes('ausdauer') || combined.includes('dreierspiel') || combined.includes('regelmäßig') || combined.includes('wiederhol')) {
-      return 'kontinuitaet';
-    }
-    if (combined.includes('selbst') || combined.includes('pionier') || combined.includes('detektiv') || combined.includes('puzzle') || combined.includes('eigen')) {
-      return 'selbststaendigkeit';
+    if (combined.includes('auswendig') || combined.includes('blatt') || combined.includes('gedächtnis') || combined.includes('ohne noten') || combined.includes('repertoire') || combined.includes('bühne') || combined.includes('performance') || combined.includes('spielfluss') || combined.includes('routine') || combined.includes('song') || combined.includes('selbst')) {
+      return 'repertoire';
     }
 
     if (category === 'rhythm') return 'rhythmus';
-    if (category === 'technique') return 'fingersatz';
-    return 'rhythmus';
+    if (category === 'technique') return 'technik';
+    return null;
   };
 
   // Robust Universal Song Title Normalization & Matcher
@@ -3292,6 +3340,53 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const isHw = isAnyHw || (localHw === 'true');
       setIsCurrentHomework(isHw);
     }
+
+    // Load Dual Match Model State
+    const localMatchMode = localStorage.getItem(`song_match_mode_${student.id}_${skill.id}`);
+    const matchEnabled = localMatchMode !== null ? localMatchMode === 'true' : (skill.is_match_mode_enabled !== false);
+    setIsMatchModeEnabled(matchEnabled);
+
+    const localStudentRating = localStorage.getItem(`song_student_rating_${student.id}_${skill.id}`);
+    const sRating = localStudentRating !== null && localStudentRating !== undefined ? parseInt(localStudentRating, 10) : (skill.student_rating ?? (dbItem?.student_rating ?? null));
+    setStudentRating(sRating);
+
+    const sUpdated = skill.student_rating_updated_at || localStorage.getItem(`song_student_rating_updated_at_${student.id}_${skill.id}`);
+    setStudentRatingUpdatedAt(sUpdated || null);
+    setIsStudentRatingCommitted(Boolean(sRating !== null && sRating !== undefined && sUpdated));
+
+    const lastMatchDate = skill.last_matched_at || dbItem?.last_matched_at || localStorage.getItem(`song_last_matched_at_${student.id}_${skill.id}`);
+    setLastMatchedAt(lastMatchDate || null);
+
+    const lastTeacherP = skill.last_matched_teacher_percent ?? dbItem?.last_matched_teacher_percent ?? null;
+    setLastMatchedTeacherPercent(lastTeacherP);
+
+    const lastStudentP = skill.last_matched_student_percent ?? dbItem?.last_matched_student_percent ?? null;
+    setLastMatchedStudentPercent(lastStudentP);
+
+    const lastMatchSuccess = skill.is_match_successful ?? dbItem?.is_match_successful ?? (lastMatchDate && lastTeacherP !== null && lastStudentP !== null ? Math.abs(lastTeacherP - lastStudentP) <= 10 : null);
+    setIsMatchSuccessful(lastMatchSuccess);
+    const isUpToDateMatch = Boolean(lastMatchDate && (!sUpdated || new Date(lastMatchDate).getTime() >= new Date(sUpdated).getTime()));
+    setIsMatchRevealed(isUpToDateMatch);
+
+    // Load persistent 3-slot match history
+    const rawHistory = (skill as any).match_history || (dbItem as any)?.match_history || localStorage.getItem(`song_match_history_${student.id}_${skill.id}`);
+    let parsedHistory: any[] = [];
+    if (Array.isArray(rawHistory)) {
+      parsedHistory = rawHistory;
+    } else if (typeof rawHistory === 'string') {
+      try { parsedHistory = JSON.parse(rawHistory); } catch (e) {}
+    }
+    if (parsedHistory.length === 0 && lastMatchDate && lastTeacherP !== null && lastStudentP !== null) {
+      const diff = Math.abs(lastTeacherP - lastStudentP);
+      parsedHistory = [{
+        matched_at: lastMatchDate,
+        teacher_percent: lastTeacherP,
+        student_percent: lastStudentP,
+        xp_amount: diff <= 10 ? 50 : (diff <= 20 ? 25 : 5),
+        tier: diff <= 10 ? 'tier1' : (diff <= 20 ? 'tier2' : 'tier3')
+      }];
+    }
+    setMatchHistory(parsedHistory.slice(0, 3));
   };
 
   // Sync active song homework status whenever progressItems finishes loading from Supabase (without overwriting typed notes)
@@ -3308,6 +3403,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             setStatus('MASTERED');
           } else {
             setStatus('IN_PROGRESS');
+          }
+          if (newest.student_rating !== undefined && newest.student_rating !== null) {
+            setStudentRating(prev => (prev === null ? newest.student_rating! : prev));
+          }
+          if (newest.last_matched_at) {
+            setLastMatchedAt(newest.last_matched_at);
+            setLastMatchedTeacherPercent(newest.last_matched_teacher_percent ?? null);
+            setLastMatchedStudentPercent(newest.last_matched_student_percent ?? null);
+            setIsMatchSuccessful(newest.is_match_successful ?? null);
+            setIsMatchRevealed(true);
           }
         }
       }
@@ -3566,6 +3671,345 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setHasChanges(false);
     setSongHomeworkNotes('');
     setPageHomeworkNotes('');
+  };
+
+  const awardCampusXP = async (amount: number, reason: string) => {
+    try {
+      if (!student.id || amount <= 0) return;
+      const nowIso = new Date().toISOString();
+
+      // 1. Fetch current user XP
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('id, campus_xp, xp')
+        .eq('id', student.id)
+        .single();
+
+      const currentCampusXP = userProfile?.campus_xp || userProfile?.xp || 0;
+      const newCampusXP = currentCampusXP + amount;
+
+      // Update users table
+      await supabase
+        .from('users')
+        .update({
+          campus_xp: newCampusXP,
+          xp: newCampusXP,
+          updated_at: nowIso
+        })
+        .eq('id', student.id);
+
+      // 2. Fetch & update student_stats record
+      const { data: statsRecord } = await supabase
+        .from('student_stats')
+        .select('*')
+        .eq('student_id', student.id)
+        .maybeSingle();
+
+      const currentStatsXp = (statsRecord?.current_xp || 0) + amount;
+      await supabase
+        .from('student_stats')
+        .upsert({
+          student_id: student.id,
+          current_xp: currentStatsXp,
+          updated_at: nowIso
+        }, { onConflict: 'student_id' });
+
+      // 3. Update avatars table
+      try {
+        await supabase
+          .from('avatars')
+          .update({
+            xp: currentStatsXp,
+            updated_at: nowIso
+          })
+          .or(`user_id.eq.${student.id},student_id.eq.${student.id}`);
+      } catch (avErr) {}
+
+      // 4. Insert log entry in fokus_logs for transparency & auditing
+      try {
+        await supabase.from('fokus_logs').insert({
+          student_id: student.id,
+          duration_minutes: 0,
+          duration_seconds: 0,
+          xp_earned: amount,
+          is_extra: true,
+          created_at: nowIso
+        });
+      } catch (logErr) {}
+
+      // 5. Dispatch real-time custom event so open student widgets instantly update
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus-xp-awarded', {
+          detail: { studentId: student.id, amount, newTotal: newCampusXP, reason }
+        }));
+      }
+    } catch (err) {
+      console.warn('Campus XP update note:', err);
+    }
+  };
+
+
+  const handleStudentRatingChange = (val: number) => {
+    setStudentRating(val);
+    setIsStudentRatingCommitted(false);
+    setIsMatchRevealed(false);
+    setHasChanges(true);
+    if (selectedActiveSongId) {
+      try {
+        localStorage.setItem(`song_student_rating_${student.id}_${selectedActiveSongId}`, String(val));
+      } catch (err) {}
+    }
+  };
+
+  const handleCommitStudentRating = async () => {
+    const val = studentRating ?? 0;
+    const nowIso = new Date().toISOString();
+    setIsStudentRatingCommitted(true);
+    setIsMatchRevealed(false);
+    setStudentRatingUpdatedAt(nowIso);
+    setMatchFeedbackToast('🔒 Tipp abgeschickt! Deine Lehrkraft sieht sofort deine Abgabe.');
+    setTimeout(() => setMatchFeedbackToast(null), 3500);
+
+    if (selectedActiveSongId) {
+      try {
+        localStorage.setItem(`song_student_rating_${student.id}_${selectedActiveSongId}`, String(val));
+        localStorage.setItem(`song_student_rating_updated_at_${student.id}_${selectedActiveSongId}`, nowIso);
+
+        if (!String(selectedActiveSongId).startsWith('temp-')) {
+          await supabase
+            .from('user_song_skills')
+            .update({
+              student_rating: val,
+              student_rating_updated_at: nowIso
+            })
+            .eq('id', selectedActiveSongId);
+        }
+        const matchingItems = progressItems.filter(item => isSongMatch(item, { id: selectedActiveSongId }));
+        const validIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+        if (validIds.length > 0) {
+          await supabase
+            .from('progress_matrix')
+            .update({
+              student_rating: val,
+              updated_at: nowIso
+            })
+            .in('id', validIds);
+        }
+      } catch (e) {
+        console.error('Error committing student rating:', e);
+      }
+    }
+  };
+
+
+  const handleToggleMatchMode = async () => {
+    const nextVal = !isMatchModeEnabled;
+    setIsMatchModeEnabled(nextVal);
+    if (selectedActiveSongId) {
+      try {
+        localStorage.setItem(`song_match_mode_${student.id}_${selectedActiveSongId}`, String(nextVal));
+        if (!String(selectedActiveSongId).startsWith('temp-')) {
+          await supabase
+            .from('user_song_skills')
+            .update({ is_match_mode_enabled: nextVal })
+            .eq('id', selectedActiveSongId);
+        }
+      } catch (err) {}
+    }
+  };
+
+  const handleCheckMatch = async () => {
+    if (studentRating === null || studentRating === undefined) return;
+    if (matchHistory.length >= 3) {
+      setMatchFeedbackToast('🏆 Alle 3 Meilenstein-Matches für diesen Song sind bereits abgeschlossen!');
+      setTimeout(() => setMatchFeedbackToast(null), 3500);
+      return;
+    }
+
+    const teacherPercent = songProgressPercent;
+    const studPercent = studentRating;
+    const diff = Math.abs(teacherPercent - studPercent);
+    const isTier1 = diff <= 10;
+    const isTier2 = diff > 10 && diff <= 20;
+    const isTier3 = diff > 20;
+    const tier: 'tier1' | 'tier2' | 'tier3' = isTier1 ? 'tier1' : (isTier2 ? 'tier2' : 'tier3');
+    const isSuccess = isTier1;
+    const xpWon = isTier1 ? 50 : (isTier2 ? 25 : 5);
+    const nowIso = new Date().toISOString();
+
+    const activeSongObj = activeSongSkills.find(s => s.id === selectedActiveSongId || s.song_id === selectedActiveSongId);
+    const songTitle = activeSongObj?.songs?.title || 'Song';
+
+    // 1. Trigger Dual-Balken Showdown Race Animation (1.2s)
+    setShowdownState({
+      isRunning: true,
+      teacherTarget: teacherPercent,
+      studentTarget: studPercent,
+      currentTeacherVal: 0,
+      currentStudentVal: 0,
+      tier,
+      xpAmount: xpWon,
+      matchedAt: nowIso
+    });
+
+    const startTime = performance.now();
+    const duration = 1200; // 1.2 seconds
+
+    const animateRace = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      // Ease out cubic
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const curT = teacherPercent * ease;
+      const curS = studPercent * ease;
+
+      setShowdownState(prev => prev ? {
+        ...prev,
+        currentTeacherVal: curT,
+        currentStudentVal: curS
+      } : null);
+
+      if (progress < 1) {
+        requestAnimationFrame(animateRace);
+      } else {
+        // Race complete! Finalize match result
+        finalizeMatchResult(teacherPercent, studPercent, isTier1, isTier2, isTier3, tier, isSuccess, xpWon, nowIso, songTitle);
+      }
+    };
+
+    requestAnimationFrame(animateRace);
+  };
+
+  const finalizeMatchResult = async (
+    teacherPercent: number,
+    studPercent: number,
+    isTier1: boolean,
+    isTier2: boolean,
+    isTier3: boolean,
+    tier: 'tier1' | 'tier2' | 'tier3',
+    isSuccess: boolean,
+    xpWon: number,
+    nowIso: string,
+    songTitle: string
+  ) => {
+    setShowdownState(prev => prev ? {
+      ...prev,
+      isRunning: false,
+      currentTeacherVal: teacherPercent,
+      currentStudentVal: studPercent
+    } : null);
+
+    setLastMatchedAt(nowIso);
+    setLastMatchedTeacherPercent(teacherPercent);
+    setLastMatchedStudentPercent(studPercent);
+    setIsMatchSuccessful(isSuccess);
+    setIsMatchRevealed(true);
+
+    const newEntry = {
+      matched_at: nowIso,
+      teacher_percent: teacherPercent,
+      student_percent: studPercent,
+      xp_amount: xpWon,
+      tier
+    };
+    const updatedHistory = [...matchHistory.filter(h => h.matched_at !== nowIso), newEntry].slice(0, 3);
+    setMatchHistory(updatedHistory);
+
+    try {
+      if (selectedActiveSongId) {
+        localStorage.setItem(`song_last_matched_at_${student.id}_${selectedActiveSongId}`, nowIso);
+        localStorage.setItem(`song_last_matched_teacher_percent_${student.id}_${selectedActiveSongId}`, String(teacherPercent));
+        localStorage.setItem(`song_last_matched_student_percent_${student.id}_${selectedActiveSongId}`, String(studPercent));
+        localStorage.setItem(`song_is_match_successful_${student.id}_${selectedActiveSongId}`, String(isSuccess));
+        localStorage.setItem(`song_match_history_${student.id}_${selectedActiveSongId}`, JSON.stringify(updatedHistory));
+
+        if (!String(selectedActiveSongId).startsWith('temp-')) {
+          await supabase
+            .from('user_song_skills')
+            .update({
+              last_matched_at: nowIso,
+              last_matched_teacher_percent: teacherPercent,
+              last_matched_student_percent: studPercent,
+              is_match_successful: isSuccess,
+              teacher_rating_updated_at: nowIso,
+              match_history: updatedHistory
+            })
+            .eq('id', selectedActiveSongId);
+        }
+        const matchingItems = progressItems.filter(item => isSongMatch(item, { id: selectedActiveSongId }));
+        const validIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+        if (validIds.length > 0) {
+          await supabase
+            .from('progress_matrix')
+            .update({
+              last_matched_at: nowIso,
+              last_matched_teacher_percent: teacherPercent,
+              last_matched_student_percent: studPercent,
+              is_match_successful: isSuccess,
+              match_history: updatedHistory
+            })
+            .in('id', validIds);
+        }
+      }
+    } catch (e) {
+      console.error('Error saving match result:', e);
+    }
+
+    // 1. Broadcast over Supabase Realtime channel for live in-app celebration on student device
+    try {
+      const channel = supabase.channel(`realtime_student_progress_${student.id}`);
+      channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.send({
+            type: 'broadcast',
+            event: 'song-matched',
+            payload: {
+              songTitle,
+              tier,
+              xpAmount: xpWon,
+              teacherPercent,
+              studentPercent: studPercent,
+              matchedAt: nowIso,
+              matchNumber: updatedHistory.length
+            }
+          });
+          supabase.removeChannel(channel);
+        }
+      });
+    } catch (bcErr) {
+      console.warn('Realtime broadcast error:', bcErr);
+    }
+
+    // 2. Insert notification record for PWA / WebPush
+    try {
+      await supabase.from('notifications').insert({
+        user_id: student.id,
+        title: isTier1 ? '🎯 Volltreffer! Meister-Ohr freigeschaltet!' : (isTier2 ? '✨ Super Gehör! +25 XP gesammelt!' : '🚀 Neues Song-Match mit deiner Lehrkraft!'),
+        message: `Für "${songTitle}": Du hast +${xpWon} Campus-XP erhalten! (Meilenstein ${updatedHistory.length}/3)`,
+        type: 'song_match',
+        is_read: false,
+        created_at: nowIso
+      });
+    } catch (notifErr) {}
+
+    // 3. XP Awarding & Teacher UI feedback
+    if (isTier1) {
+      setShowMatchConfetti(true);
+      setTimeout(() => setShowMatchConfetti(false), 4500);
+      await awardCampusXP(50, 'Meister-Ohr Volltreffer');
+      setMatchFeedbackToast(`🎯 VOLLTREFFER! +50 Campus-XP & Meister-Ohr freigeschaltet! (Match ${updatedHistory.length}/3)`);
+      setTimeout(() => setMatchFeedbackToast(null), 4500);
+    } else if (isTier2) {
+      setShowMatchConfetti(true);
+      setTimeout(() => setShowMatchConfetti(false), 4000);
+      await awardCampusXP(25, 'Super Gehör Match');
+      setMatchFeedbackToast(`✨ SUPER GEHÖR! +25 Campus-XP gesammelt! (Match ${updatedHistory.length}/3)`);
+      setTimeout(() => setMatchFeedbackToast(null), 4500);
+    } else {
+      await awardCampusXP(5, 'Weiter-Rocker Motivations-Bonus');
+      setMatchFeedbackToast(`🚀 WEITER-ROCKER! +5 Campus-XP fürs Mitmachen & Weitermachen! (Match ${updatedHistory.length}/3)`);
+      setTimeout(() => setMatchFeedbackToast(null), 4500);
+    }
   };
 
   const songSaveTimeoutRef = useRef<any>(null);
@@ -4433,46 +4877,63 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     const activeWeeklyTargetTags = SKILL_TAGS.filter(tag => {
       if (pendingTargetFocusTags.includes(tag.key)) return true;
-      const lowerText = allActiveNotesText.toLowerCase();
+      const cleanNotes = allActiveNotesText.trim();
+      if (!cleanNotes) return false;
+      const lowerText = cleanNotes.toLowerCase();
+      const detected = detectSkillTagFromText('', cleanNotes, '');
       return lowerText.includes(tag.label.toLowerCase()) || 
+             lowerText.includes(tag.shortLabel.toLowerCase()) ||
              lowerText.includes(tag.key) ||
-             detectSkillTagFromText('', allActiveNotesText, '') === tag.key;
+             detected === tag.key;
     }).map(t => t.key);
 
     const counts = SKILL_TAGS.map(tag => {
-      let baseInterventions = feedbackEntries.filter((fb: any) => fb.tags?.includes(tag.key)).length;
+      let baseInterventions = 0;
       
-      // 3-Stufen-Modell für Übe-Regelmäßigkeit basierend auf Wochen-Übetagen & Streaks (sofern vom Lehrer unmarkiert)
-      if (tag.key === 'kontinuitaet') {
-        if (baseInterventions === 0) {
-          const effectiveDays = Math.max(weeklyPracticeDays, studentStreak);
-          if (effectiveDays >= 4 || studentPracticeMinutes >= 60) {
-            baseInterventions = 0; // Stufe 1: 100% Souverän Superkraft 🌟
-          } else if (effectiveDays >= 2 || studentPracticeMinutes >= 20) {
-            baseInterventions = 0.3; // Stufe 2: Solide / In Entwicklung 🌤️
-          } else {
-            baseInterventions = 1.0; // Stufe 3: Entwicklungs-Hebel 💎
-          }
+      // Match feedbackEntries tags with legacy aliases
+      feedbackEntries.forEach((fb: any) => {
+        if (Array.isArray(fb.tags)) {
+          fb.tags.forEach((t: string) => {
+            const mappedKey = 
+              (t === 'tempo' || t === 'rhythmus') ? 'rhythmus' :
+              (t === 'fingersatz' || t === 'technik') ? 'technik' :
+              (t === 'intonation' || t === 'toene') ? 'intonation' :
+              (t === 'ausdruck' || t === 'dynamik') ? 'ausdruck' :
+              (t === 'auswendig' || t === 'repertoire' || t === 'kontinuitaet' || t === 'selbststaendigkeit') ? 'repertoire' : t;
+            if (mappedKey === tag.key) {
+              baseInterventions++;
+            }
+          });
         }
-      }
+      });
 
       const offset = skillOverrides[tag.key] ?? 0;
       const effectiveInterventions = Math.max(0, baseInterventions + offset);
+      
+      // Smooth organic growth percentage (min 0.60 for Level 3 up to 1.0 for Level 5 Meister)
+      const level = effectiveInterventions === 0 ? 5 : (effectiveInterventions === 1 ? 4 : (effectiveInterventions === 2 ? 3 : 2));
+      const pct = effectiveInterventions === 0 ? 1.0 : (effectiveInterventions === 1 ? 0.84 : (effectiveInterventions === 2 ? 0.70 : 0.58));
+      
+      const rankTitle = 
+        tag.key === 'rhythmus' ? (level === 5 ? 'Groove-Meister' : (level === 4 ? 'Timing-Sicher' : 'Puls-Entdecker')) :
+        tag.key === 'technik' ? (level === 5 ? 'Meister-Virtuose' : (level === 4 ? 'Feinmotoriker' : 'Technik-Starter')) :
+        tag.key === 'intonation' ? (level === 5 ? 'Klang-Künstler' : (level === 4 ? 'Klang-Bewusst' : 'Ton-Sucher')) :
+        tag.key === 'ausdruck' ? (level === 5 ? 'Bühnen-Magier' : (level === 4 ? 'Ausdrucksstark' : 'Gefühls-Pionier')) :
+        (level === 5 ? 'Repertoire-Profi' : (level === 4 ? 'Spielfluss-Star' : 'Song-Entdecker'));
+
       return {
         ...tag,
         baseInterventions,
         interventions: effectiveInterventions,
-        count: effectiveInterventions
+        count: effectiveInterventions,
+        level,
+        pct,
+        rankTitle
       };
     });
 
-    const maxInterventions = Math.max(...counts.map(c => c.interventions), 1);
-    const tagCounts = counts.map(t => ({
-      ...t,
-      pct: Math.max(0.18, (maxInterventions - t.interventions) / maxInterventions)
-    }));
-
-    const topStrength = tagCounts.find(t => t.interventions === 0) || tagCounts[0];
+    const tagCounts = counts;
+    const topStrength = tagCounts.find(t => t.level >= 4) || tagCounts[0];
     const currentFocus = tagCounts.reduce((prev, curr) => curr.interventions > prev.interventions ? curr : prev, tagCounts[0]);
 
     const customTagCounts: { key: string; count: number }[] = [];
@@ -4491,20 +4952,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
     });
 
-    let superkraftDesc = 'Exzellente musikalische Entwicklung in deinen Unterrichtsstunden!';
-    if (topStrength) {
-      switch (topStrength.key) {
-        case 'tempo': superkraftDesc = 'Dein inneres Metronom läuft hervorragend! Du hältst das Pulsgefühl stabil und sicher.'; break;
-        case 'rhythmus': superkraftDesc = 'Groove & Timing pur! Du triffst den Schlag genau auf den Punkt und gibst dem Stück echten Fluss.'; break;
-        case 'intonation': superkraftDesc = 'Schöne Tonkultur! Dein Klang ist sauber, klar und bewusst geformt.'; break;
-        case 'fingersatz': superkraftDesc = 'Mühelose Fingerfertigkeit! Dein durchdachter Fingersatz lässt anspruchsvolle Stellen leicht klingen.'; break;
-        case 'ausdruck': superkraftDesc = 'Voller Gefühl & Dynamik! Du nimmst die Zuhörer mit und gestaltest Phrasen lebendig.'; break;
-        case 'auswendig': superkraftDesc = 'Starkes Gedächtnis! Du verinnerlichst Musikstücke mit Leichtigkeit und spielst frei.'; break;
-        case 'kontinuitaet': superkraftDesc = 'Ausdauer-Talent! Deine Ausdauer und dein regelmäßiges Üben tragen Früchte.'; break;
-        case 'selbststaendigkeit': superkraftDesc = 'Echter Musik-Pionier! Du erarbeitest dir Stücke selbstständig und mit Freude.'; break;
-      }
-    }
-
     const N = SKILL_TAGS.length;
     const cx = 260, cy = 250, rMax = 135;
     const getPoint = (index: number, val: number) => {
@@ -4516,7 +4963,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       };
     };
 
-    const dataPoints = tagCounts.map((t, i) => getPoint(i, Math.max(t.pct, 0.05)));
+    const dataPoints = tagCounts.map((t, i) => getPoint(i, Math.max(t.pct, 0.20)));
     const dataPath = dataPoints.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
     const gridLevels = [0.25, 0.5, 0.75, 1.0];
     const gridPaths = gridLevels.map(lvl => {
@@ -4527,7 +4974,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const isMobileOrTabletView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
     return (
       <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: isMobileOrTabletView ? 'column' : 'row', overflowY: isMobileOrTabletView ? 'auto' : 'hidden', background: useNotebookLayout ? '#fcfaf7' : '#ffffff' }} className="modal-content-container custom-scrollbar">
-        {/* LINKE BUCHSEITE: SKILL-RADAR */}
+        {/* LINKE BUCHSEITE: 5-PENTAGON SKILL-RADAR */}
         <div style={{
           flex: isMobileOrTabletView ? 'none' : '1 1 0%',
           width: '100%',
@@ -4539,7 +4986,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           borderBottom: isMobileOrTabletView ? '1.5px solid #e8e8ed' : 'none',
           padding: isMobileOrTabletView ? '16px 14px' : '24px 28px',
           position: 'relative',
-          background: 'radial-gradient(circle at 50% 50%, rgba(52, 168, 83, 0.07) 0%, rgba(59, 130, 246, 0.03) 50%, transparent 80%)'
+          background: 'radial-gradient(circle at 50% 50%, rgba(52, 168, 83, 0.08) 0%, rgba(2, 132, 199, 0.04) 50%, transparent 80%)'
         }}>
           {/* Glassmorphic Legend Pill */}
           <div style={{
@@ -4556,12 +5003,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }}>
             <span style={{ color: '#15803d', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-              <strong>Außen</strong> = Superkraft 🌟
+              <strong>Außen</strong> = Superkraft (Stufe 4–5) 🌟
             </span>
             <span style={{ color: '#94a3b8' }}>•</span>
-            <span style={{ color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
-              <strong>Mitte</strong> = Hebel 💎
+            <span style={{ color: '#0284c7', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} />
+              <strong>Innen</strong> = Entwicklungs-Quest 🚀
             </span>
           </div>
 
@@ -4589,15 +5036,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             >
               <defs>
                 <radialGradient id="skillRadarGlow" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor="#34a853" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.12" />
+                  <stop offset="0%" stopColor="#22c55e" stopOpacity="0.30" />
+                  <stop offset="100%" stopColor="#0284c7" stopOpacity="0.14" />
                 </radialGradient>
                 <filter id="radarShadow" x="-20%" y="-20%" width="140%" height="140%">
                   <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#22c55e" floodOpacity="0.25" />
                 </filter>
               </defs>
 
-              {/* Grid Web Background */}
+              {/* Grid Web Background (Pentagon) */}
               {gridPaths.map((d, i) => (
                 <path
                   key={i}
@@ -4625,11 +5072,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 );
               })}
 
-              {/* Radar Polygon Fill & Border */}
+              {/* Radar Pentagon Polygon Fill & Border */}
               <path
                 d={dataPath}
                 fill="url(#skillRadarGlow)"
-                stroke="#22c55e"
+                stroke="#16a34a"
                 strokeWidth="3.2"
                 strokeLinejoin="round"
                 filter="url(#radarShadow)"
@@ -4637,8 +5084,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
               {/* Data Nodes (Points) */}
               {tagCounts.map((tag, i) => {
-                const p = getPoint(i, Math.max(tag.pct, 0.05));
-                const isSuperkraft = tag.interventions === 0;
+                const p = getPoint(i, Math.max(tag.pct, 0.20));
+                const isSuperkraft = tag.level >= 4;
                 return (
                   <g key={i}>
                     {isSuperkraft && (
@@ -4653,7 +5100,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       cx={p.x}
                       cy={p.y}
                       r={isSuperkraft ? 6.5 : 5.5}
-                      fill={isSuperkraft ? '#22c55e' : '#3b82f6'}
+                      fill={isSuperkraft ? '#16a34a' : '#0284c7'}
                       stroke="#ffffff"
                       strokeWidth="2.5"
                       style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}
@@ -4662,10 +5109,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 );
               })}
 
-              {/* Skill Labels around the radar */}
+              {/* 5 Universal Skill Labels around the radar */}
               {tagCounts.map((tag, i) => {
-                const p = getPoint(i, 1.20);
-                const isSuperkraft = tag.interventions === 0;
+                const p = getPoint(i, 1.22);
+                const isSuperkraft = tag.level >= 4;
                 const isTargetFocus = activeWeeklyTargetTags.includes(tag.key);
                 const cosVal = Math.cos(p.angle);
                 
@@ -4682,75 +5129,166 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     dominantBaseline="middle"
                     fontSize="11"
                     fontWeight="800"
-                    fill={isTargetFocus ? '#d97706' : (isSuperkraft ? '#15803d' : '#1d4ed8')}
+                    fill={isTargetFocus ? '#d97706' : (isSuperkraft ? '#15803d' : '#0284c7')}
                     style={{ letterSpacing: '0.02em', filter: 'drop-shadow(0 1px 2px rgba(255,255,255,0.9))' }}
                   >
-                    {tag.icon} {tag.label} {isTargetFocus ? '🎯' : (isSuperkraft ? '🌟' : '💎')}
+                    {tag.icon} {tag.label} {isTargetFocus ? '🎯' : (isSuperkraft ? '🌟' : '🚀')}
                   </text>
                 );
               })}
             </svg>
           </div>
 
-          {/* LEHRER INTERAKTIONS-COCKPIT (NUR FÜR LEHRER / ADMIN) */}
-          {(!readOnly || isTeacherTools) && (
-            <div style={{
-              width: '100%',
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              border: '1px solid rgba(226, 232, 240, 0.9)',
-              borderRadius: '18px',
-              padding: '10px 14px',
-              marginTop: '8px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
-              zIndex: 5
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  ⚡ Lehrer-Cockpit: Hebel-Steuerung
-                </span>
-                <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>1-Klick Freigabe</span>
-              </div>
+          {/* VORWOCHEN-RÜCKBLICK & LEHRER-STUNDENEINSTIEG */}
+          {(!readOnly || isTeacherTools) && (() => {
+            const now = new Date();
+            const prevWeekDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            const prevWeekISO = getISOWeek(prevWeekDate);
+            const prevWeekNum = prevWeekISO.split('-W')[1] || '';
 
-              {tagCounts.filter(t => t.interventions > 0).length > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {tagCounts.filter(t => t.interventions > 0).map(t => (
+            const prevWeekItem = (progressItems || []).find((item: any) => {
+              if (!item.homework_notes) return false;
+              const isMatch = (item.updated_at && getISOWeek(item.updated_at) === prevWeekISO) ||
+                              (item.created_at && getISOWeek(item.created_at) === prevWeekISO);
+              if (!isMatch) return false;
+              const clean = item.homework_notes.replace(/\["STICKER:[^\]]+"\]/g, '').trim();
+              return clean.length > 0 && clean !== '[]';
+            });
+
+            let prevWeekText = '';
+            if (prevWeekItem?.homework_notes) {
+              try {
+                const parsed = JSON.parse(prevWeekItem.homework_notes);
+                if (Array.isArray(parsed)) {
+                  prevWeekText = parsed.filter((n: string) => !n.startsWith('STICKER:')).join(' ');
+                }
+              } catch (e) {
+                prevWeekText = String(prevWeekItem.homework_notes).replace(/STICKER:[^|]+\|[^|]+\|[^|]+/, '').trim();
+              }
+            }
+
+            return (
+              <div style={{
+                width: '100%',
+                background: '#ffffff',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '18px',
+                padding: '12px 14px',
+                marginTop: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+                zIndex: 5
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <span>📅</span>
+                    <span>Rückblick KW {prevWeekNum || 'Vorwoche'} & Stundeneinstieg</span>
+                  </span>
+                  <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 750 }}>
+                    1-Klick Auswertung
+                  </span>
+                </div>
+
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '7px 10px',
+                  fontSize: '0.72rem',
+                  color: '#334155',
+                  lineHeight: '1.35'
+                }}>
+                  {prevWeekText ? (
+                    <div>
+                      <strong style={{ color: '#0f172a' }}>{prevWeekItem?.topic_name || `Hausaufgabe KW ${prevWeekNum}`}:</strong> {prevWeekText}
+                    </div>
+                  ) : (
+                    <div style={{ color: '#64748b', fontStyle: 'italic' }}>
+                      Keine Hausaufgabe in KW {prevWeekNum || 'der Vorwoche'} erfasst.
+                    </div>
+                  )}
+                </div>
+
+                {/* Kompakte Erklärung / Tipp */}
+                <div style={{
+                  fontSize: '0.67rem',
+                  color: '#475569',
+                  background: '#f1f5f9',
+                  borderLeft: '3px solid #0284c7',
+                  borderRadius: '6px',
+                  padding: '5px 8px',
+                  lineHeight: 1.35
+                }}>
+                  <strong>💡 Tipp:</strong> „Alles super gemeistert“ hält alle Säulen auf Meisterstufe. Ein Klick auf eine Schwierigkeit aktiviert diesen Bereich als neuen Wochenfokus.
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#1e293b' }}>
+                    🎯 Größte Schwierigkeit der Vorwoche:
+                  </span>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {/* Master Button: Alles super */}
                     <button
-                      key={t.key}
                       type="button"
-                      onClick={() => handleImproveSkill(t.key)}
+                      onClick={handleMasterAllSkills}
                       style={{
-                        background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                         border: 'none',
                         color: '#ffffff',
-                        borderRadius: '12px',
-                        padding: '4px 10px',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
+                        borderRadius: '99px',
+                        padding: '5px 12px',
+                        fontSize: '0.71rem',
+                        fontWeight: 900,
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '5px',
-                        boxShadow: '0 2px 6px rgba(34, 197, 94, 0.25)',
-                        transition: 'all 0.2s ease'
+                        boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                        transition: 'all 0.15s ease'
                       }}
                       className="hover-scale"
                     >
-                      <span>✨ {t.label} ({t.interventions}×): +1 Stufe nach außen</span>
+                      <span>🌟 Alles super gemeistert (100% Souverän)</span>
                     </button>
-                  ))}
+
+                    {/* 5 Säulen Schwierigkeiten-Buttons mit identischen deutschen Superkraft-Namen */}
+                    {SKILL_TAGS.map(t => {
+                      const isDifficultyActive = (tagCounts.find(tc => tc.key === t.key)?.level ?? 5) < 5;
+                      return (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => handleTriggerSkillQuest(t.key)}
+                          style={{
+                            background: isDifficultyActive ? '#fee2e2' : '#f8fafc',
+                            border: `1.5px solid ${isDifficultyActive ? '#ef4444' : '#cbd5e1'}`,
+                            color: isDifficultyActive ? '#991b1b' : '#334155',
+                            borderRadius: '99px',
+                            padding: '4px 10px',
+                            fontSize: '0.70rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: isDifficultyActive ? '0 2px 6px rgba(239, 68, 68, 0.2)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale"
+                          title={`Markiert ${t.label} als Schwierigkeit aus KW ${prevWeekNum}`}
+                        >
+                          <span>{t.icon} {t.label} {isDifficultyActive ? '⚠️ (Fokus)' : ''}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : (
-                <div style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>🏆 Alle Bereiche stehen auf 100% Souverän! Keine aktiven Hebel.</span>
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            );
+          })()}
 
           {/* Floating Apple Scroll Indicator Pill for Mobile */}
           {isMobileOrTabletView && (
@@ -4785,7 +5323,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           )}
         </div>
 
-        {/* RECHTE BUCHSEITE: PÄDAGOGISCHES FEEDBACK */}
+        {/* RECHTE BUCHSEITE: 5 SÄULEN SUPERKRÄFTE & EXPEDITION */}
         <div
           ref={radarAnalysisCardsRef}
           style={{
@@ -4794,32 +5332,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             overflowY: isMobileOrTabletView ? 'visible' : 'auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px',
+            gap: '14px',
             padding: isMobileOrTabletView ? '16px' : '24px',
             position: 'relative'
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {/* Active Weekly Practice Goal Card (Golden Focus Banner) */}
             {activeWeeklyTargetTags.length > 0 && (
               <div style={{
                 background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
                 border: '1.5px solid #f59e0b',
                 borderRadius: '20px',
-                padding: '16px',
+                padding: '14px 16px',
                 boxShadow: '0 4px 14px rgba(245, 158, 11, 0.15)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '8px'
+                gap: '6px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontWeight: 900, fontSize: '0.84rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontWeight: 900, fontSize: '0.82rem' }}>
                   <span>🎯</span>
                   <span>AKTIVES ÜBE-LERNZIEL DIESER WOCHE</span>
                 </div>
-                <p style={{ margin: 0, fontSize: '0.76rem', color: '#92400e', fontWeight: 600, lineHeight: '1.4' }}>
-                  Dein Lehrer hat dir für diese Woche folgende Schwerpunkte im Hausaufgabenheft gesetzt. Achte beim Üben besonders darauf:
+                <p style={{ margin: 0, fontSize: '0.74rem', color: '#92400e', fontWeight: 600, lineHeight: '1.4' }}>
+                  Folgende musikalische Säulen stehen aktuell im Fokus deiner Übe-Einheiten:
                 </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
                   {activeWeeklyTargetTags.map(tagKey => {
                     const tagObj = SKILL_TAGS.find(t => t.key === tagKey);
                     if (!tagObj) return null;
@@ -4828,13 +5366,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         background: '#ffffff',
                         border: '1.5px solid #f59e0b',
                         color: '#b45309',
-                        padding: '5px 12px',
+                        padding: '4px 11px',
                         borderRadius: '20px',
-                        fontSize: '0.76rem',
+                        fontSize: '0.74rem',
                         fontWeight: 800,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
+                        gap: '5px',
                         boxShadow: '0 2px 6px rgba(245, 158, 11, 0.1)'
                       }}>
                         {tagObj.icon} {tagObj.label} 🎯
@@ -4845,78 +5383,73 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               </div>
             )}
 
-            {/* Säule 1: Musikalische Superkräfte */}
-            {(() => {
-              const superkraftList = tagCounts.filter(t => t.interventions === 0);
-              const count = superkraftList.length;
-              return (
-                <div style={{
-                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                  border: '1.5px solid #86efac',
-                  borderRadius: '20px',
-                  padding: '14px 16px',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  boxShadow: '0 4px 14px rgba(34, 197, 94, 0.08)'
-                }}>
-                  <div style={{ fontSize: '1.3rem', lineHeight: 1 }}>🌟</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
-                    <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      {count > 1 ? `Deine Musikalischen Superkräfte (${count}× Souverän)` : 'Deine Musikalische Superkraft'}
+            {/* Säule 1: Deine Musikalischen Superkräfte (5 Säulen mit Meister-Rängen) */}
+            <div style={{
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              border: '1.5px solid #86efac',
+              borderRadius: '20px',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(34, 197, 94, 0.08)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>👑</span>
+                  <span>Deine Musikalischen Superkräfte (5 Säulen)</span>
+                </span>
+                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#166534', background: '#ffffff', padding: '2px 8px', borderRadius: '99px', border: '1px solid #86efac' }}>
+                  Universell aktiv
+                </span>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '6px', margin: '2px 0' }}>
+                {tagCounts.map(s => (
+                  <div key={s.key} style={{
+                    background: '#ffffff',
+                    border: '1px solid #86efac',
+                    borderRadius: '12px',
+                    padding: '6px 10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#14532d' }}>
+                        {s.icon} {s.shortLabel}
+                      </span>
+                      <span style={{ fontSize: '0.66rem', fontWeight: 850, color: s.level >= 4 ? '#15803d' : '#0284c7' }}>
+                        Stufe {s.level}/5
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 750, color: '#166534' }}>
+                      {s.rankTitle} {s.level >= 4 ? '🌟' : '🚀'}
                     </span>
-                    
-                    {count > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', margin: '2px 0 4px' }}>
-                        {superkraftList.map(s => (
-                          <span key={s.key} style={{
-                            background: '#ffffff',
-                            border: '1px solid #86efac',
-                            color: '#15803d',
-                            borderRadius: '12px',
-                            padding: '3px 9px',
-                            fontSize: '0.74rem',
-                            fontWeight: 800,
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}>
-                            {s.icon} {s.label} 🌟
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#14532d' }}>
-                        {topStrength.icon} {topStrength.label}
-                      </h4>
-                    )}
-
-                    <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#166534', lineHeight: 1.38, fontWeight: 600 }}>
-                      {count > 1 
-                        ? `Eindrucksvolles musikalisches Fundament! In diesen ${count} Säulen zeigst du maximale Sicherheit und meisterst deine Stücke mit großer Souveränität.`
-                        : superkraftDesc}
-                    </p>
                   </div>
-                </div>
-              );
-            })()}
+                ))}
+              </div>
 
-            {/* Säule 2: Dein Größter Fortschritts-Hebel ODER Meisterstufe */}
+              <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#166534', lineHeight: 1.35, fontWeight: 600 }}>
+                Eindrucksvolles musikalisches Fundament! In diesen 5 Säulen wachsen deine Fähigkeiten mit jedem geübten Song kontinuierlich weiter.
+              </p>
+            </div>
+
+            {/* Säule 2: Deine Nächste Musiker-Expedition */}
             {(() => {
-              const growthHebelList = tagCounts.filter(t => t.interventions > 0);
-              const weakestLink = growthHebelList.length > 0
-                ? growthHebelList.reduce((prev, curr) => curr.interventions > prev.interventions ? curr : prev, growthHebelList[0])
+              const growthList = tagCounts.filter(t => t.level < 5);
+              const nextQuest = growthList.length > 0
+                ? growthList.reduce((prev, curr) => curr.level < prev.level ? curr : prev, growthList[0])
                 : null;
 
-              if (!weakestLink) {
-                // Alle Bereiche auf 100% Souverän -> Meisterstufe Erreicht
+              if (!nextQuest) {
                 return (
                   <div style={{
                     background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
                     border: '1.5px solid #fde047',
                     borderRadius: '20px',
-                    padding: '12px 16px',
+                    padding: '14px 16px',
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '12px',
@@ -4928,38 +5461,43 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         Pädagogische Meisterstufe Erreicht
                       </span>
                       <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#854d0e' }}>
-                        100% Souveränität auf allen Säulen!
+                        100% Souveränität auf allen 5 Säulen!
                       </h4>
                       <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: '#713f12', lineHeight: 1.38, fontWeight: 600 }}>
-                        Du beherrschst alle aktuell dokumentierten Bausteine perfekt! Es gibt aktuell keinen Schwachpunkt. Dein Lehrer wird dir bald neue Meisterwerke und Herausforderungen eröffnen.
+                        Du beherrschst alle 5 Kern-Dimensionen auf höchster Meister-Stufe! Neue Meisterwerke werden dich weiter inspirieren.
                       </p>
                     </div>
                   </div>
                 );
               }
 
-              // Mindestens ein Bereich liegt im Inneren -> Schwächstes Glied als größter Hebel
+              let questText = 'Spiele deine aktuellen Songs im stabilen Puls mit Metronom, um dein nächstes Level freizuschalten!';
+              if (nextQuest.key === 'technik') questText = 'Achte auf lockere Haltung und saubere Wechsel, um deine Virtuosen-Stufe zu meistern!';
+              else if (nextQuest.key === 'intonation') questText = 'Forme deine Töne bewusst, sauber und klangvoll für maximalen Hörgenuss!';
+              else if (nextQuest.key === 'ausdruck') questText = 'Gestalte lebendige Lautstärken (p bis f) und Phrasen für tiefe musikalische Emotion!';
+              else if (nextQuest.key === 'repertoire') questText = 'Festige deine Stücke für freies, bühnensicheres Spiel auswendig!';
+
               return (
                 <div style={{
                   background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
                   border: '1.5px solid #93c5fd',
                   borderRadius: '20px',
-                  padding: '12px 16px',
+                  padding: '14px 16px',
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '12px',
                   boxShadow: '0 4px 14px rgba(59, 130, 246, 0.08)'
                 }}>
-                  <div style={{ fontSize: '1.3rem', lineHeight: 1 }}>💎</div>
+                  <div style={{ fontSize: '1.3rem', lineHeight: 1 }}>🚀</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Dein Größter Fortschritts-Hebel
+                      Deine Nächste Musiker-Expedition
                     </span>
                     <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#1e40af' }}>
-                      {weakestLink.icon} {weakestLink.label} ({weakestLink.interventions}× gezielt geübt)
+                      {nextQuest.icon} {nextQuest.label} • Stufe {nextQuest.level}/5
                     </h4>
                     <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: '#1e3a8a', lineHeight: 1.38, fontWeight: 600 }}>
-                      Man ist so stark wie das Kettenglied, das man als Nächstes stärkt! Wenn du in deinen nächsten Übe-Sessions gezielt an <strong>{weakestLink.label}</strong> arbeitest, machst du den spürbarsten Quantensprung.
+                      {questText}
                     </p>
                   </div>
                 </div>
@@ -4979,7 +5517,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }}>
             <span style={{ fontSize: '1.1rem' }}>💬</span>
             <p style={{ margin: 0, fontSize: '0.72rem', color: '#475569', lineHeight: 1.35, fontWeight: 600 }}>
-              <em>Pädagogische Weisheit: Wer an seinen Herausforderungen arbeitet, feiert die größten Durchbrüche. Jede Überwindung verwandelt ein Hindernis in deine neue Stärke!</em>
+              <em>Pädagogische Weisheit: Jede musikalische Meisterleistung beginnt mit Freude am Entdecken und geduldigem Wachsen.</em>
             </p>
           </div>
 
@@ -6934,45 +7472,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   Übe-Schwerpunkte & Förderbereiche
                                 </span>
 
-                                {/* Category 1: Musikalisch-Technische Fertigkeiten */}
+                                {/* 5 Universelle Musikalische Kern-Säulen */}
                                 <div style={{ marginTop: '6px' }}>
                                   <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>
-                                    Musikalisch-Technische Fertigkeiten
+                                    Musikalische Kern-Dimensionen
                                   </span>
                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                                    {SKILL_TAGS.filter(t => t.category === 'technical').map(tag => {
-                                      const active = pendingFeedbackTags.includes(tag.key);
-                                      const limitReached = !active && pendingFeedbackTags.length >= 2;
-                                      return (
-                                        <button
-                                          key={tag.key}
-                                          type="button"
-                                          onClick={() => setPendingFeedbackTags(prev => {
-                                            if (prev.includes(tag.key)) return prev.filter(t => t !== tag.key);
-                                            if (prev.length >= 2) return prev;
-                                            return [...prev, tag.key];
-                                          })}
-                                          style={{
-                                            padding: '4px 9px',
-                                            background: active ? '#fef2f2' : '#f8fafc',
-                                            border: `1.5px solid ${active ? '#fca5a5' : '#e2e8f0'}`,
-                                            borderRadius: '20px', cursor: 'pointer', fontSize: '0.66rem', fontWeight: 800,
-                                            color: active ? '#dc2626' : '#64748b', transition: 'all 0.15s ease',
-                                            opacity: limitReached ? 0.45 : 1
-                                          }}
-                                        >{tag.icon} {tag.label}</button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                {/* Category 2: Übe-Praxis & Selbstständigkeit */}
-                                <div style={{ marginTop: '8px' }}>
-                                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>
-                                    Übe-Praxis & Selbstständigkeit
-                                  </span>
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                                    {SKILL_TAGS.filter(t => t.category === 'practice').map(tag => {
+                                    {SKILL_TAGS.map(tag => {
                                       const active = pendingFeedbackTags.includes(tag.key);
                                       const limitReached = !active && pendingFeedbackTags.length >= 2;
                                       return (
@@ -7602,10 +8108,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           von {skill.songs?.artist}
                         </p>
                         <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 800 }}>
-                          {progress}%
+                          {readOnly && isMatchModeEnabled && !isMatchRevealed
+                            ? (studentRating !== null ? `Dein Tipp: ${studentRating}%` : 'Tipp noch offen 🎵')
+                            : (readOnly && isMatchRevealed ? `Stand: ${progress}%` : `${progress}%`)}
                         </span>
                         <div style={{ width: '100%', height: '7px', background: '#e8e8ed', borderRadius: '3.5px', marginTop: '6px', overflow: 'hidden' }}>
-                          <div style={{ width: `${progress}%`, height: '100%', background: (status === 'MASTERED' || skill.is_stage_ready || progress === 100) ? 'hsl(130, 65%, 82%)' : 'hsl(47, 85%, 84%)', transition: 'width 0.4s ease' }} />
+                          <div style={{
+                            width: `${readOnly && isMatchModeEnabled && !isMatchRevealed ? (studentRating ?? 0) : progress}%`,
+                            height: '100%',
+                            background: (status === 'MASTERED' || skill.is_stage_ready || progress === 100)
+                              ? 'hsl(130, 65%, 82%)'
+                              : (readOnly && isMatchModeEnabled && !isMatchRevealed ? '#16a34a' : 'hsl(47, 85%, 84%)'),
+                            transition: 'width 0.4s ease'
+                          }} />
                         </div>
                       </div>
                     </div>
@@ -7679,22 +8194,62 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </div>
                     </div>
 
-                    {/* Collapsible Progress Sliders Widget */}
+                    {/* Collapsible Progress & Dual Match Widget */}
                     <div style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '12px',
+                      gap: '14px',
                       background: 'white',
-                      borderRadius: '18px',
-                      padding: '16px',
+                      borderRadius: '20px',
+                      padding: '16px 18px',
                       border: '1px solid rgba(0, 0, 0, 0.08)',
                       boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s ease',
+                      position: 'relative'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: songProgressPercent === 100 ? '#34a853' : '#0f172a', transition: 'color 0.3s ease' }}>
-                          Fortschritt: {songProgressPercent}%
-                        </span>
+                      {/* Match Confetti Flash */}
+                      {showMatchConfetti && (
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 10 }}>
+                          <Confetti width={500} height={300} recycle={false} numberOfPieces={120} />
+                        </div>
+                      )}
+
+                      {/* Header row: Progress Title & Mode Controls */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '0.86rem', fontWeight: 900, color: songProgressPercent === 100 ? '#34a853' : '#0f172a', transition: 'color 0.3s ease' }}>
+                            {readOnly && isMatchModeEnabled
+                              ? (lastMatchedTeacherPercent !== null ? `Lehrer-Stand: ${lastMatchedTeacherPercent}%` : 'Fortschritt (Wird im Unterricht gematcht)')
+                              : `Fortschritt: ${songProgressPercent}%`}
+                          </span>
+
+                          {/* Teacher's Match-Mode Toggle Pill */}
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={handleToggleMatchMode}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '99px',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                border: isMatchModeEnabled ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                background: isMatchModeEnabled ? '#f0fdf4' : '#f8fafc',
+                                color: isMatchModeEnabled ? '#166534' : '#64748b',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className="hover-scale"
+                              title={isMatchModeEnabled ? 'Match-Modus ist aktiv (Schüler schätzt heimlich mit)' : 'Match-Modus ist aus (Schüler sieht nur Read-Only)'}
+                            >
+                              <span>🎯 Match-Modus:</span>
+                              <span style={{ fontWeight: 900 }}>{isMatchModeEnabled ? 'Aktiv' : 'Aus'}</span>
+                            </button>
+                          )}
+                        </div>
                         
                         {songProgressPercent === 100 ? (
                           <div style={{
@@ -7710,97 +8265,592 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             <Star size={16} fill="#eab308" color="#eab308" style={{ filter: 'drop-shadow(0 0 3px rgba(234, 179, 8, 0.5))' }} />
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => setIsSubSlidersExpanded(!isSubSlidersExpanded)}
-                            style={{
-                              background: '#f1f5f9',
-                              border: 'none',
-                              color: '#4b5563',
-                              fontSize: '0.74rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              padding: '8px 14px',
-                              borderRadius: '20px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            {isSubSlidersExpanded ? 'Details ausblenden ▲' : 'Details einblenden ▼'}
-                          </button>
+                          !readOnly && (
+                            <button
+                              type="button"
+                              onClick={() => setIsSubSlidersExpanded(!isSubSlidersExpanded)}
+                              style={{
+                                background: '#f1f5f9',
+                                border: 'none',
+                                color: '#4b5563',
+                                fontSize: '0.74rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                padding: '6px 12px',
+                                borderRadius: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {isSubSlidersExpanded ? 'Details ausblenden ▲' : 'Details einblenden ▼'}
+                            </button>
+                          )
                         )}
                       </div>
 
-                      {/* Main Average Slider */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={songProgressPercent}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            setSongProgressPercent(val);
-                            setRhythmVal(val);
-                            setFingerVal(val);
-                            setExpressionVal(val);
-                            if (val === 100) {
-                              setStatus('MASTERED');
-                              setIsCurrentHomework(false);
-                              setIsSubSlidersExpanded(false);
-                            } else if (status === 'MASTERED') {
-                              setStatus('IN_PROGRESS');
-                            }
-                            setHasChanges(true);
-                            setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: val, is_stage_ready: val === 100 } : s));
-                            localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
-                              rhythm: val,
-                              finger: val,
-                              expression: val
-                            }));
-                            triggerDebouncedAutoSave(300);
-                          }}
-                          style={{
-                            flex: 1,
-                            accentColor: songProgressPercent === 100 ? '#34a853' : (songProgressPercent >= 50 ? '#eab308' : '#64748b'),
-                            height: '9px',
-                            borderRadius: '4.5px',
-                            cursor: 'pointer',
-                            background: songProgressPercent === 100
-                              ? `linear-gradient(to right, #34a853 0%, #34a853 100%)`
-                              : (songProgressPercent >= 50
-                                ? `linear-gradient(to right, #eab308 0%, #eab308 ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`
-                                : `linear-gradient(to right, #64748b 0%, #64748b ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`),
-                            WebkitAppearance: 'none',
-                            outline: 'none',
-                            transition: 'all 0.3s ease'
-                          }}
-                        />
-                      </div>
+                      {/* TEACHER SLIDER (Master Rating) */}
+                      {!readOnly && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={songProgressPercent}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                setSongProgressPercent(val);
+                                setRhythmVal(val);
+                                setFingerVal(val);
+                                setExpressionVal(val);
+                                if (val === 100) {
+                                  setStatus('MASTERED');
+                                  setIsCurrentHomework(false);
+                                  setIsSubSlidersExpanded(false);
+                                } else if (status === 'MASTERED') {
+                                  setStatus('IN_PROGRESS');
+                                }
+                                setHasChanges(true);
+                                setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: val, is_stage_ready: val === 100 } : s));
+                                localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
+                                  rhythm: val,
+                                  finger: val,
+                                  expression: val
+                                }));
+                                triggerDebouncedAutoSave(300);
+                              }}
+                              style={{
+                                flex: 1,
+                                accentColor: songProgressPercent === 100 ? '#34a853' : (songProgressPercent >= 50 ? '#eab308' : '#64748b'),
+                                height: '9px',
+                                borderRadius: '4.5px',
+                                cursor: 'pointer',
+                                background: songProgressPercent === 100
+                                  ? `linear-gradient(to right, #34a853 0%, #34a853 100%)`
+                                  : (songProgressPercent >= 50
+                                    ? `linear-gradient(to right, #eab308 0%, #eab308 ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`
+                                    : `linear-gradient(to right, #64748b 0%, #64748b ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`),
+                                WebkitAppearance: 'none',
+                                outline: 'none',
+                                transition: 'all 0.3s ease'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* READ-ONLY FALLBACK (When Match-Modus is OFF for Student) */}
+                      {readOnly && !isMatchModeEnabled && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              disabled={true}
+                              value={songProgressPercent}
+                              style={{
+                                flex: 1,
+                                accentColor: songProgressPercent === 100 ? '#34a853' : (songProgressPercent >= 50 ? '#eab308' : '#64748b'),
+                                height: '10px',
+                                borderRadius: '5px',
+                                cursor: 'default',
+                                opacity: 0.85,
+                                background: songProgressPercent === 100
+                                  ? `linear-gradient(to right, #34a853 0%, #34a853 100%)`
+                                  : (songProgressPercent >= 50
+                                    ? `linear-gradient(to right, #eab308 0%, #eab308 ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`
+                                    : `linear-gradient(to right, #64748b 0%, #64748b ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`),
+                                WebkitAppearance: 'none',
+                                outline: 'none'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* STUDENT SELF-ASSESSMENT SLIDER & COMMIT BUTTON (When Match-Modus is ACTIVE for Student) */}
+                      {readOnly && isMatchModeEnabled && (() => {
+                        const currentPct = studentRating ?? 0;
+                        const getProgressFeeling = (pct: number) => {
+                          if (pct <= 25) return { icon: '🐌', text: 'Aller Anfang' };
+                          if (pct <= 50) return { icon: '🧩', text: 'Einzelne Teile klappen' };
+                          if (pct <= 75) return { icon: '⚡', text: 'Läuft fast flüssig' };
+                          return { icon: '🚀', text: 'Bühnenreif!' };
+                        };
+                        const feeling = getProgressFeeling(currentPct);
+
+                        return (
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '14px',
+                            background: '#f8fafc',
+                            padding: '16px',
+                            borderRadius: '18px',
+                            border: isStudentRatingCommitted ? '2px solid #86efac' : '2px solid #fcd34d',
+                            boxShadow: isStudentRatingCommitted ? '0 4px 14px rgba(34, 197, 94, 0.08)' : '0 4px 14px rgba(245, 158, 11, 0.08)',
+                            transition: 'all 0.2s ease'
+                          }}>
+                            {/* Top Header Row */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                🎧 Wie gut klappt es schon:
+                                <span style={{ color: currentPct > 0 ? '#15803d' : '#64748b', fontWeight: 950, fontSize: '0.94rem' }}>
+                                  {currentPct}% • {feeling.icon} {feeling.text}
+                                </span>
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '99px', fontWeight: 800 }}>
+                                🔒 Lehrer-Wertung verdeckt
+                              </span>
+                            </div>
+
+                            {/* Interactive Slider */}
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={studentRating ?? 0}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                handleStudentRatingChange(val);
+                              }}
+                              style={{
+                                width: '100%',
+                                accentColor: '#16a34a',
+                                height: '14px',
+                                borderRadius: '7px',
+                                cursor: 'pointer',
+                                touchAction: 'manipulation',
+                                pointerEvents: 'auto',
+                                background: currentPct > 0
+                                  ? `linear-gradient(to right, #16a34a 0%, #16a34a ${currentPct}%, #e2e8f0 ${currentPct}%, #e2e8f0 100%)`
+                                  : '#e2e8f0',
+                                WebkitAppearance: 'none',
+                                outline: 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                            />
+
+                            {/* Action & Status Row: Lifecycle-Aware Child-Friendly Commit Button */}
+                            {(() => {
+                              const isFullyCompleted = matchHistory.length >= 3;
+                              const targetMatchNum = Math.min(matchHistory.length + 1, 3);
+                              const hasFreshStudentRating = Boolean(
+                                studentRating !== null &&
+                                studentRating !== undefined &&
+                                studentRatingUpdatedAt &&
+                                (!lastMatchedAt || new Date(studentRatingUpdatedAt).getTime() > new Date(lastMatchedAt).getTime())
+                              );
+
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {isFullyCompleted ? (
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        background: '#dcfce7',
+                                        color: '#15803d',
+                                        padding: '5px 12px',
+                                        borderRadius: '99px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 850
+                                      }}>
+                                        <span>🏆 Alle 3 Meilensteine gemeistert!</span>
+                                      </span>
+                                    ) : (hasFreshStudentRating && isStudentRatingCommitted) ? (
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        background: '#dcfce7',
+                                        color: '#15803d',
+                                        padding: '5px 12px',
+                                        borderRadius: '99px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 850
+                                      }}>
+                                        <Check size={14} strokeWidth={3} />
+                                        <span>Tipp für Match {targetMatchNum} ist sicher bei deiner Lehrkraft!</span>
+                                      </span>
+                                    ) : (
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        background: matchHistory.length > 0 ? '#f0fdf4' : '#fffbeb',
+                                        color: matchHistory.length > 0 ? '#15803d' : '#b45309',
+                                        padding: '4px 10px',
+                                        borderRadius: '99px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 800,
+                                        border: `1px solid ${matchHistory.length > 0 ? '#bbf7d0' : '#fde68a'}`
+                                      }}>
+                                        <span>{matchHistory.length > 0 ? `🌱 Tipp für Match ${targetMatchNum} einstellen (${currentPct}%)` : '⚠️ 1. Tipp noch nicht abgeschickt'}</span>
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={handleCommitStudentRating}
+                                    disabled={isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)}
+                                    style={{
+                                      border: 'none',
+                                      background: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted))
+                                        ? '#e2e8f0'
+                                        : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                      color: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '#475569' : '#ffffff',
+                                      padding: '9px 20px',
+                                      borderRadius: '99px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 900,
+                                      cursor: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? 'default' : 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      boxShadow: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? 'none' : '0 3px 10px rgba(22, 163, 74, 0.35)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className={(isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '' : 'hover-scale'}
+                                  >
+                                    {isFullyCompleted ? (
+                                      <span>✓ Alle Matches abgeschlossen</span>
+                                    ) : (hasFreshStudentRating && isStudentRatingCommitted) ? (
+                                      <>
+                                        <Check size={14} strokeWidth={3} />
+                                        <span>Tipp {targetMatchNum} eingeloggt ({studentRating}%)</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Lock size={14} />
+                                        <span>🔒 Tipp für Match {targetMatchNum} abschicken ({currentPct}%)</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              );
+                            })()}
+
+                            {/* 3 VISUAL REWARD TIERS (Kid-Friendly & Gamified) */}
+                            <div style={{ marginTop: '4px' }}>
+                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', marginBottom: '4px' }}>
+                                🎁 Belohnungs-Stufen für dein nächstes Match:
+                              </div>
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                                gap: '8px'
+                              }}>
+                                <div style={{
+                                  background: '#fefce8',
+                                  border: '1.5px solid #fde047',
+                                  borderRadius: '12px',
+                                  padding: '8px 10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px'
+                                }}>
+                                  <span style={{ fontSize: '1.2rem' }}>🎯</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#854d0e' }}>Volltreffer (±10%)</span>
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#a16207' }}>+50 XP & Meister-Ohr</span>
+                                  </div>
+                                </div>
+
+                                <div style={{
+                                  background: '#f0f9ff',
+                                  border: '1.5px solid #bae6fd',
+                                  borderRadius: '12px',
+                                  padding: '8px 10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px'
+                                }}>
+                                  <span style={{ fontSize: '1.2rem' }}>✨</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0369a1' }}>Super Gehör (±20%)</span>
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#0284c7' }}>+25 XP</span>
+                                  </div>
+                                </div>
+
+                                <div style={{
+                                  background: '#faf5ff',
+                                  border: '1.5px solid #e9d5ff',
+                                  borderRadius: '12px',
+                                  padding: '8px 10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px'
+                                }}>
+                                  <span style={{ fontSize: '1.2rem' }}>🚀</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#7e22ce' }}>Weiter-Rocker (&gt;20%)</span>
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#9333ea' }}>+5 XP Mut-Bonus</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* 1. DUAL-BALKEN SHOWDOWN RACE BOX (Animated 1.2s Comparison) */}
+                      {showdownState && (
+                        <div style={{
+                          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                          borderRadius: '20px',
+                          padding: '16px 20px',
+                          color: '#ffffff',
+                          margin: '8px 0',
+                          boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+                          border: '1.5px solid rgba(255,255,255,0.12)',
+                          animation: 'fadeIn 0.25s ease'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 900, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                              <span>🏁 LIVE-MATCH SHOWDOWN</span>
+                            </div>
+                            {showdownState.isRunning ? (
+                              <span style={{ fontSize: '0.72rem', color: '#facc15', fontWeight: 800, animation: 'pulse 1s infinite' }}>
+                                ⚡ Showdown läuft...
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#86efac', background: 'rgba(34,197,94,0.2)', padding: '2px 8px', borderRadius: '99px' }}>
+                                Δ {Math.abs(showdownState.teacherTarget - showdownState.studentTarget)}% Differenz
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Top Bar: Lehrkraft */}
+                          <div style={{ marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '4px' }}>
+                              <span>👨‍🏫 Lehrkraft:</span>
+                              <span style={{ color: '#4ade80', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
+                                {Math.round(showdownState.currentTeacherVal)}%
+                              </span>
+                            </div>
+                            <div style={{ width: '100%', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
+                              <div style={{
+                                width: `${showdownState.currentTeacherVal}%`,
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #16a34a, #4ade80)',
+                                borderRadius: '99px',
+                                transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
+                                boxShadow: '0 0 10px rgba(74, 222, 128, 0.4)'
+                              }} />
+                            </div>
+                          </div>
+
+                          {/* Bottom Bar: Schüler */}
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '4px' }}>
+                              <span>👧 {readOnly ? 'Dein Tipp:' : 'Schüler-Tipp:'}</span>
+                              <span style={{ color: '#facc15', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
+                                {Math.round(showdownState.currentStudentVal)}%
+                              </span>
+                            </div>
+                            <div style={{ width: '100%', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
+                              <div style={{
+                                width: `${showdownState.currentStudentVal}%`,
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #eab308, #fde047)',
+                                borderRadius: '99px',
+                                transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
+                                boxShadow: '0 0 10px rgba(250, 204, 21, 0.4)'
+                              }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TEACHER MATCH STATUS & ACTION BAR (Apple-Grade Lifecycle-Aware Single-Line) */}
+                      {!readOnly && isMatchModeEnabled && (() => {
+                        const targetMatchNum = Math.min(matchHistory.length + 1, 3);
+                        const isFullyCompleted = matchHistory.length >= 3;
+                        const latestMatch = matchHistory.length > 0 ? matchHistory[matchHistory.length - 1] : null;
+                        const diff = (lastMatchedTeacherPercent !== null && lastMatchedStudentPercent !== null)
+                          ? Math.abs(lastMatchedTeacherPercent - lastMatchedStudentPercent)
+                          : (studentRating !== null ? Math.abs(songProgressPercent - studentRating) : null);
+
+                        const hasFreshStudentRating = Boolean(
+                          studentRating !== null &&
+                          studentRating !== undefined &&
+                          studentRatingUpdatedAt &&
+                          (!lastMatchedAt || new Date(studentRatingUpdatedAt).getTime() > new Date(lastMatchedAt).getTime())
+                        );
+
+                        const canExecuteMatch = !isFullyCompleted && hasFreshStudentRating && !showdownState?.isRunning;
+
+                        return (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: '#f8fafc',
+                            padding: '10px 14px',
+                            borderRadius: '14px',
+                            border: canExecuteMatch ? '1.5px solid #bbf7d0' : '1px solid #e2e8f0',
+                            gap: '10px',
+                            flexWrap: 'wrap',
+                            marginTop: '2px'
+                          }}>
+                            {/* Left Side: Student Tip Status, Compact Result Pill & 3-Dot Milestone Tracker */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              {isFullyCompleted ? (
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: '#dcfce7',
+                                  color: '#15803d',
+                                  padding: '4px 10px',
+                                  borderRadius: '99px',
+                                  fontWeight: 900,
+                                  fontSize: '0.74rem'
+                                }}>
+                                  <span>🏆 Song komplett gematcht (3/3)</span>
+                                </span>
+                              ) : hasFreshStudentRating ? (
+                                <>
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    background: '#dcfce7',
+                                    color: '#15803d',
+                                    padding: '4px 10px',
+                                    borderRadius: '99px',
+                                    fontWeight: 900,
+                                    fontSize: '0.74rem'
+                                  }}>
+                                    <Check size={13} strokeWidth={3} />
+                                    <span>Tipp {targetMatchNum} liegt bereit: {studentRating}%</span>
+                                  </span>
+                                </>
+                              ) : matchHistory.length > 0 ? (
+                                <>
+                                  {latestMatch && (
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      background: latestMatch.tier === 'tier1' ? '#fef3c7' : (latestMatch.tier === 'tier2' ? '#e0f2fe' : '#f3e8ff'),
+                                      color: latestMatch.tier === 'tier1' ? '#92400e' : (latestMatch.tier === 'tier2' ? '#075985' : '#6b21a8'),
+                                      border: `1px solid ${latestMatch.tier === 'tier1' ? '#fde68a' : (latestMatch.tier === 'tier2' ? '#bae6fd' : '#e9d5ff')}`,
+                                      padding: '4px 9px',
+                                      borderRadius: '99px',
+                                      fontWeight: 850,
+                                      fontSize: '0.72rem'
+                                    }}>
+                                      <span>{latestMatch.tier === 'tier1' ? '🎯' : (latestMatch.tier === 'tier2' ? '✨' : '🚀')}</span>
+                                      <span>
+                                        Match #{matchHistory.length} beendet
+                                        {diff !== null && ` (Δ ${diff}%)`} • +{latestMatch.xp_amount} XP
+                                      </span>
+                                    </span>
+                                  )}
+                                  <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.74rem' }}>
+                                    ⏳ Wartet auf Schüler-Tipp für Match {targetMatchNum}
+                                  </span>
+                                </>
+                              ) : (
+                                <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.74rem' }}>
+                                  ⏳ Schüler-Tipp steht noch aus (Match 1/3)
+                                </span>
+                              )}
+
+                              {/* Apple-Style 3-Dot Milestone Tracker */}
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                padding: '4px 8px',
+                                borderRadius: '99px'
+                              }} title={`Match ${matchHistory.length} von 3 belegt`}>
+                                {[0, 1, 2].map((idx) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      width: '7px',
+                                      height: '7px',
+                                      borderRadius: '50%',
+                                      background: idx < matchHistory.length
+                                        ? '#16a34a'
+                                        : (idx === matchHistory.length && hasFreshStudentRating ? '#38bdf8' : '#cbd5e1')
+                                    }}
+                                  />
+                                ))}
+                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginLeft: '2px' }}>
+                                  {matchHistory.length}/3
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Right Side: Action Button */}
+                            <button
+                              type="button"
+                              onClick={handleCheckMatch}
+                              disabled={!canExecuteMatch}
+                              style={{
+                                border: 'none',
+                                background: canExecuteMatch
+                                  ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
+                                  : '#cbd5e1',
+                                color: canExecuteMatch ? '#ffffff' : '#64748b',
+                                padding: '7px 16px',
+                                borderRadius: '99px',
+                                fontSize: '0.76rem',
+                                fontWeight: 900,
+                                cursor: canExecuteMatch ? 'pointer' : 'not-allowed',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: canExecuteMatch ? '0 2px 8px rgba(22, 163, 74, 0.3)' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className={canExecuteMatch ? 'hover-scale' : ''}
+                            >
+                              <Sparkles size={13} />
+                              <span>
+                                {isFullyCompleted
+                                  ? '🏆 3/3 Meilensteine belegt'
+                                  : (!hasFreshStudentRating && matchHistory.length > 0)
+                                    ? `⏳ Wartet auf Tipp ${targetMatchNum}`
+                                    : `🎯 Match ${targetMatchNum} prüfen`}
+                              </span>
+                            </button>
+                          </div>
+                        );
+                      })()}
 
                       {/* Sub sliders (Rhythm, Finger, Expression) */}
                       {isSubSlidersExpanded && (
                         <div style={{
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '26px',
-                          borderTop: '1px solid rgba(0, 0, 0, 0.12)',
-                          padding: '16px 0 0 0',
-                          marginTop: '12px',
+                          gap: '14px',
+                          borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+                          padding: '14px 0 0 0',
+                          marginTop: '10px',
                           background: 'transparent',
                           animation: 'fadeIn 0.2s ease'
                         }}>
                           {songProgressPercent < 100 && [
-                            { label: 'Rhythmus & Timing', value: rhythmVal, type: 'rhythm', color: '#000000' },
-                            { label: 'Finger & Technik', value: fingerVal, type: 'finger', color: '#000000' },
-                            { label: 'Ausdruck & Performance', value: expressionVal, type: 'expression', color: '#000000' }
+                            { label: 'Rhythmus & Timing', value: rhythmVal, type: 'rhythm', color: '#16a34a' },
+                            { label: 'Finger & Technik', value: fingerVal, type: 'finger', color: '#0284c7' },
+                            { label: 'Ausdruck & Performance', value: expressionVal, type: 'expression', color: '#d97706' }
                           ].map(sub => (
-                            <div key={sub.type} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#4b5563' }}>
+                            <div key={sub.type} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.73rem', fontWeight: 800, color: '#475569' }}>
                                 <span>{sub.label}</span>
-                                <span>{sub.value}%</span>
+                                <span style={{ color: sub.color, fontWeight: 900 }}>{sub.value}%</span>
                               </div>
                               <input
                                 type="range"
@@ -7842,13 +8892,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 style={{
                                   width: '100%',
                                   accentColor: sub.color,
-                                  height: '5px',
-                                  borderRadius: '2.5px',
+                                  height: '3.5px',
+                                  borderRadius: '2px',
                                   cursor: 'pointer',
-                                  background: `linear-gradient(to right, ${sub.color} 0%, ${sub.color} ${sub.value}%, #e8e8ed ${sub.value}%, #e8e8ed 100%)`,
+                                  background: `linear-gradient(to right, ${sub.color} 0%, ${sub.color} ${sub.value}%, #e2e8f0 ${sub.value}%, #e2e8f0 100%)`,
                                   WebkitAppearance: 'none',
                                   outline: 'none',
-                                  padding: '8px 0' // increases the tap/touch target area size vertical padding
+                                  padding: '6px 0'
                                 }}
                               />
                             </div>
@@ -10170,6 +11220,123 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         </div>
                       )}
 
+                      {/* SCHÜLER TROPHÄEN- & MEILENSTEIN-PASS (Right Column Trophy Center for Apple Balance) */}
+                      {readOnly && (
+                        <div style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '24px',
+                          padding: '18px 20px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px',
+                          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Sparkles size={16} style={{ color: '#f59e0b' }} />
+                              <span>Auszeichnungen & Meilenstein-Pass</span>
+                            </span>
+                            <span style={{ fontSize: '0.70rem', background: matchHistory.length >= 3 ? '#dcfce7' : '#f1f5f9', color: matchHistory.length >= 3 ? '#15803d' : '#475569', padding: '2px 8px', borderRadius: '99px', fontWeight: 850 }}>
+                              {matchHistory.length} von 3 Matches
+                            </span>
+                          </div>
+
+                          {/* Latest Hologram Sticker if at least 1 match exists */}
+                          {matchHistory.length > 0 && (() => {
+                            const latest = matchHistory[matchHistory.length - 1];
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>
+                                  ✨ Dein neuester Sticker (Match #{matchHistory.length}):
+                                </div>
+                                <MeisterOhrSticker
+                                  matchedAt={latest.matched_at}
+                                  teacherPercent={latest.teacher_percent}
+                                  studentPercent={latest.student_percent}
+                                  xpAmount={latest.xp_amount}
+                                  isCompact={false}
+                                />
+                              </div>
+                            );
+                          })()}
+
+                          {/* 3 Horizontal Milestone Cards */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                            {[0, 1, 2].map((slotIdx) => {
+                              const entry = matchHistory[slotIdx];
+                              const slotNum = slotIdx + 1;
+                              if (entry) {
+                                const isGold = entry.tier === 'tier1';
+                                const isBlue = entry.tier === 'tier2';
+                                return (
+                                  <div key={slotIdx} style={{
+                                    background: isGold ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' : (isBlue ? 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)' : 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)'),
+                                    border: `1.5px solid ${isGold ? '#f59e0b' : (isBlue ? '#38bdf8' : '#c084fc')}`,
+                                    borderRadius: '14px',
+                                    padding: '10px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '4px',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                                  }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#64748b' }}>
+                                        #{slotNum} Match
+                                      </span>
+                                      <span style={{ fontSize: '0.64rem', fontWeight: 750, color: '#94a3b8' }}>
+                                        {new Date(entry.matched_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                      </span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 900, color: '#0f172a' }}>
+                                      <span>{isGold ? '🎯' : (isBlue ? '✨' : '🚀')}</span>
+                                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {isGold ? 'Meister-Ohr' : (isBlue ? 'Super Gehör' : 'Weiter-Rocker')}
+                                      </span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', fontSize: '0.68rem', color: '#475569' }}>
+                                      <span>L:{entry.teacher_percent}% • S:{entry.student_percent}%</span>
+                                      <span style={{ fontWeight: 900, color: '#16a34a', background: 'rgba(34,197,94,0.12)', padding: '1px 5px', borderRadius: '5px', fontSize: '0.64rem' }}>
+                                        +{entry.xp_amount} XP
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              } else {
+                                const isNextSlot = slotIdx === matchHistory.length;
+                                return (
+                                  <div key={slotIdx} style={{
+                                    border: isNextSlot ? '1.5px dashed #94a3b8' : '1.5px dashed #e2e8f0',
+                                    background: isNextSlot ? '#f8fafc' : '#ffffff',
+                                    borderRadius: '14px',
+                                    padding: '10px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    minHeight: '74px',
+                                    textAlign: 'center',
+                                    gap: '3px'
+                                  }}>
+                                    <span style={{ fontSize: '0.95rem', opacity: isNextSlot ? 1 : 0.4 }}>
+                                      {slotIdx === 0 ? '🌱' : (slotIdx === 1 ? '⚡' : '🏆')}
+                                    </span>
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isNextSlot ? '#475569' : '#94a3b8' }}>
+                                      {slotIdx === 0 ? '1. Match' : (slotIdx === 1 ? '2. Match' : '3. Finale')}
+                                    </span>
+                                    <span style={{ fontSize: '0.60rem', color: isNextSlot ? '#16a34a' : '#cbd5e1', fontWeight: 750 }}>
+                                      {isNextSlot ? 'Tipp abgeben 🔒' : 'Gesperrt'}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       <div style={{ display: 'flex', gap: '12px', marginTop: '8px', paddingBottom: (isMobileView || isInsideSim || isFullscreen || isMobileOrSim) ? '180px' : '48px' }}>
                         <button
                           type="button"
@@ -10227,27 +11394,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     gap: '16px'
                   }}>
                     <div style={{
-                      background: '#ffffff',
+                      background: '#f8fafc',
                       border: '1.5px solid #e2e8f0',
                       borderRadius: '24px',
-                      padding: '20px',
+                      padding: '16px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '16px',
-                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
+                      gap: '14px',
+                      boxShadow: '0 2px 12px rgba(0, 0, 0, 0.02)'
                     }}>
                       {/* ========================================================================= */}
-                      {/* ZONE 1: MINIMALISTISCHE SCHÜLERVORSCHAU (Device Preview Card)            */}
+                      {/* ZONE 1: MINIMALISTISCHE SCHÜLERVORSCHAU (Hero Card)                      */}
                       {/* ========================================================================= */}
                       <div style={{
-                        background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
-                        border: '1.5px solid #e2e8f0',
+                        background: '#ffffff',
+                        border: '1px solid rgba(226, 232, 240, 0.9)',
                         borderRadius: '20px',
-                        padding: '14px 16px',
+                        padding: '16px 18px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '10px',
-                        boxShadow: 'inset 0 1px 2px rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.02)'
+                        gap: '12px',
+                        boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03)'
                       }}>
                         {/* Preview Header Bar */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -10452,7 +11619,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           }
 
                           return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '2px 0' }}>
                               {/* Lehrwerke Books */}
                               {lehrwerkeList.map((item, idx) => {
                                 const bookColor = getLehrwerkColor(item.title);
@@ -10472,29 +11639,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     display: 'flex',
                                     flexDirection: 'column',
                                     gap: '6px',
-                                    padding: '10px 12px',
-                                    background: '#ffffff',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '14px',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                                    paddingBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '10px' : '0',
+                                    borderBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '1px solid rgba(0,0,0,0.06)' : 'none'
                                   }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                                         <div style={{
-                                          width: '22px',
-                                          height: '28px',
+                                          width: '26px',
+                                          height: '30px',
                                           background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                          borderRadius: '5px',
+                                          borderRadius: '6px',
                                           flexShrink: 0,
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center',
-                                          boxShadow: '0 2px 4px rgba(0,0,0,0.08)'
+                                          boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
                                         }}>
-                                          <BookOpen size={11} color={bookColor.text} />
+                                          <BookOpen size={13} color={bookColor.text} />
                                         </div>
                                         <span style={{
-                                          fontSize: '0.88rem',
+                                          fontSize: '0.90rem',
                                           fontWeight: 850,
                                           color: '#0f172a',
                                           overflow: 'hidden',
@@ -10505,17 +11669,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         </span>
                                       </div>
 
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                         {/* Granular Page Badges */}
                                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                           {item.pages.map((p: number) => (
                                             <span key={`p-pill-${p}`} style={{
                                               fontSize: '0.72rem',
-                                              fontWeight: 850,
+                                              fontWeight: 800,
                                               color: '#15803d',
                                               background: '#dcfce7',
-                                              padding: '2px 6px',
-                                              borderRadius: '6px',
+                                              padding: '3px 8px',
+                                              borderRadius: '99px',
                                               display: 'inline-flex',
                                               alignItems: 'center',
                                               gap: '4px'
@@ -10557,10 +11721,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               background: 'rgba(239, 68, 68, 0.08)',
                                               color: '#dc2626',
                                               cursor: 'pointer',
-                                              fontSize: '0.70rem',
+                                              fontSize: '0.72rem',
                                               fontWeight: 800,
-                                              padding: '3px 6px',
-                                              borderRadius: '6px',
+                                              padding: '4px 8px',
+                                              borderRadius: '8px',
                                               marginLeft: '2px'
                                             }}
                                             className="hover-scale-mini"
@@ -10572,7 +11736,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       </div>
                                     </div>
 
-                                    {/* Specific Page Notes (Apple Rose Soft-Pill) */}
+                                    {/* Specific Page Notes (Frameless Editorial Flow) */}
                                     {pagesWithNotes.map((p: number) => {
                                       const pState = assignedBook?.pageStates?.[p];
                                       let noteText = getCleanPageNotes(pState?.homeworkNotes || pState?.homework_notes);
@@ -10590,15 +11754,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           justifyContent: 'space-between',
                                           gap: '8px',
                                           fontSize: '0.78rem',
-                                          color: '#881337',
-                                          padding: '6px 10px',
-                                          background: '#fff1f2',
-                                          border: '1px solid #fecdd3',
-                                          borderRadius: '10px'
+                                          padding: '2px 0',
+                                          marginLeft: '36px'
                                         }}>
                                           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
-                                            <span style={{ fontWeight: 850, color: '#9f1239', flexShrink: 0 }}>S. {p}:</span>
-                                            <span style={{ fontWeight: 650, color: '#4c0519', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{noteText}</span>
+                                            <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0 }}>S. {p}:</span>
+                                            <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{noteText}</span>
                                           </div>
                                           {!readOnly && (
                                             <button
@@ -10607,10 +11768,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               style={{
                                                 border: 'none',
                                                 background: 'none',
-                                                color: '#e11d48',
+                                                color: '#94a3b8',
                                                 cursor: 'pointer',
                                                 fontSize: '0.70rem',
-                                                fontWeight: 900,
+                                                fontWeight: 800,
                                                 padding: '2px',
                                                 flexShrink: 0
                                               }}
@@ -10629,7 +11790,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                               {/* Songs List */}
                               {otherHWs.length > 0 && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                   {otherHWs.map((item, idx) => {
                                     const songNote = getCleanPageNotes(item.homework_notes);
                                     return (
@@ -10637,18 +11798,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         display: 'flex',
                                         flexDirection: 'column',
                                         gap: '6px',
-                                        padding: '10px 12px',
-                                        background: '#ffffff',
-                                        border: '1px solid #e2e8f0',
-                                        borderRadius: '14px',
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                                        paddingBottom: idx < otherHWs.length - 1 ? '10px' : '0',
+                                        borderBottom: idx < otherHWs.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none'
                                       }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                                             <div style={{
-                                              width: '24px',
-                                              height: '24px',
-                                              borderRadius: '6px',
+                                              width: '26px',
+                                              height: '26px',
+                                              borderRadius: '8px',
                                               background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
                                               display: 'flex',
                                               alignItems: 'center',
@@ -10659,7 +11817,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               <Music size={13} strokeWidth={2.4} />
                                             </div>
                                             <span style={{
-                                              fontSize: '0.88rem',
+                                              fontSize: '0.90rem',
                                               fontWeight: 850,
                                               color: '#0f172a',
                                               overflow: 'hidden',
@@ -10679,10 +11837,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                 background: 'rgba(239, 68, 68, 0.08)',
                                                 color: '#dc2626',
                                                 cursor: 'pointer',
-                                                fontSize: '0.70rem',
+                                                fontSize: '0.72rem',
                                                 fontWeight: 800,
-                                                padding: '3px 6px',
-                                                borderRadius: '6px',
+                                                padding: '4px 8px',
+                                                borderRadius: '8px',
                                                 flexShrink: 0
                                               }}
                                               className="hover-scale-mini"
@@ -10693,21 +11851,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           )}
                                         </div>
 
-                                        {/* Specific Song Practice Note (Apple Indigo Soft-Pill) */}
+                                        {/* Specific Song Practice Note (Frameless Editorial Flow) */}
                                         {songNote ? (
                                           <div style={{
                                             display: 'flex',
                                             alignItems: 'baseline',
                                             gap: '6px',
                                             fontSize: '0.78rem',
-                                            color: '#3730a3',
-                                            padding: '6px 10px',
-                                            background: '#eef2ff',
-                                            border: '1px solid #c7d2fe',
-                                            borderRadius: '10px'
+                                            padding: '2px 0',
+                                            marginLeft: '36px'
                                           }}>
-                                            <span style={{ fontWeight: 850, color: '#312e81', flexShrink: 0 }}>📌 Fahrplan:</span>
-                                            <span style={{ fontWeight: 650, color: '#1e1b4b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{songNote}</span>
+                                            <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0 }}>📌 Fahrplan:</span>
+                                            <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{songNote}</span>
                                           </div>
                                         ) : null}
                                       </div>
@@ -10716,39 +11871,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 </div>
                               )}
 
-                              {/* Audio Badges in Live Preview (Single-line infinite loop carousel) */}
+                              {/* Audio Badges in Live Preview */}
                               {audioNotes.length > 0 && (
-                                <AudioTrackCarousel
-                                  tracks={audioNotes.map((item, index) => {
-                                    const parts = item.note.substring(6).split('|');
-                                    return {
-                                      url: parts[0],
-                                      duration: parseInt(parts[1] || '0', 10),
-                                      label: parts[3] || `🎵 Play-Along #${index + 1}`,
-                                      originalIdx: item.idx,
-                                      idx: item.idx
-                                    };
-                                  })}
-                                  onDelete={!readOnly ? handleDeleteNote : undefined}
-                                  readOnly={readOnly}
-                                />
+                                <div style={{ paddingTop: '2px' }}>
+                                  <AudioTrackCarousel
+                                    tracks={audioNotes.map((item, index) => {
+                                      const parts = item.note.substring(6).split('|');
+                                      return {
+                                        url: parts[0],
+                                        duration: parseInt(parts[1] || '0', 10),
+                                        label: parts[3] || `🎵 Play-Along #${index + 1}`,
+                                        originalIdx: item.idx,
+                                        idx: item.idx
+                                      };
+                                    })}
+                                    onDelete={!readOnly ? handleDeleteNote : undefined}
+                                    readOnly={readOnly}
+                                  />
+                                </div>
                               )}
 
-                              {/* Compact Note Indicator in Live Preview (Avoids 1:1 Text Wall Duplication) */}
+                              {/* Compact Note Indicator in Live Preview */}
                               {generalHomeworkNotes.trim() && (
                                 <div style={{
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '8px',
-                                  background: 'rgba(52, 168, 83, 0.08)',
-                                  border: '1px solid rgba(52, 168, 83, 0.25)',
-                                  borderRadius: '10px',
-                                  padding: '6px 10px',
-                                  fontSize: '0.78rem'
+                                  padding: '6px 0 2px 0',
+                                  fontSize: '0.78rem',
+                                  borderTop: (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0) ? '1px dashed #e2e8f0' : 'none'
                                 }}>
                                   <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                  <span style={{ fontWeight: 800, color: '#15803d', flexShrink: 0 }}>Hinweis:</span>
-                                  <span style={{ color: '#1e293b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                  <span style={{ fontWeight: 850, color: '#15803d', flexShrink: 0 }}>Hinweis:</span>
+                                  <span style={{ color: '#334155', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                                     {generalHomeworkNotes.trim()}
                                   </span>
                                 </div>
@@ -10759,30 +11914,63 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </div>
 
                       {/* ========================================================================= */}
-                      {/* ZONE 2: SEGMENTIERTE WERKZEUG-KACHELN                                     */}
+                      {/* ZONE 2: SEGMENTIERTE UNTERRICHTS-WERKZEUGE & EINGABE                     */}
                       {/* ========================================================================= */}
                       {!readOnly && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          background: 'rgba(241, 245, 249, 0.8)',
+                          border: '1px solid rgba(226, 232, 240, 0.95)',
+                          borderRadius: '20px',
+                          padding: '12px',
+                          boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.02)'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '2px 4px 4px 4px'
+                          }}>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 900,
+                              color: '#64748b',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}>
+                              <span>🛠️</span>
+                              <span>Unterrichts-Werkzeuge & Eingabe</span>
+                            </span>
+                            <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 650 }}>
+                              Lehrer-Studio
+                            </span>
+                          </div>
+
                           {/* --------------------------------------------------------------------- */}
                           {/* KACHEL A: PLAY-ALONG AUDIO STUDIO                                     */}
                           {/* --------------------------------------------------------------------- */}
                           <div style={{
                             background: '#ffffff',
-                            borderRadius: '18px',
-                            border: '1.5px solid #e2e8f0',
-                            padding: '14px 16px',
+                            borderRadius: '14px',
+                            border: '1px solid #e2e8f0',
+                            padding: '12px 14px',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '10px',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                            gap: '8px',
+                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
                           }}>
                             {/* Studio Header */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>
                                   🎙️ Play-Along Studio
                                 </span>
-                                <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 650 }}>
+                                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 650 }}>
                                   (max. 60s)
                                 </span>
                               </div>
@@ -10846,6 +12034,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 padding: '10px 14px',
                                 display: 'flex',
                                 alignItems: 'center',
+                                justifySelf: 'stretch',
                                 justifyContent: 'space-between',
                                 fontSize: '0.80rem'
                               }}>
@@ -10873,7 +12062,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             )}
 
                             {isUploadingAudio && (
-                              <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ fontSize: '0.76rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span>⏳</span> Audio wird gesichert und zur Vorschau hinzugefügt...
                               </div>
                             )}
@@ -10884,18 +12073,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           {/* --------------------------------------------------------------------- */}
                           <div style={{
                             background: '#ffffff',
-                            borderRadius: '18px',
-                            border: '1.5px solid #e2e8f0',
-                            padding: '14px 16px',
+                            borderRadius: '14px',
+                            border: '1px solid #e2e8f0',
+                            padding: '12px 14px',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '10px',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                            gap: '8px',
+                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
                           }}>
                             {/* Editor Header */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <label style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                                <FileText size={15} style={{ color: '#34a853' }} />
+                              <label style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                                <FileText size={14} style={{ color: '#34a853' }} />
                                 <span>Zusätzliche Hausaufgaben-Bemerkungen</span>
                               </label>
 
@@ -10903,12 +12092,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 type="button"
                                 onClick={toggleSpeechRecognition}
                                 style={{
-                                  background: isListening ? '#ef4444' : '#f1f5f9',
+                                  background: isListening ? '#ef4444' : '#f8fafc',
                                   color: isListening ? '#ffffff' : '#334155',
                                   border: '1px solid #e2e8f0',
-                                  padding: '4px 10px',
-                                  borderRadius: '9px',
-                                  fontSize: '0.72rem',
+                                  padding: '3px 8px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.70rem',
                                   fontWeight: 800,
                                   cursor: 'pointer',
                                   display: 'flex',
@@ -10926,7 +12115,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                             {/* Textarea */}
                             <textarea
-                              placeholder="Trage hier zusätzliche Bemerkungen zur Hausaufgabe ein (z.B. Nächstes Mal bitte das Plektrum mitbringen)..."
+                              placeholder="Trage hier zusätzliche Bemerkungen zur Hausaufgabe ein..."
                               value={generalHomeworkNotes}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -10945,13 +12134,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               }}
                               style={{
                                 width: '100%',
-                                height: '70px',
-                                padding: '10px 12px',
-                                borderRadius: '12px',
+                                height: '64px',
+                                padding: '8px 10px',
+                                borderRadius: '10px',
                                 border: '1.5px solid #cbd5e1',
-                                fontSize: '0.84rem',
+                                fontSize: '0.82rem',
                                 fontWeight: 600,
-                                lineHeight: '1.45',
+                                lineHeight: '1.4',
                                 outline: 'none',
                                 resize: 'none',
                                 background: '#fefdf8',
@@ -10965,93 +12154,90 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               {(() => {
                                 const isPresetActive = (itemText: string, isBpm = false) => {
-                                  const currentNotes = generalHomeworkNotes || '';
                                   if (isBpm) {
-                                    return currentNotes.includes("Achte diese Woche besonders darauf, das Metronom bei");
+                                    return generalHomeworkNotes.toLowerCase().includes('bpm');
                                   }
-                                  return currentNotes.includes(itemText);
+                                  return generalHomeworkNotes.includes(itemText);
                                 };
 
                                 const togglePreset = (itemText: string, isBpm = false, tagKey?: string) => {
-                                  let currentNotes = generalHomeworkNotes || '';
-                                  const active = isPresetActive(itemText, isBpm);
-
-                                  if (active) {
-                                    if (isBpm) {
-                                      currentNotes = currentNotes.replace(/\n*Achte diese Woche besonders darauf, das Metronom bei .* zu halten\./g, '');
-                                    } else {
-                                      const escapedText = itemText.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-                                      currentNotes = currentNotes.replace(new RegExp('\\n*' + escapedText, 'g'), '');
-                                    }
-                                    currentNotes = currentNotes.replace(/\n{3,}/g, '\n\n').trim();
-                                    setGeneralHomeworkNotes(currentNotes);
-
-                                    if (tagKey) {
-                                      setPendingTargetFocusTags(prev => prev.filter(t => t !== tagKey));
-                                    }
+                                  if (isBpm) {
+                                    setGeneralHomeworkNotes(prev => {
+                                      const clean = prev.replace(/\s*\(?\d+\s*BPM\)?/gi, '').trim();
+                                      const next = clean ? `${clean} (60 BPM)` : '60 BPM';
+                                      try { localStorage.setItem(`campus_homework_notes_${student.id}`, next); } catch {}
+                                      return next;
+                                    });
                                   } else {
-                                    let textToAdd = itemText;
-                                    if (isBpm) {
-                                      const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
-                                      const bpmText = bpm ? `${bpm} BPM` : "120 BPM";
-                                      textToAdd = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
-                                    }
-                                    currentNotes = currentNotes ? `${currentNotes.trim()}\n\n${textToAdd}` : textToAdd;
-                                    setGeneralHomeworkNotes(currentNotes);
-                                    setIsCurrentHomework(true);
-
-                                    if (tagKey) {
-                                      setPendingTargetFocusTags(prev => prev.includes(tagKey) ? prev : [...prev, tagKey]);
-                                    }
+                                    setGeneralHomeworkNotes(prev => {
+                                      let next = '';
+                                      if (prev.includes(itemText)) {
+                                        next = prev.replace(itemText, '').replace(/\n\n+/g, '\n').trim();
+                                      } else {
+                                        next = prev.trim() ? `${prev.trim()}\n${itemText}` : itemText;
+                                      }
+                                      try { localStorage.setItem(`campus_homework_notes_${student.id}`, next); } catch {}
+                                      return next;
+                                    });
                                   }
-                                  setHasChanges(true);
-                                  triggerDebouncedAutoSave();
+
+                                  if (tagKey) {
+                                    setPendingTargetFocusTags(prev => {
+                                      if (prev.includes(tagKey)) {
+                                        return prev.filter(k => k !== tagKey);
+                                      } else {
+                                        return [...prev, tagKey];
+                                      }
+                                    });
+                                  }
+
+                                  triggerImmediateAutoSave();
                                 };
 
                                 const allPresets = [
                                   {
                                     label: '⏱️ Tempo halten',
-                                    desc: 'Metronom BPM',
-                                    text: '',
-                                    tagKey: 'tempo',
-                                    isBpm: true,
-                                    onClick: () => togglePreset('', true, 'tempo')
+                                    desc: 'Metronom & Puls',
+                                    text: 'Achte auf ein gleichmäßiges Tempo und übe gezielt mit dem Metronom.',
+                                    tagKey: 'rhythmus',
+                                    isBpm: false,
+                                    onClick: () => togglePreset('Achte auf ein gleichmäßiges Tempo und übe gezielt mit dem Metronom.', false, 'rhythmus')
                                   },
                                   {
                                     label: '✨ Sauber spielen',
-                                    desc: 'Töne & Intonation',
-                                    text: 'Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.',
+                                    desc: 'Klangkultur',
+                                    text: 'Spiele diese Stelle besonders sauber, achte auf saubere Töne und klaren Klang.',
                                     tagKey: 'intonation',
                                     isBpm: false,
-                                    onClick: () => togglePreset('Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.', false, 'intonation')
+                                    onClick: () => togglePreset('Spiele diese Stelle besonders sauber, achte auf saubere Töne und klaren Klang.', false, 'intonation')
                                   },
                                   {
                                     label: '🥁 Rhythmus-Metronom',
-                                    desc: 'Timing & Takt',
-                                    text: 'Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.',
+                                    desc: 'Timing & BPM',
+                                    text: 'Übe diesen Rhythmus präzise auf den Klick.',
                                     tagKey: 'rhythmus',
-                                    isBpm: false,
-                                    onClick: () => togglePreset('Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.', false, 'rhythmus')
+                                    isBpm: true,
+                                    onClick: () => togglePreset('Übe diesen Rhythmus präzise auf den Klick.', true, 'rhythmus')
                                   },
                                   {
-                                    label: '🖖 Fingersatz üben',
-                                    desc: 'Fingersatz einhalten',
-                                    text: 'Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.',
-                                    tagKey: 'fingersatz',
+                                    label: '🖐️ Fingersatz üben',
+                                    desc: 'Präzise Motorik',
+                                    text: 'Halte dich exakt an den notierten Fingersatz und achte auf eine entspannte Handhaltung.',
+                                    tagKey: 'technik',
                                     isBpm: false,
-                                    onClick: () => togglePreset('Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.', false, 'fingersatz')
+                                    onClick: () => togglePreset('Halte dich exakt an den notierten Fingersatz und achte auf eine entspannte Handhaltung.', false, 'technik')
                                   },
                                   {
                                     label: '🦅 Ausdruck & Dynamik',
-                                    desc: 'Musikalität',
-                                    text: 'Spiele mit voller Hingabe, achte auf die Lautstärken-Dynamik und Phrasierung.',
+                                    desc: 'Emotion & Gefühl',
+                                    text: 'Gestalte die Dynamik bewusst (p/f) und bringe Emotion und Gefühl in deinen Ausdruck.',
                                     tagKey: 'ausdruck',
                                     isBpm: false,
-                                    onClick: () => togglePreset('Spiele mit voller Hingabe, achte auf die Lautstärken-Dynamik und Phrasierung.', false, 'ausdruck')
+                                    onClick: () => togglePreset('Gestalte die Dynamik bewusst (p/f) und bringe Emotion und Gefühl in deinen Ausdruck.', false, 'ausdruck')
                                   },
                                   {
-                                    label: '📖 Auswendig lernen',
-                                    desc: 'Spiel ohne Blatt',
+                                    label: '🧠 Auswendig spielen',
+                                    desc: 'Freies Spiel',
                                     text: 'Präge dir diesen Abschnitt auswendig ein und spiele frei ohne Notenblatt.',
                                     tagKey: 'auswendig',
                                     isBpm: false,
@@ -11103,37 +12289,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       }}
                                       className="preset-chip-card hover-scale"
                                     >
-                                      <span style={{ fontWeight: 800, fontSize: '0.72rem', letterSpacing: '-0.01em' }}>
+                                      <span style={{ fontWeight: 800, fontSize: '0.70rem', letterSpacing: '-0.01em' }}>
                                         {item.label}
                                       </span>
-                                      {active && (
-                                        <span style={{ 
-                                          background: 'rgba(255, 255, 255, 0.25)', 
-                                          borderRadius: '50%', 
-                                          width: '11px', 
-                                          height: '11px', 
-                                          display: 'flex', 
-                                          alignItems: 'center', 
-                                          justifyContent: 'center', 
-                                          fontSize: '0.55rem', 
-                                          fontWeight: 900 
-                                        }}>
-                                          ✓
-                                        </span>
-                                      )}
                                     </button>
                                   );
                                 };
 
                                 return (
                                   <>
-                                    <div 
-                                      style={{ 
-                                        display: 'flex', 
-                                        gap: '5px', 
-                                        overflowX: 'auto', 
-                                        padding: '2px 0', 
-                                        scrollbarWidth: 'none',
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        gap: '6px',
+                                        overflowX: 'auto',
+                                        padding: '2px 0',
                                         WebkitOverflowScrolling: 'touch',
                                         flexWrap: 'nowrap',
                                         width: '100%',
@@ -11159,7 +12329,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                             alignItems: 'center',
                                             gap: '3px',
                                             fontWeight: 850,
-                                            fontSize: '0.72rem',
+                                            fontSize: '0.70rem',
                                             whiteSpace: 'nowrap'
                                           }}
                                           className="preset-chip-card hover-scale"
@@ -11199,18 +12369,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               cursor: 'pointer'
                                             }}
                                           >
-                                            Schließen ✕
+                                            ✕ Schließen
                                           </button>
                                         </div>
-
-                                        <div style={{
-                                          display: 'flex',
-                                          flexWrap: 'wrap',
-                                          gap: '5px',
-                                          maxHeight: '140px',
-                                          overflowY: 'auto',
-                                          padding: '2px 0'
-                                        }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingTop: '4px' }}>
                                           {extraPresets.map((item, idx) => renderPill(item, idx + 5))}
                                         </div>
                                       </div>
@@ -11226,14 +12388,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           {/* --------------------------------------------------------------------- */}
                           <div style={{
                             background: '#ffffff',
-                            borderRadius: '16px',
-                            border: '1.5px solid #e2e8f0',
-                            padding: '12px 14px',
+                            borderRadius: '14px',
+                            border: '1px solid #e2e8f0',
+                            padding: '10px 12px',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '6px'
+                            gap: '6px',
+                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
                           }}>
-                            <label style={{ fontSize: '0.78rem', fontWeight: 850, color: '#64748b', margin: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <label style={{ fontSize: '0.76rem', fontWeight: 850, color: '#64748b', margin: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
                               <span>🔒 Interne Notiz (nur für Lehrer sichtbar)</span>
                             </label>
                             <textarea
@@ -11252,11 +12415,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               }}
                               style={{
                                 width: '100%',
-                                height: '50px',
-                                padding: '8px 10px',
-                                borderRadius: '10px',
+                                height: '46px',
+                                padding: '6px 10px',
+                                borderRadius: '8px',
                                 border: '1px solid #cbd5e1',
-                                fontSize: '0.80rem',
+                                fontSize: '0.78rem',
                                 fontWeight: 600,
                                 outline: 'none',
                                 resize: 'none',

@@ -25,6 +25,7 @@ import { CampusJuniorDashboard } from './campus/CampusJuniorDashboard';
 import { CampusTeenDashboard } from './campus/CampusTeenDashboard';
 import { CampusLevelSelectModal } from './campus/CampusLevelSelectModal';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
+import { MeisterOhrSticker } from './MeisterOhrSticker';
 
 const showMissionsFeature = false;
 
@@ -2833,6 +2834,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [firstPinActiveField, setFirstPinActiveField] = useState<'new' | 'confirm'>('new');
   const [firstPinShowMask, setFirstPinShowMask] = useState<boolean>(false);
   const [firstPinSavedSuccess, setFirstPinSavedSuccess] = useState<boolean>(false);
+  const [matchCelebrationData, setMatchCelebrationData] = useState<any | null>(null);
 
   const [isAppUser, setIsAppUser] = useState(false);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
@@ -5726,6 +5728,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     fetchStudentProgress();
 
     if (!studentId) return;
+    const playMatchChime = () => {
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const now = audioCtx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 (Happy Major Chime)
+        notes.forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.11);
+          gain.gain.setValueAtTime(0.28, now + i * 0.11);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.11 + 0.65);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + i * 0.11);
+          osc.stop(now + i * 0.11 + 0.7);
+        });
+      } catch (e) {}
+    };
+
     const channel = supabase.channel(`realtime_student_progress_${studentId}`);
     channel
       .on('broadcast', { event: 'homework-changed' }, () => {
@@ -5737,6 +5759,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         const songTitle = payload.payload?.songTitle || 'einem Song';
         alert(`Glückwunsch! Deine Challenge für "${songTitle}" wurde von deinem Lehrer bestätigt! 🏆🎉`);
       })
+      .on('broadcast', { event: 'song-matched' }, (payload: any) => {
+        console.log('[Realtime] Song-matched broadcast received:', payload);
+        const data = payload?.payload;
+        if (data) {
+          setMatchCelebrationData(data);
+          if (data.xpAmount) {
+            setAvatar((prev: any) => prev ? { ...prev, xp: (prev.xp || 0) + data.xpAmount } : prev);
+          }
+          fetchStudentProgress();
+          playMatchChime();
+          // WebPush Native Notification fallback when tab is in background
+          try {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
+              new Notification('🎯 Neues Song-Match!', {
+                body: `Für "${data.songTitle}": Du hast +${data.xpAmount} Campus-XP erhalten!`,
+                icon: '/favicon.ico'
+              });
+            }
+          } catch (e) {}
+        }
+      })
       .subscribe();
 
     const handleHomeworkUpdate = (e: Event) => {
@@ -5745,11 +5788,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         fetchStudentProgress();
       }
     };
+    const handleCampusXpAwarded = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.studentId === studentId && customEvent.detail?.amount) {
+        setAvatar((prev: any) => prev ? { ...prev, xp: (prev.xp || 0) + customEvent.detail.amount } : prev);
+      }
+    };
     window.addEventListener('homework-updated', handleHomeworkUpdate);
+    window.addEventListener('campus-xp-awarded', handleCampusXpAwarded);
 
     return () => {
       supabase.removeChannel(channel);
       window.removeEventListener('homework-updated', handleHomeworkUpdate);
+      window.removeEventListener('campus-xp-awarded', handleCampusXpAwarded);
     };
   }, [studentId]);
 
@@ -9474,6 +9525,106 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       , document.body)}
                     </>
                   )}
+
+                  {/* 2.5 Live Match Celebration Modal Portal */}
+                  {matchCelebrationData && createPortal(
+                    <div
+                      style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 10006,
+                        background: 'rgba(9, 9, 11, 0.82)',
+                        backdropFilter: 'blur(24px)',
+                        WebkitBackdropFilter: 'blur(24px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px',
+                        color: '#ffffff',
+                        fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
+                        animation: 'fadeIn 0.25s ease'
+                      }}
+                    >
+                      <Confetti width={typeof window !== 'undefined' ? window.innerWidth : 400} height={typeof window !== 'undefined' ? window.innerHeight : 800} recycle={false} numberOfPieces={280} gravity={0.22} />
+                      <div
+                        style={{
+                          width: '100%',
+                          maxWidth: '420px',
+                          background: 'linear-gradient(180deg, #18181b 0%, #09090b 100%)',
+                          border: '2px solid rgba(52, 168, 83, 0.45)',
+                          borderRadius: '28px',
+                          padding: '32px 24px',
+                          textAlign: 'center',
+                          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.8), 0 0 50px rgba(52, 168, 83, 0.25)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '18px',
+                          position: 'relative'
+                        }}
+                      >
+                        <div style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 900,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.1em',
+                          color: '#86efac',
+                          background: 'rgba(34, 197, 94, 0.15)',
+                          padding: '4px 14px',
+                          borderRadius: '99px',
+                          border: '1px solid rgba(34, 197, 94, 0.3)'
+                        }}>
+                          ✨ Live aus deinem Unterricht
+                        </div>
+
+                        <div>
+                          <h3 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 950, color: '#ffffff', letterSpacing: '-0.02em' }}>
+                            Song-Match geprüft! 🎯
+                          </h3>
+                          <p style={{ margin: 0, fontSize: '0.84rem', color: '#a1a1aa', lineHeight: 1.4 }}>
+                            Deine Lehrkraft hat dein Können für <strong style={{ color: '#ffffff' }}>{matchCelebrationData.songTitle}</strong> gematcht!
+                          </p>
+                        </div>
+
+                        {/* Holographic 3-Tier Sticker Card */}
+                        <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                          <MeisterOhrSticker
+                            matchedAt={matchCelebrationData.matchedAt}
+                            teacherPercent={matchCelebrationData.teacherPercent}
+                            studentPercent={matchCelebrationData.studentPercent}
+                            xpAmount={matchCelebrationData.xpAmount}
+                            isCompact={false}
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setMatchCelebrationData(null)}
+                          style={{
+                            width: '100%',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            color: '#ffffff',
+                            padding: '14px',
+                            borderRadius: '16px',
+                            fontSize: '0.94rem',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            boxShadow: '0 6px 20px rgba(22, 163, 74, 0.45)',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px'
+                          }}
+                          className="hover-scale"
+                        >
+                          <Sparkles size={18} />
+                          <span>🚀 Weiter rocken!</span>
+                        </button>
+                      </div>
+                    </div>
+                  , document.body)}
 
                   {/* 3. Celebration / Success Logbook Overlay */}
                   {showCelebration && celebrationDetails && createPortal(
