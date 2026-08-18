@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
@@ -5632,15 +5632,34 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     return Array.from(songsMap.values());
   }, [activeSongSkills, progressItems, songs]);
 
+  const isSongMastered = useCallback((song: any) => {
+    if (!song) return false;
+    if (song.status === 'MASTERED' || (song.progress_percent || 0) === 100) return true;
+    const normKey = (song.title || '').toLowerCase().trim();
+    if (!normKey) return false;
+    const pItem = (progressItems || []).find(item => {
+      const t = (item.topic_name || item.title || '').toLowerCase().trim();
+      return t && (t === normKey || t.includes(normKey) || normKey.includes(t));
+    });
+    if (pItem && (pItem.status === 'MASTERED' || (pItem.progress_percent || 0) === 100)) return true;
+    const skill = (activeSongSkills || []).find((s: any) => {
+      const skTitle = (s.songs?.title || s.title || s.song_title || '').toLowerCase().trim();
+      return (s.id && song.id && s.id === song.id) || (skTitle && (skTitle === normKey || skTitle.includes(normKey) || normKey.includes(skTitle)));
+    });
+    if (skill && (skill.is_stage_ready || (skill.progress_percent || 0) === 100 || skill.status === 'MASTERED')) return true;
+    return false;
+  }, [progressItems, activeSongSkills]);
+
   const songStats = useMemo(() => {
     const assigned = assignedCampusSongs;
-    const mastered = assigned.filter(song => song.status === 'MASTERED' || (song.progress_percent || 0) === 100);
+    const mastered = assigned.filter(song => isSongMastered(song));
 
     return {
       assignedCount: assigned.length,
-      masteredCount: mastered.length
+      masteredCount: mastered.length,
+      activeCount: assigned.length - mastered.length
     };
-  }, [assignedCampusSongs]);
+  }, [assignedCampusSongs, isSongMastered]);
   const [songSearch, setSongSearch] = useState('');
   const [songSearchDebounced, setSongSearchDebounced] = useState('');
 
@@ -7049,6 +7068,251 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       console.warn('Junior sticker celebration error:', e);
     }
   }, [studentUiLevel, studentId, progressItems, totalFocusMinutes, avatar?.xp, avatar?.streak_flame, songStats?.masteredCount]);
+
+  const downloadJuniorStickerJpg = (sticker: any, topicOverride?: string) => {
+    if (!sticker) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 1200;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const medalCenterY = 410;
+    const tX = 160;
+    const tY = 80;
+    const tW = 880;
+    const tH = 1040;
+
+    const isLegendary = sticker.rarity === 'legendary';
+    const isEpic = sticker.rarity === 'epic';
+    const themeColor = sticker.color || '#34a853';
+
+    // 1. Draw premium dark studio gradient background
+    const bgGrad = ctx.createLinearGradient(0, 0, 1200, 1200);
+    bgGrad.addColorStop(0, '#090d16');
+    bgGrad.addColorStop(1, '#0f172a');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1200, 1200);
+
+    // 2. Ambient radial background glow behind card
+    const glowGrad = ctx.createRadialGradient(600, 600, 100, 600, 600, 550);
+    glowGrad.addColorStop(0, isLegendary ? 'rgba(234, 179, 8, 0.25)' : 'rgba(52, 168, 83, 0.22)');
+    glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(0, 0, 1200, 1200);
+
+    // 3. Draw rounded 3D Panini Collector Card Container
+    ctx.save();
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(tX, tY, tW, tH, 44);
+    } else {
+      ctx.rect(tX, tY, tW, tH);
+    }
+    ctx.fill();
+
+    // 4. Draw Rainbow Holo-Foil diagonal stripes inside card for rare/epic/legendary stickers
+    if (isLegendary || isEpic || sticker.rarity === 'rare') {
+      ctx.save();
+      ctx.clip();
+      const holoGrad = ctx.createLinearGradient(tX, tY, tX + tW, tY + tH);
+      holoGrad.addColorStop(0, 'rgba(255, 0, 128, 0.15)');
+      holoGrad.addColorStop(0.25, 'rgba(0, 255, 255, 0.15)');
+      holoGrad.addColorStop(0.5, 'rgba(255, 255, 0, 0.15)');
+      holoGrad.addColorStop(0.75, 'rgba(0, 255, 128, 0.15)');
+      holoGrad.addColorStop(1, 'rgba(255, 0, 255, 0.15)');
+      ctx.fillStyle = holoGrad;
+      ctx.fillRect(tX, tY, tW, tH);
+      ctx.restore();
+    }
+
+    // 5. Card Metallic Glowing Border
+    ctx.shadowColor = isLegendary ? '#eab308' : isEpic ? '#af52de' : themeColor;
+    ctx.shadowBlur = 30;
+    ctx.strokeStyle = isLegendary ? '#eab308' : isEpic ? '#af52de' : 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = isLegendary || isEpic ? 6 : 4;
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(tX, tY, tW, tH, 44);
+    } else {
+      ctx.rect(tX, tY, tW, tH);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // 6. Header Rarity Tag
+    ctx.save();
+    ctx.translate(600, tY + 50);
+    const rarityText = `⭐ ${(sticker.rarityLabel || 'STANDARD').toUpperCase()} • CAMPUS-GROOVELAB`;
+    ctx.font = '900 19px "Helvetica Neue", Inter, sans-serif';
+    ctx.fillStyle = isLegendary ? '#facc15' : isEpic ? '#c084fc' : themeColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(rarityText, 0, 0);
+    ctx.restore();
+
+    // 7. Header Action "FREIGESCHALTET!" Pill
+    ctx.save();
+    ctx.translate(600, tY + 115);
+    ctx.rotate(-2 * Math.PI / 180);
+    ctx.fillStyle = themeColor;
+    const pillText = 'FREIGESCHALTET!';
+    ctx.font = '900 28px "Helvetica Neue", Arial, sans-serif';
+    const pillTextWidth = ctx.measureText(pillText).width;
+    const pillW = pillTextWidth + 44;
+    const pillH = 48;
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(-pillW/2, -pillH/2, pillW, pillH, 24);
+    } else {
+      ctx.rect(-pillW/2, -pillH/2, pillW, pillH);
+    }
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(pillText, 0, 0);
+    ctx.restore();
+
+    // 8. Student Details
+    const actualStudentName = studentUser?.first_name 
+      ? `${studentUser.first_name}${studentUser.last_name ? ' ' + studentUser.last_name.charAt(0) + '.' : ''}`
+      : 'Musik-Schüler';
+    const studentInstrument = studentUser?.instrument || '';
+    const schoolName = studentUser?.schools?.name || 'Musikschule';
+
+    let textY = tY + 630;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 52px "Helvetica Neue", Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(actualStudentName, 600, textY);
+
+    if (studentInstrument) {
+      textY += 38;
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '900 22px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(studentInstrument.toUpperCase(), 600, textY);
+    }
+
+    textY += 52;
+    ctx.fillStyle = themeColor;
+    ctx.font = 'italic 900 44px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillText((sticker.title || '').toUpperCase(), 600, textY);
+
+    const masteredSong = assignedCampusSongs.find(s => isSongMastered(s)) || assignedCampusSongs[0];
+    const songMasteredTopic = topicOverride || (masteredSong ? `${masteredSong.artist} – ${masteredSong.title}` : (progressItems.find(p => p.status === 'MASTERED')?.topic_name || ''));
+
+    if (sticker.category === 'songs' || sticker.id === 'song-master' || topicOverride || songMasteredTopic) {
+      const displayTopic = topicOverride || songMasteredTopic;
+      if (displayTopic) {
+        textY += 44;
+        ctx.fillStyle = '#facc15';
+        ctx.font = '900 28px "Helvetica Neue", Inter, sans-serif';
+        ctx.fillText(displayTopic, 600, textY);
+      }
+      textY += 38;
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = 'bold 22px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(sticker.desc || '', 600, textY);
+    } else {
+      textY += 40;
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = 'bold 22px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(sticker.desc || '', 600, textY);
+
+      if (sticker.equiv) {
+        textY += 34;
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '700 20px "Helvetica Neue", Inter, sans-serif';
+        ctx.fillText(sticker.equiv, 600, textY);
+      }
+    }
+
+    // 9. Translucent Badge Pill for School Name
+    const badgeText = schoolName.toUpperCase();
+    ctx.font = 'bold 20px "Helvetica Neue", Inter, sans-serif';
+    const textWidth = ctx.measureText(badgeText).width;
+    const badgeW = textWidth + 60;
+    const badgeH = 50;
+    const badgeX = 600 - badgeW / 2;
+    const badgeY = Math.max(tY + 860, textY + 36);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 25);
+    } else {
+      ctx.rect(badgeX, badgeY, badgeW, badgeH);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, 600, badgeY + badgeH / 2);
+    ctx.textBaseline = 'alphabetic';
+
+    // 10. Website URL footer
+    ctx.fillStyle = themeColor;
+    ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('campus-groovelab.de', 600, badgeY + badgeH + 42);
+
+    // Helper stenciled sticker asset loader
+    const drawStickerAsset = (imgOrEmoji: HTMLImageElement | string, isImg: boolean) => {
+      ctx.save();
+      ctx.translate(600, medalCenterY);
+
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 10;
+
+      ctx.fillStyle = sticker.bg || 'rgba(52, 168, 83, 0.2)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 150, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 8;
+      ctx.stroke();
+
+      if (isImg) {
+        ctx.beginPath();
+        ctx.arc(0, 0, 146, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(imgOrEmoji as HTMLImageElement, -146, -146, 292, 292);
+      } else {
+        ctx.font = '120px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(sticker.emoji || '🏆', 0, 0);
+      }
+
+      ctx.restore();
+      
+      const filename = (topicOverride || sticker.title || 'sticker').toLowerCase().replace(/[^a-z0-9]/gi, '_');
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      const link = document.createElement('a');
+      link.download = `campus_sticker_${filename}.jpg`;
+      link.href = dataUrl;
+      link.click();
+    };
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      drawStickerAsset(img, true);
+    };
+    img.onerror = () => {
+      drawStickerAsset(sticker.emoji || '🏆', false);
+    };
+    img.src = `/stickers/${sticker.id}.png?v=1`;
+  };
 
   const fetchClassHighlights = async (schoolId: string, teacherId?: string | null, silent = false) => {
     if (!schoolId) return;
@@ -10986,12 +11250,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 {(() => {
                   const brandColor = studentUser?.schools?.brand_color || '#34a853';
                   
-                  const assignedSongs = assignedCampusSongs;
+                  const activeAssignedSongs = assignedCampusSongs.filter(song => !isSongMastered(song));
                   const assignedLehrwerke = lehrwerke.filter(item => 
                     localProgress.some((p: any) => String(p.studentId) === String(studentId) && String(p.lehrwerkId) === String(item.id))
                   );
 
-                  const homeworkSongs = assignedSongs.filter(song => Boolean(song.is_current_homework));
+                  const homeworkSongs = activeAssignedSongs.filter(song => Boolean(song.is_current_homework));
                   const homeworkCount = homeworkSongs.length;
 
                   return (
@@ -11026,7 +11290,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           boxShadow: juniorMediathekFilter === 'all' ? `0 2px 8px ${brandColor}20` : 'none'
                         }}
                       >
-                        <span>Alles ({assignedSongs.length + assignedLehrwerke.length})</span>
+                        <span>Alles ({activeAssignedSongs.length + assignedLehrwerke.length})</span>
                       </button>
 
                       <button
@@ -11051,7 +11315,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         }}
                       >
                         <Music size={14} />
-                        <span>Songs ({assignedSongs.length})</span>
+                        <span>Songs ({activeAssignedSongs.length})</span>
                       </button>
 
                       <button
@@ -11124,7 +11388,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       fontWeight: 600, 
                       fontSize: '0.92rem', 
                       outline: 'none', 
-                      transition: 'all 0.2s',
+                      transition: 'all 0.2s', 
                       boxSizing: 'border-box',
                       boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
                     }}
@@ -11135,21 +11399,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 {(() => {
                   const brandColor = studentUser?.schools?.brand_color || '#34a853';
                   
-                  const isMastered = (sng: any) => sng.status === 'MASTERED' || (sng.progress_percent || 0) === 100;
-                  
                   const filteredSongs = assignedCampusSongs.filter(song => {
+                    // Exclude 100% mastered songs from the active songs list
+                    if (isSongMastered(song)) return false;
+
                     const matchesSearch = songSearchDebounced === '' || 
                       song.title?.toLowerCase().includes(songSearchDebounced.toLowerCase()) || 
                       song.artist?.toLowerCase().includes(songSearchDebounced.toLowerCase());
                     const matchesHomework = juniorMediathekFilter !== 'homework' || Boolean(song.is_current_homework);
                     return matchesSearch && matchesHomework;
-                  }).sort((a, b) => {
-                    const aMastered = isMastered(a);
-                    const bMastered = isMastered(b);
-                    if (aMastered && !bMastered) return 1;
-                    if (!aMastered && bMastered) return -1;
-                    return (a.title || '').localeCompare(b.title || '', 'de', { sensitivity: 'base' });
-                  });
+                  }).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'de', { sensitivity: 'base' }));
 
                   const filteredLehrwerke = lehrwerke.filter(item => {
                     const matchesSearch = songSearchDebounced === '' || 
@@ -11503,44 +11762,124 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       🏆 Gemeisterte Songs
                     </h5>
                     {(() => {
-                      const masteredSongs = progressItems.filter(item => {
-                        const t = item.topic_name.toLowerCase().trim();
-                        return !t.includes(' - seite ') && t !== 'test' && t !== 'test - test' && t !== 'test-test' && item.status === 'MASTERED';
+                      const masteredSongsMap = new Map<string, any>();
+
+                      // 1. From assignedCampusSongs
+                      assignedCampusSongs.forEach(song => {
+                        if (isSongMastered(song)) {
+                          const key = (song.title || '').toLowerCase().trim();
+                          if (key) {
+                            masteredSongsMap.set(key, {
+                              ...song,
+                              status: 'MASTERED',
+                              progress_percent: 100
+                            });
+                          }
+                        }
                       });
-                      if (masteredSongs.length === 0) {
+
+                      // 2. From progressItems
+                      (progressItems || []).forEach(item => {
+                        const rawTopic = (item.topic_name || item.title || '').trim();
+                        if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase() === 'test' || rawTopic.toLowerCase() === 'test - test' || rawTopic.toLowerCase() === 'test-test') return;
+                        if (item.status === 'MASTERED' || item.progress_percent === 100) {
+                          const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                          const key = cleanT.toLowerCase();
+                          if (!masteredSongsMap.has(key)) {
+                            let artist = 'Unbekannt';
+                            let title = cleanT;
+                            if (cleanT.includes(' - ')) {
+                              const parts = cleanT.split(' - ');
+                              artist = parts[0].trim();
+                              title = parts.slice(1).join(' - ').trim();
+                            }
+                            masteredSongsMap.set(key, {
+                              id: item.song_id || item.id || key,
+                              title,
+                              artist,
+                              status: 'MASTERED',
+                              progress_percent: 100,
+                              is_campus_active: true
+                            });
+                          }
+                        }
+                      });
+
+                      // 3. From activeSongSkills
+                      (activeSongSkills || []).forEach((skill: any) => {
+                        if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
+                          const title = skill.songs?.title || skill.title || skill.song_title;
+                          const artist = skill.songs?.artist || skill.artist || 'Unbekannt';
+                          if (title) {
+                            const key = title.toLowerCase().trim();
+                            if (!masteredSongsMap.has(key)) {
+                              masteredSongsMap.set(key, {
+                                id: skill.songs?.id || skill.song_id || skill.id || key,
+                                title,
+                                artist,
+                                status: 'MASTERED',
+                                progress_percent: 100,
+                                is_campus_active: true
+                              });
+                            }
+                          }
+                        }
+                      });
+
+                      const masteredSongsList = Array.from(masteredSongsMap.values());
+
+                      if (masteredSongsList.length === 0) {
                         return (
                           <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                             Noch keine Meisterwerke.
                           </div>
                         );
                       }
+
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {masteredSongs.map(item => {
-                            const matchingSong = songs.find(s => s.title.toLowerCase() === item.topic_name.toLowerCase() || item.topic_name.toLowerCase().includes(s.title.toLowerCase()));
-                            const artist = matchingSong?.artist || 'Unbekannt';
-                            const title = matchingSong?.title || item.topic_name;
-                            const lwColor = getSongColor(title);
-                            const coverBg = `linear-gradient(135deg, ${lwColor.from} 0%, ${lwColor.to} 100%)`;
-
+                          {masteredSongsList.map(song => {
+                            const lwColor = getSongColor(song.title);
                             return (
-                              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#e6f4ea', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e6f4ea' }}>
+                              <div 
+                                key={song.id || song.title} 
+                                onClick={() => setSelectedSongForDetail(song)}
+                                className="hover-scale"
+                                style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '10px', 
+                                  background: '#ffffff', 
+                                  padding: '8px 12px', 
+                                  borderRadius: '14px', 
+                                  border: '1px solid #dcfce7', 
+                                  boxShadow: '0 2px 6px rgba(34, 197, 94, 0.06)',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {renderSongVinylCover(lwColor, 'sm')}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {song.title}
+                                  </div>
+                                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    von {song.artist}
+                                  </div>
+                                </div>
                                 <div style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  background: coverBg,
-                                  borderRadius: '8px',
+                                  background: '#dcfce7',
+                                  color: '#15803d',
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 900,
                                   display: 'flex',
                                   alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: lwColor.text,
-                                  flexShrink: 0,
-                                  border: '1px solid rgba(0,0,0,0.05)'
+                                  gap: '3px',
+                                  flexShrink: 0
                                 }}>
-                                  <Music size={14} />
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: '#34a853', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {artist} - {title}
+                                  <span>🏆</span>
+                                  <span>100%</span>
                                 </div>
                               </div>
                             );
@@ -14933,109 +15272,126 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </button>
 
                         {/* Rarity Pill */}
-                        <span style={{
-                          background: juniorSelectedPreviewSticker.rarity === 'legendary' ? '#fef3c7' : juniorSelectedPreviewSticker.rarity === 'epic' ? '#f3e8ff' : juniorSelectedPreviewSticker.rarity === 'rare' ? '#eff6ff' : '#f0fdf4',
-                          color: juniorSelectedPreviewSticker.rarity === 'legendary' ? '#b45309' : juniorSelectedPreviewSticker.rarity === 'epic' ? '#7e22ce' : juniorSelectedPreviewSticker.rarity === 'rare' ? '#1d4ed8' : '#15803d',
-                          fontSize: '0.8rem',
-                          fontWeight: 950,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.08em',
-                          padding: '6px 16px',
-                          borderRadius: '100px',
-                          border: juniorSelectedPreviewSticker.rarity === 'legendary' ? '1.5px solid #facc15' : 'none'
-                        }}>
-                          {juniorSelectedPreviewSticker.rarityLabel} • {juniorSelectedPreviewSticker.category === 'ueben' ? '⏱️ Übe-Fleiß' : juniorSelectedPreviewSticker.category === 'xp' ? '⭐ Zauber-XP' : juniorSelectedPreviewSticker.category === 'streaks' ? '🔥 Streaks' : juniorSelectedPreviewSticker.category === 'songs' ? '🎵 Repertoire' : '🏆 Spezial'}
-                        </span>
+                        {(() => {
+                          const isSongSticker = juniorSelectedPreviewSticker.category === 'songs' || juniorSelectedPreviewSticker.id === 'song-master';
+                          const masteredSong = assignedCampusSongs.find(s => isSongMastered(s)) || assignedCampusSongs[0];
+                          const songTitleDisplay = masteredSong ? `${masteredSong.artist} – ${masteredSong.title}` : (progressItems.find(p => p.status === 'MASTERED')?.topic_name || '');
 
-                        {/* Large 150px Full-Color Floating Sticker Card */}
-                        <div style={{
-                          width: '150px',
-                          height: '150px',
-                          borderRadius: '34px',
-                          background: '#ffffff',
-                          border: juniorSelectedPreviewSticker.isUnlocked 
-                            ? '4px solid #34a853' 
-                            : '4px solid #facc15',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: juniorSelectedPreviewSticker.isUnlocked 
-                            ? '0 16px 40px rgba(52, 168, 83, 0.35)' 
-                            : '0 16px 40px rgba(250, 204, 21, 0.35)',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          padding: '10px'
-                        }}>
-                          <img
-                            src={`/stickers/${juniorSelectedPreviewSticker.id}.png?v=1`}
-                            alt={juniorSelectedPreviewSticker.title}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'contain',
-                              filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.18))'
-                            }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              const parent = e.currentTarget.parentElement;
-                              if (parent) {
-                                const span = document.createElement('span');
-                                span.style.fontSize = '4.5rem';
-                                span.innerText = juniorSelectedPreviewSticker.emoji;
-                                parent.appendChild(span);
-                              }
-                            }}
-                          />
+                          return (
+                            <>
+                              <span style={{
+                                background: juniorSelectedPreviewSticker.rarity === 'legendary' ? '#fef3c7' : juniorSelectedPreviewSticker.rarity === 'epic' ? '#f3e8ff' : juniorSelectedPreviewSticker.rarity === 'rare' ? '#eff6ff' : '#f0fdf4',
+                                color: juniorSelectedPreviewSticker.rarity === 'legendary' ? '#b45309' : juniorSelectedPreviewSticker.rarity === 'epic' ? '#7e22ce' : juniorSelectedPreviewSticker.rarity === 'rare' ? '#1d4ed8' : '#15803d',
+                                fontSize: '0.8rem',
+                                fontWeight: 900,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.08em',
+                                padding: '6px 16px',
+                                borderRadius: '100px',
+                                border: juniorSelectedPreviewSticker.rarity === 'legendary' ? '1.5px solid #facc15' : 'none',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}>
+                                <Star size={12} fill="currentColor" /> {juniorSelectedPreviewSticker.rarityLabel} • {juniorSelectedPreviewSticker.category === 'ueben' ? 'Übe-Fleiß' : juniorSelectedPreviewSticker.category === 'xp' ? 'Zauber-XP' : juniorSelectedPreviewSticker.category === 'streaks' ? 'Streaks' : juniorSelectedPreviewSticker.category === 'songs' ? 'Repertoire' : 'Spezial'}
+                              </span>
 
-                          {!juniorSelectedPreviewSticker.isUnlocked && (
-                            <div 
-                              className="holo-phantom-overlay"
-                              style={{
-                                position: 'absolute',
-                                inset: 0,
-                                borderRadius: '30px',
-                                background: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.7) 0px, rgba(255,255,255,0.7) 4px, transparent 4px, transparent 8px)',
-                                pointerEvents: 'none'
-                              }}
-                            />
-                          )}
-                        </div>
+                              {/* Large 150px Full-Color Floating Sticker Card */}
+                              <div style={{
+                                width: '150px',
+                                height: '150px',
+                                borderRadius: '34px',
+                                background: '#ffffff',
+                                border: juniorSelectedPreviewSticker.isUnlocked 
+                                  ? '4px solid #34a853' 
+                                  : '4px solid #facc15',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: juniorSelectedPreviewSticker.isUnlocked 
+                                  ? '0 16px 40px rgba(52, 168, 83, 0.35)' 
+                                  : '0 16px 40px rgba(250, 204, 21, 0.35)',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                padding: '10px'
+                              }}>
+                                <img
+                                  src={`/stickers/${juniorSelectedPreviewSticker.id}.png?v=1`}
+                                  alt={juniorSelectedPreviewSticker.title}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'contain',
+                                    filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.18))'
+                                  }}
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const parent = e.currentTarget.parentElement;
+                                    if (parent) {
+                                      const span = document.createElement('span');
+                                      span.style.fontSize = '4.5rem';
+                                      span.innerText = juniorSelectedPreviewSticker.emoji;
+                                      parent.appendChild(span);
+                                    }
+                                  }}
+                                />
 
-                        <div>
-                          <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', margin: '0 0 6px 0', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            {juniorSelectedPreviewSticker.title}
-                          </h2>
-                          <p style={{ fontSize: '0.95rem', color: '#475569', fontWeight: 650, margin: 0, lineHeight: 1.35 }}>
-                            {juniorSelectedPreviewSticker.desc}
-                          </p>
-                        </div>
-
-                        {/* QUEST / PROGRESS BOX */}
-                        <div style={{
-                          width: '100%',
-                          background: juniorSelectedPreviewSticker.isUnlocked ? '#f0fdf4' : '#fffbeb',
-                          border: juniorSelectedPreviewSticker.isUnlocked ? '1.5px solid #bbf7d0' : '1.5px solid #fde68a',
-                          borderRadius: '24px',
-                          padding: '16px 20px',
-                          textAlign: 'center',
-                          boxSizing: 'border-box'
-                        }}>
-                          {juniorSelectedPreviewSticker.isUnlocked ? (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#15803d', fontWeight: 950 }}>
-                              <span style={{ fontSize: '1.3rem' }}>🎉</span>
-                              <span>Glückwunsch! Du besitzt diesen Sticker bereits!</span>
-                            </div>
-                          ) : (
-                            <div>
-                              <div style={{ fontSize: '0.8rem', fontWeight: 950, color: '#d97706', textTransform: 'uppercase', marginBottom: '4px' }}>
-                                🎯 Dein Ziel zum Freischalten:
+                                {!juniorSelectedPreviewSticker.isUnlocked && (
+                                  <div 
+                                    className="holo-phantom-overlay"
+                                    style={{
+                                      position: 'absolute',
+                                      inset: 0,
+                                      borderRadius: '30px',
+                                      background: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.7) 0px, rgba(255,255,255,0.7) 4px, transparent 4px, transparent 8px)',
+                                      pointerEvents: 'none'
+                                    }}
+                                  />
+                                )}
                               </div>
-                              <div style={{ fontSize: '1.05rem', fontWeight: 950, color: '#92400e' }}>
-                                {juniorSelectedPreviewSticker.progressText || juniorSelectedPreviewSticker.desc}
+
+                              <div>
+                                <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', margin: '0 0 4px 0', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  {juniorSelectedPreviewSticker.title}
+                                </h2>
+                                <p style={{ fontSize: '0.95rem', color: '#475569', fontWeight: 650, margin: 0, lineHeight: 1.35 }}>
+                                  {juniorSelectedPreviewSticker.desc}
+                                </p>
                               </div>
-                            </div>
-                          )}
-                        </div>
+
+                              {/* Interpret + Songtitel Display for Song Stickers */}
+                              {isSongSticker && songTitleDisplay && (
+                                <div style={{ textAlign: 'center', margin: '2px 0' }}>
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                    <Music size={12} /> Interpret &amp; Songtitel
+                                  </div>
+                                  <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
+                                    {songTitleDisplay}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Open, Borderless Progress / Achievement Flow */}
+                              <div style={{ textAlign: 'center', padding: '4px 8px' }}>
+                                {juniorSelectedPreviewSticker.isUnlocked ? (
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#15803d', fontWeight: 800, fontSize: '0.94rem' }}>
+                                    <Check size={16} color="#15803d" />
+                                    <span>Glückwunsch! Du besitzt diesen Sticker bereits!</span>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                      Dein Ziel zum Freischalten
+                                    </div>
+                                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                                      {juniorSelectedPreviewSticker.progressText || juniorSelectedPreviewSticker.desc}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()}
 
                         {/* ACTION BUTTON (Seamless Briefing Board Guidance) */}
                         {!juniorSelectedPreviewSticker.isUnlocked ? (
@@ -15063,27 +15419,55 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             }}
                             className="hover-scale"
                           >
-                            <Play size={22} fill="currentColor" />
-                            <span>Jetzt Übe-Rakete starten! 🚀</span>
+                            <Play size={20} fill="currentColor" />
+                            <span>Jetzt Übe-Rakete starten!</span>
                           </button>
                         ) : (
-                          <button
-                            onClick={() => setJuniorSelectedPreviewSticker(null)}
-                            style={{
-                              width: '100%',
-                              background: '#0f172a',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '20px',
-                              padding: '16px',
-                              fontWeight: 950,
-                              fontSize: '1.05rem',
-                              cursor: 'pointer'
-                            }}
-                            className="hover-scale"
-                          >
-                            Schließen 👍
-                          </button>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+                            <button
+                              type="button"
+                              onClick={() => downloadJuniorStickerJpg(juniorSelectedPreviewSticker)}
+                              style={{
+                                width: '100%',
+                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '20px',
+                                padding: '16px',
+                                fontWeight: 950,
+                                fontSize: '1rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px'
+                              }}
+                              className="hover-scale"
+                            >
+                              <Download size={18} />
+                              <span>Sticker als JPG herunterladen</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setJuniorSelectedPreviewSticker(null)}
+                              style={{
+                                width: '100%',
+                                background: '#0f172a',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '20px',
+                                padding: '14px',
+                                fontWeight: 950,
+                                fontSize: '1rem',
+                                cursor: 'pointer'
+                              }}
+                              className="hover-scale"
+                            >
+                              Schließen
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -15136,7 +15520,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           background: '#fef3c7',
                           color: '#d97706',
                           fontSize: '0.8rem',
-                          fontWeight: 950,
+                          fontWeight: 900,
                           textTransform: 'uppercase',
                           letterSpacing: '0.08em',
                           padding: '6px 16px',
@@ -15145,7 +15529,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           alignItems: 'center',
                           gap: '6px'
                         }}>
-                          🌟 Neuer Sticker freigeschaltet!
+                          <Award size={14} /> Neuer Sticker freigeschaltet!
                         </span>
 
                         {/* Animated Floating Sticker Badge */}
@@ -15184,37 +15568,85 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', margin: '0 0 6px 0', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                             {juniorAwardedStickerToCelebrate.title}
                           </h2>
-                          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#15803d', marginBottom: '8px' }}>
-                            Super gemacht! Du warst richtig fleißig! 🎉
-                          </div>
-                          <p style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 650, margin: 0, lineHeight: 1.3 }}>
-                            {juniorAwardedStickerToCelebrate.desc}
-                          </p>
+                          {(() => {
+                            const isSongSticker = juniorAwardedStickerToCelebrate.category === 'songs' || juniorAwardedStickerToCelebrate.id === 'song-master';
+                            const masteredSong = assignedCampusSongs.find(s => isSongMastered(s)) || assignedCampusSongs[0];
+                            const songTitleDisplay = masteredSong ? `${masteredSong.artist} – ${masteredSong.title}` : (progressItems.find(p => p.status === 'MASTERED')?.topic_name || '');
+
+                            return (
+                              <>
+                                {isSongSticker && songTitleDisplay && (
+                                  <div style={{ textAlign: 'center', margin: '4px 0 8px 0' }}>
+                                    <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                      <Music size={12} /> Interpret &amp; Songtitel
+                                    </div>
+                                    <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
+                                      {songTitleDisplay}
+                                    </div>
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '1.02rem', fontWeight: 800, color: '#15803d', marginBottom: '8px' }}>
+                                  Super gemacht! Du warst richtig fleißig!
+                                </div>
+                                <p style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 650, margin: 0, lineHeight: 1.3 }}>
+                                  {juniorAwardedStickerToCelebrate.desc}
+                                </p>
+                              </>
+                            );
+                          })()}
                         </div>
 
-                        <button
-                          onClick={() => setJuniorAwardedStickerToCelebrate(null)}
-                          style={{
-                            width: '100%',
-                            background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '20px',
-                            padding: '18px',
-                            fontWeight: 950,
-                            fontSize: '1.1rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 8px 24px rgba(52, 168, 83, 0.35)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            marginTop: '6px'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span>🌟 In mein Album kleben!</span>
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+                          <button
+                            type="button"
+                            onClick={() => downloadJuniorStickerJpg(juniorAwardedStickerToCelebrate)}
+                            style={{
+                              width: '100%',
+                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '20px',
+                              padding: '16px',
+                              fontWeight: 950,
+                              fontSize: '1.05rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px'
+                            }}
+                            className="hover-scale"
+                          >
+                            <Download size={18} />
+                            <span>Sticker als JPG herunterladen</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setJuniorAwardedStickerToCelebrate(null)}
+                            style={{
+                              width: '100%',
+                              background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '20px',
+                              padding: '16px',
+                              fontWeight: 950,
+                              fontSize: '1.05rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 8px 24px rgba(52, 168, 83, 0.35)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px'
+                            }}
+                            className="hover-scale"
+                          >
+                            <BookOpen size={18} />
+                            <span>In mein Album kleben</span>
+                          </button>
+                        </div>
                       </div>
 
                       <style dangerouslySetInnerHTML={{__html: `

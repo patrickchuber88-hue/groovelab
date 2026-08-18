@@ -86,6 +86,9 @@
   - **Editorial Flow (Keine Querstreifen-Balken)**: Innerhalb der Schülervorschau dürfen Notizen und Fahrpläne NIEMALS in vollflächig farbigen Hintergrundbalken (wie Rosa-, Blau- oder Grün-Streifen) oder doppelten Kasten-in-Kasten-Rahmen gerendert werden. Sie fließen immer als offene, saubere Magazin-Typografie auf dem weißen Grund mit `36px` Einrückung unter dem jeweiligen Titel.
   - **Farbige Badges & Icons**: Buchcover-Gradienten und Song-Icons bleiben lebendig und farbenfroh. Seitenzahlen werden als grüne Pillen (`S. 1`, `S. 2`) dargestellt.
   - **Stage & Toolbox Separation**: Eingabe-Werkzeuge für Lehrkräfte (*Play-Along Studio*, *Zusätzliche Hausaufgaben-Bemerkungen*, *Interne Notiz*) müssen immer in der zusammenhängenden, matten Werkzeugbank (`#f1f5f9` / `rgba(241, 245, 249, 0.8)`) dezent unterhalb der Hero-Card angeordnet sein.
+- **Herkunft von Unterrichts- und Schüler-Aufnahmen (Strikte Zuordnungsregel)**:
+  - Aufnahmen, die einer Hausaufgabe angehängt wurden bzw. in der Schülervorschau als Unterrichtsaufnahmen erscheinen (`AUDIO:` in `homeworkNotesList`, `progressItems.homework_notes`, `campus_homework_notes_${student.id}`), wurden **immer von der Lehrkraft erstellt** und müssen **immer auf der linken Seite** im Hausaufgabenheft / Aufnahmen-Tab (*Aufnahmen von deiner Lehrkraft*) dargestellt werden.
+  - Aufnahmen, die der Schüler selbst über das Aufnahmegerät / Übe-Studio aufnimmt (`campus_junior_recordings_${student.id}`), gehören **immer auf die rechte Seite** (*Deine eigenen Aufnahmen / Dein Übe-Studio*).
 - **Menü-Synchronisation (Aufgaben-Reiter)**: Wenn im Schüler-Dashboard das Aufgabenheft geladen oder geöffnet wird (z. B. via `activeTab === 'homework_book'`), MUSS auch immer der Hauptmenü-Punkt "Aufgaben" (`activeStudentTab === 'homework_book'`) synchron aktiviert sein.
 
 ## Loopstation Rules

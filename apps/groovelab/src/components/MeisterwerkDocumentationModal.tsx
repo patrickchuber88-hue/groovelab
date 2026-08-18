@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
@@ -14,36 +14,45 @@ import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 
 
+const getSimulatedNow = (): Date => {
+  const sim = localStorage.getItem('simulated_date');
+  if (sim) {
+    const d = new Date(sim);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return new Date();
+};
+
 export const ALL_STICKERS = [
-  // Meilensteine / Üben (Einmalig - Mittelwert-Progression L1=5m, L2=10m, L3=15m im Schuljahr)
-  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: 'Für insgesamt 50 Minuten fleißiges Üben.', equiv: '💡 Level 1: Ca. 17 Fokus-Timer Sessions à 3 Min.', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true, category: 'ueben', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: 'Für insgesamt 250 Minuten ausdauerndes Üben.', equiv: '💡 Level 1: Genau 50 Fokus-Timer Sessions à 5 Min.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true, category: 'ueben', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: 'Für unglaubliche 1000 Minuten Übezeit!', equiv: '💡 Level 2: Genau 100 Fokus-Timer Sessions à 10 Min. im Schuljahr', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true, category: 'ueben', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'uebe-grossmeister', emoji: '🏆', title: 'Übe-Großmeister', desc: 'Für grandiose 2000 Minuten Übezeit!', equiv: '💡 Level 3: Ca. 133 Fokus-Timer Sessions à 15 Min. im Schuljahr', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)', auto: true, category: 'ueben', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  // Meilensteine / Üben (Einmalig)
+  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: '50 Minuten fokussiert geübt und musiziert!', equiv: 'Klasse Start! Regelmäßiges Üben legt das Fundament für deinen Klang.', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true, category: 'ueben', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: '250 Minuten konzentriert am Instrument gearbeitet!', equiv: 'Starke Routine: Deine Koordination, Rhythmik und Spieltechnik wachsen spürbar.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true, category: 'ueben', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: 'Über 1.000 Minuten engagierte Übezeit erreicht!', equiv: 'Echte Ausdauer: Du beherrschst deine Stücke mit musikalischer Sicherheit und Ausdruck.', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true, category: 'ueben', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'uebe-grossmeister', emoji: '🏆', title: 'Übe-Großmeister', desc: 'Grandiose 2.000 Minuten Übezeit gemeistert!', equiv: 'Höchste Meisterschaft: Dein Instrument ist dein zweites Zuhause – souverän im Klang und Ausdruck.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)', auto: true, category: 'ueben', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
   // XP (Einmalig)
-  { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '250 XP auf dem Profil gesammelt.', equiv: '🎯 25 Fokus-Ziele im Schuljahr erreicht', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true, category: 'xp', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'xp-champion', emoji: '🎖️', title: 'XP-Champion', desc: '1000 XP auf dem Profil gesammelt.', equiv: '🎯 100 Fokus-Ziele im Schuljahr erreicht', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', auto: true, category: 'xp', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'xp-meister', emoji: '🌌', title: 'XP-Meister', desc: 'Phänomenale 2500 XP auf dem Profil gesammelt.', equiv: '🎯 Level 2: 250 Fokus-Ziele im Schuljahr erreicht', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', auto: true, category: 'xp', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'xp-legende', emoji: '💎', title: 'XP-Legende', desc: 'Unglaubliche 5000 XP auf dem Profil gesammelt.', equiv: '🎯 Level 3: Repertoire-Großmeister im Schuljahr', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.15)', auto: true, category: 'xp', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '250 XP durch fleißige Unterrichts- und Übe-Einheiten gesammelt!', equiv: 'Erste Erfolge: Du erreichst deine wöchentlichen Aufgaben mit Begeisterung.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true, category: 'xp', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'xp-champion', emoji: '🎖️', title: 'XP-Champion', desc: '1.000 XP gesammelt – kontinuierlicher Fortschritt im Unterricht!', equiv: 'Konstanter Fleiß: Du setzt Aufgaben und musikalische Herausforderungen zielstrebig um.', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', auto: true, category: 'xp', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'xp-meister', emoji: '🌌', title: 'XP-Meister', desc: '2.500 XP erreicht – herausragender Einsatz im Musikschuljahr!', equiv: 'Fortgeschrittenes Niveau: Du meisterst Theorie, Gehörbildung und Spielpraxis mit Bravour.', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', auto: true, category: 'xp', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'xp-legende', emoji: '💎', title: 'XP-Legende', desc: '5.000 XP gesammelt – das höchste musikalische Engagement-Level!', equiv: 'Spitzenleistung: Vorbildlicher Lernwille und meisterhafte musikalische Entwicklung.', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.15)', auto: true, category: 'xp', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
   // Streaks (Einmalig)
-  { id: 'dranbleiber', emoji: '🔥', title: 'Dranbleiber', desc: 'Erreiche eine Übe-Streak von 3 Tagen.', equiv: '🔥 1 volle Schulwoche konstant am Instrument geblieben', color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', auto: true, category: 'streaks', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'wochen-held', emoji: '📆', title: 'Wochen-Held', desc: 'Erreiche eine Übe-Streak von 7 Tagen.', equiv: '🔥 7 Tage in Folge ohne einen einzigen Tag Pause', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', auto: true, category: 'streaks', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'streak-koenig', emoji: '⚡', title: 'Streak-König', desc: 'Unglaubliche Übe-Streak von 21 Tagen gehalten!', equiv: '🔥 3 Wochen am Stück diszipliniert am Ball geblieben', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: true, category: 'streaks', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'streak-kaiser', emoji: '👑', title: 'Streak-Kaiser', desc: 'Legendäre Übe-Streak von 30 Tagen gehalten!', equiv: '🔥 1 ganzer Monat lückenlose Übe-Disziplin', color: '#7c2d12', bg: 'rgba(124, 45, 18, 0.15)', auto: true, category: 'streaks', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'dranbleiber', emoji: '🔥', title: 'Dranbleiber', desc: '3 Tage hintereinander am Instrument geübt!', equiv: 'Kurze, tägliche Einheiten festigen Bewegungsabläufe und Notenlesen am besten.', color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', auto: true, category: 'streaks', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'wochen-held', emoji: '📆', title: 'Wochen-Held', desc: '7 Tage lückenlose Übe-Streak gemeistert!', equiv: 'Klasse Gewohnheit: Tägliches Spielen macht aus Üben echte Spielfreude.', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', auto: true, category: 'streaks', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'streak-koenig', emoji: '⚡', title: 'Streak-König', desc: '21 Tage ununterbrochen geübt und musiziert!', equiv: '3 Wochen Kontinuität: Deine musikalische Routine ist fest im Alltag verankert.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: true, category: 'streaks', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'streak-kaiser', emoji: '👑', title: 'Streak-Kaiser', desc: 'Ein voller Monat tägliche Übe-Disziplin (30 Tage Streak)!', equiv: 'Höchste Disziplin: Du hast die goldene Regel des Musizierens verinnerlicht – Beständigkeit führt zur Meisterschaft.', color: '#7c2d12', bg: 'rgba(124, 45, 18, 0.15)', auto: true, category: 'streaks', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
   // Songs (Einmalig)
-  { id: 'erster-erfolg', emoji: '🎵', title: 'Erster Erfolg', desc: 'Dein allererster gemeisterter Song (100%).', equiv: '🎵 Dein erster kompletter Song von Anfang bis Ende', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)', auto: true, category: 'songs', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'song-sammler', emoji: '📚', title: 'Song-Sammler', desc: 'Schon 3 Songs komplett gemeistert.', equiv: '🎵 Reicht bereits für ein kleines Mini-Konzert', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', auto: true, category: 'songs', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '5 Songs zu 100% gemeistert und im Repertoire!', equiv: '🎵 Ein vollständiges Set für deinen ersten Live-Auftritt', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true, category: 'songs', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs zu 100% gemeistert und im Repertoire!', equiv: '🎵 Ein komplettes Album-Repertoire auf Bühnen-Niveau', color: '#137333', bg: 'rgba(19, 115, 51, 0.15)', auto: true, category: 'songs', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'erster-erfolg', emoji: '🎵', title: 'Erster Erfolg', desc: 'Dein erstes Musikstück zu 100% gemeistert!', equiv: 'Vom ersten bis zum letzten Takt im Timing und mit allen Noten souverän gespielt.', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)', auto: true, category: 'songs', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'song-sammler', emoji: '📚', title: 'Song-Sammler', desc: '3 Stücke komplett und bühnenreif im Repertoire!', equiv: 'Dein Repertoire wächst: Genug Stoff für deinen ersten kleinen Vorspiel-Auftritt.', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', auto: true, category: 'songs', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '5 Songs zu 100% beherrscht und abrufbereit!', equiv: 'Ein solides Konzert-Set: Verschiedene Tempi, Rhythmen und Stile sicher im Griff.', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true, category: 'songs', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs vollständig gemeistert – ein ganzes Konzertprogramm!', equiv: 'Umfangreiches Repertoire auf Auftritts-Niveau – musikalisch vielseitig und spieltechnisch reif.', color: '#137333', bg: 'rgba(19, 115, 51, 0.15)', auto: true, category: 'songs', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
   // Spezielle Auszeichnungen (Mehrfach vergebbar)
-  { id: 'stage-star', emoji: '🎤', title: 'Bühnen-Star', desc: 'Für jeden Live-Auftritt vor Publikum.', equiv: '🌟 Bühnen-Erfahrung vor echtem Publikum gesammelt', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', auto: false, category: 'spezial', rarity: 'epic', rarityLabel: 'Episch', multi: true },
-  { id: 'song-master', emoji: '🏆', title: 'Song-Master', desc: 'Wird für jeden zu 100% gemeisterten Song verliehen.', equiv: '🎸 Song zu 100% gemeistert und bühnenreif performt', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: false, category: 'spezial', rarity: 'rare', rarityLabel: 'Selten', multi: true },
-  { id: 'creative-mind', emoji: '💡', title: 'Kreativ-Kopf', desc: 'Für eigene Kompositionen, Improvisation oder kreative Ideen.', equiv: '🎨 Eigenständiges musikalisches Engagement bewiesen', color: '#db2777', bg: 'rgba(219, 39, 119, 0.1)', auto: false, category: 'spezial', rarity: 'epic', rarityLabel: 'Episch', multi: true },
-  { id: 'extra-mile', emoji: '🚀', title: 'Extra-Meile', desc: 'Für das freiwillige Erarbeiten von Zusatzaufgaben.', equiv: '🚀 Über das geforderte Ziel hinausgewachsen', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.1)', auto: false, category: 'spezial', rarity: 'rare', rarityLabel: 'Selten', multi: true }
+  { id: 'stage-star', emoji: '🎤', title: 'Bühnen-Star', desc: 'Erfolgreicher Live-Auftritt oder Vorspiel vor Publikum!', equiv: 'Bühnenpräsenz bewiesen: Lampenfieber überwunden und das Publikum mit Musik begeistert.', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', auto: false, category: 'spezial', rarity: 'epic', rarityLabel: 'Episch', multi: true },
+  { id: 'song-master', emoji: '🏆', title: 'Song-Master', desc: 'Diesen Song mit 100% Präzision, Dynamik und Ausdruck gemeistert!', equiv: 'Bühnenreife Leistung: Rhythmus, Phrasierung und Klangvorstellung perfekt vereint.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: false, category: 'spezial', rarity: 'rare', rarityLabel: 'Selten', multi: true },
+  { id: 'creative-mind', emoji: '💡', title: 'Kreativ-Kopf', desc: 'Eigene Komposition, Improvisation oder kreative Song-Arrangements erschaffen!', equiv: 'Eigenständiger Musikergeist: Mut zur eigenen musikalischen Handschrift und kreativen Gestaltung.', color: '#db2777', bg: 'rgba(219, 39, 119, 0.1)', auto: false, category: 'spezial', rarity: 'epic', rarityLabel: 'Episch', multi: true },
+  { id: 'extra-mile', emoji: '🚀', title: 'Extra-Meile', desc: 'Zusatzaufgaben, schwere Passagen oder zweite Stimmen freiwillig erarbeitet!', equiv: 'Hohe Eigenmotivation: Du nimmst neue Herausforderungen selbstständig an und wächst daran.', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.1)', auto: false, category: 'spezial', rarity: 'rare', rarityLabel: 'Selten', multi: true }
 ];
 
 interface Student {
@@ -377,7 +386,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   }, [student.first_name, student.last_name]);
 
   const getSchoolYearString = (dateInput?: string | Date) => {
-    const d = dateInput ? new Date(dateInput) : new Date();
+    let d = new Date();
+    if (dateInput) {
+      const parsed = new Date(dateInput);
+      if (!isNaN(parsed.getTime())) {
+        d = parsed;
+      }
+    }
     const year = d.getFullYear();
     const month = d.getMonth(); // 0-indexed (0 = Jan, 8 = Sept)
     if (month >= 8) {
@@ -524,6 +539,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [newCustomTagInput, setNewCustomTagInput] = useState<string>('');
+  const [expandedAudioWeeks, setExpandedAudioWeeks] = useState<Record<string, boolean>>({});
+
+  const toggleAudioWeek = (weekKey: string, defaultOpen: boolean = true) => {
+    setExpandedAudioWeeks(prev => {
+      const current = prev[weekKey] !== undefined ? prev[weekKey] : defaultOpen;
+      return { ...prev, [weekKey]: !current };
+    });
+  };
 
   const handleAddCustomTag = () => {
     const val = newCustomTagInput.trim();
@@ -2476,9 +2499,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.restore();
       
       const filename = (topicOverride || sticker.title).toLowerCase().replace(/[^a-z0-9]/gi, '_');
-      const dataUrl = canvas.toDataURL('image/png');
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
       const link = document.createElement('a');
-      link.download = `campus_auszeichnung_${filename}.png`;
+      link.download = `campus_sticker_${filename}.jpg`;
       link.href = dataUrl;
       link.click();
     };
@@ -2497,17 +2520,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const shareCard = async (sticker: any, topicOverride?: string) => {
     try {
-      if (navigator.share) {
-        downloadShareCard(sticker, topicOverride);
-        await navigator.share({
-          title: `Campus-Groovelab Auszeichnung: ${sticker.title}${topicOverride ? ` - ${topicOverride}` : ''}`,
-          text: `Schau dir meine Auszeichnung "${sticker.title}" ${topicOverride ? `(${topicOverride}) ` : ''}an der ${schoolName} auf Campus-Groovelab an! 🎵🏆`,
-          url: 'https://campus-groovelab.de'
-        });
-      } else {
-        downloadShareCard(sticker, topicOverride);
-        alert("Auszeichnung heruntergeladen! Du kannst das Bild jetzt in WhatsApp oder Instagram teilen. 📲");
-      }
+      downloadShareCard(sticker, topicOverride);
     } catch (err) {
       console.log('Share action ended:', err);
     }
@@ -6437,19 +6450,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 {/* Teacher Record Tool (when teacher is viewing) */}
                 {isTeacherTools && (
                   <div style={{
-                    margin: '0 0 24px 0',
-                    padding: '18px 20px',
+                    margin: '0 0 16px 0',
+                    padding: '12px 14px',
                     background: '#f8fafc',
                     border: '1.5px solid #e2e8f0',
-                    borderRadius: '20px',
+                    borderRadius: '16px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '12px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                    gap: '8px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>🎙️ Neue Lehrkraft-Aufnahme erstellen (max. 60s)</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>🎙️ Neue Lehrkraft-Aufnahme</span>
                       </span>
                       {!isRecordingAudio ? (
                         <button
@@ -6460,19 +6473,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                             color: '#fff',
                             border: 'none',
-                            padding: '8px 16px',
-                            borderRadius: '12px',
-                            fontSize: '0.78rem',
+                            padding: '6px 14px',
+                            borderRadius: '10px',
+                            fontSize: '0.74rem',
                             fontWeight: 850,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: '0 3px 10px rgba(34, 197, 94, 0.25)'
+                            boxShadow: '0 2px 8px rgba(34, 197, 94, 0.25)'
                           }}
                           className="hover-scale"
                         >
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
+                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
                           <span>Aufnahme starten</span>
                         </button>
                       ) : (
@@ -6483,19 +6496,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             background: '#ef4444',
                             color: '#fff',
                             border: 'none',
-                            padding: '8px 16px',
-                            borderRadius: '12px',
-                            fontSize: '0.78rem',
+                            padding: '6px 14px',
+                            borderRadius: '10px',
+                            fontSize: '0.74rem',
                             fontWeight: 850,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: '0 3px 10px rgba(239, 68, 68, 0.3)'
+                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
+                            animation: 'pulse 1.5s infinite'
                           }}
                           className="hover-scale"
                         >
-                          <span style={{ width: '8px', height: '8px', background: '#ffffff', display: 'inline-block' }} />
+                          <span style={{ width: '7px', height: '7px', background: '#ffffff', display: 'inline-block' }} />
                           <span>Stopp ({audioDuration}s / 60s)</span>
                         </button>
                       )}
@@ -6509,9 +6523,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         onChange={(e) => setAudioLabel(e.target.value)}
                         style={{
                           width: '100%',
-                          fontSize: '0.84rem',
-                          padding: '10px 14px',
-                          borderRadius: '12px',
+                          fontSize: '0.80rem',
+                          padding: '8px 12px',
+                          borderRadius: '10px',
                           border: '1.5px solid #cbd5e1',
                           background: '#fff',
                           outline: 'none',
@@ -6521,14 +6535,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     )}
 
                     {isUploadingAudio && (
-                      <div style={{ fontSize: '0.76rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                      <div style={{ fontSize: '0.74rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
                         <span>⏳</span> Audio wird gesichert und zur Schüler-Übersicht hinzugefügt...
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Teacher Recordings Gallery */}
+                {/* Teacher Recordings Gallery with Weekly Accordions */}
                 {(() => {
                   // Collect ALL teacher audios from homeworkNotesList, local storage, and progressItems
                   const rawAudioStrings: { str: string; originalIdx: number }[] = [];
@@ -6569,10 +6583,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     const url = parts[0]?.trim();
                     if (!url || seenTeacherUrls.has(url)) return;
 
-                    const role = parts[4];
-                    // Any audio in homework notes without role='student' is TEACHER audio!
-                    if (role === 'student') return;
-
                     seenTeacherUrls.add(url);
                     teacherAudios.push({
                       url,
@@ -6592,104 +6602,139 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#94a3b8',
-                        padding: '60px 20px',
-                        gap: '14px',
+                        padding: '40px 20px',
+                        gap: '12px',
                         textAlign: 'center',
                         background: '#f8fafc',
-                        borderRadius: '24px',
+                        borderRadius: '20px',
                         border: '1.5px dashed #e2e8f0'
                       }}>
                         <div style={{
-                          width: '56px',
-                          height: '56px',
+                          width: '48px',
+                          height: '48px',
                           borderRadius: '50%',
                           background: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           color: '#34a853',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                         }}>
-                          <Music size={26} />
+                          <Music size={22} />
                         </div>
                         <div>
-                          <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>
+                          <h4 style={{ margin: '0 0 4px 0', fontSize: '0.92rem', fontWeight: 900, color: '#1e293b' }}>
                             Noch keine Aufnahmen vom Lehrer
                           </h4>
-                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 600, maxWidth: '280px', lineHeight: 1.45 }}>
-                            Sobald dein Lehrer im Unterricht ein Play-Along oder Übe-Beispiel aufnimmt, findest du es hier zum Mitspielen!
+                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, maxWidth: '260px', lineHeight: 1.45 }}>
+                            Sobald dein Lehrer im Unterricht ein Play-Along oder Übe-Beispiel aufnimmt, findest du es hier!
                           </p>
                         </div>
                       </div>
                     );
                   }
 
-                  return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
-                      {teacherAudios.map((aud, idx) => (
-                        <div key={`teacher-aud-${idx}`} style={{
-                          background: '#ffffff',
-                          borderRadius: '20px',
-                          padding: '16px',
-                          border: '1.5px solid #e2e8f0',
-                          boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                              <div style={{
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '8px',
-                                background: '#dcfce7',
-                                color: '#15803d',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0
-                              }}>
-                                <Play size={13} fill="#15803d" />
-                              </div>
-                              <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {aud.label}
-                              </span>
-                            </div>
+                  // Group by Calendar Week
+                  const now = getSimulatedNow();
+                  const currentWeekStr = getISOWeek(now);
+                  const prevDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                  const prevWeekStr = getISOWeek(prevDate);
 
-                            {!readOnly && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteNote(aud.originalIdx)}
+                  const groups: { [key: string]: { key: string; label: string; isCurrent: boolean; items: any[] } } = {};
+                  teacherAudios.forEach(aud => {
+                    const d = aud.date ? new Date(aud.date) : now;
+                    const weekKey = getISOWeek(isNaN(d.getTime()) ? now : d);
+                    const weekNum = weekKey.split('-W')[1] || '';
+                    if (!groups[weekKey]) {
+                      const isCurrent = weekKey === currentWeekStr;
+                      const isPrev = weekKey === prevWeekStr;
+                      let label = `KW ${weekNum}`;
+                      if (isCurrent) label = `Diese Woche (KW ${weekNum})`;
+                      else if (isPrev) label = `Letzte Woche (KW ${weekNum})`;
+                      else {
+                        const mName = d.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' });
+                        label = `KW ${weekNum} • ${mName}`;
+                      }
+                      groups[weekKey] = { key: weekKey, label, isCurrent, items: [] };
+                    }
+                    groups[weekKey].items.push(aud);
+                  });
+
+                  const groupList = Object.values(groups);
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {groupList.map(group => {
+                        const isExpanded = expandedAudioWeeks[group.key] !== undefined ? expandedAudioWeeks[group.key] : true;
+                        return (
+                          <div key={`teacher-week-${group.key}`} style={{ display: 'flex', flexDirection: 'column' }}>
+                            {groupList.length > 1 && (
+                              <div
+                                onClick={() => toggleAudioWeek(group.key, true)}
                                 style={{
-                                  border: 'none',
-                                  background: '#fee2e2',
-                                  color: '#dc2626',
-                                  borderRadius: '8px',
-                                  padding: '4px 8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '8px 12px',
+                                  background: group.isCurrent ? '#f0fdf4' : '#ffffff',
+                                  borderRadius: '12px',
+                                  border: group.isCurrent ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
                                   cursor: 'pointer',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 800
+                                  marginBottom: '8px',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                  userSelect: 'none'
                                 }}
                                 className="hover-scale"
                               >
-                                ✕
-                              </button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{
+                                    fontSize: '0.74rem',
+                                    color: group.isCurrent ? '#16a34a' : '#64748b',
+                                    display: 'inline-flex',
+                                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.15s ease'
+                                  }}>
+                                    ▶
+                                  </span>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 850, color: group.isCurrent ? '#15803d' : '#334155' }}>
+                                    {group.label}
+                                  </span>
+                                </div>
+                                <span style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 800,
+                                  background: group.isCurrent ? '#dcfce7' : '#f1f5f9',
+                                  color: group.isCurrent ? '#15803d' : '#64748b',
+                                  padding: '2px 8px',
+                                  borderRadius: '100px'
+                                }}>
+                                  {group.items.length} {group.items.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
+                                </span>
+                              </div>
+                            )}
+
+                            {isExpanded && (
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '8px', marginBottom: '8px' }}>
+                                {group.items.map((aud, idx) => (
+                                  <InlineAudioPlayer 
+                                    key={`teacher-aud-${group.key}-${idx}`}
+                                    url={aud.url} 
+                                    label={aud.label} 
+                                    duration={aud.duration}
+                                    date={aud.date}
+                                    themeColor="#15803d"
+                                    themeBg="#e6f4ea"
+                                    badge="👨‍🏫 Lehrkraft"
+                                    badgeBg="#dcfce7"
+                                    badgeColor="#15803d"
+                                    onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                                  />
+                                ))}
+                              </div>
                             )}
                           </div>
-
-                          <InlineAudioPlayer 
-                            url={aud.url} 
-                            label={aud.label} 
-                            duration={aud.duration}
-                          />
-
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.70rem', color: '#64748b', fontWeight: 700, paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
-                            <span style={{ color: '#15803d', fontWeight: 850 }}>👨‍🏫 Lehrkraft-Audio</span>
-                            <span>{aud.duration > 0 ? `${aud.duration} Sek.` : 'Audio'}</span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()}
@@ -6709,7 +6754,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
                 boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
                 position: 'relative',
-                padding: '28px'
+                padding: '24px'
               }}>
                 {useNotebookLayout && (
                   <div style={{
@@ -6746,26 +6791,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 )}
 
                 {/* Header: Student Own Recordings */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <div style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '14px',
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '12px',
                     background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
                     color: '#6d28d9',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 4px 10px rgba(109, 40, 217, 0.15)',
+                    boxShadow: '0 3px 8px rgba(109, 40, 217, 0.15)',
                     flexShrink: 0
                   }}>
-                    <Star size={20} strokeWidth={2.4} fill="#6d28d9" />
+                    <Star size={18} strokeWidth={2.4} fill="#6d28d9" />
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.70rem', fontWeight: 900, color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                       Dein Übe-Studio
                     </span>
-                    <h3 style={{ margin: '1px 0 0 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    <h3 style={{ margin: '1px 0 0 0', fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
                       {isTeacherTools ? 'Freigegebene Schüler-Aufnahmen' : 'Deine eigenen Aufnahmen'}
                     </h3>
                   </div>
@@ -6776,18 +6821,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
-                    padding: '10px 14px',
+                    gap: '8px',
+                    padding: '8px 12px',
                     background: '#ffffff',
                     border: '1.5px solid #e2e8f0',
-                    borderRadius: '16px',
-                    fontSize: '0.76rem',
+                    borderRadius: '12px',
+                    fontSize: '0.74rem',
                     color: '#475569',
                     fontWeight: 650,
-                    marginBottom: '18px',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                    marginBottom: '14px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
                   }}>
-                    <Lock size={15} color="#6366f1" style={{ flexShrink: 0 }} />
+                    <Lock size={14} color="#6366f1" style={{ flexShrink: 0 }} />
                     <span>
                       Deine Aufnahmen sind <strong style={{ color: '#4338ca' }}>standardmäßig privat</strong> und nur für dich sichtbar.
                     </span>
@@ -6797,18 +6842,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 {/* Kid-Friendly Studio Recording Tool (for students) */}
                 {!isTeacherTools && (
                   <div style={{
-                    margin: '0 0 24px 0',
-                    padding: '20px',
+                    margin: '0 0 16px 0',
+                    padding: '14px 16px',
                     background: '#ffffff',
-                    borderRadius: '24px',
+                    borderRadius: '18px',
                     border: '1.5px solid #e0e7ff',
-                    boxShadow: '0 6px 20px rgba(99, 102, 241, 0.06)',
+                    boxShadow: '0 4px 16px rgba(99, 102, 241, 0.05)',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '14px'
+                    gap: '10px'
                   }}>
                     {(() => {
-                      // Student recordings calculate monthly quota
                       let studentRecordingsTotalSec = 0;
                       try {
                         if (student?.id) {
@@ -6826,90 +6870,93 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       return (
                         <>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>🎙️ Selbstaufnahme (max. 60 Sek.)</span>
+                            <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>🎙️ Selbstaufnahme (max. 60s)</span>
                             </span>
-                            <span style={{ fontSize: '0.72rem', color: isLimitReached ? '#dc2626' : '#6366f1', fontWeight: 800, background: isLimitReached ? '#fee2e2' : '#eef2ff', padding: '3px 9px', borderRadius: '100px' }}>
+                            <span style={{ fontSize: '0.70rem', color: isLimitReached ? '#dc2626' : '#6366f1', fontWeight: 800, background: isLimitReached ? '#fee2e2' : '#eef2ff', padding: '2px 8px', borderRadius: '100px' }}>
                               ⏱️ {studentRecordingsTotalSec}s / {monthlyLimit}s verbraucht
                             </span>
                           </div>
 
-                          {!isRecordingAudio && !isLimitReached && (
-                            <input
-                              type="text"
-                              placeholder="Name für deine Aufnahme (z. B. Mein Gitarren-Hit)..."
-                              value={audioLabel}
-                              onChange={(e) => setAudioLabel(e.target.value)}
-                              style={{
-                                width: '100%',
-                                fontSize: '0.84rem',
-                                padding: '10px 14px',
-                                borderRadius: '12px',
-                                border: '1.5px solid #cbd5e1',
-                                background: '#f8fafc',
-                                outline: 'none',
-                                boxSizing: 'border-box'
-                              }}
-                            />
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                            {!isRecordingAudio && !isLimitReached && (
+                              <input
+                                type="text"
+                                placeholder="Name deiner Aufnahme (z. B. Mein Gitarren-Hit)..."
+                                value={audioLabel}
+                                onChange={(e) => setAudioLabel(e.target.value)}
+                                style={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  fontSize: '0.80rem',
+                                  padding: '8px 12px',
+                                  borderRadius: '10px',
+                                  border: '1.5px solid #cbd5e1',
+                                  background: '#f8fafc',
+                                  outline: 'none',
+                                  boxSizing: 'border-box'
+                                }}
+                              />
+                            )}
 
-                          {!isRecordingAudio ? (
-                            <button
-                              type="button"
-                              onClick={startRecordingAudio}
-                              disabled={isUploadingAudio || isLimitReached}
-                              style={{
-                                width: '100%',
-                                background: isLimitReached ? '#cbd5e1' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                                color: '#fff',
-                                border: 'none',
-                                padding: '14px 20px',
-                                borderRadius: '16px',
-                                fontSize: '0.90rem',
-                                fontWeight: 900,
-                                cursor: isLimitReached ? 'not-allowed' : 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                boxShadow: isLimitReached ? 'none' : '0 4px 14px rgba(99, 102, 241, 0.3)',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className={isLimitReached ? '' : 'hover-scale'}
-                            >
-                              <Mic size={18} strokeWidth={2.4} />
-                              <span>Aufnahme starten</span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => stopRecordingAudio()}
-                              style={{
-                                width: '100%',
-                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                                color: '#fff',
-                                border: 'none',
-                                padding: '14px 20px',
-                                borderRadius: '16px',
-                                fontSize: '0.90rem',
-                                fontWeight: 900,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
-                                animation: 'pulse 1.5s infinite'
-                              }}
-                              className="hover-scale"
-                            >
-                              <span style={{ width: '10px', height: '10px', background: '#ffffff', borderRadius: '2px', display: 'inline-block' }} />
-                              <span>Aufnahme beenden ({audioDuration}s / 60s)</span>
-                            </button>
-                          )}
+                            {!isRecordingAudio ? (
+                              <button
+                                type="button"
+                                onClick={startRecordingAudio}
+                                disabled={isUploadingAudio || isLimitReached}
+                                style={{
+                                  background: isLimitReached ? '#cbd5e1' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                  color: '#fff',
+                                  border: 'none',
+                                  padding: '8px 16px',
+                                  borderRadius: '12px',
+                                  fontSize: '0.80rem',
+                                  fontWeight: 900,
+                                  cursor: isLimitReached ? 'not-allowed' : 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  boxShadow: isLimitReached ? 'none' : '0 3px 10px rgba(99, 102, 241, 0.25)',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0
+                                }}
+                                className={isLimitReached ? '' : 'hover-scale'}
+                              >
+                                <Mic size={15} strokeWidth={2.4} />
+                                <span>Aufnahme starten</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => stopRecordingAudio()}
+                                style={{
+                                  width: '100%',
+                                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                  color: '#fff',
+                                  border: 'none',
+                                  padding: '10px 16px',
+                                  borderRadius: '12px',
+                                  fontSize: '0.84rem',
+                                  fontWeight: 900,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px',
+                                  boxShadow: '0 3px 10px rgba(239, 68, 68, 0.3)',
+                                  animation: 'pulse 1.5s infinite'
+                                }}
+                                className="hover-scale"
+                              >
+                                <span style={{ width: '8px', height: '8px', background: '#ffffff', borderRadius: '2px', display: 'inline-block' }} />
+                                <span>Aufnahme beenden ({audioDuration}s / 60s)</span>
+                              </button>
+                            )}
+                          </div>
 
                           {isUploadingAudio && (
-                            <div style={{ fontSize: '0.76rem', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 750 }}>
+                            <div style={{ fontSize: '0.74rem', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 750 }}>
                               <span>⏳</span> Deine Aufnahme wird gespeichert...
                             </div>
                           )}
@@ -6919,7 +6966,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </div>
                 )}
 
-                {/* Student Recordings List */}
+                {/* Student Recordings Gallery with Weekly Accordions */}
                 {(() => {
                   const studentAudios: any[] = [];
                   const seenStudentUrls = new Set<string>();
@@ -6952,42 +6999,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     }
                   } catch {}
 
-                  // 2. Load any role='student' from homework notes
-                  (homeworkNotesList || []).forEach((note, idx) => {
-                    if (typeof note === 'string' && note.includes('AUDIO:')) {
-                      const cleanStr = note.startsWith('[') ? note.replace(/[\[\]"]/g, '') : note;
-                      const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
-                      const url = parts[0]?.trim();
-                      if (url && !seenStudentUrls.has(url) && parts[4] === 'student') {
-                        seenStudentUrls.add(url);
-                        studentAudios.push({
-                          id: `hw-${idx}`,
-                          url,
-                          duration: parseInt(parts[1] || '0', 10),
-                          date: parts[2] || new Date().toISOString(),
-                          label: parts[3] || `Eigene Aufnahme #${studentAudios.length + 1}`,
-                          visibility: (parts[5] || 'private') as 'private' | 'shared_with_teacher',
-                          originalIdx: idx,
-                          source: 'homework_note'
-                        });
-                      }
-                    }
-                  });
-
                   // If teacher is viewing, only show student recordings that are shared
                   if (isTeacherTools) {
                     const sharedAudios = studentAudios.filter(aud => aud.visibility === 'shared_with_teacher');
 
                     if (sharedAudios.length === 0) {
                       return (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '14px', textAlign: 'center' }}>
-                          <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-                            <Lock size={22} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '40px 20px', gap: '12px', textAlign: 'center' }}>
+                          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                            <Lock size={20} />
                           </div>
                           <div>
-                            <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#334155', margin: '0 0 4px' }}>Keine freigegebenen Aufnahmen</p>
-                            <p style={{ fontSize: '0.76rem', color: '#64748b', margin: 0, maxWidth: '300px', lineHeight: 1.45 }}>
-                              Der Schüler nutzt diesen Bereich zum ungestörten, privaten Ausprobieren. Sobald er eine Aufnahme für dich freigibt, erscheint sie hier.
+                            <p style={{ fontWeight: 800, fontSize: '0.86rem', color: '#334155', margin: '0 0 4px' }}>Keine freigegebenen Aufnahmen</p>
+                            <p style={{ fontSize: '0.74rem', color: '#64748b', margin: 0, maxWidth: '280px', lineHeight: 1.45 }}>
+                              Der Schüler nutzt diesen Bereich zum ungestörten, privaten Ausprobieren. Sobald er eine Aufnahme freigibt, erscheint sie hier.
                             </p>
                           </div>
                         </div>
@@ -6995,31 +7020,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     }
 
                     return (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '8px' }}>
                         {sharedAudios.map((aud, idx) => (
-                          <div key={`shared-aud-${idx}`} style={{
-                            background: '#ffffff',
-                            borderRadius: '20px',
-                            padding: '16px',
-                            border: '1.5px solid #e2e8f0',
-                            boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '10px'
-                          }}>
-                            <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>{aud.label}</span>
-                            <InlineAudioPlayer url={aud.url} label={aud.label} duration={aud.duration} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.70rem', color: '#16a34a', fontWeight: 800 }}>
-                              <span>🎓 Für Lehrer freigegeben</span>
-                              <span>{aud.duration > 0 ? `${aud.duration} Sek.` : 'Audio'}</span>
-                            </div>
-                          </div>
+                          <InlineAudioPlayer 
+                            key={`shared-aud-${idx}`}
+                            url={aud.url} 
+                            label={aud.label} 
+                            duration={aud.duration}
+                            date={aud.date}
+                            themeColor="#16a34a"
+                            themeBg="#dcfce7"
+                            badge="🎓 Freigegeben"
+                            badgeBg="#dcfce7"
+                            badgeColor="#15803d"
+                          />
                         ))}
                       </div>
                     );
                   }
 
-                  // Student view: show all student audios (without playlist sharing)
+                  // Student view: show all student audios
                   if (studentAudios.length === 0) {
                     return (
                       <div style={{
@@ -7029,16 +7049,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#94a3b8',
-                        padding: '60px 20px',
-                        gap: '14px',
+                        padding: '40px 20px',
+                        gap: '12px',
                         textAlign: 'center',
                         background: '#ffffff',
-                        borderRadius: '24px',
+                        borderRadius: '20px',
                         border: '1.5px dashed #e2e8f0'
                       }}>
                         <div style={{
-                          width: '56px',
-                          height: '56px',
+                          width: '48px',
+                          height: '48px',
                           borderRadius: '50%',
                           background: '#f5f3ff',
                           display: 'flex',
@@ -7046,13 +7066,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           justifyContent: 'center',
                           color: '#6366f1'
                         }}>
-                          <Star size={26} />
+                          <Star size={22} />
                         </div>
                         <div>
-                          <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>
+                          <h4 style={{ margin: '0 0 4px 0', fontSize: '0.92rem', fontWeight: 900, color: '#1e293b' }}>
                             Noch keine eigenen Aufnahmen
                           </h4>
-                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 600, maxWidth: '280px', lineHeight: 1.45 }}>
+                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, maxWidth: '260px', lineHeight: 1.45 }}>
                             Nimm dein Üben auf, höre dir selbst zu und sammle deine besten Takes in deinem Übe-Studio!
                           </p>
                         </div>
@@ -7060,87 +7080,121 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     );
                   }
 
+                  // Group student audios by Calendar Week
+                  const now = getSimulatedNow();
+                  const currentWeekStr = getISOWeek(now);
+                  const prevDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                  const prevWeekStr = getISOWeek(prevDate);
+
+                  const groups: { [key: string]: { key: string; label: string; isCurrent: boolean; items: any[] } } = {};
+                  studentAudios.forEach(aud => {
+                    const d = aud.date ? new Date(aud.date) : now;
+                    const weekKey = getISOWeek(isNaN(d.getTime()) ? now : d);
+                    const weekNum = weekKey.split('-W')[1] || '';
+                    if (!groups[weekKey]) {
+                      const isCurrent = weekKey === currentWeekStr;
+                      const isPrev = weekKey === prevWeekStr;
+                      let label = `KW ${weekNum}`;
+                      if (isCurrent) label = `Diese Woche (KW ${weekNum})`;
+                      else if (isPrev) label = `Letzte Woche (KW ${weekNum})`;
+                      else {
+                        const mName = d.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' });
+                        label = `KW ${weekNum} • ${mName}`;
+                      }
+                      groups[weekKey] = { key: weekKey, label, isCurrent, items: [] };
+                    }
+                    groups[weekKey].items.push(aud);
+                  });
+
+                  const groupList = Object.values(groups);
+
                   return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
-                      {studentAudios.map((aud, idx) => (
-                        <div key={`stud-rec-${idx}`} style={{
-                          background: '#ffffff',
-                          borderRadius: '20px',
-                          padding: '16px',
-                          border: '1.5px solid #e2e8f0',
-                          boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                              <div style={{
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '8px',
-                                background: '#ede9fe',
-                                color: '#6d28d9',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0
-                              }}>
-                                <Music size={13} strokeWidth={2.4} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {groupList.map(group => {
+                        const isExpanded = expandedAudioWeeks[group.key] !== undefined ? expandedAudioWeeks[group.key] : true;
+                        return (
+                          <div key={`stud-week-${group.key}`} style={{ display: 'flex', flexDirection: 'column' }}>
+                            {groupList.length > 1 && (
+                              <div
+                                onClick={() => toggleAudioWeek(group.key, true)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '8px 12px',
+                                  background: group.isCurrent ? '#faf5ff' : '#ffffff',
+                                  borderRadius: '12px',
+                                  border: group.isCurrent ? '1px solid #e9d5ff' : '1px solid #e2e8f0',
+                                  cursor: 'pointer',
+                                  marginBottom: '8px',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                  userSelect: 'none'
+                                }}
+                                className="hover-scale"
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{
+                                    fontSize: '0.74rem',
+                                    color: group.isCurrent ? '#9333ea' : '#64748b',
+                                    display: 'inline-flex',
+                                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.15s ease'
+                                  }}>
+                                    ▶
+                                  </span>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 850, color: group.isCurrent ? '#6d28d9' : '#334155' }}>
+                                    {group.label}
+                                  </span>
+                                </div>
+                                <span style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 800,
+                                  background: group.isCurrent ? '#ede9fe' : '#f1f5f9',
+                                  color: group.isCurrent ? '#6d28d9' : '#64748b',
+                                  padding: '2px 8px',
+                                  borderRadius: '100px'
+                                }}>
+                                  {group.items.length} {group.items.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
+                                </span>
                               </div>
-                              <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {aud.label}
-                              </span>
-                            </div>
+                            )}
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (aud.source === 'local_junior' && student?.id) {
-                                  try {
-                                    const juniorKey = `campus_junior_recordings_${student.id}`;
-                                    const stored = localStorage.getItem(juniorKey);
-                                    if (stored) {
-                                      const recs = JSON.parse(stored).filter((r: any) => r.url !== aud.url && r.id !== aud.id);
-                                      localStorage.setItem(juniorKey, JSON.stringify(recs));
-                                      setHomeworkNotesList([...homeworkNotesList]);
-                                    }
-                                  } catch {}
-                                } else if (aud.originalIdx >= 0) {
-                                  handleDeleteNote(aud.originalIdx);
-                                }
-                              }}
-                              style={{
-                                border: 'none',
-                                background: '#fee2e2',
-                                color: '#dc2626',
-                                borderRadius: '8px',
-                                padding: '4px 8px',
-                                cursor: 'pointer',
-                                fontSize: '0.72rem',
-                                fontWeight: 800
-                              }}
-                              className="hover-scale"
-                              title="Aufnahme löschen"
-                            >
-                              ✕
-                            </button>
+                            {isExpanded && (
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '8px', marginBottom: '8px' }}>
+                                {group.items.map((aud, idx) => (
+                                  <InlineAudioPlayer 
+                                    key={`stud-rec-${group.key}-${idx}`}
+                                    url={aud.url} 
+                                    label={aud.label} 
+                                    duration={aud.duration}
+                                    date={aud.date}
+                                    themeColor="#6366f1"
+                                    themeBg="#ede9fe"
+                                    badge="🔒 Privat"
+                                    badgeBg="#ede9fe"
+                                    badgeColor="#6d28d9"
+                                    onDelete={() => {
+                                      if (aud.source === 'local_junior' && student?.id) {
+                                        try {
+                                          const juniorKey = `campus_junior_recordings_${student.id}`;
+                                          const stored = localStorage.getItem(juniorKey);
+                                          if (stored) {
+                                            const recs = JSON.parse(stored).filter((r: any) => r.url !== aud.url && r.id !== aud.id);
+                                            localStorage.setItem(juniorKey, JSON.stringify(recs));
+                                            setHomeworkNotesList([...homeworkNotesList]);
+                                          }
+                                        } catch {}
+                                      } else if (aud.originalIdx >= 0) {
+                                        handleDeleteNote(aud.originalIdx);
+                                      }
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            )}
                           </div>
-
-                          <InlineAudioPlayer 
-                            url={aud.url} 
-                            label={aud.label} 
-                            duration={aud.duration}
-                          />
-
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.70rem', color: '#64748b', fontWeight: 700, paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
-                            <span style={{ color: '#6366f1', fontWeight: 850, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Lock size={11} /> Nur für dich (Privat)
-                            </span>
-                            <span>{aud.duration > 0 ? `${aud.duration} Sek.` : 'Audio'}</span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()}
@@ -13625,19 +13679,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   {/* Header Badge & Rarity Tag with Schuljahr Stamp */}
                   <div style={{ textAlign: 'center', marginTop: '4px', zIndex: 2 }}>
                     <span style={{ 
-                      fontSize: '0.68rem', 
+                      fontSize: '0.72rem', 
                       fontWeight: 900, 
                       textTransform: 'uppercase', 
                       letterSpacing: '0.12em', 
                       color: isLegendary ? '#facc15' : isEpic ? '#c084fc' : st.color || '#34a853',
                       background: 'rgba(255,255,255,0.06)',
-                      padding: '4px 12px',
-                      borderRadius: '12px',
-                      border: '1px solid rgba(255,255,255,0.1)'
+                      padding: '4px 14px',
+                      borderRadius: '100px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px'
                     }}>
-                      ⭐ {st.rarityLabel || 'Standard'} • Schuljahr {getSchoolYearString(displayDate)}
+                      <Star size={12} fill="currentColor" /> {st.rarityLabel || 'Standard'} • Schuljahr {getSchoolYearString(displayDate)}
                     </span>
-                    <h3 style={{ fontSize: '1.6rem', fontWeight: 900, margin: '10px 0 0 0', letterSpacing: '-0.5px', color: '#ffffff' }}>
+                    <h3 style={{ fontSize: '1.65rem', fontWeight: 900, margin: '10px 0 0 0', letterSpacing: '-0.5px', color: '#ffffff' }}>
                       {st.title}
                     </h3>
                   </div>
@@ -13691,7 +13748,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         justifyContent: 'center',
                         pointerEvents: 'none'
                       }}>
-                        <span style={{ fontSize: '2.5rem', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.6))' }}>🔒</span>
+                        <Lock size={36} color="#facc15" style={{ filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.6))' }} />
                       </div>
                     )}
                   </div>
@@ -13708,25 +13765,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     )}
                   </div>
 
-                  {/* Song Master Interpret & Title Badge */}
-                  {(st.id === 'song-master' || activeTopic) && (
+                  {/* Song Master Interpret & Title Badge (Clear, Open, Borderless Flow) */}
+                  {(st.category === 'songs' || st.id === 'song-master' || activeTopic) && (
                     <div style={{
                       width: '100%',
                       textAlign: 'center',
-                      background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(234, 179, 8, 0.35) 100%)',
-                      border: '1.5px solid #facc15',
-                      borderRadius: '16px',
-                      padding: '10px 14px',
-                      margin: '10px 0 4px 0',
-                      boxShadow: '0 4px 15px rgba(245, 158, 11, 0.2)',
+                      margin: '6px 0 2px 0',
                       zIndex: 2
                     }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block' }}>
-                        Gemeisterter Song (Interpret & Titel):
-                      </span>
-                      <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'block', marginTop: '2px', wordBreak: 'break-word' }}>
-                        🎵 {activeTopic || 'Song gemeistert'}
-                      </span>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <Music size={13} color="#facc15" /> Interpret &amp; Songtitel
+                      </div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#ffffff', marginTop: '2px', wordBreak: 'break-word' }}>
+                        {activeTopic || (details[0]?.topic) || 'Song gemeistert'}
+                      </div>
                     </div>
                   )}
 
@@ -13762,50 +13814,58 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       >
                         {details.map((d: any, idx: number) => (
                           <option key={idx} value={idx}>
-                            🎵 {d.topic}
+                            {d.topic}
                           </option>
                         ))}
                       </select>
                     </div>
                   )}
 
-                  {/* Description Box */}
+                  {/* Open, Borderless Description Flow */}
                   <div style={{ 
                     width: '100%', 
                     textAlign: 'center', 
-                    background: 'rgba(255,255,255,0.04)', 
-                    padding: '16px 20px', 
-                    borderRadius: '20px', 
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    zIndex: 2
+                    padding: '8px 12px', 
+                    zIndex: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
                   }}>
-                    <p style={{ fontSize: '0.86rem', color: '#e2e8f0', margin: '0 0 6px 0', lineHeight: '1.4', fontWeight: 600 }}>
+                    <p style={{ fontSize: '0.94rem', color: '#f8fafc', margin: 0, lineHeight: '1.45', fontWeight: 700 }}>
                       {st.desc}
                     </p>
                     {st.equiv && (
-                      <div style={{
-                        background: 'rgba(56, 189, 248, 0.1)',
-                        border: '1px solid rgba(56, 189, 248, 0.25)',
-                        borderRadius: '12px',
-                        padding: '6px 12px',
-                        fontSize: '0.74rem',
-                        fontWeight: 800,
+                      <p style={{
+                        fontSize: '0.84rem',
+                        fontWeight: 650,
                         color: '#38bdf8',
-                        margin: '8px 0 6px 0'
+                        margin: 0,
+                        lineHeight: '1.4'
                       }}>
                         {st.equiv}
-                      </div>
+                      </p>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px' }}>
                       <span style={{ 
-                        fontSize: '0.72rem', 
+                        fontSize: '0.74rem', 
                         color: isCollected ? '#4ade80' : '#94a3b8', 
-                        fontWeight: 800 
+                        fontWeight: 800,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
                       }}>
-                        {isCollected ? `✓ Freigeschaltet (${info.count}x gesammelt)` : '🔒 Noch nicht freigeschaltet'}
+                        {isCollected ? (
+                          <>
+                            <Check size={13} color="#4ade80" /> Freigeschaltet ({info.count}x gesammelt)
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={12} color="#94a3b8" /> Noch nicht freigeschaltet
+                          </>
+                        )}
                       </span>
                       <span style={{ color: 'rgba(255,255,255,0.2)' }}>•</span>
-                      <span style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 900 }}>
+                      <span style={{ fontSize: '0.74rem', color: '#34a853', fontWeight: 900 }}>
                         campus-groovelab.de
                       </span>
                     </div>
@@ -13866,15 +13926,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         onClick={() => shareCard(st, activeTopic)}
                         style={{
                           width: '100%',
-                          background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '16px',
                           padding: '14px',
-                          fontSize: '0.86rem',
+                          fontSize: '0.9rem',
                           fontWeight: 900,
                           cursor: 'pointer',
-                          boxShadow: '0 6px 20px rgba(52, 168, 83, 0.3)',
+                          boxShadow: '0 6px 20px rgba(245, 158, 11, 0.35)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -13883,7 +13943,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         }}
                         className="hover-scale"
                       >
-                        <span>📲</span> Auszeichnung teilen
+                        <Download size={18} />
+                        <span>Sticker als JPG herunterladen</span>
                       </button>
                     )}
 
@@ -14002,30 +14063,74 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0' }}>
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: '0 0 4px 0' }}>
                     {awardedStickerToAnimate.title}
                   </h2>
-                  <p style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600, margin: 0 }}>
+                  {(awardedStickerToAnimate.category === 'songs' || awardedStickerToAnimate.id === 'song-master' || topicName) && (
+                    <div style={{ textAlign: 'center', margin: '4px 0 8px 0' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <Music size={12} /> Interpret &amp; Songtitel
+                      </div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
+                        {topicName || 'Song gemeistert'}
+                      </div>
+                    </div>
+                  )}
+                  <p style={{ fontSize: '0.88rem', color: '#475569', fontWeight: 650, margin: 0, lineHeight: 1.35 }}>
                     {awardedStickerToAnimate.desc}
                   </p>
                 </div>
-                <button
-                  onClick={() => setAwardedStickerToAnimate(null)}
-                  style={{
-                    background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '14px',
-                    padding: '12px 32px',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
-                    transition: 'all 0.15s'
-                  }}
-                  className="hover-scale"
-                >
-                  Großartig!
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+                  <button
+                    type="button"
+                    onClick={() => downloadShareCard(awardedStickerToAnimate, topicName)}
+                    style={{
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '16px',
+                      padding: '14px 24px',
+                      fontWeight: 900,
+                      fontSize: '0.92rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Download size={18} />
+                    <span>Sticker als JPG herunterladen</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAwardedStickerToAnimate(null)}
+                    style={{
+                      background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '16px',
+                      padding: '12px 24px',
+                      fontWeight: 900,
+                      fontSize: '0.92rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <BookOpen size={18} />
+                    <span>In mein Album kleben</span>
+                  </button>
+                </div>
               </div>
               <style dangerouslySetInnerHTML={{__html: `
                 @keyframes spinStickerAward {
@@ -14159,7 +14264,51 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               }
             });
 
-            const masteredSongs = activeSongSkills.filter(s => s.is_stage_ready || s.progress_percent === 100);
+            const masteredSongsMap = new Map<string, any>();
+
+            // 1. From activeSongSkills
+            (activeSongSkills || []).forEach(skill => {
+              if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
+                const title = skill.songs?.title || skill.title || skill.song_title;
+                const artist = skill.songs?.artist || skill.artist || 'Unbekannt';
+                if (title) {
+                  const key = title.toLowerCase().trim();
+                  masteredSongsMap.set(key, {
+                    title,
+                    artist,
+                    instrument: skill.instrument || 'Campus',
+                    id: skill.id
+                  });
+                }
+              }
+            });
+
+            // 2. From progressItems
+            (progressItems || []).forEach((item: any) => {
+              const rawTopic = (item.topic_name || item.title || '').trim();
+              if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase() === 'test' || rawTopic.toLowerCase() === 'test - test' || rawTopic.toLowerCase() === 'test-test') return;
+              if (item.status === 'MASTERED' || (item.progress_percent || 0) === 100) {
+                const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                const key = cleanT.toLowerCase();
+                if (!masteredSongsMap.has(key)) {
+                  let artist = 'Unbekannt';
+                  let title = cleanT;
+                  if (cleanT.includes(' - ')) {
+                    const parts = cleanT.split(' - ');
+                    artist = parts[0].trim();
+                    title = parts.slice(1).join(' - ').trim();
+                  }
+                  masteredSongsMap.set(key, {
+                    title,
+                    artist,
+                    instrument: item.instrument || 'Campus',
+                    id: item.id
+                  });
+                }
+              }
+            });
+
+            const masteredSongs = Array.from(masteredSongsMap.values());
 
             const hasMastered = masteredBooksList.length > 0 || masteredSongs.length > 0;
 
@@ -14254,7 +14403,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     </div>
                   ) : (
                     masteredSongs.map((skill, idx) => {
-                      const songColor = getSongColor(skill.songs?.title || 'Song');
+                      const songColor = getSongColor(skill.title || 'Song');
                       return (
                         <div key={`m-song-${idx}`} style={{
                           background: 'white',
@@ -14281,10 +14430,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               overflow: 'hidden',
                               textOverflow: 'ellipsis'
                             }}>
-                              {skill.songs?.artist} - {skill.songs?.title}
+                              {skill.artist} - {skill.title}
                             </div>
-                            <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#334155', padding: '3px 8px', borderRadius: '8px', fontWeight: 800, border: '1px solid #e2e8f0', flexShrink: 0 }}>
-                              {skill.instrument}
+                            <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '8px', fontWeight: 800, border: '1px solid #bbf7d0', flexShrink: 0 }}>
+                              🏆 Meisterwerk
                             </span>
                           </div>
                         </div>
@@ -14986,7 +15135,29 @@ const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlay
   );
 };
 
-const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () => void; duration?: number }> = ({ url, label, onDelete, duration: initialDuration }) => {
+const InlineAudioPlayer: React.FC<{ 
+  url: string; 
+  label: string; 
+  onDelete?: () => void; 
+  duration?: number;
+  themeColor?: string;
+  themeBg?: string;
+  badge?: string;
+  badgeBg?: string;
+  badgeColor?: string;
+  date?: string;
+}> = ({ 
+  url, 
+  label, 
+  onDelete, 
+  duration: initialDuration,
+  themeColor = '#34a853',
+  themeBg = '#e6f4ea',
+  badge,
+  badgeBg = '#f1f5f9',
+  badgeColor = '#475569',
+  date
+}) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -15068,35 +15239,47 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // 18 dynamic waveform bar heights for modern voice-note look
-  const waveformHeights = [40, 65, 30, 85, 55, 95, 70, 45, 80, 100, 60, 90, 75, 40, 85, 50, 70, 35];
+  // 16 dynamic waveform bar heights for ultra-crisp modern audio pill look
+  const waveformHeights = [40, 65, 30, 85, 55, 95, 70, 45, 80, 100, 60, 90, 75, 45, 80, 50];
   const progressRatio = duration > 0 ? currentTime / duration : 0;
+
+  const formattedDate = (() => {
+    if (!date) return '';
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+    } catch {
+      return '';
+    }
+  })();
 
   return (
     <div style={{
       background: '#ffffff',
-      borderRadius: '14px',
-      border: '1.5px solid #e2e8f0',
+      borderRadius: '16px',
+      border: isPlaying ? `1.5px solid ${themeColor}` : '1.5px solid #e2e8f0',
       padding: '8px 12px',
       width: '100%',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+      boxShadow: isPlaying ? `0 4px 16px ${themeColor}22, 0 1px 3px rgba(0,0,0,0.04)` : '0 2px 6px rgba(0,0,0,0.02)',
       display: 'flex',
       alignItems: 'center',
       gap: '10px',
       boxSizing: 'border-box',
-      position: 'relative'
+      position: 'relative',
+      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
     }}>
       <audio ref={audioRef} src={resolvedUrl} />
 
-      {/* Play / Pause Circular Button */}
+      {/* Play / Pause Circular Button with Apple Bounce */}
       <button
         type="button"
         onClick={(e) => togglePlay(e)}
         style={{
-          width: '36px',
-          height: '36px',
+          width: '34px',
+          height: '34px',
           borderRadius: '50%',
-          background: isPlaying ? '#22c55e' : '#34a853',
+          background: isPlaying ? themeColor : `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}ee 100%)`,
           color: '#ffffff',
           border: 'none',
           cursor: 'pointer',
@@ -15104,40 +15287,51 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
-          boxShadow: isPlaying ? '0 0 12px rgba(34, 197, 94, 0.4)' : '0 2px 6px rgba(52, 168, 83, 0.25)',
+          boxShadow: isPlaying ? `0 0 12px ${themeColor}66` : `0 2px 6px ${themeColor}40`,
           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
         className="hover-scale"
         title={isPlaying ? 'Pause' : 'Abspielen'}
       >
         {isPlaying ? (
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
             <rect x="6" y="5" width="4" height="14" rx="1.5" />
             <rect x="14" y="5" width="4" height="14" rx="1.5" />
           </svg>
         ) : (
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ marginLeft: '2px' }}>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style={{ marginLeft: '2px' }}>
             <path d="M8 5v14l11-7z" />
           </svg>
         )}
       </button>
 
       {/* Center Waveform & Metadata */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-          <span style={{
-            fontSize: '0.74rem',
-            fontWeight: 800,
-            color: '#0f172a',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            flex: 1,
-            minWidth: 0
-          }}>
-            {label || 'Sprachnotiz'}
-          </span>
-          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+            <span style={{
+              fontSize: '0.78rem',
+              fontWeight: 850,
+              color: '#0f172a',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+              {label || 'Aufnahme'}
+            </span>
+            {formattedDate && (
+              <span style={{
+                fontSize: '0.66rem',
+                fontWeight: 700,
+                color: '#94a3b8',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}>
+                • {formattedDate}
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: '0.68rem', fontWeight: 750, color: '#64748b', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
         </div>
@@ -15156,9 +15350,9 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
             display: 'flex',
             alignItems: 'center',
             gap: '2.5px',
-            height: '18px',
+            height: '16px',
             cursor: 'pointer',
-            padding: '2px 0'
+            padding: '1px 0'
           }}
           title="Klicken zum Spulen"
         >
@@ -15173,9 +15367,7 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
                   height: `${h}%`,
                   minHeight: '3px',
                   borderRadius: '2px',
-                  background: isFilled 
-                    ? (isPlaying ? '#22c55e' : '#34a853') 
-                    : '#e2e8f0',
+                  background: isFilled ? themeColor : '#e2e8f0',
                   transition: 'background 0.1s ease, height 0.15s ease'
                 }}
               />
@@ -15192,7 +15384,7 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
           background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
           border: playbackRate !== 1 ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
           color: playbackRate !== 1 ? '#2563eb' : '#64748b',
-          borderRadius: '6px',
+          borderRadius: '8px',
           padding: '3px 6px',
           fontSize: '0.66rem',
           fontWeight: 800,
@@ -15203,6 +15395,24 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
       >
         {playbackRate}x
       </button>
+
+      {/* Optional Badge */}
+      {badge && (
+        <span style={{
+          fontSize: '0.66rem',
+          fontWeight: 800,
+          background: badgeBg,
+          color: badgeColor,
+          padding: '3px 8px',
+          borderRadius: '100px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center'
+        }}>
+          {badge}
+        </span>
+      )}
 
       {/* Delete Icon Button */}
       {onDelete && (
