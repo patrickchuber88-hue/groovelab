@@ -2414,8 +2414,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           lastSecuredDate = jokerDateStr;
         }
       }
-      if (!lastSecuredDate && profile?.created_at) {
-        lastSecuredDate = new Date(profile.created_at).toLocaleDateString('en-CA');
+      if (!lastSecuredDate) {
+        const actDateStr = (profile as any)?.activated_at || (profile?.is_pin_activated ? profile?.created_at : null);
+        if (actDateStr) {
+          lastSecuredDate = new Date(actDateStr).toLocaleDateString('en-CA');
+        }
       }
 
       if (lastSecuredDate) {
@@ -2464,7 +2467,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const totalMins = (currentStats?.total_focus_minutes || 0) + minutes;
       const monthlyMins = (currentStats?.monthly_focus_minutes || 0) + minutes;
       const newXp = (currentStats?.current_xp || 0) + xpGained;
-      const flameLevelName = newStreak >= 9 ? 'Helden-Feuer' : (newStreak >= 4 ? 'Mittlere Flamme' : 'Kleine Flamme');
+      const flameLevelName = newStreak >= 9 ? 'Helden-Feuer' : (newStreak >= 3 ? 'Mittlere Flamme' : 'Kleine Flamme');
 
       // 1. Fokus-Protokoll schreiben (aufgeteilt in Fokus und Extra)
       if (!skipDbLogsInsert) {
@@ -2555,23 +2558,107 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   const handleFinishFocusSession = async () => {
-    if (elapsedSeconds < 5) {
-      alert("Übe mindestens ein paar Sekunden, um deine Session zu speichern!");
+    if (!profile) return;
+    const targetSeconds = dailyGoal * 60;
+    const targetMinsVal = dailyGoal;
+
+    // Schutz gegen versehentliches Antippen (< 10 Sekunden) -> stilles Beenden ohne Fehlermeldung
+    if (elapsedSeconds < 10) {
+      if (currentLogIdRef.current) {
+        try {
+          await supabase.from('fokus_logs').delete().eq('id', currentLogIdRef.current);
+        } catch (e) {}
+        currentLogIdRef.current = null;
+      }
+      if (currentExtraLogIdRef.current) {
+        try {
+          await supabase.from('fokus_logs').delete().eq('id', currentExtraLogIdRef.current);
+        } catch (e) {}
+        currentExtraLogIdRef.current = null;
+      }
+      setElapsedSeconds(0);
+      setTimerRunning(false);
+      setIsExtraTime(false);
+      setShowCheckpoint(false);
       return;
     }
-    const targetSeconds = dailyGoal * 60;
+
+    const hasReachedDailyTarget = elapsedSeconds >= targetSeconds;
     let focusMinutes = 0;
+    let focusSeconds = 0;
+    let extraSeconds = 0;
     let extraMinutes = 0;
-    
-    const totalMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
-    const targetMinsVal = dailyGoal;
-    
-    if (totalMinutes >= targetMinsVal) {
+
+    if (hasReachedDailyTarget) {
+      focusSeconds = targetSeconds;
       focusMinutes = targetMinsVal;
-      extraMinutes = totalMinutes - targetMinsVal;
+      extraSeconds = Math.max(0, elapsedSeconds - targetSeconds);
+      extraMinutes = Math.round(extraSeconds / 60);
     } else {
-      focusMinutes = totalMinutes;
+      // Unter dem Tagesziel: Jede Session ab 10 Sek. wird wohlwollend als mindestens 1 Minute Übezeit verbucht!
+      focusMinutes = Math.max(1, Math.round(elapsedSeconds / 60) || 1);
+      focusSeconds = Math.max(elapsedSeconds, focusMinutes * 60);
+      extraSeconds = 0;
       extraMinutes = 0;
+    }
+
+    const flameLevelName = (dailyGoal >= 10) ? 'Helden-Feuer' : (dailyGoal >= 5 ? 'Mittlere Flamme' : 'Kleine Flamme');
+
+    // Finalize exact duration in DB
+    if (currentLogIdRef.current) {
+      try {
+        await supabase
+          .from('fokus_logs')
+          .update({
+            duration_seconds: focusSeconds,
+            duration_minutes: focusMinutes,
+            flame_level: flameLevelName,
+            is_extra: false
+          })
+          .eq('id', currentLogIdRef.current);
+      } catch (e) {}
+    } else {
+      try {
+        await supabase
+          .from('fokus_logs')
+          .insert({
+            user_id: profile.id,
+            duration_seconds: focusSeconds,
+            duration_minutes: focusMinutes,
+            flame_level: flameLevelName,
+            is_extra: false,
+            created_at: new Date().toISOString()
+          });
+      } catch (e) {}
+    }
+
+    if (extraSeconds > 0) {
+      if (currentExtraLogIdRef.current) {
+        try {
+          await supabase
+            .from('fokus_logs')
+            .update({
+              duration_seconds: extraSeconds,
+              duration_minutes: extraMinutes,
+              flame_level: flameLevelName,
+              is_extra: true
+            })
+            .eq('id', currentExtraLogIdRef.current);
+        } catch (e) {}
+      } else {
+        try {
+          await supabase
+            .from('fokus_logs')
+            .insert({
+              user_id: profile.id,
+              duration_seconds: extraSeconds,
+              duration_minutes: extraMinutes,
+              is_extra: true,
+              flame_level: flameLevelName,
+              created_at: new Date().toISOString()
+            });
+        } catch (e) {}
+      }
     }
 
     // Since logs are written in real-time, skip inserts but update stats and avatar.

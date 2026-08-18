@@ -810,10 +810,10 @@ function applyStereoDimensionAndMonoMaker(audioBuffer: AudioBuffer): AudioBuffer
   const a2H = 1 - alphaHigh;
 
   let xl1 = 0, xl2 = 0, yl1 = 0, yl2 = 0;
-  let xr1 = 0, xr2 = 0, yr1 = 0, yr2 = 0;
+  const xr1 = 0, xr2 = 0, yr1 = 0, yr2 = 0;
 
   let xh1 = 0, xh2 = 0, yh1 = 0, yh2 = 0;
-  let xhr1 = 0, xhr2 = 0, yhr1 = 0, yhr2 = 0;
+  const xhr1 = 0, xhr2 = 0, yhr1 = 0, yhr2 = 0;
 
   for (let i = 0; i < length; i++) {
     const l = left[i];
@@ -821,7 +821,7 @@ function applyStereoDimensionAndMonoMaker(audioBuffer: AudioBuffer): AudioBuffer
 
     // Mid / Side decomposition
     const mid = (l + r) * 0.5;
-    let side = (l - r) * 0.5;
+    const side = (l - r) * 0.5;
 
     // Filter Mid/Side low-end for Mono-Maker (< 150 Hz Side is eliminated)
     const ylSide = (b0L / a0L) * side + (b1L / a0L) * xl1 + (b2L / a0L) * xl2 - (a1L / a0L) * yl1 - (a2L / a0L) * yl2;

@@ -104,7 +104,7 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
   const effectiveGroovelabCount = groovelabStudentCount !== undefined ? groovelabStudentCount : 0;
 
   let campusStudentActivationFeeTotal = 0;
-  let groovelabStudentActivationFeeTotal = Number((Math.max(0, effectiveGroovelabCount) * effectiveStudentRate).toFixed(2));
+  const groovelabStudentActivationFeeTotal = Number((Math.max(0, effectiveGroovelabCount) * effectiveStudentRate).toFixed(2));
 
   if (input.studentProfiles && input.studentProfiles.length > 0) {
     // Exact summation of individual student profiles

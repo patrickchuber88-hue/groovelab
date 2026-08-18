@@ -4232,6 +4232,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     usedJokerThisSession: boolean;
     streak: number;
     sessionMinutes?: number;
+    exactSeconds?: number;
     dailyGoal?: number;
   } | null>(null);
 
@@ -5329,7 +5330,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   };
 
   const getGroupedLogs = () => {
-    const groups: Record<string, { date: string, focusSeconds: number, extraSeconds: number, flameLevel: string, isPlaceholder?: boolean }> = {};
+    const groups: Record<string, { 
+      date: string, 
+      focusSeconds: number, 
+      extraSeconds: number, 
+      hasMasteredSession: boolean, 
+      flameLevel: string, 
+      isPlaceholder?: boolean 
+    }> = {};
     
     // Initialize placeholders for the last 7 days starting from user activation date
     const now = new Date();
@@ -5356,6 +5364,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         date: dateStr,
         focusSeconds: 0,
         extraSeconds: 0,
+        hasMasteredSession: false,
         flameLevel: 'Keine Flamme',
         isPlaceholder: true
       };
@@ -5376,26 +5385,40 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           date: dateStr,
           focusSeconds: 0,
           extraSeconds: 0,
+          hasMasteredSession: false,
           flameLevel: log.flame_level || 'Keine Flamme',
           isPlaceholder: true
         };
       }
       
       const seconds = log.duration_seconds || ((log.duration_minutes || 0) * 60);
-      if (log.is_extra) {
-        groups[dateStr].extraSeconds += seconds;
+      
+      // Pädagogische Regel: Fokus-Meisterschaft erfordert EINE Einheit am Stück (>= 180s)
+      if (!log.is_extra && seconds >= 180) {
+        groups[dateStr].hasMasteredSession = true;
+        groups[dateStr].focusSeconds = 180;
+        groups[dateStr].extraSeconds += (seconds - 180);
       } else {
-        groups[dateStr].focusSeconds += seconds;
+        // Freie Übezeit / Teil-Übezeit
+        groups[dateStr].extraSeconds += seconds;
       }
 
-      const totalSeconds = groups[dateStr].focusSeconds + groups[dateStr].extraSeconds;
-      if (totalSeconds >= 180) {
-        groups[dateStr].isPlaceholder = false;
-        if (!groups[dateStr].flameLevel || groups[dateStr].flameLevel === 'Keine Flamme') {
-          groups[dateStr].flameLevel = log.flame_level && log.flame_level !== 'Keine Flamme'
-            ? log.flame_level
-            : getFlameLevelName(avatar?.streak_flame || 0);
+      if (log.flame_level && log.flame_level !== 'Keine Flamme') {
+        groups[dateStr].flameLevel = log.flame_level;
+      }
+    });
+
+    Object.values(groups).forEach(g => {
+      const totalSeconds = g.focusSeconds + g.extraSeconds;
+      if (totalSeconds > 0) {
+        g.isPlaceholder = false;
+      }
+      if (g.hasMasteredSession) {
+        if (!g.flameLevel || g.flameLevel === 'Keine Flamme') {
+          g.flameLevel = getFlameLevelName(avatar?.streak_flame || 0);
         }
+      } else {
+        g.flameLevel = 'Keine Flamme';
       }
     });
     
@@ -6200,7 +6223,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       .from('fokus_logs')
                       .update({ duration_seconds: targetSeconds, duration_minutes: Math.floor(targetSeconds / 60) })
                       .eq('id', currentLogIdRef.current);
-                    currentLogIdRef.current = null;
                   }
                 }
 
@@ -6444,23 +6466,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     const streak = avatar?.streak_flame || 0;
     const targetMins = getTargetMinutes(streak);
     const targetSeconds = targetMins * 60;
-    const flameLevelName = getFlameLevelName(streak);
 
-    // 🔒 HARTE FOKUS-REGEL: Alles unter der Mindestzeit führt zum Komplett-Abbruch
-    if (secondsElapsed < targetSeconds) {
+    // Schutz gegen versehentliches Antippen (< 10 Sekunden) -> stilles Beenden ohne Fehlermeldung
+    if (secondsElapsed < 10) {
       if (currentLogIdRef.current) {
         try {
           await supabase.from('fokus_logs').delete().eq('id', currentLogIdRef.current);
-        } catch (e) {
-          // ignore
-        }
+        } catch (e) {}
         currentLogIdRef.current = null;
+      }
+      if (currentExtraLogIdRef.current) {
+        try {
+          await supabase.from('fokus_logs').delete().eq('id', currentExtraLogIdRef.current);
+        } catch (e) {}
+        currentExtraLogIdRef.current = null;
       }
       setSecondsElapsed(0);
       setIsExtraTime(false);
       setIsGraceActive(false);
       isFinishingSessionRef.current = false;
-      alert(`Fokus-Session vor Erreichen der Mindestzeit (${targetMins} Min.) abgebrochen – es wurden keine Übe-Minuten verbucht. 🎸`);
       return;
     }
 
@@ -6470,23 +6494,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-      const dayBeforeYesterday = new Date();
-      dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2);
-      const dayBeforeYesterdayStr = dayBeforeYesterday.toISOString().split('T')[0];
-
       // Fetch current stats
       const { data: stats } = await supabase
         .from('student_stats')
         .select('*')
         .eq('student_id', studentId)
         .maybeSingle();
-
-      const focusSeconds = targetSeconds;
-      const extraSeconds = Math.max(0, secondsElapsed - targetSeconds);
-
-      // Convert to completed minutes
-      const focusMinutes = Math.floor(focusSeconds / 60);
-      const extraMinutes = Math.round(extraSeconds / 60);
 
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
@@ -6504,6 +6517,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const alreadyCompletedTargetEarlierToday = previousFocusLogs.some(
         (log: any) => (log.duration_minutes || 0) >= targetMins
       );
+
+      // Did this session complete the daily target?
+      const sessionCompletedTarget = !alreadyCompletedTargetEarlierToday && (secondsElapsed >= targetSeconds);
+
+      // Pädagogische 2-Stufen Minuten-Aufteilung (Großzügiges Runden ab 10 Sek. auf mindestens 1 Minute)
+      let focusSeconds = 0;
+      let focusMinutes = 0;
+      let extraSeconds = 0;
+      let extraMinutes = 0;
+
+      if (sessionCompletedTarget) {
+        focusSeconds = targetSeconds;
+        focusMinutes = targetMins;
+        extraSeconds = Math.max(0, secondsElapsed - targetSeconds);
+        extraMinutes = Math.round(extraSeconds / 60);
+      } else {
+        // Unter dem Tagesziel: Jede Session ab 10 Sek. wird wohlwollend als mindestens 1 Minute Übezeit verbucht!
+        focusMinutes = Math.max(1, Math.round(secondsElapsed / 60) || 1);
+        focusSeconds = Math.max(secondsElapsed, focusMinutes * 60);
+        extraSeconds = 0;
+        extraMinutes = 0;
+      }
 
       const effectiveFocusMinutes = alreadyCompletedTargetEarlierToday ? 0 : focusMinutes;
       const effectiveExtraMinutes = alreadyCompletedTargetEarlierToday ? (focusMinutes + extraMinutes) : extraMinutes;
@@ -6549,10 +6584,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
       }
 
-      // Check if this session completed the target or if target was already completed today
-      const sessionCompletedTarget = !alreadyCompletedTargetEarlierToday && (secondsElapsed >= targetSeconds);
       let usedJokerThisSession = false;
       
+      // Streak wird nur erhöht wenn Tagesziel gemeistert wurde
       if (sessionCompletedTarget) {
         if (lastSecuredDate === yesterdayStr) {
           streakFlame += 1;
@@ -6584,29 +6618,49 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         : getFlameLevelName(streak);
 
       // 1. Update or Insert Primary Fokus Log in DB
+      let finalPrimaryLogId = currentLogIdRef.current;
       if (currentLogIdRef.current) {
-        await supabase
+        const { error: updateErr } = await supabase
           .from('fokus_logs')
           .update({
-            duration_seconds: targetSeconds,
+            duration_seconds: focusSeconds,
             duration_minutes: focusMinutes,
             flame_level: activeFlameLevel,
             is_extra: false
           })
           .eq('id', currentLogIdRef.current);
+        if (updateErr) {
+          console.error('Update primary log failed, falling back to insert:', updateErr);
+          const { data: insData } = await supabase
+            .from('fokus_logs')
+            .insert({
+              user_id: studentId,
+              duration_seconds: focusSeconds,
+              duration_minutes: focusMinutes,
+              is_extra: false,
+              flame_level: activeFlameLevel
+            })
+            .select('id')
+            .single();
+          if (insData) finalPrimaryLogId = insData.id;
+        }
       } else {
-        await supabase
+        const { data: insData } = await supabase
           .from('fokus_logs')
           .insert({
             user_id: studentId,
-            duration_seconds: targetSeconds,
+            duration_seconds: focusSeconds,
             duration_minutes: focusMinutes,
             is_extra: false,
             flame_level: activeFlameLevel
-          });
+          })
+          .select('id')
+          .single();
+        if (insData) finalPrimaryLogId = insData.id;
       }
 
       // 2. Update or Insert Extra Log in DB if extra time occurred
+      let finalExtraLogId = currentExtraLogIdRef.current;
       if (extraSeconds > 0) {
         if (currentExtraLogIdRef.current) {
           await supabase
@@ -6619,7 +6673,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             })
             .eq('id', currentExtraLogIdRef.current);
         } else {
-          await supabase
+          const { data: insExtra } = await supabase
             .from('fokus_logs')
             .insert({
               user_id: studentId,
@@ -6627,7 +6681,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               duration_minutes: extraMinutes,
               is_extra: true,
               flame_level: activeFlameLevel
-            });
+            })
+            .select('id')
+            .single();
+          if (insExtra) finalExtraLogId = insExtra.id;
         }
       }
 
@@ -6637,7 +6694,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         total_focus_minutes: totalFocus,
         monthly_focus_minutes: monthlyFocus,
         streak_flame: streakFlame,
-        last_practice_date: todayStr,
+        last_practice_date: sessionCompletedTarget ? todayStr : (stats?.last_practice_date || todayStr),
         current_xp: currentXp,
         practice_anchor: practiceAnchor,
         updated_at: new Date().toISOString()
@@ -6654,10 +6711,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         await supabase.from('avatars').update({
           xp: currentXp,
           streak_flame: streakFlame,
-          last_focus_date: todayStr
+          last_focus_date: sessionCompletedTarget ? todayStr : (avatarRecord.last_focus_date || todayStr)
         }).eq('id', avatarRecord.id);
 
-        // Persist client-side disaster-resilience backup in localStorage
         try {
           localStorage.setItem(`cg_offline_practice_${studentId}`, JSON.stringify({
             last_focus_date: todayStr,
@@ -6677,9 +6733,36 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
 
       // 6. Optimistic React State Updates (instant UI reaction)
+      const newLogEntry = {
+        id: finalPrimaryLogId || `temp-${Date.now()}`,
+        user_id: studentId,
+        duration_seconds: focusSeconds,
+        duration_minutes: focusMinutes,
+        is_extra: false,
+        flame_level: activeFlameLevel,
+        created_at: new Date().toISOString()
+      };
+      const newExtraEntry = extraSeconds > 0 ? {
+        id: finalExtraLogId || `temp-extra-${Date.now()}`,
+        user_id: studentId,
+        duration_seconds: extraSeconds,
+        duration_minutes: extraMinutes,
+        is_extra: true,
+        flame_level: activeFlameLevel,
+        created_at: new Date().toISOString()
+      } : null;
+
+      setFokusLogs(prev => [
+        ...(newExtraEntry ? [newExtraEntry] : []),
+        newLogEntry,
+        ...prev.filter(l => l.id !== currentLogIdRef.current && l.id !== currentExtraLogIdRef.current && l.id !== finalPrimaryLogId && l.id !== finalExtraLogId)
+      ]);
+
       setTotalFocusMinutes(totalFocus);
       setMonthlyFocusMinutes(monthlyFocus);
-      setHasCompletedTargetToday(true);
+      if (sessionCompletedTarget) {
+        setHasCompletedTargetToday(true);
+      }
       setAvatar(prev => prev ? { ...prev, xp: currentXp, streak_flame: streakFlame } : prev);
 
       setCelebrationDetails({
@@ -6689,7 +6772,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         usedJokerThisSession: usedJokerThisSession,
         streak: streak,
         sessionMinutes: totalMinutes,
-        dailyGoal: getTargetMinutes(streakFlame)
+        exactSeconds: secondsElapsed,
+        dailyGoal: targetMins
       });
       setCelebrationRingProgress(0);
       setCelebrationExploded(false);
@@ -8903,62 +8987,79 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 height: '100%',
                 position: 'relative'
               }}>
-                <div style={{ 
+                <div style={sessionActive ? {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  width: '100%',
+                  maxWidth: '440px',
+                  margin: '0 auto',
+                  textAlign: 'center',
+                  paddingBottom: '10px'
+                } : { 
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '12px', 
                   width: '100%', 
-                  borderBottom: sessionActive ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(241, 245, 249, 0.8)', 
+                  borderBottom: '1px solid rgba(241, 245, 249, 0.8)', 
                   paddingBottom: '12px' 
                 }}>
                   <div style={{ 
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
                     background: sessionActive ? 'rgba(255, 255, 255, 0.12)' : '#e6f4ea', 
                     color: sessionActive ? '#ffffff' : '#34a853', 
-                    padding: '9px', 
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    padding: sessionActive ? '6px 16px' : '9px', 
+                    borderRadius: sessionActive ? '999px' : '12px',
                     boxShadow: sessionActive ? 'none' : '0 2px 8px rgba(52, 168, 83, 0.08)'
                   }}>
-                    <Clock size={18} color={sessionActive ? '#ffffff' : '#34a853'} />
+                    <Clock size={sessionActive ? 15 : 18} color={sessionActive ? '#ffffff' : '#34a853'} />
+                    {sessionActive && (
+                      <span style={{ fontSize: '0.84rem', fontWeight: 850, color: '#ffffff', letterSpacing: '0.02em' }}>
+                        {isExtraTime ? '🌟 Extra-Zeit läuft!' : (studentUiLevel === 'junior' ? '🚀 Deine Übe-Rakete' : '🎧 Fokus-Session')}
+                      </span>
+                    )}
                   </div>
                   <div>
-                    <h4 style={{ 
-                      fontWeight: 850, 
-                      fontSize: '18px', 
-                      color: sessionActive ? '#ffffff' : '#0f172a', 
-                      margin: 0, 
-                      letterSpacing: '-0.02em',
-                      fontFamily: "'Plus Jakarta Sans', sans-serif"
-                    }}>
-                      {sessionActive ? 'Fokus-Session läuft' : (
-                        studentUiLevel === 'junior' ? 'Deine Übe-Rakete' : (studentUiLevel === 'teen' ? 'Flow-Timer' : 'Fokus-Timer')
-                      )}
-                    </h4>
+                    {!sessionActive && (
+                      <h4 style={{ 
+                        fontWeight: 850, 
+                        fontSize: '18px', 
+                        color: '#0f172a', 
+                        margin: 0, 
+                        letterSpacing: '-0.02em',
+                        fontFamily: "'Plus Jakarta Sans', sans-serif"
+                      }}>
+                        {studentUiLevel === 'junior' ? 'Deine Übe-Rakete' : (studentUiLevel === 'teen' ? 'Flow-Timer' : 'Fokus-Timer')}
+                      </h4>
+                    )}
                     <p style={{ 
                       fontSize: '0.74rem', 
-                      color: sessionActive ? 'rgba(255, 255, 255, 0.6)' : '#64748b', 
+                      color: sessionActive ? 'rgba(255, 255, 255, 0.7)' : '#64748b', 
                       margin: '2px 0 0 0', 
                       fontWeight: 550, 
                       display: 'flex', 
                       alignItems: 'center', 
+                      justifyContent: sessionActive ? 'center' : 'flex-start',
                       gap: '5px' 
                     }}>
                       {isExtraTime ? (
                         <>
                           <Award size={13} style={{ color: '#ffffff', flexShrink: 0 }} />
-                          <span style={{ color: '#ffffff', fontWeight: 600 }}>Du bist in der Extra-Zeit!</span>
+                          <span style={{ color: '#ffffff', fontWeight: 600 }}>Du bist in der Extra-Zeit! Jede Minute bringt Extra-XP.</span>
                         </>
                       ) : (
                         <>
                           <Smartphone size={13} style={{ color: sessionActive ? '#ffffff' : '#34a853', flexShrink: 0 }} />
                           <span>
-                            {studentUiLevel === 'junior' 
-                              ? 'Handy flach hinlegen & Üben starten' 
-                              : (studentUiLevel === 'teen' 
-                                  ? 'Handy umdrehen, Fokus aktivieren & XP sammeln' 
-                                  : 'Handy mit dem Display nach unten hinlegen')}
+                            {sessionActive 
+                              ? `Ziel: ${getTargetMinutes(avatar?.streak_flame || 0)} Min. am Stück für deinen Tages-Streak 🔥`
+                              : (studentUiLevel === 'junior' 
+                                  ? `Handy flach hinlegen & ${getTargetMinutes(avatar?.streak_flame || 0)} Min. am Stück üben` 
+                                  : `Handy flach hinlegen – ${getTargetMinutes(avatar?.streak_flame || 0)} Min. am Stück für die Flamme 🔥`)}
                           </span>
                         </>
                       )}
@@ -10241,14 +10342,45 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           textAlign: 'left'
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                            <span style={{ color: '#71717a', fontWeight: 600 }}>Geübte Zeit:</span>
+                            <span style={{ color: '#ffffff', fontWeight: 800 }}>
+                              {celebrationDetails?.exactSeconds ? (
+                                `${String(Math.floor(celebrationDetails.exactSeconds / 60)).padStart(2, '0')}:${String(celebrationDetails.exactSeconds % 60).padStart(2, '0')} Min. ⏱️`
+                              ) : (
+                                `${celebrationDetails.sessionMinutes} Min. ⏱️`
+                              )}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
                             <span style={{ color: '#71717a', fontWeight: 600 }}>XP erhalten:</span>
                             <span style={{ color: '#38bdf8', fontWeight: 800 }}>+{celebrationDetails.xpGained} XP ⚡</span>
                           </div>
                           
-                          {celebrationDetails.sessionCompletedTarget && (
+                          {celebrationDetails.sessionCompletedTarget ? (
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
                               <span style={{ color: '#71717a', fontWeight: 600 }}>Tagesziel:</span>
                               <span style={{ color: '#34a853', fontWeight: 800 }}>Erreicht! 🏆</span>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                <span style={{ color: '#71717a', fontWeight: 600 }}>Tages-Ziel:</span>
+                                <span style={{ color: '#eab308', fontWeight: 800 }}>Noch {celebrationDetails?.dailyGoal || 3} Min. am Stück zur Flamme 🔥</span>
+                              </div>
+                              <div style={{
+                                background: 'rgba(234, 179, 8, 0.08)',
+                                border: '1px solid rgba(234, 179, 8, 0.2)',
+                                borderRadius: '12px',
+                                padding: '8px 10px',
+                                fontSize: '0.74rem',
+                                color: '#fef08a',
+                                lineHeight: 1.4,
+                                textAlign: 'center',
+                                fontWeight: 600
+                              }}>
+                                💡 <strong>Streak-Regel:</strong> Der Tages-Streak zählt, wenn du die <strong>{celebrationDetails?.dailyGoal || 3} Min. in einer Session am Stück</strong> übst. Deine bisherige Übezeit ist sicher gespeichert und du kannst es heute jederzeit nochmal versuchen! 🎸
+                              </div>
                             </div>
                           )}
 
@@ -10789,33 +10921,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 return `${dd}.${mm}.${yy}`;
                               })();
                               const isJokerDay = jokerDateStr === group.date;
-                              
-                              const getTargetSeconds = (flame: string) => {
-                                const level = avatar?.evolution_level || 1;
-                                if (level === 3) {
-                                  if (flame === 'Helden-Feuer') return 20 * 60;
-                                  if (flame === 'Mittlere Flamme') return 15 * 60;
-                                  return 10 * 60;
-                                } else if (level === 2) {
-                                  if (flame === 'Helden-Feuer') return 15 * 60;
-                                  if (flame === 'Mittlere Flamme') return 10 * 60;
-                                  return 5 * 60;
-                                } else {
-                                  if (flame === 'Helden-Feuer') return 10 * 60;
-                                  if (flame === 'Mittlere Flamme') return 5 * 60;
-                                  return 3 * 60;
-                                }
-                              };
-                              
                               const getFlameIconSize = (flame: string) => {
                                 if (flame === 'Helden-Feuer') return 18;
                                 if (flame === 'Mittlere Flamme') return 15;
                                 return 12;
                               };
-                              
-                              const targetSecs = getTargetSeconds(group.flameLevel);
                               const iconSize = getFlameIconSize(group.flameLevel);
-                              const hasMastered = group.focusSeconds >= targetSecs && !group.isPlaceholder;
+                              const totalDaySeconds = (group.focusSeconds || 0) + (group.extraSeconds || 0);
+                              const hasMastered = Boolean(group.hasMasteredSession || group.focusSeconds >= 180) && !group.isPlaceholder;
                               
                               let borderLeftColor = '#e2e8f0';
                               if (hasMastered) {
@@ -10839,27 +10952,36 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
                               })();
 
-                              const totalSecs = group.focusSeconds + group.extraSeconds;
-                              let fSeconds = group.focusSeconds;
-                              let eSeconds = group.extraSeconds;
-
-                              // Senior Developer Enhancement:
-                              // If totalSecs >= 180 (3 min target) but fSeconds was 0 (e.g. initial log flag), split totalSecs into 180s target focus + remainder extra!
-                              if (totalSecs >= 180 && fSeconds === 0) {
-                                fSeconds = 180;
-                                eSeconds = totalSecs - 180;
-                              }
+                              const fSeconds = group.focusSeconds;
+                              const eSeconds = group.extraSeconds;
 
                               const focusMins = Math.floor(fSeconds / 60);
+                              const focusSecs = fSeconds % 60;
                               const extraMins = Math.floor(eSeconds / 60);
                               const extraSecs = eSeconds % 60;
                               
                               const textParts = [];
                               if (fSeconds > 0) {
-                                textParts.push(`Fokuszeit (+${focusMins}m)`);
+                                if (focusSecs > 0) {
+                                  textParts.push(`Fokuszeit (+${focusMins}:${String(focusSecs).padStart(2, '0')}m)`);
+                                } else {
+                                  textParts.push(`Fokuszeit (+${focusMins}m)`);
+                                }
                               }
                               if (eSeconds > 0) {
-                                textParts.push(`+${extraMins}:${String(extraSecs).padStart(2, '0')} (extra)`);
+                                if (fSeconds > 0) {
+                                  if (extraSecs > 0) {
+                                    textParts.push(`+${extraMins}:${String(extraSecs).padStart(2, '0')}m (extra)`);
+                                  } else {
+                                    textParts.push(`+${extraMins}m (extra)`);
+                                  }
+                                } else {
+                                  if (extraSecs > 0) {
+                                    textParts.push(`Freie Übezeit (+${extraMins}:${String(extraSecs).padStart(2, '0')}m)`);
+                                  } else {
+                                    textParts.push(`Freie Übezeit (+${extraMins}m)`);
+                                  }
+                                }
                               }
                               const statusText = textParts.join(' - ');
 
@@ -11107,24 +11229,29 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       )}
                                     </div>
                                     
-                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                                      <Flame size={iconSize} fill={hasMastered ? '#34a853' : isToday ? '#eab308' : '#ef4444'} color={hasMastered ? '#34a853' : isToday ? '#eab308' : '#ef4444'} />
-                                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: hasMastered ? '#34a853' : isToday ? '#eab308' : '#ef4444' }}>
-                                        {group.flameLevel}
-                                      </span>
+                                    <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexShrink: 0 }}>
+                                      {isToday ? (
+                                        <>
+                                          <Clock size={13} color="#ca8a04" />
+                                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ca8a04' }}>
+                                            Noch {Math.max(1, Math.ceil((180 - totalDaySeconds) / 60))}m zur Flamme
+                                          </span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Clock size={13} color="#64748b" />
+                                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>
+                                            Geübt
+                                          </span>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                 );
                               })();
 
-                              const getFlameColor = (flame: string) => {
-                                if (flame === 'Helden-Feuer') return '#ef4444';
-                                if (flame === 'Mittlere Flamme') return '#f97316';
-                                if (flame === 'Kleine Flamme') return '#eab308';
-                                return '#cbd5e1';
-                              };
-                              const activeColor = getFlameColor(group.flameLevel);
-                              const isStreakActive = group.flameLevel !== 'Keine Flamme';
+                              const isStreakActive = hasMastered;
+                              const activeColor = hasMastered ? '#34a853' : (totalDaySeconds > 0 ? '#ca8a04' : '#cbd5e1');
 
 
 

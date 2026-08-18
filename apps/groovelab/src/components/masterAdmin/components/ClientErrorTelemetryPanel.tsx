@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  AlertTriangle, ShieldAlert, CheckCircle2, RefreshCw, Trash2, 
-  Search, Filter, Bug, Smartphone, Monitor, Tablet, Copy, Check, 
-  ExternalLink, Eye, Play, Sparkles, X, ChevronRight, Activity, Terminal
+  AlertTriangle, CheckCircle2, RefreshCw, Trash2, 
+  Search, Smartphone, Monitor, Tablet, Copy, Check, 
+  X, Terminal
 } from 'lucide-react';
 import { 
   ClientErrorLog, fetchErrorLogs, markErrorResolved, 
-  clearAllErrorLogs, simulateTestClientError 
+  clearAllErrorLogs
 } from '../../../lib/errorTelemetry';
 
 export const ClientErrorTelemetryPanel: React.FC = () => {
@@ -17,7 +17,6 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'UNRESOLVED' | 'RESOLVED'>('ALL');
   const [selectedLog, setSelectedLog] = useState<ClientErrorLog | null>(null);
   const [copiedStack, setCopiedStack] = useState(false);
-  const [isSimulating, setIsSimulating] = useState(false);
 
   const loadLogs = async () => {
     setLoading(true);
@@ -61,15 +60,6 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
     }
   };
 
-  const handleSimulate = async (type: 'AUDIO' | 'NETWORK' | 'RENDER') => {
-    setIsSimulating(true);
-    try {
-      await simulateTestClientError(type);
-      await loadLogs();
-    } finally {
-      setIsSimulating(false);
-    }
-  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -78,10 +68,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
   };
 
   // Metrics Calculation
-  const totalLogs = logs.length;
   const unresolvedLogs = logs.filter(l => !l.resolved).length;
-  const criticalLogs = logs.filter(l => l.severity === 'CRITICAL' && !l.resolved).length;
-  const crashFreeRate = totalLogs > 0 ? Math.max(99.4, (100 - (unresolvedLogs * 0.05))).toFixed(2) : '100.00';
 
   // Filtered Logs
   const filteredLogs = logs.filter(log => {
@@ -100,230 +87,139 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
-      
-      {/* ─── 1. TOP METRICS CARDS ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-        
-        {/* Metric 1: Crash-Free Rate */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="animate-fade-in">
+      {/* If 0 errors: Clean, peaceful status banner */}
+      {logs.length === 0 ? (
         <div style={{
-          background: '#ffffff',
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+          border: '1.5px solid #86efac',
           borderRadius: '20px',
-          padding: '20px 24px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '6px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Crash-Free Sessions
-            </span>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-            {crashFreeRate}%
-          </div>
-          <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700 }}>
-            🟢 Enterprise 99.9% Uptime SLA konform
-          </span>
-        </div>
-
-        {/* Metric 2: Unresolved Critical Incidents */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '20px',
-          padding: '20px 24px',
-          border: `1px solid ${criticalLogs > 0 ? '#fecaca' : '#e2e8f0'}`,
-          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '6px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Offene Incidents
-            </span>
-            <AlertTriangle size={16} color={criticalLogs > 0 ? '#ef4444' : '#64748b'} />
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: criticalLogs > 0 ? '#ef4444' : '#0f172a', letterSpacing: '-0.02em' }}>
-            {unresolvedLogs}
-          </div>
-          <span style={{ fontSize: '0.74rem', color: criticalLogs > 0 ? '#ef4444' : '#64748b', fontWeight: 650 }}>
-            {criticalLogs > 0 ? `⚠️ ${criticalLogs} kritische Ausnahme(n)` : '✅ Keine akuten Systemblocker'}
-          </span>
-        </div>
-
-        {/* Metric 3: Total Recorded Events */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '20px',
-          padding: '20px 24px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '6px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Gesamte Telemetrie-Events
-            </span>
-            <Bug size={16} color="#64748b" />
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-            {totalLogs}
-          </div>
-          <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-            Geräuschlos abgefangen &amp; protokolliert
-          </span>
-        </div>
-
-        {/* Metric 4: Zero-PII Compliance Badge */}
-        <div style={{
-          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-          borderRadius: '20px',
-          padding: '20px 24px',
-          border: '1px solid #bbf7d0',
-          boxShadow: '0 4px 16px rgba(16, 185, 129, 0.05)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '6px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              DSGVO Privacy Shield
-            </span>
-            <CheckCircle2 size={16} color="#166534" />
-          </div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#166534', letterSpacing: '-0.02em' }}>
-            Zero-PII Telemetrie
-          </div>
-          <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 600 }}>
-            100% anonymisiert • Keine Schüler-Klardaten
-          </span>
-        </div>
-
-      </div>
-
-      {/* ─── 2. MAIN INCIDENT COCKPIT CARD ─── */}
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '24px',
-        border: '1px solid #e2e8f0',
-        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        
-        {/* Cockpit Top Bar */}
-        <div style={{
           padding: '24px 28px',
-          borderBottom: '1px solid #f1f5f9',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
+          justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '16px'
+          gap: '16px',
+          boxShadow: '0 4px 16px rgba(34, 197, 94, 0.06)'
         }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                🚨 Live Client Error-Stream &amp; Incident Monitor
-              </h3>
-              <span style={{
-                background: '#eff6ff',
-                color: '#2563eb',
-                border: '1px solid #bfdbfe',
-                padding: '2px 8px',
-                borderRadius: '100px',
-                fontSize: '0.68rem',
-                fontWeight: 800
-              }}>
-                PROAKTIVE SLA-OBSERVABILITY
-              </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '14px',
+              background: '#dcfce7',
+              color: '#15803d',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(34, 197, 94, 0.15)'
+            }}>
+              <CheckCircle2 size={24} />
             </div>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>
-              Fängt unhandled Exceptions, Audio-Player Abbrüche und Netzwerk-Timeouts live aus allen Benutzer-Browsern ab.
-            </p>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#14532d', fontFamily: '"Outfit", sans-serif' }}>
+                  Client Incident Monitor: 100% Fehlerfrei
+                </h4>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: '#bbf7d0', color: '#166534' }}>
+                  Zero-PII &amp; DSGVO
+                </span>
+              </div>
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.84rem', color: '#166534', fontWeight: 550 }}>
+                Keine unhandled Exceptions, Audio-Abbrüche oder Timeouts in den letzten 24 Stunden erfasst. Alle Benutzer-Clients laufen stabil.
+              </p>
+            </div>
           </div>
 
-          {/* Action Toolbar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            
-            {/* Simulation Dropdown */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button
-                onClick={() => handleSimulate('AUDIO')}
-                disabled={isSimulating}
-                style={{
-                  background: '#f8fafc',
-                  border: '1.5px solid #e2e8f0',
-                  color: '#334155',
-                  padding: '8px 14px',
-                  borderRadius: '12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale-mini"
-              >
-                <Sparkles size={14} color="#d97706" /> Test-Fehler: Audio
-              </button>
-
-              <button
-                onClick={() => handleSimulate('NETWORK')}
-                disabled={isSimulating}
-                style={{
-                  background: '#f8fafc',
-                  border: '1.5px solid #e2e8f0',
-                  color: '#334155',
-                  padding: '8px 14px',
-                  borderRadius: '12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale-mini"
-              >
-                <Sparkles size={14} color="#dc2626" /> Test-Fehler: Sync
-              </button>
+          <button
+            onClick={loadLogs}
+            disabled={loading}
+            style={{
+              background: '#ffffff',
+              border: '1.5px solid #86efac',
+              color: '#166534',
+              padding: '9px 16px',
+              borderRadius: '12px',
+              fontSize: '0.80rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)'
+            }}
+            className="hover-scale-mini"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Logs prüfen
+          </button>
+        </div>
+      ) : (
+        /* ─── MAIN INCIDENT COCKPIT CARD (ONLY WHEN ERRORS EXIST) ─── */
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '24px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          
+          {/* Cockpit Top Bar */}
+          <div style={{
+            padding: '20px 24px',
+            borderBottom: '1px solid #f1f5f9',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '14px'
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                  🚨 Client Error-Stream &amp; Incident Monitor
+                </h3>
+                <span style={{
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  border: '1px solid #fecaca',
+                  padding: '2px 8px',
+                  borderRadius: '100px',
+                  fontSize: '0.68rem',
+                  fontWeight: 800
+                }}>
+                  {unresolvedLogs} OFFENE VORFÄLLE
+                </span>
+              </div>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.80rem', color: '#64748b', fontWeight: 500 }}>
+                Aufgefangene Exceptions und Netzwerk-Timeouts aus Benutzer-Browsern.
+              </p>
             </div>
 
-            {/* Refresh Button */}
-            <button
-              onClick={loadLogs}
-              disabled={loading}
-              style={{
-                background: '#ffffff',
-                border: '1.5px solid #cbd5e1',
-                color: '#334155',
-                padding: '8px 14px',
-                borderRadius: '12px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-              className="hover-scale-mini"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Aktualisieren
-            </button>
+            {/* Action Toolbar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={loadLogs}
+                disabled={loading}
+                style={{
+                  background: '#ffffff',
+                  border: '1.5px solid #cbd5e1',
+                  color: '#334155',
+                  padding: '8px 14px',
+                  borderRadius: '12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                className="hover-scale-mini"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Aktualisieren
+              </button>
 
-            {/* Clear Logs Button */}
-            {logs.length > 0 && (
               <button
                 onClick={handleClearAll}
                 style={{
@@ -343,9 +239,8 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
               >
                 <Trash2 size={14} /> Logs leeren
               </button>
-            )}
+            </div>
           </div>
-        </div>
 
         {/* Filter Bar */}
         <div style={{
@@ -568,6 +463,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* ─── 4. DETAIL STACK TRACE MODAL ─── */}
       {selectedLog && (
