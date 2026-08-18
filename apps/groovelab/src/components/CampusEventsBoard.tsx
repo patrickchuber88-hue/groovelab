@@ -39,7 +39,7 @@ import {
   Star,
   History
 } from 'lucide-react';
-import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel } from '../utils/nameHelper';
+import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName } from '../utils/nameHelper';
 
 interface CampusEventsBoardProps {
   userId: string;
@@ -5225,7 +5225,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                           : null;
 
                                         const opponentName = groupFirstNames || (role === 'student'
-                                          ? (occ.teacher?.first_name ? `${occ.teacher.first_name} ${occ.teacher.last_name ? occ.teacher.last_name[0].toUpperCase() + '.' : ''}`.trim() : 'Lehrkraft')
+                                          ? (occ.teacher ? formatTeacherFullName(occ.teacher) : 'Lehrkraft')
                                           : (() => {
                                               const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || occ.student_name || occ.studentName || occ.name || occ.purpose || '';
                                               const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
@@ -12784,7 +12784,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       {/* 1:1 Shoutbox Overlay Modal */}
       {activeChatOcc && (() => {
         const studentName = activeChatOcc.student?.first_name || 'Schüler';
-        const teacherName = activeChatOcc.teacher?.first_name || 'Lehrer';
+        const teacherName = formatTeacherFullName(activeChatOcc.teacher);
         const titleText = `1:1 Shoutbox: ${role === 'student' ? teacherName : studentName}`;
         
         let isFrozen = false;

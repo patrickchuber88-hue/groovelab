@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { useRealNamesVisibility, maskLastName, sanitizeBirthDateToDayOnly } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { 
   ShieldAlert, CheckCircle, Users, Settings, ShieldCheck, FileText,
@@ -627,7 +627,7 @@ function TeacherCard({
 }) {
   const [hovered, setHovered] = React.useState(false);
 
-  const name = `${teacher.firstName || teacher.first_name || ''} ${teacher.lastName || teacher.last_name || ''}`.trim();
+  const name = formatTeacherFullName(teacher);
   const email = teacher.email || '';
   const instrument = teacher.instrument || 'Nicht festgelegt';
   const pin = teacher.ausweisNummer || teacher.ausweis_nummer || '';
@@ -6027,7 +6027,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     isGroovelabActive?: boolean
   ) => {
     const teacher = allTeachers.find((t: any) => t.id === teacherId);
-    const teacherName = teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : undefined;
+    const teacherName = teacher ? formatTeacherFullName(teacher) : undefined;
     setDeleteStudentModalData({
       id: studentId,
       name,
@@ -16095,7 +16095,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1.5s infinite' }} />
                               <div style={{ flex: 1 }}>
                                 <strong style={{ display: 'block', fontSize: '0.82rem', color: '#991b1b', fontWeight: 700 }}>
-                                  {teacher.firstName || teacher.first_name} {teacher.lastName || teacher.last_name}
+                                  {formatTeacherFullName(teacher)}
                                 </strong>
                                 <span style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: 600 }}>
                                   Ausfall gemeldet: bis {sickUntilStr}
@@ -16621,7 +16621,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           const TicketCard = ({ t }: { t: any }) => {
             const urgency = crisisTabMode === 'history' ? 'GREEN' : getUrgency(t);
             const studentName = t.student ? `${t.student.first_name} ${t.student.last_name}` : 'Unbekannter Schüler';
-            const teacherName = t.teacher ? `${t.teacher.first_name} ${t.teacher.last_name}` : 'Lehrkraft';
+            const teacherName = t.teacher ? formatTeacherFullName(t.teacher) : 'Lehrkraft';
             const subject = t.student?.instrument || 'Musikunterricht';
             const timeStr = new Date(t.slot_start_datetime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
             const dateStr = new Date(t.slot_start_datetime).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
@@ -17138,7 +17138,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           const total = group.tickets.length;
                           const successCount = group.tickets.filter(t => t.status === 'READ' || t.notified_at).length;
                           const failedCount = total - successCount;
-                          const teacherName = group.teacher ? `${group.teacher.first_name} ${group.teacher.last_name}` : 'Lehrkraft';
+                          const teacherName = group.teacher ? formatTeacherFullName(group.teacher) : 'Lehrkraft';
                           const isExpanded = selectedArchiveLog?.date === group.date && selectedArchiveLog?.teacher?.id === group.teacher?.id;
 
                           return (
@@ -17359,7 +17359,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#7f1d1d', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                  {teacher.first_name} {teacher.last_name}
+                                  {formatTeacherFullName(teacher)}
                                 </div>
                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '3px' }}>
                                   <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444' }}>
@@ -17373,7 +17373,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleEndSickOnBehalf(teacher.id, `${teacher.first_name} ${teacher.last_name}`);
+                                  handleEndSickOnBehalf(teacher.id, formatTeacherFullName(teacher));
                                 }}
                                 title="Lehrkraft als gesund melden (Stunden reaktivieren)"
                                 style={{

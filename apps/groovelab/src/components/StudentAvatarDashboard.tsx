@@ -15,10 +15,10 @@ import { CampusEventsBoard } from './CampusEventsBoard';
 import { createPortal } from 'react-dom';
 import Confetti from 'react-confetti';
 import { QRCodeModal } from './QRCodeModal';
-import { MeisterwerkDocumentationModal, ALL_STICKERS } from './MeisterwerkDocumentationModal';
+import { MeisterwerkDocumentationModal, ALL_STICKERS, getUnifiedStickersMap, getUnifiedStickerStatus } from './MeisterwerkDocumentationModal';
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
-import { cleanHomeworkNotesText, maskLastName } from '../utils/nameHelper';
+import { cleanHomeworkNotesText, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 import { validateNewPin } from '../utils/pinValidation';
 import { CampusLevelSwitcher, CampusUiLevel } from './campus/CampusLevelSwitcher';
 import { CampusJuniorDashboard } from './campus/CampusJuniorDashboard';
@@ -7009,6 +7009,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   };
 
+  // Unified Sticker Map calculated 1:1 across Junior, Teen, and Pro levels
+  const unifiedStickersMap = useMemo(() => {
+    return getUnifiedStickersMap({
+      practiceMinutes: totalFocusMinutes || 0,
+      xp: avatar?.xp || 0,
+      streakDays: avatar?.streak_flame || 0,
+      masteredSongsCount: songStats?.masteredCount || 0,
+      progressItems: progressItems || []
+    });
+  }, [totalFocusMinutes, avatar?.xp, avatar?.streak_flame, songStats?.masteredCount, progressItems]);
+
   // Check and trigger sticker award celebration in Level 1 (Junior) Briefing Board
   useEffect(() => {
     if (studentUiLevel !== 'junior' || !studentId) return;
@@ -7022,41 +7033,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       for (const st of ALL_STICKERS) {
         if (celebratedSet.has(st.id)) continue;
 
-        const isAwardedInNotes = (progressItems || []).some(item => {
-          if (!item.homework_notes) return false;
-          return item.homework_notes.includes(`STICKER:${st.id}`);
-        });
-
-        let isUnlocked = isAwardedInNotes;
-        if (!isUnlocked) {
-          if (st.category === 'ueben') {
-            const mins = totalFocusMinutes || 0;
-            if (st.id === 'fleiss-pionier') isUnlocked = mins >= 50;
-            else if (st.id === 'uebe-meister') isUnlocked = mins >= 250;
-            else if (st.id === 'uebe-legende') isUnlocked = mins >= 1000;
-            else if (st.id === 'uebe-grossmeister') isUnlocked = mins >= 2000;
-          } else if (st.category === 'xp') {
-            const xp = avatar?.xp || 0;
-            if (st.id === 'xp-sammler') isUnlocked = xp >= 250;
-            else if (st.id === 'xp-champion') isUnlocked = xp >= 1000;
-            else if (st.id === 'xp-meister') isUnlocked = xp >= 2500;
-            else if (st.id === 'xp-legende') isUnlocked = xp >= 5000;
-          } else if (st.category === 'streaks') {
-            const streak = avatar?.streak_flame || 0;
-            if (st.id === 'dranbleiber') isUnlocked = streak >= 3;
-            else if (st.id === 'wochen-held') isUnlocked = streak >= 7;
-            else if (st.id === 'streak-koenig') isUnlocked = streak >= 21;
-            else if (st.id === 'streak-kaiser') isUnlocked = streak >= 30;
-          } else if (st.category === 'songs') {
-            const mastered = songStats?.masteredCount || 0;
-            if (st.id === 'erster-erfolg') isUnlocked = mastered >= 1;
-            else if (st.id === 'song-sammler') isUnlocked = mastered >= 3;
-            else if (st.id === 'repertoire-riese') isUnlocked = mastered >= 5;
-            else if (st.id === 'repertoire-gigant') isUnlocked = mastered >= 10;
-          }
-        }
-
-        if (isUnlocked) {
+        const stickerStatus = unifiedStickersMap[st.id];
+        if (stickerStatus?.isUnlocked) {
           playSuccessChime();
           setJuniorAwardedStickerToCelebrate(st);
           celebratedSet.add(st.id);
@@ -7067,7 +7045,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     } catch (e) {
       console.warn('Junior sticker celebration error:', e);
     }
-  }, [studentUiLevel, studentId, progressItems, totalFocusMinutes, avatar?.xp, avatar?.streak_flame, songStats?.masteredCount]);
+  }, [studentUiLevel, studentId, unifiedStickersMap]);
 
   const downloadJuniorStickerJpg = (sticker: any, topicOverride?: string) => {
     if (!sticker) return;
@@ -12542,6 +12520,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             isEmbed={true}
             initialModalTab={homeworkBookTab}
             uiLevel={studentUiLevel || 'junior'}
+            initialXp={avatar?.xp || 0}
+            initialStreak={avatar?.streak_flame || 0}
+            initialPracticeMinutes={totalFocusMinutes || 0}
+            initialMasteredSongsCount={songStats?.masteredCount || 0}
           />
         )}
       </div>
@@ -13002,18 +12984,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     const activeJuniorSongs: any[] = [];
                     (progressItems || []).forEach(item => {
                       if (item.topic_name.startsWith('Hausaufgabe KW ') || item.topic_name.includes(' - Seite ')) return;
-                      const isSongHw = (() => {
-                        const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
-                                        (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
-                        if (localHw === 'false') return false;
-                        if (localHw === 'true') return true;
-                        if (!item.is_current_homework || item.status === 'MASTERED') return false;
-                        if (item.updated_at) {
-                          const itemWeek = getItemWeek(item);
-                          if (itemWeek && itemWeek !== currentWeekStr) return false;
-                        }
-                        return true;
-                      })();
+                      const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+                                      (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                      if (localHw === 'false') return;
+                      const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
                       if (isSongHw) {
                         const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
                         if (!activeJuniorSongs.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
@@ -13029,7 +13003,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                       const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
 
-                      if (isHw && skill.progress_percent !== 100 && !skill.is_stage_ready && skill.status !== 'MASTERED') {
+                      if (isHw) {
                         const songArtist = skill.songs?.artist || skill.artist || '';
                         const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
                         const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
@@ -13201,14 +13175,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 Hausaufgaben
                               </div>
-                              <h3 style={{ margin: '2px 0 0 0', fontSize: '1.35rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                {focusTitle}
-                              </h3>
+                              
+                              {/* Lehrwerke */}
+                              {activeJuniorBooks.map((b, idx) => (
+                                <h3 key={`j-b-${idx}`} style={{ margin: '2px 0 0 0', fontSize: '1.28rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  {b.title} ({b.formattedPages})
+                                </h3>
+                              ))}
 
-                              {/* Wenn sowohl Buch als auch Songs aktiv sind, Song hier sauber anzeigen */}
-                              {activeJuniorBooks.length > 0 && activeJuniorSongs.length > 0 && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                                  {activeJuniorSongs.map((s, idx) => (
+                              {/* Wenn keine Lehrwerke, aber Songs aktiv sind */}
+                              {activeJuniorBooks.length === 0 && activeJuniorSongs.length > 0 && (
+                                <h3 style={{ margin: '2px 0 0 0', fontSize: '1.28rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  {cleanTitle(activeJuniorSongs[0]?.topic_name || activeJuniorSongs[0]?.title || 'Song')}
+                                </h3>
+                              )}
+
+                              {/* Kompakte Songs Liste (ohne Bemerkungen für komprimiertes Widget) */}
+                              {activeJuniorSongs.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: activeJuniorBooks.length > 0 ? '4px' : '0' }}>
+                                  {(activeJuniorBooks.length > 0 ? activeJuniorSongs : activeJuniorSongs.slice(1)).map((s, idx) => (
                                     <div key={`j-s-${idx}`} style={{
                                       display: 'flex',
                                       alignItems: 'center',
@@ -13222,28 +13207,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         width: '22px',
                                         height: '22px',
                                         borderRadius: '6px',
-                                        background: '#e0f2fe',
+                                        background: '#e0e7ff',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
+                                        color: '#4338ca',
                                         flexShrink: 0
                                       }}>
-                                        <Music size={12} color="#0284c7" />
+                                        <Music size={12} strokeWidth={2.4} />
                                       </div>
                                       <span style={{ fontWeight: 850, fontSize: '0.88rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {cleanTitle(s.topic_name || s.title)}
                                       </span>
                                     </div>
                                   ))}
-                                </div>
-                              )}
-
-                              {/* Zusätzliche Bemerkung */}
-                              {generalNote && (
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.80rem', color: '#334155', fontWeight: 600, paddingTop: '6px', marginTop: '4px', borderTop: '1px dashed #e2e8f0' }}>
-                                  <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                  <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
-                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
                                 </div>
                               )}
                             </div>
@@ -13649,36 +13626,29 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 }
                               }
                             } else {
-                              const isSongHw = (() => {
-                                const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
-                                                (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
-                                if (localHw === 'false') return false;
-                                if (localHw === 'true') return true;
-                                if (!item.is_current_homework || item.status === 'MASTERED') return false;
-                                if (item.updated_at) {
-                                  const itemWeek = getItemWeek(item);
-                                  if (itemWeek && itemWeek !== currentWeekStr) return false;
-                                }
-                                return true;
-                              })();
-                              if (isSongHw) {
-                                const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                                if (!otherActiveSongs.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                                  let cleanNote = item.homework_notes || '';
-                                  if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                                    try {
-                                      const parsed = JSON.parse(cleanNote);
-                                      if (Array.isArray(parsed)) {
-                                        cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                      }
-                                    } catch {}
-                                  }
-                                  cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                              const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+                                              (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                              if (localHw !== 'false') {
+                                const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
+                                if (isSongHw) {
+                                  const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
+                                  if (!otherActiveSongs.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                                    let cleanNote = item.homework_notes || '';
+                                    if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
+                                      try {
+                                        const parsed = JSON.parse(cleanNote);
+                                        if (Array.isArray(parsed)) {
+                                          cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                        }
+                                      } catch {}
+                                    }
+                                    cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
 
-                                  otherActiveSongs.push({
-                                    ...item,
-                                    homework_notes: cleanNote
-                                  });
+                                    otherActiveSongs.push({
+                                      ...item,
+                                      homework_notes: cleanNote
+                                    });
+                                  }
                                 }
                               }
                             }
@@ -13692,7 +13662,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                             const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
 
-                            if (isHw && skill.progress_percent !== 100 && !skill.is_stage_ready && skill.status !== 'MASTERED') {
+                            if (isHw) {
                               const songArtist = skill.songs?.artist || skill.artist || '';
                               const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
                               const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
@@ -14918,14 +14888,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   padding: '2px 10px',
                                   borderRadius: '100px'
                                 }}>
-                                  {ALL_STICKERS.filter(st => {
-                                    if ((progressItems || []).some(item => item.homework_notes?.includes(`STICKER:${st.id}`))) return true;
-                                    if (st.category === 'ueben') return (totalFocusMinutes || 0) >= (st.id === 'fleiss-pionier' ? 50 : st.id === 'uebe-meister' ? 250 : st.id === 'uebe-legende' ? 1000 : 2000);
-                                    if (st.category === 'xp') return (avatar?.xp || 0) >= (st.id === 'xp-sammler' ? 250 : st.id === 'xp-champion' ? 1000 : st.id === 'xp-meister' ? 2500 : 5000);
-                                    if (st.category === 'streaks') return (avatar?.streak_flame || 0) >= (st.id === 'dranbleiber' ? 3 : st.id === 'wochen-held' ? 7 : st.id === 'streak-koenig' ? 21 : 30);
-                                    if (st.category === 'songs') return (songStats?.masteredCount || 0) >= (st.id === 'erster-erfolg' ? 1 : st.id === 'song-sammler' ? 3 : st.id === 'repertoire-riese' ? 5 : 10);
-                                    return false;
-                                  }).length} von {ALL_STICKERS.length} freigeschaltet ✨
+                                  {ALL_STICKERS.filter(st => unifiedStickersMap[st.id]?.isUnlocked).length} von {ALL_STICKERS.length} freigeschaltet ✨
                                 </span>
                               </div>
                               <h2 style={{ margin: '2px 0 0 0', fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -14994,38 +14957,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             {ALL_STICKERS
                               .filter(st => juniorStickerCategory === 'all' || st.category === juniorStickerCategory)
                               .map((st) => {
-                                const isAwardedInNotes = (progressItems || []).some(item => {
-                                  if (!item.homework_notes) return false;
-                                  return item.homework_notes.includes(`STICKER:${st.id}`);
-                                });
-
-                                let isUnlocked = isAwardedInNotes;
-                                let progressText = '';
-                                if (!isUnlocked) {
-                                  if (st.category === 'ueben') {
-                                    const mins = totalFocusMinutes || 0;
-                                    const target = st.id === 'fleiss-pionier' ? 50 : st.id === 'uebe-meister' ? 250 : st.id === 'uebe-legende' ? 1000 : 2000;
-                                    isUnlocked = mins >= target;
-                                    progressText = `Noch ${Math.max(1, target - mins)} Min. Üben`;
-                                  } else if (st.category === 'xp') {
-                                    const xp = avatar?.xp || 0;
-                                    const target = st.id === 'xp-sammler' ? 250 : st.id === 'xp-champion' ? 1000 : st.id === 'xp-meister' ? 2500 : 5000;
-                                    isUnlocked = xp >= target;
-                                    progressText = `Noch ${Math.max(1, target - xp)} XP`;
-                                  } else if (st.category === 'streaks') {
-                                    const streak = avatar?.streak_flame || 0;
-                                    const target = st.id === 'dranbleiber' ? 3 : st.id === 'wochen-held' ? 7 : st.id === 'streak-koenig' ? 21 : 30;
-                                    isUnlocked = streak >= target;
-                                    progressText = `Noch ${Math.max(1, target - streak)} Tage Streak`;
-                                  } else if (st.category === 'songs') {
-                                    const mastered = songStats?.masteredCount || 0;
-                                    const target = st.id === 'erster-erfolg' ? 1 : st.id === 'song-sammler' ? 3 : st.id === 'repertoire-riese' ? 5 : 10;
-                                    isUnlocked = mastered >= target;
-                                    progressText = `Noch ${Math.max(1, target - mastered)} ${target === 1 ? 'Song' : 'Songs'}`;
-                                  } else {
-                                    progressText = 'Von Lehrkraft vergeben';
-                                  }
-                                }
+                                const status = unifiedStickersMap[st.id] || { isUnlocked: false, progressText: '', count: 0, details: [] };
+                                const isUnlocked = status.isUnlocked;
+                                const progressText = status.progressText;
 
                                 const isLegendary = st.rarity === 'legendary';
                                 const isEpic = st.rarity === 'epic';
@@ -16099,39 +16033,31 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               });
                             }
                           }
-                          const isSongHw = (() => {
-                            const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
-                                            (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
-                            if (localHw === 'false') return false;
-                            if (localHw === 'true') return true;
-                            if (!item.is_current_homework || item.status === 'MASTERED') return false;
-                            if (item.updated_at) {
-                              const itemWeek = getItemWeek(item);
-                              if (itemWeek && itemWeek !== currentWeekStr) return false;
-                            }
-                            return true;
-                          })();
+                          const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+                                          (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                          if (localHw !== 'false') {
+                            const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
+                            if (isSongHw) {
+                              const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
+                              if (!otherActiveHWItems.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                                let cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
+                                                 localStorage.getItem(`song_note_${studentId}_${item.song_id}`) ||
+                                                 item.homework_notes || '';
+                                if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
+                                  try {
+                                    const parsed = JSON.parse(cachedNote);
+                                    if (Array.isArray(parsed)) {
+                                      cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                    }
+                                  } catch {}
+                                }
+                                cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
 
-                          if (isSongHw) {
-                            const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                            if (!otherActiveHWItems.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                              let cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
-                                               localStorage.getItem(`song_note_${studentId}_${item.song_id}`) ||
-                                               item.homework_notes || '';
-                              if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
-                                try {
-                                  const parsed = JSON.parse(cachedNote);
-                                  if (Array.isArray(parsed)) {
-                                    cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                  }
-                                } catch {}
+                                otherActiveHWItems.push({
+                                  ...item,
+                                  homework_notes: cachedNote
+                                });
                               }
-                              cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                              otherActiveHWItems.push({
-                                ...item,
-                                homework_notes: cachedNote
-                              });
                             }
                           }
                         }
@@ -16145,7 +16071,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                         const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
 
-                        if (isHw && skill.progress_percent !== 100 && !skill.is_stage_ready && skill.status !== 'MASTERED') {
+                        if (isHw) {
                           const songArtist = skill.songs?.artist || skill.artist || '';
                           const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
                           const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
@@ -17122,39 +17048,31 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             }
                           }
                         } else {
-                          const isSongHw = (() => {
-                            const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
-                                            (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
-                            if (localHw === 'false') return false;
-                            if (localHw === 'true') return true;
-                            if (!item.is_current_homework || item.status === 'MASTERED') return false;
-                            if (item.updated_at) {
-                              const itemWeek = getItemWeek(item);
-                              if (itemWeek && itemWeek !== currentWeekStr) return false;
-                            }
-                            return true;
-                          })();
+                          const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+                                          (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                          if (localHw !== 'false') {
+                            const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
+                            if (isSongHw) {
+                              const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
+                              if (!otherActiveHWItems.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                                let cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
+                                                 localStorage.getItem(`song_note_${studentId}_${item.song_id}`) ||
+                                                 item.homework_notes || '';
+                                if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
+                                  try {
+                                    const parsed = JSON.parse(cachedNote);
+                                    if (Array.isArray(parsed)) {
+                                      cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                    }
+                                  } catch {}
+                                }
+                                cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
 
-                          if (isSongHw) {
-                            const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                            if (!otherActiveHWItems.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                              let cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
-                                               localStorage.getItem(`song_note_${studentId}_${item.song_id}`) ||
-                                               item.homework_notes || '';
-                              if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
-                                try {
-                                  const parsed = JSON.parse(cachedNote);
-                                  if (Array.isArray(parsed)) {
-                                    cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                                  }
-                                } catch {}
+                                otherActiveHWItems.push({
+                                  ...item,
+                                  homework_notes: cachedNote
+                                });
                               }
-                              cachedNote = cachedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                              otherActiveHWItems.push({
-                                ...item,
-                                homework_notes: cachedNote
-                              });
                             }
                           }
                         }
@@ -17168,7 +17086,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                         const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
 
-                        if (isHw && skill.progress_percent !== 100 && !skill.is_stage_ready && skill.status !== 'MASTERED') {
+                        if (isHw) {
                           const songArtist = skill.songs?.artist || skill.artist || '';
                           const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
                           const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
@@ -17557,15 +17475,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     </div>
                                   ))}
 
-                                  {/* Zusätzliche Bemerkung */}
-                                  {generalNote && (
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                      <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                      <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
-                                    </div>
-                                  )}
-                                </>
+                                  </>
                               ) : (
                                 <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
                                   Noch keine Aufgaben für diese Woche eingetragen
@@ -17764,15 +17674,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         </span>
                                       </div>
                                     ))}
-
-                                    {/* Zusätzliche Bemerkung */}
-                                    {generalNote && (
-                                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                        <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                        <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
-                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
-                                      </div>
-                                    )}
                                   </>
                                 ) : (
                                   <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
@@ -19515,7 +19416,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               {DAYS_DE[sch.day_of_week]}s, {sch.time_slot} Uhr
                             </div>
                             <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                              {sch.teacher ? `Coach: ${sch.teacher.first_name} ${sch.teacher.last_name}` : 'Patrick Huber'} • {sch.rooms?.name || 'Raum 1'} ({sch.duration || 45} Min)
+                              {sch.teacher ? `Coach: ${formatTeacherFullName(sch.teacher)}` : 'Patrick Huber'} • {sch.rooms?.name || 'Raum 1'} ({sch.duration || 45} Min)
                             </div>
                           </div>
                         </div>
@@ -22615,7 +22516,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   const dt = new Date(n.slot_start_datetime);
                   const dateStr = dt.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
                   const timeStr = dt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                  const teacherName = n.teacher ? `${n.teacher.first_name} ${n.teacher.last_name}` : 'Deine Lehrkraft';
+                  const teacherName = n.teacher ? formatTeacherFullName(n.teacher) : 'Deine Lehrkraft';
 
                   return (
                     <div key={n.id || idx} style={{

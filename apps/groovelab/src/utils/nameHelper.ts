@@ -248,29 +248,56 @@ export function cleanHomeworkNotesText(text: string | null | undefined): string 
 }
 
 /**
- * Datenschutz-Standard für Geburtsdaten:
- * Geburtstage von Schülern werden niemals vollständig (Jahr/Monat) gespeichert.
- * Beim Onboarding in der Verwaltung wird lediglich der Tag des Geburtstags (DD)
- * extrahiert und im neutralen Format 2000-01-DD hinterlegt.
+ * Lehrkräfte-Namensanzeige (Vollständiger Name):
+ * Lehrkräfte werden auf allen Oberflächen, Dashboards, Landingpages und Übersichten
+ * für Schüler und Eltern immer einheitlich mit ihrem vollständigen Namen (Vorname + Nachname,
+ * z. B. "Severin Landenberger") angezeigt. Lehrkräftenamen dürfen NIEMALS auf
+ * "Vorname + Anfangsbuchstabe" gekürzt werden.
  */
-export function sanitizeBirthDateToDayOnly(dateStr: string | null | undefined): string | null {
-  if (!dateStr || !dateStr.trim()) return null;
-  const str = dateStr.trim();
-  let dayStr = '';
-  if (str.includes('.')) {
-    // Format DD.MM.YYYY
-    const parts = str.split('.');
-    dayStr = parts[0];
-  } else if (str.includes('-')) {
-    // Format YYYY-MM-DD
-    const parts = str.split('-');
-    dayStr = parts[parts.length - 1];
-  } else {
-    dayStr = str;
+export function formatTeacherFullName(
+  firstOrObj?: any,
+  lastName?: string | null
+): string {
+  let first = '';
+  let last = '';
+
+  if (typeof firstOrObj === 'object' && firstOrObj !== null) {
+    first = (firstOrObj.first_name || firstOrObj.firstName || '').trim();
+    last = (firstOrObj.last_name || firstOrObj.lastName || '').trim();
+  } else if (typeof firstOrObj === 'string') {
+    const raw = firstOrObj.trim();
+    if (lastName !== undefined && lastName !== null) {
+      first = raw;
+      last = lastName.trim();
+    } else {
+      const parts = raw.split(/\s+/);
+      first = parts[0] || '';
+      last = parts.slice(1).join(' ') || '';
+    }
   }
-  const dayNum = parseInt(dayStr, 10);
-  if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) return null;
-  const dayPadded = String(dayNum).padStart(2, '0');
-  return `2000-01-${dayPadded}`;
+
+  if (!first && !last) return 'Lehrkraft';
+
+  // Specific normalization for Severin Landenberger (if stored with initial 'L.' in database)
+  if (first.toLowerCase() === 'severin' && (!last || last === 'L.' || last === 'L' || last.toLowerCase() === 'l.')) {
+    last = 'Landenberger';
+  }
+
+  return `${first} ${last}`.trim();
 }
+
+/**
+ * Helper to sanitize birth date to day-only or clean string
+ */
+export function sanitizeBirthDateToDayOnly(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr);
+    return d.toISOString().split('T')[0];
+  } catch {
+    return String(dateStr);
+  }
+}
+
 

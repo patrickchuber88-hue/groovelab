@@ -71,7 +71,13 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
     setError(null);
     const limit = selectedProfile?.role === 'student' ? 2 : 4;
     if (pinInput.length < limit) {
-      setPinInput(prev => prev + num);
+      const nextPin = pinInput + num;
+      setPinInput(nextPin);
+      if (nextPin.length === limit) {
+        setTimeout(() => {
+          handleVerify(nextPin);
+        }, 100);
+      }
     }
   };
 
@@ -86,10 +92,11 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
   };
 
   // Submit and verify PIN
-  const handleVerify = async () => {
+  const handleVerify = async (explicitPin?: string) => {
     if (!selectedProfile || loading) return;
     const limit = selectedProfile.role === 'student' ? 2 : 4;
-    if (pinInput.length !== limit) {
+    const pinToVerify = typeof explicitPin === 'string' ? explicitPin : pinInput;
+    if (pinToVerify.length !== limit) {
       setError(selectedProfile.role === 'student' ? 'Bitte gib deinen Geburtstag (2 Ziffern) ein.' : 'Bitte gib deine 4-stellige PIN ein.');
       return;
     }
@@ -111,7 +118,7 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
       }
 
       let isMatch = false;
-      const cleanInput = pinInput.trim();
+      const cleanInput = pinToVerify.trim();
       const userPin = String(user.personal_pin || user.parent_pin || user.onboarding_pin || '').trim();
       const cachedPin = localStorage.getItem(`groovelab_user_pin_${user.id}`);
 

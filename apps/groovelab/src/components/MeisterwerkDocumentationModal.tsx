@@ -55,6 +55,172 @@ export const ALL_STICKERS = [
   { id: 'extra-mile', emoji: '🚀', title: 'Extra-Meile', desc: 'Zusatzaufgaben, schwere Passagen oder zweite Stimmen freiwillig erarbeitet!', equiv: 'Hohe Eigenmotivation: Du nimmst neue Herausforderungen selbstständig an und wächst daran.', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.1)', auto: false, category: 'spezial', rarity: 'rare', rarityLabel: 'Selten', multi: true }
 ];
 
+export interface StickerUnlockContext {
+  practiceMinutes?: number;
+  xp?: number;
+  streakDays?: number;
+  masteredSongsCount?: number;
+  progressItems?: Array<{
+    id?: string;
+    topic_name?: string;
+    title?: string;
+    status?: string;
+    progress_percent?: number;
+    homework_notes?: string;
+    teacher_notes?: string;
+    updated_at?: string;
+    [key: string]: any;
+  }>;
+  simulatedStickers?: Record<string, { count: number; details: { topic: string; date: string }[] }>;
+}
+
+export interface StickerUnlockResult {
+  isUnlocked: boolean;
+  progressText: string;
+  count: number;
+  details: { topic: string; date: string }[];
+}
+
+export const getUnifiedStickerStatus = (
+  sticker: (typeof ALL_STICKERS)[0],
+  ctx: StickerUnlockContext
+): StickerUnlockResult => {
+  const {
+    practiceMinutes = 0,
+    xp = 0,
+    streakDays = 0,
+    progressItems = [],
+    simulatedStickers = {}
+  } = ctx;
+
+  // 1. Gather any explicit teacher awards from progressItems (homework_notes contains STICKER:<id>|<topic>|<date>)
+  const awardedDetails: { topic: string; date: string }[] = [];
+  progressItems.forEach(item => {
+    if (item.homework_notes) {
+      try {
+        const notesArray = item.homework_notes.startsWith('[') && item.homework_notes.endsWith(']')
+          ? JSON.parse(item.homework_notes)
+          : [item.homework_notes];
+
+        if (Array.isArray(notesArray)) {
+          notesArray.forEach((note: string) => {
+            if (note.startsWith('STICKER:')) {
+              const content = note.substring(8);
+              const parts = content.split('|');
+              const sId = parts[0];
+              if (sId === sticker.id) {
+                const topic = parts[1] || 'Allgemein';
+                const date = parts[2] ? new Date(parts[2]).toLocaleDateString('de-DE') : 'Unbekannt';
+                awardedDetails.push({ topic, date });
+              }
+            }
+          });
+        }
+      } catch (e) {
+        // ignore JSON parse errors
+      }
+    }
+  });
+
+  // 2. Add any simulated sticker entries
+  if (simulatedStickers[sticker.id] && simulatedStickers[sticker.id].count > 0) {
+    simulatedStickers[sticker.id].details.forEach(d => awardedDetails.push(d));
+  }
+
+  // 3. For song-related stickers (category === 'songs', song-master, stage-star), extract actual mastered songs
+  if (sticker.category === 'songs' || sticker.id === 'song-master' || sticker.id === 'stage-star') {
+    const masteredSongs = progressItems.filter(item => {
+      const t = (item.topic_name || '').toLowerCase().trim();
+      return !t.includes(' - seite ') && t !== 'test' && t !== 'test - test' && t !== 'test-test' && (item.status === 'MASTERED' || item.progress_percent === 100);
+    });
+    masteredSongs.forEach(item => {
+      const topicName = (item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, '').trim() || 'Song';
+      const dateStr = item.updated_at ? new Date(item.updated_at).toLocaleDateString('de-DE') : 'Meilenstein erreicht';
+      const alreadyPresent = awardedDetails.some(d => d.topic.toLowerCase().trim() === topicName.toLowerCase().trim());
+      if (!alreadyPresent) {
+        awardedDetails.push({ topic: topicName, date: dateStr });
+      }
+    });
+
+    // If still empty but student has songs in progress_matrix, grab the song name
+    if (awardedDetails.length === 0) {
+      const anySong = progressItems.find(item => {
+        const t = (item.topic_name || '').toLowerCase().trim();
+        return !t.includes(' - seite ') && t !== 'test' && t !== 'test - test' && t !== 'test-test' && !t.startsWith('hausaufgabe kw ');
+      });
+      if (anySong) {
+        const topicName = (anySong.topic_name || anySong.title || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+        const dateStr = anySong.updated_at ? new Date(anySong.updated_at).toLocaleDateString('de-DE') : 'Meilenstein erreicht';
+        awardedDetails.push({ topic: topicName, date: dateStr });
+      }
+    }
+  }
+
+  const explicitAwardCount = awardedDetails.length;
+
+  // 4. Calculate effective mastered song count across both explicit context count and progressItems
+  const masteredSongsFromItemsCount = progressItems.filter(item => {
+    const t = (item.topic_name || '').toLowerCase().trim();
+    return !t.includes(' - seite ') && t !== 'test' && t !== 'test - test' && t !== 'test-test' && (item.status === 'MASTERED' || item.progress_percent === 100);
+  }).length;
+  const effectiveMasteredSongsCount = Math.max(ctx.masteredSongsCount || 0, masteredSongsFromItemsCount, (sticker.category === 'songs' && explicitAwardCount > 0 ? explicitAwardCount : 0));
+
+  // 5. Evaluate threshold / milestone criteria
+  let isMilestoneUnlocked = false;
+  let progressText = '';
+  let autoDetailTopic = '';
+
+  if (sticker.category === 'ueben') {
+    const target = sticker.id === 'fleiss-pionier' ? 50 : sticker.id === 'uebe-meister' ? 250 : sticker.id === 'uebe-legende' ? 1000 : 2000;
+    isMilestoneUnlocked = practiceMinutes >= target;
+    progressText = isMilestoneUnlocked ? `${target} Min. geübt` : `Noch ${Math.max(1, target - practiceMinutes)} Min. Üben`;
+    autoDetailTopic = `${target} Min. konzentriert geübt`;
+  } else if (sticker.category === 'xp') {
+    const target = sticker.id === 'xp-sammler' ? 250 : sticker.id === 'xp-champion' ? 1000 : sticker.id === 'xp-meister' ? 2500 : 5000;
+    isMilestoneUnlocked = xp >= target;
+    progressText = isMilestoneUnlocked ? `${target} XP erreicht` : `Noch ${Math.max(1, target - xp)} XP`;
+    autoDetailTopic = `${target} XP Meilenstein erreicht`;
+  } else if (sticker.category === 'streaks') {
+    const target = sticker.id === 'dranbleiber' ? 3 : sticker.id === 'wochen-held' ? 7 : sticker.id === 'streak-koenig' ? 21 : 30;
+    isMilestoneUnlocked = streakDays >= target;
+    progressText = isMilestoneUnlocked ? `${target} Tage Streak` : `Noch ${Math.max(1, target - streakDays)} Tage Streak`;
+    autoDetailTopic = `${target} Tage ununterbrochene Streak`;
+  } else if (sticker.category === 'songs') {
+    const target = sticker.id === 'erster-erfolg' ? 1 : sticker.id === 'song-sammler' ? 3 : sticker.id === 'repertoire-riese' ? 5 : 10;
+    isMilestoneUnlocked = effectiveMasteredSongsCount >= target;
+    progressText = isMilestoneUnlocked 
+      ? `${target} ${target === 1 ? 'Song' : 'Songs'} gemeistert` 
+      : `Noch ${Math.max(1, target - effectiveMasteredSongsCount)} ${Math.max(1, target - effectiveMasteredSongsCount) === 1 ? 'Song' : 'Songs'}`;
+    autoDetailTopic = `${target} ${target === 1 ? 'Song' : 'Songs'} zu 100% gemeistert`;
+  } else {
+    // category === 'spezial'
+    progressText = 'Von Lehrkraft vergeben';
+  }
+
+  const isUnlocked = explicitAwardCount > 0 || isMilestoneUnlocked;
+  const count = explicitAwardCount > 0 ? explicitAwardCount : (isMilestoneUnlocked ? 1 : 0);
+
+  const finalDetails = [...awardedDetails];
+  if (isMilestoneUnlocked && finalDetails.length === 0 && autoDetailTopic) {
+    finalDetails.push({ topic: autoDetailTopic, date: 'Meilenstein erreicht' });
+  }
+
+  return {
+    isUnlocked,
+    progressText: isUnlocked ? (progressText || 'Freigeschaltet') : progressText,
+    count,
+    details: finalDetails
+  };
+};
+
+export const getUnifiedStickersMap = (ctx: StickerUnlockContext) => {
+  const result: Record<string, StickerUnlockResult> = {};
+  ALL_STICKERS.forEach(st => {
+    result[st.id] = getUnifiedStickerStatus(st, ctx);
+  });
+  return result;
+};
+
 interface Student {
   id: string;
   first_name: string;
@@ -95,6 +261,10 @@ interface MeisterwerkDocumentationModalProps {
   isEmbed?: boolean;
   isTeacherTools?: boolean;
   uiLevel?: 'junior' | 'teen' | 'pro';
+  initialXp?: number;
+  initialStreak?: number;
+  initialPracticeMinutes?: number;
+  initialMasteredSongsCount?: number;
 }
 
 interface ProgressItem {
@@ -303,7 +473,23 @@ const SKILL_TAGS = [
   { key: 'repertoire', label: 'Repertoire & Performance', shortLabel: 'Repertoire', icon: '🌟', category: 'musical' },
 ];
 
-export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, initialViewMode, initialModalTab, onProfileClick, readOnly = false, isEmbed = false, isTeacherTools = false, uiLevel = 'pro' }) => {
+export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ 
+  student, 
+  onClose, 
+  teacherId, 
+  initialLehrwerkId, 
+  initialViewMode, 
+  initialModalTab, 
+  onProfileClick, 
+  readOnly = false, 
+  isEmbed = false, 
+  isTeacherTools = false, 
+  uiLevel = 'pro',
+  initialXp,
+  initialStreak,
+  initialPracticeMinutes,
+  initialMasteredSongsCount
+}) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showProtokollOnboarding, setShowProtokollOnboarding] = useState<boolean>(() => {
@@ -911,10 +1097,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const [isSongSearchFocused, setIsSongSearchFocused] = useState(false);
-  const [studentXP, setStudentXP] = useState<number>(0);
-  const [studentStreak, setStudentStreak] = useState<number>(0);
-  const [studentPracticeMinutes, setStudentPracticeMinutes] = useState<number>(0);
+  const [studentXP, setStudentXP] = useState<number>(initialXp ?? 0);
+  const [studentStreak, setStudentStreak] = useState<number>(initialStreak ?? 0);
+  const [studentPracticeMinutes, setStudentPracticeMinutes] = useState<number>(initialPracticeMinutes ?? 0);
   const [weeklyPracticeDays, setWeeklyPracticeDays] = useState<number>(0);
+
+  useEffect(() => {
+    if (initialXp !== undefined) setStudentXP(initialXp);
+  }, [initialXp]);
+
+  useEffect(() => {
+    if (initialStreak !== undefined) setStudentStreak(initialStreak);
+  }, [initialStreak]);
+
+  useEffect(() => {
+    if (initialPracticeMinutes !== undefined) setStudentPracticeMinutes(initialPracticeMinutes);
+  }, [initialPracticeMinutes]);
 
   // Developer simulation states
   const [simulatedSongsCount, setSimulatedSongsCount] = useState<number | null>(null);
@@ -3438,66 +3636,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return progressItems.filter(item => item.topic_name.toLowerCase().trim() === topicName.toLowerCase().trim());
   }, [topicName, progressItems]);
 
-  // Scan all database entries for awarded stickers
-  const collectedStickers = useMemo(() => {
-    const counts: Record<string, { count: number; details: { topic: string; date: string }[] }> = {};
-    ALL_STICKERS.forEach(s => {
-      counts[s.id] = { count: 0, details: [] };
-    });
-
-    progressItems.forEach(item => {
-      if (item.homework_notes) {
-        try {
-          const notesArray = item.homework_notes.startsWith('[') && item.homework_notes.endsWith(']')
-            ? JSON.parse(item.homework_notes)
-            : [item.homework_notes];
-          
-          if (Array.isArray(notesArray)) {
-            notesArray.forEach((note: string) => {
-              if (note.startsWith("STICKER:")) {
-                const content = note.substring(8);
-                const parts = content.split('|');
-                const stickerId = parts[0];
-                const topic = parts[1] || 'Allgemein';
-                const date = parts[2] ? new Date(parts[2]).toLocaleDateString('de-DE') : 'Unbekannt';
-                
-                if (counts[stickerId]) {
-                  counts[stickerId].count += 1;
-                  counts[stickerId].details.push({ topic, date });
-                }
-              }
-            });
-          }
-        } catch (e) {
-          // Ignore parse errors
-        }
-      }
-    });
-
-    // Automatically include all MASTERED songs from progressItems in song-master sticker details
-    const masteredSongsFromItems = progressItems.filter(item => {
-      const t = item.topic_name.toLowerCase().trim();
+  const effectiveMasteredSongsCount = useMemo(() => {
+    const fromSkills = (activeSongSkills || []).filter(s => s.progress === 100 || s.status === 'MASTERED' || s.is_stage_ready).length;
+    const fromItems = (progressItems || []).filter(item => {
+      const t = (item.topic_name || '').toLowerCase().trim();
       return !t.includes(' - seite ') && t !== 'test' && t !== 'test - test' && t !== 'test-test' && item.status === 'MASTERED';
-    });
-    masteredSongsFromItems.forEach(item => {
-      const topicName = item.topic_name;
-      const dateStr = item.updated_at ? new Date(item.updated_at).toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE');
+    }).length;
+    const fromInitial = initialMasteredSongsCount || 0;
+    const fromSim = simulatedSongsCount !== null ? simulatedSongsCount : 0;
+    return Math.max(fromSkills, fromItems, fromInitial, fromSim);
+  }, [activeSongSkills, progressItems, initialMasteredSongsCount, simulatedSongsCount]);
 
-      const alreadyPresent = counts['song-master']?.details.some(d => d.topic.toLowerCase().trim() === topicName.toLowerCase().trim());
-      if (!alreadyPresent && counts['song-master']) {
-        counts['song-master'].count += 1;
-        counts['song-master'].details.push({ topic: topicName, date: dateStr });
-      }
+  // Scan all database entries for awarded stickers & compute milestone stickers synchronously
+  const collectedStickers = useMemo(() => {
+    return getUnifiedStickersMap({
+      practiceMinutes: studentPracticeMinutes,
+      xp: studentXP,
+      streakDays: studentStreak,
+      masteredSongsCount: effectiveMasteredSongsCount,
+      progressItems,
+      simulatedStickers
     });
-
-    Object.keys(simulatedStickers).forEach(id => {
-      if (counts[id] && (simulatedStickers[id]?.count || 0) > 0) {
-        counts[id] = simulatedStickers[id];
-      }
-    });
-
-    return counts;
-  }, [progressItems, simulatedStickers]);
+  }, [studentPracticeMinutes, studentXP, studentStreak, effectiveMasteredSongsCount, progressItems, simulatedStickers]);
 
   useEffect(() => {
     if (!student.id || loading || progressItems.length === 0) return;
@@ -4766,14 +4926,77 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setShowCreateSongModal(false);
   };
 
+  // Unified canonical active songs resolver (combines user_song_skills, progressItems/homework, songs catalog, and localStorage)
+  const resolvedActiveSongs = useMemo(() => {
+    const songsMap = new Map<string, any>();
 
+    // 1. From activeSongSkills (Direct user assignments in user_song_skills)
+    (activeSongSkills || []).forEach((skill: any) => {
+      const songObj = skill.songs || {};
+      const title = songObj.title || skill.title || skill.song_title || '';
+      const artist = songObj.artist || skill.artist || 'Unbekannt';
+      const id = skill.id || songObj.id || skill.song_id;
+      if (title) {
+        const normKey = getNormalizedSongTitle(skill) || title.toLowerCase().trim();
+        const localHw = localStorage.getItem(`song_hw_${student.id}_${id}`) ??
+                        (skill.song_id ? localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) : null) ??
+                        (songObj.id ? localStorage.getItem(`song_hw_${student.id}_${songObj.id}`) : null);
+        const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
+        const localNote = localStorage.getItem(`song_note_${student.id}_${id}`) ||
+                          (skill.song_id ? localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) : '') ||
+                          (songObj.id ? localStorage.getItem(`song_note_${student.id}_${songObj.id}`) : '') ||
+                          skill.homework_notes;
+
+        songsMap.set(normKey, {
+          ...skill,
+          id,
+          title,
+          artist,
+          progress_percent: skill.progress_percent || 0,
+          is_stage_ready: Boolean(skill.is_stage_ready || skill.progress_percent === 100),
+          status: skill.status || (skill.progress_percent === 100 ? 'MASTERED' : 'IN_PROGRESS'),
+          is_current_homework: isHw,
+          homework_notes: localNote,
+          songs: songObj.title ? songObj : { id: skill.song_id || id, title, artist, teacher_id: skill.teacher_id }
+        });
+      }
+    });
+
+    // 2. From progressItems (Direct assignments in progress_matrix / homework notes for assigned songs)
+    (progressItems || []).forEach((item: any) => {
+      const rawTopic = (item.topic_name || item.title || '').trim();
+      if (!rawTopic || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.includes(' - Seite ') || rawTopic.toLowerCase().trim() === 'test') return;
+
+      const normKey = getNormalizedSongTitle(item) || rawTopic.toLowerCase().trim();
+      const existing = songsMap.get(normKey) || Array.from(songsMap.values()).find(s => isSongMatch(item, s));
+
+      if (existing) {
+        const localHw = localStorage.getItem(`song_hw_${student.id}_${item.id}`) ??
+                        (item.song_id ? localStorage.getItem(`song_hw_${student.id}_${item.song_id}`) : null);
+        const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(item.is_current_homework));
+        const localNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
+                          (item.song_id ? localStorage.getItem(`song_note_${student.id}_${item.song_id}`) : '') ||
+                          item.homework_notes;
+
+        if (isHw) existing.is_current_homework = true;
+        if (item.status === 'MASTERED') {
+          existing.status = 'MASTERED';
+          existing.is_stage_ready = true;
+          existing.progress_percent = 100;
+        }
+        if (localNote) existing.homework_notes = localNote;
+      }
+    });
+
+    return Array.from(songsMap.values());
+  }, [activeSongSkills, progressItems, student.id]);
 
   const activeBook = activeLehrwerkId ? globalLehrwerke.find(g => g.id === activeLehrwerkId) : null;
-  const activeSong = selectedActiveSongId ? activeSongSkills.find(s => s.id === selectedActiveSongId) : null;
+  const activeSong = selectedActiveSongId ? (resolvedActiveSongs.find(s => s.id === selectedActiveSongId || s.song_id === selectedActiveSongId) || activeSongSkills.find(s => s.id === selectedActiveSongId)) : null;
   const bookColor = (activeBook && activeSubView === 'lehrwerk') 
     ? getLehrwerkColor(activeBook.title) 
     : (activeSong && activeSubView === 'song') 
-      ? getSongColor(activeSong.songs?.title || 'Song') 
+      ? getSongColor(activeSong.songs?.title || activeSong.title || 'Song') 
       : null;
 
   const renderArchivButton = (isMobile: boolean = false) => {
@@ -9836,8 +10059,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </div>
 
                   {(() => {
-                      const activeSongsRaw = activeSongSkills.filter(skill =>
-                        !skill.is_stage_ready && (skill.progress_percent || 0) < 100
+                      const activeSongsRaw = (activeSongSkills || []).filter(skill =>
+                        !skill.is_stage_ready && (skill.progress_percent || 0) < 100 && skill.status !== 'MASTERED'
                       );
 
                       // Deduplicate active songs so each unique song is only listed once
@@ -13765,59 +13988,95 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     )}
                   </div>
 
-                  {/* Song Master Interpret & Title Badge (Clear, Open, Borderless Flow) */}
+                  {/* Song Master Interpret & Title Badge (Clean, Non-overloaded Meisterwerk Dedication) */}
                   {(st.category === 'songs' || st.id === 'song-master' || activeTopic) && (
                     <div style={{
                       width: '100%',
                       textAlign: 'center',
-                      margin: '6px 0 2px 0',
+                      margin: '4px 0 0 0',
                       zIndex: 2
                     }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        <Music size={13} color="#facc15" /> Interpret &amp; Songtitel
+                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <Music size={12} color="#facc15" /> Gemeistertes Werk
                       </div>
-                      <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#ffffff', marginTop: '2px', wordBreak: 'break-word' }}>
-                        {activeTopic || (details[0]?.topic) || 'Song gemeistert'}
-                      </div>
+                      {(() => {
+                        const topicStr = activeTopic || (details[0]?.topic) || (isCollected ? 'Song gemeistert' : '');
+                        if (!topicStr) return null;
+                        
+                        if (topicStr.includes(' - ')) {
+                          const parts = topicStr.split(' - ');
+                          const artist = parts[0].trim();
+                          const songTitle = parts.slice(1).join(' - ').trim();
+                          return (
+                            <div style={{ fontSize: '1.25rem', fontWeight: 950, color: '#ffffff', marginTop: '2px', wordBreak: 'break-word', letterSpacing: '-0.02em' }}>
+                              <span style={{ color: '#facc15' }}>{artist}</span>
+                              <span style={{ opacity: 0.45, margin: '0 6px', fontWeight: 400 }}>–</span>
+                              <span>{songTitle}</span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div style={{ fontSize: '1.25rem', fontWeight: 950, color: '#ffffff', marginTop: '2px', wordBreak: 'break-word', letterSpacing: '-0.02em' }}>
+                            {topicStr}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 
-                  {/* Multi-song Dropdown Selector if student mastered multiple songs */}
+                  {/* Multi-song Sleek Chip Selector (Modern Glass Pills instead of heavy select box) */}
                   {details.length > 1 && (
                     <div style={{
                       width: '100%',
                       margin: '4px 0 0 0',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '4px',
+                      alignItems: 'center',
+                      gap: '5px',
                       zIndex: 3
                     }}>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 900, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        Ausgewählter Song ({details.length} gemeistert):
-                      </label>
-                      <select
-                        value={activeIdx}
-                        onChange={(e) => setSelectedStickerDetailIdx(Number(e.target.value))}
-                        style={{
-                          width: '100%',
-                          background: '#0f172a',
-                          border: '2px solid #eab308',
-                          borderRadius: '14px',
-                          color: '#ffffff',
-                          padding: '10px 14px',
-                          fontSize: '0.88rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 14px rgba(250, 204, 21, 0.25)',
-                          outline: 'none'
-                        }}
-                      >
-                        {details.map((d: any, idx: number) => (
-                          <option key={idx} value={idx}>
-                            {d.topic}
-                          </option>
-                        ))}
-                      </select>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        {details.length} Songs im Repertoire (Klick zum Wechseln):
+                      </span>
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        maxWidth: '100%'
+                      }}>
+                        {details.map((d: any, idx: number) => {
+                          const isSel = idx === activeIdx;
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setSelectedStickerDetailIdx(idx)}
+                              style={{
+                                background: isSel ? 'rgba(250, 204, 21, 0.22)' : 'rgba(255, 255, 255, 0.06)',
+                                border: isSel ? '1.5px solid #facc15' : '1px solid rgba(255, 255, 255, 0.12)',
+                                color: isSel ? '#facc15' : '#e2e8f0',
+                                borderRadius: '100px',
+                                padding: '4px 12px',
+                                fontSize: '0.74rem',
+                                fontWeight: isSel ? 900 : 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                transition: 'all 0.15s ease',
+                                boxShadow: isSel ? '0 2px 8px rgba(250, 204, 21, 0.25)' : 'none'
+                              }}
+                              className="hover-scale"
+                            >
+                              <span>🎵</span>
+                              <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {d.topic}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -13860,7 +14119,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           </>
                         ) : (
                           <>
-                            <Lock size={12} color="#94a3b8" /> Noch nicht freigeschaltet
+                            <Lock size={12} color="#94a3b8" /> {info.progressText || 'Noch nicht freigeschaltet'}
                           </>
                         )}
                       </span>

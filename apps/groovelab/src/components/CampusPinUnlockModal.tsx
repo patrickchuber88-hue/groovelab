@@ -56,23 +56,31 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
   const expectedLength = isSetupMode ? 4 : (studentBirthDay ? 2 : 4);
 
   const handleKeyPress = (val: string) => {
+    if (loading) return;
     if (val === 'back') {
       setPinInput(prev => prev.slice(0, -1));
     } else if (val === 'clear') {
       setPinInput('');
     } else if (pinInput.length < expectedLength) {
-      setPinInput(prev => prev + val);
+      const nextPin = pinInput + val;
+      setPinInput(nextPin);
+      if (nextPin.length === expectedLength) {
+        setTimeout(() => {
+          handleVerify(nextPin);
+        }, 100);
+      }
     }
   };
 
-  const handleVerify = async () => {
-    if (pinInput.length !== expectedLength) return;
+  const handleVerify = async (explicitPin?: string) => {
+    const pinToVerify = typeof explicitPin === 'string' ? explicitPin : pinInput;
+    if (pinToVerify.length !== expectedLength || loading) return;
     setLoading(true);
 
     try {
       if (isSetupMode) {
         // Validate proposed PIN against trivial and birthday patterns
-        const validation = validateNewPin(pinInput, studentBirthDay || user.day_of_birth);
+        const validation = validateNewPin(pinToVerify, studentBirthDay || user.day_of_birth);
         if (!validation.isValid) {
           alert(validation.error || 'Ungültige PIN.');
           setPinInput('');
@@ -88,17 +96,17 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
 
         try {
           await supabase.from('students').update({
-            personal_pin: pinInput,
-            parent_pin: pinInput,
-            onboarding_pin: pinInput,
+            personal_pin: pinToVerify,
+            parent_pin: pinToVerify,
+            onboarding_pin: pinToVerify,
             is_pin_activated: true,
             is_campus_active: true
           }).eq('id', user.id);
 
           await supabase.from('pending_students').update({
-            personal_pin: pinInput,
-            parent_pin: pinInput,
-            onboarding_pin: pinInput,
+            personal_pin: pinToVerify,
+            parent_pin: pinToVerify,
+            onboarding_pin: pinToVerify,
             is_pin_activated: true,
             is_campus_active: true
           }).eq('id', user.id);
@@ -106,44 +114,52 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
 
         try {
           await supabase.from('users_raw').update({
-            personal_pin: pinInput,
-            parent_pin: pinInput,
-            onboarding_pin: pinInput,
+            personal_pin: pinToVerify,
+            parent_pin: pinToVerify,
+            onboarding_pin: pinToVerify,
             is_pin_activated: true,
             is_campus_active: true
           }).eq('id', user.id);
         } catch (e) {}
 
         const userUpdatePayload: any = {
-          personal_pin: pinInput,
-          parent_pin: pinInput,
-          onboarding_pin: pinInput,
+          personal_pin: pinToVerify,
+          parent_pin: pinToVerify,
+          onboarding_pin: pinToVerify,
           is_pin_activated: true,
           is_campus_active: true
         };
-        let { error } = await supabase
+        let { error: updateErr } = await supabase
           .from('users')
           .update(userUpdatePayload)
           .eq('id', user.id);
 
-        if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+        if (updateErr && (updateErr.message?.includes('onboarding_pin') || updateErr.message?.includes('record "new" has no field'))) {
           delete userUpdatePayload.onboarding_pin;
           const fallbackRes = await supabase
             .from('users')
             .update(userUpdatePayload)
             .eq('id', user.id);
-          error = fallbackRes.error;
+          updateErr = fallbackRes.error;
         }
 
-        if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-          console.warn('[CampusPinUnlockModal] users view trigger warning ignored because student table was updated:', error);
-          error = null;
+        if (updateErr && (updateErr.message?.includes('onboarding_pin') || updateErr.message?.includes('record "new" has no field'))) {
+          updateErr = null;
         }
 
-        localStorage.setItem(`groovelab_user_pin_${user.id}`, pinInput);
+        if (updateErr) {
+          console.error('[CampusPinUnlockModal] user update error:', updateErr);
+          alert('Fehler beim Speichern der PIN: ' + updateErr.message);
+          setLoading(false);
+          return;
+        }
+
+        localStorage.setItem(`groovelab_user_pin_${user.id}`, pinToVerify);
+        if (authQrToken) {
+          localStorage.setItem(`groovelab_pin_${authQrToken}`, pinToVerify);
+        }
 
         sessionStorage.removeItem('groovelab_qr_token');
-        if (error) throw error;
 
         // Ensure activation_days record exists for active student detection
         try {
@@ -363,24 +379,11 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
 
         {renderKeypad()}
 
-        <button
-          onClick={handleVerify}
-          disabled={pinInput.length !== expectedLength || loading}
-          style={{
-            width: '100%',
-            padding: '14px',
-            borderRadius: '16px',
-            background: pinInput.length === expectedLength ? primaryColor : '#cbd5e1',
-            color: '#ffffff',
-            fontWeight: 800,
-            border: 'none',
-            marginTop: '24px',
-            cursor: pinInput.length === expectedLength ? 'pointer' : 'not-allowed',
-            transition: 'all 0.2s'
-          }}
-        >
-          {isSetupMode ? 'PIN aktivieren & Freischalten' : 'Verifizieren & Freischalten'}
-        </button>
+        {loading && (
+          <div style={{ marginTop: '18px', color: primaryColor, fontWeight: 800, fontSize: '0.9rem' }}>
+            Einen Moment bitte...
+          </div>
+        )}
       </div>
     </div>
   );

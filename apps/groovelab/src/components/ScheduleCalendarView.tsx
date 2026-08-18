@@ -34,7 +34,7 @@ import {
   BookOpen,
   Edit3
 } from 'lucide-react';
-import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
 interface ScheduleOccurrence {
@@ -6275,7 +6275,7 @@ export function ScheduleCalendarView({
 
                                 {!isSelectedForSubCard && (occ.substitute_teacher_id || occ.is_substitute) && (
                                   <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#3730a3', background: '#e0e7ff', padding: '1px 5px', borderRadius: '4px', border: '1px solid #c7d2fe', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Vertretung: {occ.substitute_teacher?.first_name || allSchoolTeachers.find(t => t.id === occ.substitute_teacher_id)?.first_name || 'Dozent'}
+                                    Vertretung: {formatTeacherFullName(occ.substitute_teacher || allSchoolTeachers.find(t => t.id === occ.substitute_teacher_id)) || 'Dozent'}
                                   </div>
                                 )}
                               </div>

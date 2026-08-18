@@ -235,14 +235,14 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
         borderRadius: '16px',
         border: '1px solid #e2e8f0',
-        padding: '6px 10px',
+        padding: '10px 12px',
         width: '100%',
         boxShadow: isPlaying 
           ? '0 6px 20px -4px rgba(34, 197, 94, 0.15), 0 2px 6px -1px rgba(0,0,0,0.04)' 
           : '0 2px 8px -2px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0,0,0,0.02)',
         display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
+        flexDirection: 'column',
+        gap: '8px',
         boxSizing: 'border-box',
         position: 'relative',
         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -252,29 +252,30 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     >
       <audio ref={audioRef} src={resolvedUrl} />
 
-      {/* ─── LEFT SEGMENT: Label & Touch-Optimized Thumb Switcher ──────── */}
+      {/* ─── ROW 1: Header / Category Badge & Track Selector / Delete ──────── */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
-        flexShrink: 0
+        justifyContent: 'space-between',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         {/* Label Badge */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '5px',
-          height: '32px',
-          padding: '0 10px',
+          height: '26px',
+          padding: '0 8px',
           background: '#f0fdf4',
           borderRadius: '99px',
           border: '1px solid #bbf7d0',
           boxSizing: 'border-box'
         }}>
-          <Mic size={13} style={{ color: '#16a34a' }} />
+          <Mic size={12} style={{ color: '#16a34a' }} />
           <span style={{
-            fontSize: '0.75rem',
-            fontWeight: 900,
+            fontSize: '0.72rem',
+            fontWeight: 850,
             color: '#166534',
             letterSpacing: '-0.01em',
             whiteSpace: 'nowrap'
@@ -283,96 +284,124 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           </span>
         </div>
 
-        {/* Daumenfreundlicher Track-Wechsler (nur bei >1 Track) */}
-        {totalTracks > 1 && onPrev && onNext && (
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            height: '32px',
-            background: '#f8fafc',
-            border: '1px solid #cbd5e1',
-            borderRadius: '99px',
-            padding: '2px',
-            boxSizing: 'border-box',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-          }}>
-            <button
-              type="button"
-              onClick={onPrev}
-              style={{
-                width: '28px',
-                height: '26px',
-                border: 'none',
-                background: 'transparent',
-                color: '#334155',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '99px',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale"
-              title="Vorherige Aufnahme (Endlos-Loop)"
-            >
-              <ChevronLeft size={15} strokeWidth={3} />
-            </button>
-
-            <span style={{
-              fontSize: '0.74rem',
-              fontWeight: 900,
-              color: '#15803d',
-              padding: '0 4px',
-              fontVariantNumeric: 'tabular-nums',
-              letterSpacing: '-0.02em',
-              userSelect: 'none'
+        {/* Right actions: Selector and/or Delete */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Daumenfreundlicher Track-Wechsler (nur bei >1 Track) */}
+          {totalTracks > 1 && onPrev && onNext && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              height: '26px',
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: '99px',
+              padding: '1px 2px',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
             }}>
-              {trackIndex + 1}/{totalTracks}
-            </span>
+              <button
+                type="button"
+                onClick={onPrev}
+                style={{
+                  width: '24px',
+                  height: '22px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#334155',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '99px',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale"
+                title="Vorherige Aufnahme (Endlos-Loop)"
+              >
+                <ChevronLeft size={14} strokeWidth={3} />
+              </button>
 
+              <span style={{
+                fontSize: '0.70rem',
+                fontWeight: 900,
+                color: '#15803d',
+                padding: '0 4px',
+                fontVariantNumeric: 'tabular-nums',
+                letterSpacing: '-0.02em',
+                userSelect: 'none'
+              }}>
+                {trackIndex + 1}/{totalTracks}
+              </span>
+
+              <button
+                type="button"
+                onClick={onNext}
+                style={{
+                  width: '24px',
+                  height: '22px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#334155',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '99px',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale"
+                title="Nächste Aufnahme (Endlos-Loop)"
+              >
+                <ChevronRight size={14} strokeWidth={3} />
+              </button>
+            </div>
+          )}
+
+          {/* Delete (Trash) */}
+          {onDelete && (
             <button
               type="button"
-              onClick={onNext}
+              onClick={onDelete}
               style={{
-                width: '28px',
-                height: '26px',
                 border: 'none',
-                background: 'transparent',
-                color: '#334155',
+                background: 'none',
+                color: '#ef4444',
                 cursor: 'pointer',
+                padding: '4px',
+                borderRadius: '6px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                borderRadius: '99px',
-                transition: 'all 0.15s ease'
+                opacity: 0.6,
+                flexShrink: 0,
+                transition: 'opacity 0.15s ease'
               }}
-              className="hover-scale"
-              title="Nächste Aufnahme (Endlos-Loop)"
+              onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+              title="Diese Aufnahme löschen"
             >
-              <ChevronRight size={15} strokeWidth={3} />
+              <Trash2 size={13} />
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Hairline Divider */}
-      <div style={{ width: '1px', height: '24px', background: '#e2e8f0', flexShrink: 0 }} />
-
-      {/* ─── RIGHT SEGMENT: Player Controls & Apple Waveform ─────────────── */}
+      {/* ─── ROW 2: Player Controls, Waveform, Time & Speed ─────────────── */}
       <div style={{
-        flex: 1,
-        minWidth: 0,
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: '8px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box'
       }}>
         {/* Play Button */}
         <button
           type="button"
           onClick={togglePlay}
           style={{
-            width: '34px',
-            height: '34px',
+            width: '32px',
+            height: '32px',
             borderRadius: '50%',
             background: isPlaying 
               ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' 
@@ -395,13 +424,13 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           title={isPlaying ? 'Pause' : 'Abspielen'}
         >
           {isPlaying ? (
-            <Pause size={14} fill="currentColor" strokeWidth={0} />
+            <Pause size={13} fill="currentColor" strokeWidth={0} />
           ) : (
-            <Play size={14} fill="currentColor" strokeWidth={0} style={{ marginLeft: '2px' }} />
+            <Play size={13} fill="currentColor" strokeWidth={0} style={{ marginLeft: '2px' }} />
           )}
         </button>
 
-        {/* Middle: Title + 32-Bar Waveform */}
+        {/* Middle: Title/Time + 32-Bar Waveform */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
           {/* Top Line: Track title + time */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
@@ -497,33 +526,6 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         >
           {playbackRate}×
         </button>
-
-        {/* Delete (Trash) */}
-        {onDelete && (
-          <button
-            type="button"
-            onClick={onDelete}
-            style={{
-              border: 'none',
-              background: 'none',
-              color: '#ef4444',
-              cursor: 'pointer',
-              padding: '4px',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: 0.6,
-              flexShrink: 0,
-              transition: 'opacity 0.15s ease'
-            }}
-            onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-            onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
-            title="Diese Aufnahme löschen"
-          >
-            <Trash2 size={13} />
-          </button>
-        )}
       </div>
     </div>
   );

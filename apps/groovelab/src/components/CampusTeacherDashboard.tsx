@@ -30,7 +30,7 @@ import {
   ChevronLeft,
   RefreshCw
 } from 'lucide-react';
-import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 
 const timeToMinutes = (timeStr: string): number => {
   if (!timeStr) return 0;
@@ -908,7 +908,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
           school_id: teacher?.school_id || null,
           teacher_id: userId,
           type: 'Ersatztermin vorgeschlagen',
-          message: `🔄 Dein Coach ${teacher?.first_name || ''} hat dir einen Ersatztermin am ${new Date(rescheduleProposedDate).toLocaleDateString('de-DE')} um ${rescheduleProposedTime} Uhr vorgeschlagen.`,
+          message: `🔄 Dein Coach ${formatTeacherFullName(teacher)} hat dir einen Ersatztermin am ${new Date(rescheduleProposedDate).toLocaleDateString('de-DE')} um ${rescheduleProposedTime} Uhr vorgeschlagen.`,
           created_at: new Date().toISOString(),
           resolved: false
         });
@@ -1186,7 +1186,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
 
       // Fallback update
       const status = color === 'GREEN' ? 'approved' : 'pending_parent_approval';
-      const teacherName = teacher ? `${teacher.first_name} ${teacher.last_name}` : 'dein Lehrer';
+      const teacherName = teacher ? formatTeacherFullName(teacher) : 'dein Lehrer';
       const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
       // Direct push triggering helper for fallback
@@ -2031,7 +2031,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               <img src={teacher?.photo_url || '/avatar_ghost.jpg'} alt="" className="h-full w-full object-cover" />
             </div>
             <div>
-              <p className="text-sm font-bold text-white leading-tight">{teacher?.first_name} {teacher?.last_name}</p>
+              <p className="text-sm font-bold text-white leading-tight">{formatTeacherFullName(teacher)}</p>
               <p className="text-[10px] text-slate-400 uppercase tracking-wider">Studio ID: {teacher?.ausweis_id}</p>
             </div>
           </div>
@@ -3042,7 +3042,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                             : 'Freie Buchung';
 
                                           const displayTitle = booking.student 
-                                            ? `${booking.status === 'pending_reschedule' ? 'Reservierung' : booking.status === 'rescheduled_confirmed' ? 'Verschoben' : 'Unterricht'}: ${isCurrentTeacherBooking ? `${booking.student.first_name} ${booking.student.last_name[0] ? booking.student.last_name[0] + '.' : ''}` : 'Besetzt'} (${bookingTimeDisplay}) - Coach: ${booking.teacher ? `${booking.teacher.first_name} ${booking.teacher.last_name}` : 'Unbekannt'}`
+                                            ? `${booking.status === 'pending_reschedule' ? 'Reservierung' : booking.status === 'rescheduled_confirmed' ? 'Verschoben' : 'Unterricht'}: ${isCurrentTeacherBooking ? `${booking.student.first_name} ${booking.student.last_name[0] ? booking.student.last_name[0] + '.' : ''}` : 'Besetzt'} (${bookingTimeDisplay}) - Coach: ${booking.teacher ? formatTeacherFullName(booking.teacher) : 'Unbekannt'}`
                                             : `Freie Buchung (${bookingTimeDisplay})`;
 
                                           return (

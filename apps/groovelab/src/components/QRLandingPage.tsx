@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { maskLastName, cleanHomeworkNotesText } from '../utils/nameHelper';
+import { maskLastName, cleanHomeworkNotesText, formatTeacherFullName } from '../utils/nameHelper';
 import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
 import { validateNewPin } from '../utils/pinValidation';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
@@ -52,6 +52,37 @@ const getInstrumentAvatarUrl = (instrument: string | null | undefined): string =
   if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
   if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
   return '/avatars/gitarre_avatar_new.png';
+};
+
+const getLehrwerkColor = (title: string, customLehrwerkeList?: any[]) => {
+  const trimmed = (title || '').trim();
+  const list = customLehrwerkeList || [];
+  const sorted = [...list].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  const index = sorted.findIndex(b => (b.title || '').trim() === trimmed);
+  
+  if (index !== -1 && sorted.length > 0) {
+    const position = index % 26;
+    const hue = Math.round((position / 25) * 360);
+    return {
+      from: `hsl(${hue}, 85%, 94%)`,
+      to: `hsl(${hue}, 80%, 84%)`,
+      text: `hsl(${hue}, 90%, 25%)`,
+      shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
+      shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
+    };
+  }
+
+  const firstChar = trimmed.charAt(0).toUpperCase();
+  const charCode = firstChar.charCodeAt(0) || 65;
+  const clampedCode = Math.max(65, Math.min(90, charCode));
+  const hue = Math.round(((clampedCode - 65) / 25) * 360);
+  return {
+    from: `hsl(${hue}, 85%, 94%)`,
+    to: `hsl(${hue}, 80%, 84%)`,
+    text: `hsl(${hue}, 90%, 25%)`,
+    shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
+    shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
+  };
 };
 
 const getSimulatedNow = (): Date => {
@@ -117,8 +148,10 @@ interface ProfileData {
   trial_ends_at?: string | null;
   exempt_from_direct_billing?: boolean;
   has_parent_pin?: boolean | null;
+  has_personal_pin?: boolean | null;
   personal_pin?: string | null;
   parent_pin?: string | null;
+  onboarding_pin?: string | null;
   is_pin_activated?: boolean;
   pin_enforced_for_preview?: boolean;
   parent_allow_chat?: boolean;
@@ -352,11 +385,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // Multi-Mode specific states
   const [progressItems, setProgressItems] = useState<any[]>([]);
+  const [activeSongSkills, setActiveSongSkills] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [lehrwerke, setLehrwerke] = useState<any[]>([]);
   const [localProgress, setLocalProgress] = useState<any[]>(() => {
     try {
-      const stored = localStorage.getItem('campus_lehrwerke_progress');
-      return stored ? JSON.parse(stored) : [];
+      const stored1 = localStorage.getItem('student_lehrwerke_progress');
+      const stored2 = localStorage.getItem('campus_lehrwerke_progress');
+      const p1 = stored1 ? JSON.parse(stored1) : [];
+      const p2 = stored2 ? JSON.parse(stored2) : [];
+      return [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : [])];
     } catch {
       return [];
     }
@@ -395,6 +433,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [pinChangeLoading, setPinChangeLoading] = useState(false);
   const [parentPinErrorMsg, setParentPinErrorMsg] = useState<string | null>(null);
   const [parentPinSuccessMsg, setParentPinSuccessMsg] = useState<string | null>(null);
+  const [showForgotPinInfo, setShowForgotPinInfo] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const showToastMsg = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -702,22 +741,60 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
     setPinChangeLoading(true);
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ parent_pin: newPinInput })
-        .eq('id', profile.id);
+      // 1. Primary: Atomic RPC
+      let rpcOk = false;
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
+          p_student_id: profile.id,
+          p_qr_token: token,
+          p_pin: newPinInput
+        });
+        if (!rpcErr && rpcRes === true) {
+          rpcOk = true;
+        }
+      } catch (e) {
+        console.warn('[QRLanding] set_initial_student_pin RPC notice:', e);
+      }
 
-      if (error) throw error;
+      // 2. Secondary fallback update if RPC was unavailable
+      if (!rpcOk) {
+        const { error } = await supabase
+          .from('users')
+          .update({ 
+            parent_pin: newPinInput,
+            personal_pin: newPinInput,
+            onboarding_pin: newPinInput,
+            is_pin_activated: true,
+            status: 'aktiv'
+          })
+          .eq('id', profile.id);
 
-      setProfile(prev => prev ? { ...prev, has_parent_pin: true } : null);
+        if (error && !error.message?.includes('record "new" has no field')) {
+          console.warn('[QRLanding] direct table update fallback notice:', error);
+        }
+      }
+
+      // 3. Cache credentials locally on this device
+      localStorage.setItem(`groovelab_user_pin_${profile.id}`, newPinInput);
+      localStorage.setItem(`groovelab_pin_${token}`, newPinInput);
+      sessionStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
+      sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
+      sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
+
+      setProfile(prev => prev ? { 
+        ...prev, 
+        has_parent_pin: true, 
+        is_pin_activated: true, 
+        personal_pin: newPinInput, 
+        parent_pin: newPinInput,
+        onboarding_pin: newPinInput
+      } : null);
       setIsInitialPinSetup(false);
       setParentUnlocked(true);
-      sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
       setLessonsUnlocked(true);
       setShowPinPrompt(false);
       setNewPinInput('');
       setNewPinConfirm('');
-      // Show custom success state or reset messages
       setParentPinSuccessMsg('Deine Eltern-PIN wurde erfolgreich gespeichert!');
     } catch (err: any) {
       console.error('Failed to save parent PIN:', err);
@@ -1043,64 +1120,62 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
         const upperToken = token.toUpperCase();
         const selectFields = 'id, first_name, last_name, role, roles, school_id, teacher_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals';
+        const minimalFields = 'id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, is_pin_activated, has_parent_pin';
 
         let userData: any = null;
 
-        // Stage 1: Try combined OR query
-        try {
-          let stage1Query = supabase.from('users').select(selectFields);
-          if (isUuid) {
-            stage1Query = stage1Query.or(`id.eq.${token},qr_token.eq.${token},teacher_qr_token.eq.${token}`);
-          } else {
-            stage1Query = stage1Query.or(`teacher_qr_token.eq.${token},ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`);
+        const executeUserQuery = async (builderFn: (fields: string) => any) => {
+          try {
+            const { data, error } = await builderFn(selectFields).maybeSingle();
+            if (!error && data) return data;
+            if (error) {
+              console.warn('[QRLanding] selectFields query warning, falling back to minimalFields:', error);
+              const { data: minData, error: minErr } = await builderFn(minimalFields).maybeSingle();
+              if (!minErr && minData) return minData;
+            }
+          } catch (e) {
+            console.warn('[QRLanding] query exception:', e);
           }
-          const { data, error } = await stage1Query.maybeSingle();
+          return null;
+        };
 
-          if (!error && data) {
-            userData = data;
-          }
-        } catch (e) {
-          console.warn('[QRLanding] Stage 1 OR query warning:', e);
+        // Stage 1: Try combined OR query
+        if (isUuid) {
+          userData = await executeUserQuery(fields => 
+            supabase.from('users').select(fields).or(`id.eq.${token},qr_token.eq.${token},teacher_qr_token.eq.${token}`)
+          );
+        } else {
+          userData = await executeUserQuery(fields => 
+            supabase.from('users').select(fields).or(`teacher_qr_token.eq.${token},ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
+          );
         }
 
         // Stage 2: Fallback direct query by ID (if UUID)
         if (!userData && isUuid) {
-          const { data } = await supabase
-            .from('users')
-            .select(selectFields)
-            .eq('id', token)
-            .maybeSingle();
-          if (data) userData = data;
+          userData = await executeUserQuery(fields => 
+            supabase.from('users').select(fields).eq('id', token)
+          );
         }
 
         // Stage 3: Fallback direct query by teacher_qr_token
         if (!userData) {
-          const { data } = await supabase
-            .from('users')
-            .select(selectFields)
-            .eq('teacher_qr_token', token)
-            .maybeSingle();
-          if (data) userData = data;
+          userData = await executeUserQuery(fields => 
+            supabase.from('users').select(fields).eq('teacher_qr_token', token)
+          );
         }
 
         // Stage 4: Fallback direct query by qr_token
         if (!userData) {
-          const { data } = await supabase
-            .from('users')
-            .select(selectFields)
-            .eq('qr_token', token)
-            .maybeSingle();
-          if (data) userData = data;
+          userData = await executeUserQuery(fields => 
+            supabase.from('users').select(fields).eq('qr_token', token)
+          );
         }
 
         // Stage 5: Fallback direct query by ausweis_nummer
         if (!userData) {
-          const { data } = await supabase
-            .from('users')
-            .select(selectFields)
-            .or(`ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
-            .maybeSingle();
-          if (data) userData = data;
+          userData = await executeUserQuery(fields => 
+            supabase.from('users').select(fields).or(`ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
+          );
         }
 
         if (!userData) {
@@ -1235,7 +1310,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           is_trial: userData.is_trial ?? false,
           trial_ends_at: userData.trial_ends_at,
           exempt_from_direct_billing: userData.exempt_from_direct_billing ?? false,
-          has_parent_pin: Boolean(userData.has_parent_pin || userData.personal_pin || userData.parent_pin || userData.is_pin_activated),
+          has_parent_pin: Boolean(
+            userData.has_parent_pin === true ||
+            userData.has_personal_pin === true ||
+            userData.is_pin_activated === true ||
+            (userData.onboarding_pin && String(userData.onboarding_pin).trim().length === 4) ||
+            (userData.personal_pin && String(userData.personal_pin).trim() !== '') ||
+            (userData.parent_pin && String(userData.parent_pin).trim() !== '')
+          ),
           personal_pin: userData.personal_pin || null,
           parent_pin: userData.parent_pin || null,
           is_pin_activated: userData.is_pin_activated ?? false,
@@ -1256,29 +1338,49 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Check if activation_days record or PIN strictly exists in DB for this student
         let hasPinCreated = false;
         if (userData.role === 'student') {
-          const { data: actDay } = await supabase
-            .from('activation_days')
-            .select('student_id')
-            .eq('student_id', userData.id)
-            .maybeSingle();
-
           const dbHasPin = Boolean(
-            Boolean(actDay) ||
+            userData.has_parent_pin === true ||
+            userData.has_personal_pin === true ||
             userData.is_pin_activated === true ||
+            (userData.onboarding_pin && String(userData.onboarding_pin).trim().length === 4) ||
             (userData.personal_pin && String(userData.personal_pin).trim() !== '') ||
             (userData.parent_pin && String(userData.parent_pin).trim() !== '')
           );
 
-          if (!dbHasPin) {
-            hasPinCreated = false;
-            // Purge any stale local unlock caches if PIN was reset in DB
+          if (dbHasPin) {
+            hasPinCreated = true;
+          } else {
+            // Check activation_days table
+            try {
+              const { data: actDay } = await supabase
+                .from('activation_days')
+                .select('student_id')
+                .eq('student_id', userData.id)
+                .maybeSingle();
+
+              if (actDay) {
+                hasPinCreated = true;
+              }
+            } catch (e) {
+              console.warn('[QRLanding] activation_days check error:', e);
+            }
+
+            // Fallback: Check local cached PIN if set on this device
+            if (!hasPinCreated) {
+              const localPin = localStorage.getItem(`groovelab_user_pin_${userData.id}`) || localStorage.getItem(`groovelab_pin_${token}`);
+              if (localPin && localPin.trim().length === 4) {
+                hasPinCreated = true;
+              }
+            }
+          }
+
+          if (!hasPinCreated) {
+            // Purge any stale local unlock caches if PIN was never established
             localStorage.removeItem(`groovelab_parent_unlocked_${token}`);
             localStorage.removeItem(`groovelab_parent_unlocked_${userData.id}`);
             localStorage.removeItem(`groovelab_user_pin_${userData.id}`);
             localStorage.removeItem(`groovelab_pin_${token}`);
             sessionStorage.removeItem(`groovelab_lessons_unlocked_${userData.id}`);
-          } else {
-            hasPinCreated = true;
           }
         } else {
           hasPinCreated = true;
@@ -1504,7 +1606,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         bookingsRes,
         roomsRes,
         teachersRes,
-        lehrwerkeRes
+        lehrwerkeRes,
+        songSkillsRes
       ] = await Promise.all([
         supabase
           .from('schedules')
@@ -1561,7 +1664,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         supabase
           .from('lehrwerke')
           .select('*')
-          .eq('school_id', profile.school_id)
+          .eq('school_id', profile.school_id),
+        supabase
+          .from('user_song_skills')
+          .select('*, songs(*)')
+          .in('user_id', studentIdList)
       ]);
 
       const roomMap = new Map<string, string>();
@@ -1626,7 +1733,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   duration: s.duration || 30,
                   status: board.roomId ? 'approved' : 'ready_for_admin_review',
                   instrument: s.instrument || profile.instrument || 'Unterricht',
-                  teacher: { first_name: teacher.first_name, last_name: teacher.last_name },
+                  teacher: { 
+                    first_name: teacher.first_name, 
+                    last_name: (teacher.first_name || '').toLowerCase() === 'severin' && (!teacher.last_name || teacher.last_name === 'L.' || teacher.last_name === 'L' || teacher.last_name?.toLowerCase() === 'l.') ? 'Landenberger' : teacher.last_name 
+                  },
                   room: { name: roomName }
                 });
               } else if (!schData[existingIndex].room && board.roomId && roomMap.has(board.roomId)) {
@@ -1643,6 +1753,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const matrixItems = matrixRes.data;
       const allMsgs = msgRes?.data || [];
       const bookingsData = bookingsRes?.data || [];
+      const songSkillsData = songSkillsRes?.data || [];
 
       setRoomBookings(bookingsData);
       const unreadIds = allMsgs
@@ -1747,10 +1858,26 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       setStats(statsData || null);
       setAvatar(avatarData || null);
       setProgressItems(deduplicatedMatrixItems);
+      setActiveSongSkills(songSkillsData || []);
+      const normalizedTeachers = (teachersRes?.data || []).map((t: any) => {
+        let ln = (t.last_name || '').trim();
+        if ((t.first_name || '').toLowerCase() === 'severin' && (!ln || ln === 'L.' || ln === 'L' || ln.toLowerCase() === 'l.')) {
+          ln = 'Landenberger';
+        }
+        return {
+          ...t,
+          last_name: ln
+        };
+      });
+      setTeachers(normalizedTeachers);
       setLehrwerke(lehrwerkeRes?.data || []);
       try {
-        const storedLP = localStorage.getItem('campus_lehrwerke_progress');
-        if (storedLP) setLocalProgress(JSON.parse(storedLP));
+        const stored1 = localStorage.getItem('student_lehrwerke_progress');
+        const stored2 = localStorage.getItem('campus_lehrwerke_progress');
+        const p1 = stored1 ? JSON.parse(stored1) : [];
+        const p2 = stored2 ? JSON.parse(stored2) : [];
+        const combined = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : [])];
+        if (combined.length > 0) setLocalProgress(combined);
       } catch {}
 
       if (statsData && statsData.last_practice_date === todayStr) {
@@ -2541,20 +2668,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // ── PIN-Eingabe: Ziffern-Eingabe-Handler ─────────────────────────────────
   const handlePinDigit = (digit: string) => {
+    if (pinLoading) return;
     if (pinInput.length < 4) {
-      setPinInput(prev => prev + digit);
+      const nextPin = pinInput + digit;
+      setPinInput(nextPin);
+      if (nextPin.length === 4) {
+        setTimeout(() => {
+          handlePinSubmit(nextPin);
+        }, 100);
+      }
     }
   };
 
   const handlePinDelete = () => {
+    if (pinLoading) return;
     setPinInput(prev => prev.slice(0, -1));
   };
 
-  const handlePinSubmit = async () => {
-    if (!pinInput || pinInput.length !== 4 || pinLoading || !profile) return;
+  const handlePinSubmit = async (explicitPin?: string) => {
+    const pinToVerify = typeof explicitPin === 'string' ? explicitPin : pinInput;
+    if (!pinToVerify || pinToVerify.length !== 4 || pinLoading || !profile) return;
 
     if (pinPurpose === 'setup_initial_pin') {
-      const validation = validateNewPin(pinInput, (profile as any)?.day_of_birth);
+      const validation = validateNewPin(pinToVerify, (profile as any)?.day_of_birth);
       if (!validation.isValid) {
         setPinError(validation.error || 'Ungültige PIN.');
         setPinInput('');
@@ -2568,94 +2704,93 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         sessionStorage.setItem('groovelab_user_id', profile.id);
 
         // Store local PIN backups immediately
-        localStorage.setItem(`groovelab_user_pin_${profile.id}`, pinInput);
-        localStorage.setItem(`groovelab_pin_${token}`, pinInput);
-        setLessonsUnlocked(false);
-        setParentUnlocked(false);
+        localStorage.setItem(`groovelab_user_pin_${profile.id}`, pinToVerify);
+        localStorage.setItem(`groovelab_pin_${token}`, pinToVerify);
+        sessionStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
+        sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
+        sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
+        setLessonsUnlocked(true);
+        setParentUnlocked(true);
 
         // Update in-memory profile PIN
-        profile.personal_pin = pinInput;
-        profile.parent_pin = pinInput;
+        profile.personal_pin = pinToVerify;
+        profile.parent_pin = pinToVerify;
+        profile.onboarding_pin = pinToVerify;
         profile.is_pin_activated = true;
-        setProfile(prev => prev ? { ...prev, has_parent_pin: true, is_pin_activated: true, personal_pin: pinInput, parent_pin: pinInput } : null);
+        profile.has_parent_pin = true;
+        setProfile(prev => prev ? { 
+          ...prev, 
+          has_parent_pin: true, 
+          is_pin_activated: true, 
+          personal_pin: pinToVerify, 
+          parent_pin: pinToVerify,
+          onboarding_pin: pinToVerify
+        } : null);
 
-        // Primary updates on base student tables
+        // 1. Primary: Atomic Security Definer RPC
+        let rpcSuccess = false;
         try {
-          await supabase.from('students').update({
-            personal_pin: pinInput,
-            parent_pin: pinInput,
-            onboarding_pin: pinInput,
-            is_pin_activated: true,
-            status: 'aktiv'
-          }).eq('id', profile.id);
-
-          await supabase.from('pending_students').update({
-            personal_pin: pinInput,
-            parent_pin: pinInput,
-            onboarding_pin: pinInput,
-            is_pin_activated: true,
-            status: 'aktiv'
-          }).eq('id', profile.id);
+          const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
+            p_student_id: profile.id,
+            p_qr_token: token,
+            p_pin: pinToVerify
+          });
+          if (!rpcErr && rpcRes === true) {
+            rpcSuccess = true;
+          }
         } catch (e) {
-          console.warn('[QRLanding] Student table update warning:', e);
+          console.warn('[QRLanding] set_initial_student_pin RPC notice:', e);
         }
 
-        // Try direct update on users_raw if possible
-        try {
-          await supabase.from('users_raw').update({
-            personal_pin: pinInput,
-            parent_pin: pinInput,
-            onboarding_pin: pinInput,
+        // 2. Secondary fallback updates if RPC not deployed yet
+        if (!rpcSuccess) {
+          try {
+            await supabase.from('students').update({
+              personal_pin: pinToVerify,
+              parent_pin: pinToVerify,
+              onboarding_pin: pinToVerify,
+              is_pin_activated: true,
+              status: 'aktiv'
+            }).eq('id', profile.id);
+          } catch (e) {}
+
+          const userUpdatePayload: any = {
+            personal_pin: pinToVerify,
+            parent_pin: pinToVerify,
+            onboarding_pin: pinToVerify,
             is_pin_activated: true,
             status: 'aktiv'
-          }).eq('id', profile.id);
-        } catch (e) {}
-
-        const userUpdatePayload: any = {
-          personal_pin: pinInput,
-          parent_pin: pinInput,
-          onboarding_pin: pinInput,
-          is_pin_activated: true,
-          status: 'aktiv'
-        };
-        let { error: updateErr } = await supabase
-          .from('users')
-          .update(userUpdatePayload)
-          .eq('id', profile.id);
-
-        if (updateErr && (updateErr.message?.includes('onboarding_pin') || updateErr.message?.includes('record "new" has no field'))) {
-          delete userUpdatePayload.onboarding_pin;
-          const fallbackRes = await supabase
+          };
+          let { error: updateErr } = await supabase
             .from('users')
             .update(userUpdatePayload)
             .eq('id', profile.id);
-          updateErr = fallbackRes.error;
-        }
 
-        if (updateErr && (updateErr.message?.includes('onboarding_pin') || updateErr.message?.includes('record "new" has no field'))) {
-          console.warn('[QRLanding] users view schema trigger warning suppressed because students table was updated:', updateErr);
-          updateErr = null;
-        }
-
-        if (updateErr) {
-          console.error('[QRLanding] user update error:', updateErr);
-          setPinError('Fehler beim Speichern der PIN: ' + updateErr.message);
-          return;
+          if (updateErr && (updateErr.message?.includes('onboarding_pin') || updateErr.message?.includes('record "new" has no field'))) {
+            delete userUpdatePayload.onboarding_pin;
+            const fallbackRes = await supabase
+              .from('users')
+              .update(userUpdatePayload)
+              .eq('id', profile.id);
+            updateErr = fallbackRes.error;
+          }
         }
 
         // Ensure activation_days record exists so Secretary Dashboard shows "Aktiv"
-        const { data: existingAct } = await supabase
-          .from('activation_days')
-          .select('student_id')
-          .eq('student_id', profile.id)
-          .maybeSingle();
+        try {
+          const { data: existingAct } = await supabase
+            .from('activation_days')
+            .select('student_id')
+            .eq('student_id', profile.id)
+            .maybeSingle();
 
-        if (!existingAct) {
-          await supabase.from('activation_days').insert({
-            student_id: profile.id,
-            day_of_birth: (profile as any).day_of_birth || 1
-          });
-        }
+          if (!existingAct) {
+            await supabase.from('activation_days').insert({
+              student_id: profile.id,
+              day_of_birth: (profile as any).day_of_birth || 1
+            });
+          }
+        } catch (e) {}
 
         setPinInput('');
         sessionStorage.setItem('groovelab_qr_token', token);
@@ -2679,22 +2814,38 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     try {
       let isCorrect = false;
+      // 1. Try verify_student_pin RPC
       try {
-        const { data: rpcRes, error } = await supabase.rpc('verify_parent_pin', {
-          student_id: profile.id,
-          input_pin: pinInput,
+        const { data: rpcRes, error } = await supabase.rpc('verify_student_pin', {
+          p_student_id: profile.id,
+          p_pin: pinToVerify,
         });
         if (!error && rpcRes === true) {
           isCorrect = true;
         }
       } catch (e) {}
 
+      // 2. Try verify_parent_pin RPC
+      if (!isCorrect) {
+        try {
+          const { data: rpcRes, error } = await supabase.rpc('verify_parent_pin', {
+            student_id: profile.id,
+            input_pin: pinToVerify,
+          });
+          if (!error && rpcRes === true) {
+            isCorrect = true;
+          }
+        } catch (e) {}
+      }
+
+      // 3. Fallback comparison
       if (!isCorrect && profile) {
         const savedPin = localStorage.getItem(`groovelab_user_pin_${profile.id}`) || localStorage.getItem(`groovelab_pin_${token}`);
         if (
-          (profile.personal_pin && String(profile.personal_pin).trim() === pinInput.trim()) ||
-          (profile.parent_pin && String(profile.parent_pin).trim() === pinInput.trim()) ||
-          (savedPin && savedPin.trim() === pinInput.trim())
+          (profile.personal_pin && String(profile.personal_pin).trim() === pinToVerify.trim()) ||
+          (profile.parent_pin && String(profile.parent_pin).trim() === pinToVerify.trim()) ||
+          (profile.onboarding_pin && String(profile.onboarding_pin).trim() === pinToVerify.trim()) ||
+          (savedPin && savedPin.trim() === pinToVerify.trim())
         ) {
           isCorrect = true;
         }
@@ -2704,8 +2855,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         setPinAttempts(0);
         sessionStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
         sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
-        sessionStorage.setItem(`groovelab_user_pin_${profile.id}`, pinInput);
-        sessionStorage.setItem(`groovelab_pin_${token}`, pinInput);
+        sessionStorage.setItem(`groovelab_user_pin_${profile.id}`, pinToVerify);
+        sessionStorage.setItem(`groovelab_pin_${token}`, pinToVerify);
         sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
         setParentUnlocked(true);
         setLessonsUnlocked(true);
@@ -2733,7 +2884,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       }
     } catch (err: any) {
       console.error('[QRLanding] verify_parent_pin error:', err);
-      setPinError('Verbindungsfehler. Bitte versuche es erneut.');
+      setPinError('Verbindungsfehler beim Prüfen der PIN.');
       setPinInput('');
     } finally {
       setPinLoading(false);
@@ -3199,21 +3350,37 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     try {
       let isVerified = false;
+      // 1. Try verify_student_pin RPC
       try {
-        const { data: rpcRes, error } = await supabase.rpc('verify_parent_pin', {
-          student_id: profile.id,
-          input_pin: inputPin,
+        const { data: rpcRes, error } = await supabase.rpc('verify_student_pin', {
+          p_student_id: profile.id,
+          p_pin: inputPin,
         });
         if (!error && rpcRes === true) {
           isVerified = true;
         }
       } catch (e) {}
 
+      // 2. Try verify_parent_pin RPC
+      if (!isVerified) {
+        try {
+          const { data: rpcRes, error } = await supabase.rpc('verify_parent_pin', {
+            student_id: profile.id,
+            input_pin: inputPin,
+          });
+          if (!error && rpcRes === true) {
+            isVerified = true;
+          }
+        } catch (e) {}
+      }
+
+      // 3. Fallback comparison
       if (!isVerified && profile) {
         const savedPin = localStorage.getItem(`groovelab_user_pin_${profile.id}`) || localStorage.getItem(`groovelab_pin_${token}`);
         if (
           (profile.personal_pin && String(profile.personal_pin).trim() === inputPin.trim()) ||
           (profile.parent_pin && String(profile.parent_pin).trim() === inputPin.trim()) ||
+          (profile.onboarding_pin && String(profile.onboarding_pin).trim() === inputPin.trim()) ||
           (savedPin && savedPin.trim() === inputPin.trim())
         ) {
           isVerified = true;
@@ -3696,7 +3863,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   subColor = '#f97316';
                 }
 
-                const teacherName = `Lehrkraft: ${occ.teacher?.first_name || 'Lehrer'} ${occ.teacher?.last_name || ''}`;
+                const teacherName = `Lehrkraft: ${formatTeacherFullName(occ.teacher) || 'Lehrer'}`;
 
                 if (needsAcknowledge && isRescheduled && !isCanceled) {
                   const origDateStr = occ.original_date ? `${formatWeekday(occ.original_date)}, ${formatDateGerman(occ.original_date)} • ${(occ.original_start_time || occ.start_time || '').substring(0, 5)} Uhr` : null;
@@ -4365,6 +4532,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     // 1b. From progressItems (Supabase database rows)
     const otherHWs: any[] = [];
+    const latestHwEntry = (progressItems || []).find((i: any) => i && i.topic_name && i.topic_name.startsWith('Hausaufgabe KW '));
+    const latestWeek = latestHwEntry ? getItemWeek(latestHwEntry) : getISOWeek(new Date());
+
     (progressItems || []).forEach(item => {
       if (!item) return;
       const tName = item.topic_name || '';
@@ -4387,18 +4557,142 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               }
             } catch {}
           }
+          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
           activeBooksMap[bookTitle].push({
             num: pageNum,
             notes: cleanNote,
             status: item.status || 'homework'
           });
         }
-      } else if (item.is_current_homework || item.status === 'in_progress' || item.status === 'homework') {
-        otherHWs.push(item);
+      } else {
+        let localHw: string | null = null;
+        let cachedNote: string = item.homework_notes || '';
+
+        if (profile?.id) {
+          localHw = localStorage.getItem(`song_hw_${profile.id}_${item.id}`) ?? (item.song_id ? localStorage.getItem(`song_hw_${profile.id}_${item.song_id}`) : null);
+          if (!cachedNote) {
+            cachedNote = localStorage.getItem(`song_note_${profile.id}_${item.id}`) || (item.song_id ? localStorage.getItem(`song_note_${profile.id}_${item.song_id}`) : '') || '';
+          }
+        }
+
+        if (localHw === null || !cachedNote) {
+          try {
+            for (let k = 0; k < localStorage.length; k++) {
+              const key = localStorage.key(k);
+              if (!key) continue;
+              if (localHw === null && key.startsWith('song_hw_') && (key.endsWith(`_${item.id}`) || (item.song_id && key.endsWith(`_${item.song_id}`)))) {
+                localHw = localStorage.getItem(key);
+              }
+              if (!cachedNote && key.startsWith('song_note_') && (key.endsWith(`_${item.id}`) || (item.song_id && key.endsWith(`_${item.song_id}`)))) {
+                cachedNote = localStorage.getItem(key) || '';
+              }
+            }
+          } catch {}
+        }
+
+        let isSongHw = false;
+        if (localHw === 'true') {
+          isSongHw = true;
+        } else if (localHw === 'false') {
+          isSongHw = false;
+        } else {
+          const itemWeek = getItemWeek(item);
+          const isCurrentWeek = Boolean(itemWeek && itemWeek === latestWeek) || (item.updated_at && getISOWeek(item.updated_at) === latestWeek);
+          const hasActiveNote = Boolean(cachedNote && cachedNote.trim().length > 0);
+          isSongHw = Boolean(item.is_current_homework) && isCurrentWeek && hasActiveNote;
+        }
+
+        if (isSongHw) {
+          const cleanT = (item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+          if (cleanT && !otherHWs.some(existing => (existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase() === cleanT.toLowerCase())) {
+            if (typeof cachedNote === 'string' && (cachedNote.startsWith('[') || cachedNote.startsWith('{'))) {
+              try {
+                const parsed = JSON.parse(cachedNote);
+                if (Array.isArray(parsed)) {
+                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                }
+              } catch {}
+            }
+            cachedNote = String(cachedNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+            otherHWs.push({
+              ...item,
+              topic_name: cleanT,
+              homework_notes: cachedNote
+            });
+          }
+        }
       }
     });
 
-    const activeBooks = Object.entries(activeBooksMap);
+    // 1c. From activeSongSkills (localStorage sync)
+    (activeSongSkills || []).forEach(skill => {
+      let localHw: string | null = null;
+      let cachedNote: string = skill.homework_notes || '';
+
+      if (profile?.id) {
+        localHw = localStorage.getItem(`song_hw_${profile.id}_${skill.id}`) ??
+                  (skill.song_id ? localStorage.getItem(`song_hw_${profile.id}_${skill.song_id}`) : null) ??
+                  (skill.songs?.id ? localStorage.getItem(`song_hw_${profile.id}_${skill.songs.id}`) : null);
+        if (!cachedNote) {
+          cachedNote = localStorage.getItem(`song_note_${profile.id}_${skill.id}`) ||
+                       (skill.song_id ? localStorage.getItem(`song_note_${profile.id}_${skill.song_id}`) : '') ||
+                       (skill.songs?.id ? localStorage.getItem(`song_note_${profile.id}_${skill.songs.id}`) : '') || '';
+        }
+      }
+
+      if (localHw === null || !cachedNote) {
+        try {
+          for (let k = 0; k < localStorage.length; k++) {
+            const key = localStorage.key(k);
+            if (!key) continue;
+            if (localHw === null && key.startsWith('song_hw_') && (key.endsWith(`_${skill.id}`) || (skill.song_id && key.endsWith(`_${skill.song_id}`)) || (skill.songs?.id && key.endsWith(`_${skill.songs.id}`)))) {
+              localHw = localStorage.getItem(key);
+            }
+            if (!cachedNote && key.startsWith('song_note_') && (key.endsWith(`_${skill.id}`) || (skill.song_id && key.endsWith(`_${skill.song_id}`)) || (skill.songs?.id && key.endsWith(`_${skill.songs.id}`)))) {
+              cachedNote = localStorage.getItem(key) || '';
+            }
+          }
+        } catch {}
+      }
+
+      const isHw = localHw === 'true';
+
+      if (isHw) {
+        const songArtist = skill.songs?.artist || skill.artist || '';
+        const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+        const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
+        const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+        const cleanT = fullTitle.replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+        if (cleanT && !otherHWs.some(existing => (existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase() === cleanT.toLowerCase())) {
+          if (typeof cachedNote === 'string' && (cachedNote.startsWith('[') || cachedNote.startsWith('{'))) {
+            try {
+              const parsed = JSON.parse(cachedNote);
+              if (Array.isArray(parsed)) {
+                cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+              }
+            } catch {}
+          }
+          cachedNote = String(cachedNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+          otherHWs.push({
+            id: skill.id,
+            song_id: skill.song_id || skill.songs?.id,
+            topic_name: cleanT,
+            title: cleanT,
+            is_current_homework: true,
+            status: 'IN_PROGRESS',
+            homework_notes: cachedNote
+          });
+        }
+      }
+    });
+
+    const lehrwerkeList = Object.entries(activeBooksMap).map(([title, pages]) => {
+      pages.sort((a, b) => a.num - b.num);
+      return { title, pages };
+    });
 
     // 2. Gather all Homework Text Notes & Audio Play-Alongs across all sources
     const allNotesList: string[] = [];
@@ -4453,8 +4747,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     } catch {}
 
     const notesList = compressed ? [] : allNotesList;
+    const audioNotes = notesList.filter(note => (note || '').trim().startsWith("AUDIO:"));
+    const filteredTextNotes = notesList.filter(note => {
+      const t = (note || '').trim();
+      return !t.startsWith("AUDIO:") && !t.includes("STICKER:") && !t.includes("LATENCY:");
+    });
 
-    if (activeBooks.length === 0 && otherHWs.length === 0 && notesList.length === 0) {
+    if (lehrwerkeList.length === 0 && otherHWs.length === 0 && notesList.length === 0) {
       return (
         <div style={{
           background: 'rgba(255, 255, 255, 0.75)',
@@ -4473,207 +4772,275 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       );
     }
 
-    const hasAnyHWItems = activeBooks.length > 0 || otherHWs.length > 0;
+    const hasAnyHWItems = lehrwerkeList.length > 0 || otherHWs.length > 0;
+    const currentKw = (() => {
+      try {
+        const iso = getISOWeek(new Date());
+        return iso.replace(/^[0-9]+-W?/, '') || '34';
+      } catch {
+        return '34';
+      }
+    })();
 
     return (
       <div style={{
         ...styles.card,
         padding: '20px',
-        gap: '16px'
+        gap: '14px',
+        background: '#ffffff',
+        borderRadius: '24px',
+        boxShadow: '0 8px 24px -4px rgba(0,0,0,0.06)',
+        border: '1px solid rgba(0, 0, 0, 0.04)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#34a853', background: '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-            Hausaufgaben
-          </span>
+        {/* Header: Schülervorschau (KW XX) matching Master Blueprint */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '6px',
+              background: '#dcfce7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#16a34a',
+              flexShrink: 0
+            }}>
+              <Calendar size={14} />
+            </div>
+            <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+              Schülervorschau (KW {currentKw})
+            </span>
+          </div>
         </div>
 
-        {activeBooks.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {activeBooks.map(([bookTitle, pages]) => {
-              const formattedPages = formatPageNumbers(pages.map(p => p.num));
-              const textNotes = compressed ? '' : cleanHomeworkNotesText(pages.map(p => p.notes).filter(Boolean).join('\n'));
+        {/* Lehrwerke Books */}
+        {lehrwerkeList.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {lehrwerkeList.map((item, idx) => {
+              const bookColor = getLehrwerkColor(item.title, lehrwerke);
+              const pagesWithNotes = item.pages.filter(p => p.notes && p.notes.trim().length > 0);
+
               return (
-                <div key={bookTitle} style={{
-                  background: '#f8fafc',
-                  padding: '12px 14px',
-                  borderRadius: '14px',
+                <div key={`lw-${idx}`} style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '6px'
+                  gap: '6px',
+                  paddingBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '10px' : '0',
+                  borderBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '1px solid #f1f5f9' : 'none'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                       <div style={{
-                        width: '24px',
-                        height: '30px',
-                        borderRadius: '5px',
-                        background: 'linear-gradient(135deg, #e2e8f0, #cbd5e1)',
+                        width: '28px',
+                        height: '28px',
+                        background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                        borderRadius: '8px',
+                        flexShrink: 0,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        flexShrink: 0
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.06)',
+                        color: bookColor.text
                       }}>
-                        <BookOpen size={13} color="#475569" />
+                        <BookOpen size={14} />
                       </div>
-                      <span style={{ fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                        {bookTitle}
+                      <span style={{
+                        fontSize: '0.94rem',
+                        fontWeight: 850,
+                        color: '#0f172a',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {item.title}
                       </span>
                     </div>
-                    <span style={{
-                      fontSize: '0.84rem',
-                      fontWeight: 850,
-                      color: '#15803d',
-                      background: '#dcfce7',
-                      padding: '3px 10px',
-                      borderRadius: '8px',
-                      flexShrink: 0
-                    }}>
-                      {formattedPages}
-                    </span>
-                  </div>
-                  {!compressed && textNotes && (
-                    <div style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 600, paddingLeft: '34px', lineHeight: '1.4' }}>
-                      {textNotes}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', flexShrink: 0 }}>
+                      {item.pages.map(p => (
+                        <span key={`p-pill-${p.num}`} style={{
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          color: '#15803d',
+                          background: '#dcfce7',
+                          padding: '3px 9px',
+                          borderRadius: '99px'
+                        }}>
+                          S. {p.num}
+                        </span>
+                      ))}
                     </div>
-                  )}
+                  </div>
+
+                  {/* Specific Page Notes (Frameless Editorial Flow) */}
+                  {!compressed && pagesWithNotes.map(p => (
+                    <div key={`p-note-${p.num}`} style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: '6px',
+                      fontSize: '0.80rem',
+                      padding: '2px 0',
+                      marginLeft: '38px'
+                    }}>
+                      <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0 }}>S. {p.num}:</span>
+                      <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.notes}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               );
             })}
           </div>
         )}
 
+        {/* Songs List */}
         {otherHWs.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {otherHWs.map((item, idx) => {
-              const cleanedOtherNote = cleanHomeworkNotesText(item.homework_notes);
+              const songNote = item.homework_notes ? cleanHomeworkNotesText(item.homework_notes) : '';
               return (
-                <div key={idx} style={{
-                  background: '#f8fafc',
-                  padding: '12px 14px',
-                  borderRadius: '14px',
+                <div key={`song-hw-${idx}`} style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '6px'
+                  gap: '6px',
+                  paddingBottom: idx < otherHWs.length - 1 ? '10px' : '0',
+                  borderBottom: idx < otherHWs.length - 1 ? '1px solid #f1f5f9' : 'none'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '6px',
-                      background: '#e0e7ff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <Music size={13} color="#4338ca" />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#4338ca',
+                        flexShrink: 0
+                      }}>
+                        <Music size={14} strokeWidth={2.4} />
+                      </div>
+                      <span style={{
+                        fontSize: '0.94rem',
+                        fontWeight: 850,
+                        color: '#0f172a',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {item.topic_name}
+                      </span>
                     </div>
-                    <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
-                      {item.topic_name}
-                    </span>
                   </div>
-                  {!compressed && cleanedOtherNote && (
-                    <div style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 600, paddingLeft: '34px', lineHeight: '1.4' }}>
-                      {cleanedOtherNote}
+
+                  {/* Specific Song Practice Note (Frameless Editorial Flow) */}
+                  {!compressed && songNote ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: '6px',
+                      fontSize: '0.80rem',
+                      padding: '2px 0',
+                      marginLeft: '38px'
+                    }}>
+                      <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0 }}>📌 Fahrplan:</span>
+                      <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {songNote}
+                      </span>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               );
             })}
           </div>
         )}
 
-        {!compressed && notesList.length > 0 && (() => {
-          let audioCount = 0;
-          const filteredNotes = notesList.filter(note => {
-            const t = (note || '').trim();
-            return !t.includes("STICKER:") && !t.includes("LATENCY:");
-          });
-          if (filteredNotes.length === 0) return null;
-          
-          return (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              borderTop: hasAnyHWItems ? '1px solid #f1f5f9' : 'none',
-              paddingTop: hasAnyHWItems ? '10px' : 0
-            }}>
-              {/* Play-Alongs (Single-line infinite loop carousel) */}
-              {(() => {
-                const audioNotes = filteredNotes.filter(note => (note || '').trim().startsWith("AUDIO:"));
-                if (audioNotes.length === 0) return null;
-                return (
-                  <div style={{ padding: '2px 0', width: '100%', boxSizing: 'border-box' }}>
-                    <AudioTrackCarousel
-                      tracks={audioNotes.map((note, aIdx) => {
-                        const parts = (note || '').trim().substring(6).split('|');
-                        return {
-                          url: parts[0],
-                          duration: parseInt(parts[1] || '0', 10),
-                          label: parts[3] || `Play-Along #${aIdx + 1}`,
-                          idx: aIdx
-                        };
-                      })}
-                      readOnly={true}
-                    />
-                  </div>
-                );
-              })()}
-
-              {filteredNotes.filter(note => !(note || '').trim().startsWith("AUDIO:")).map((note, idx) => {
-                const trimmed = (note || '').trim();
-
-                const isPublic = trimmed.includes('STUDENT_NOTE_PUBLIC:');
-                const isPrivate = trimmed.includes('STUDENT_NOTE_PRIVATE:');
-
-                let cleanText = trimmed;
-                if (isPublic || isPrivate) {
-                  if (cleanText.includes('|')) {
-                    cleanText = cleanText.split('|').slice(1).join('|');
-                  } else {
-                    cleanText = cleanText.replace(/STUDENT_NOTE_PUBLIC:[^\s]*/gi, '').replace(/STUDENT_NOTE_PRIVATE:[^\s]*/gi, '');
-                  }
-                }
-                cleanText = cleanText.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                if (!cleanText) return null;
-
-                if (isPublic) {
-                  return (
-                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.8rem', color: '#166534', fontWeight: 750, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '5px 10px', borderRadius: '8px' }}>
-                      <span style={{ fontSize: '0.85rem' }}>💬</span>
-                      <span>Frage: {cleanText}</span>
-                    </div>
-                  );
-                }
-
-                if (isPrivate) {
-                  return (
-                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.8rem', color: '#dc2626', fontWeight: 750, background: '#fef2f2', border: '1px solid #fecaca', padding: '5px 10px', borderRadius: '8px' }}>
-                      <span style={{ fontSize: '0.85rem' }}>🔒</span>
-                      <span>Notiz: {cleanText}</span>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <FileText size={14} color="#64748b" style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.82rem', color: '#334155', fontWeight: 650 }}>
-                      {cleanText}
-                    </span>
-                  </div>
-                );
+        {/* Audio Carousel */}
+        {!compressed && audioNotes.length > 0 && (
+          <div style={{ padding: '2px 0', width: '100%', boxSizing: 'border-box' }}>
+            <AudioTrackCarousel
+              tracks={audioNotes.map((note, aIdx) => {
+                const parts = (note || '').trim().substring(6).split('|');
+                return {
+                  url: parts[0],
+                  duration: parseInt(parts[1] || '0', 10),
+                  label: parts[3] || `Aufnahme #${aIdx + 1}`,
+                  idx: aIdx
+                };
               })}
-            </div>
-          );
-        })()}
+              readOnly={true}
+            />
+          </div>
+        )}
+
+        {/* General Text Notes */}
+        {!compressed && filteredTextNotes.length > 0 && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            borderTop: hasAnyHWItems || audioNotes.length > 0 ? '1px dashed #e2e8f0' : 'none',
+            paddingTop: hasAnyHWItems || audioNotes.length > 0 ? '8px' : 0
+          }}>
+            {filteredTextNotes.map((note, idx) => {
+              const trimmed = (note || '').trim();
+              const isPublic = trimmed.includes('STUDENT_NOTE_PUBLIC:');
+              const isPrivate = trimmed.includes('STUDENT_NOTE_PRIVATE:');
+
+              let cleanText = trimmed;
+              if (isPublic || isPrivate) {
+                if (cleanText.includes('|')) {
+                  cleanText = cleanText.split('|').slice(1).join('|');
+                } else {
+                  cleanText = cleanText.replace(/STUDENT_NOTE_PUBLIC:[^\s]*/gi, '').replace(/STUDENT_NOTE_PRIVATE:[^\s]*/gi, '');
+                }
+              }
+              cleanText = cleanText.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+              if (!cleanText) return null;
+
+              if (isPublic) {
+                return (
+                  <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.8rem', color: '#166534', fontWeight: 750, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '5px 10px', borderRadius: '8px' }}>
+                    <span style={{ fontSize: '0.85rem' }}>💬</span>
+                    <span>Frage: {cleanText}</span>
+                  </div>
+                );
+              }
+
+              if (isPrivate) {
+                return (
+                  <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.8rem', color: '#dc2626', fontWeight: 750, background: '#fef2f2', border: '1px solid #fecaca', padding: '5px 10px', borderRadius: '8px' }}>
+                    <span style={{ fontSize: '0.85rem' }}>🔒</span>
+                    <span>Notiz: {cleanText}</span>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <FileText size={14} color="#16a34a" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.80rem', color: '#15803d', fontWeight: 850 }}>
+                    Hinweis:
+                  </span>
+                  <span style={{ fontSize: '0.82rem', color: '#334155', fontWeight: 600 }}>
+                    {cleanText}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
 
   const renderLessonInfoCard = (lesson: any, isToday: boolean, nextLesson?: any) => {
+    const teacherObj = lesson?.teacher || lesson?.schedule?.teacher || teachers.find(t => t.id === lesson?.teacher_id || t.id === lesson?.schedule?.teacher_id);
+    const teacherFullName = formatTeacherFullName(teacherObj, (profile as any)?.teacher_name);
+
     if (isToday && lesson) {
       return (
         <div style={{
@@ -4697,7 +5064,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <User size={16} color="#64748b" />
               <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                Mit deiner Lehrkraft
+                Mit {teacherFullName || 'deiner Lehrkraft'}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -4710,6 +5077,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         </div>
       );
     } else if (nextLesson) {
+      const nextTeacherObj = nextLesson?.teacher || nextLesson?.occ?.teacher || nextLesson?.occ?.schedule?.teacher || teachers.find(t => t.id === nextLesson?.teacher_id || t.id === nextLesson?.occ?.teacher_id);
+      const nextTeacherFullName = formatTeacherFullName(nextTeacherObj, (profile as any)?.teacher_name);
       const isShiftedPending = Boolean(nextLesson.needsAck);
       const isShiftedConfirmed = Boolean(!nextLesson.needsAck && (nextLesson.isRescheduled || nextLesson.occ?.status === 'rescheduled_confirmed'));
       const isPendingAdmin = Boolean(nextLesson.isPendingReview && !isShiftedPending && !isShiftedConfirmed);
@@ -4744,7 +5113,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </span>
             ) : null}
           </div>
- 
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {(() => {
               const origTime = (nextLesson.occ?.original_start_time || nextLesson.occ?.schedule?.time_slot || '').substring(0, 5);
@@ -4769,6 +5138,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           (ursprünglich {origTime} Uhr)
                         </span>
                       )}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <User size={16} color="#64748b" />
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
+                      Mit {nextTeacherFullName || 'deiner Lehrkraft'}
                     </span>
                   </div>
 
@@ -5267,66 +5643,151 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
           )}
 
-          {/* Confirm Button */}
-          {!blocked && (
-            <button
-              disabled={pinInput.length === 0 || pinLoading}
-              onClick={handlePinSubmit}
-              style={{
-                width: '100%',
-                padding: '18px',
-                borderRadius: '16px',
-                border: 'none',
-                background: pinInput.length > 0 ? '#34a853' : '#e2e8f0',
-                color: pinInput.length > 0 ? 'white' : '#94a3b8',
-                fontSize: '1rem',
-                fontWeight: 900,
-                cursor: pinInput.length > 0 ? 'pointer' : 'not-allowed',
-                transition: 'background 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px'
-              }}
-            >
-              {pinLoading ? (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={styles.spinnerInline} /> Speichere...
-                </span>
-              ) : (
-                <>
-                  <CheckCircle size={20} /> {pinPurpose === 'setup_initial_pin' ? 'PIN speichern & Ausweis aktivieren' : 'Bestätigen'}
-                </>
-              )}
-            </button>
+          {/* Loading Indicator */}
+          {pinLoading && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '12px',
+              borderRadius: '14px',
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              color: '#16a34a',
+              fontSize: '0.92rem',
+              fontWeight: 800
+            }}>
+              <span style={styles.spinnerInline} />
+              <span>{pinPurpose === 'setup_initial_pin' ? 'Speichere PIN...' : 'PIN wird überprüft & Anmeldung startet...'}</span>
+            </div>
           )}
 
           {pinPurpose !== 'setup_initial_pin' && (
-            <button
-              onClick={() => {
-                setPageState('profile');
-                setPinInput('');
-                setPinError(null);
-              }}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+              <button
+                type="button"
+                onClick={() => setShowForgotPinInfo(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#34a853',
+                  fontSize: '0.85rem',
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  textDecoration: 'underline'
+                }}
+              >
+                PIN vergessen?
+              </button>
+
+              <button
+                disabled={pinLoading}
+                onClick={() => {
+                  setPageState('profile');
+                  setPinInput('');
+                  setPinError(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  border: 'none',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  fontSize: '0.95rem',
+                  fontWeight: 800,
+                  cursor: pinLoading ? 'not-allowed' : 'pointer',
+                  opacity: pinLoading ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <ArrowLeft size={16} /> Abbrechen
+              </button>
+            </div>
+          )}
+
+          {/* Forgot PIN Info Modal */}
+          {showForgotPinInfo && (
+            <div
               style={{
-                width: '100%',
-                padding: '16px',
-                borderRadius: '16px',
-                border: 'none',
-                background: '#f1f5f9',
-                color: '#475569',
-                fontSize: '0.95rem',
-                fontWeight: 800,
-                cursor: 'pointer',
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                backdropFilter: 'blur(12px)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                marginTop: '-14px'
+                zIndex: 99999,
+                padding: '16px'
               }}
+              onClick={() => setShowForgotPinInfo(false)}
             >
-              <ArrowLeft size={16} /> Abbrechen
-            </button>
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '28px 24px',
+                  maxWidth: '420px',
+                  width: '100%',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '18px',
+                  textAlign: 'center'
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div
+                  style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '18px',
+                    background: '#e6f4ea',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto'
+                  }}
+                >
+                  <Key size={28} color="#34a853" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                    PIN vergessen?
+                  </h3>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
+                    Aus Sicherheits- und Datenschutzgründen (DSGVO) kann deine <strong>Lehrkraft</strong> oder das <strong>Schulsekretariat</strong> deine PIN im nächsten Unterricht mit <strong>1 Klick zurücksetzen</strong> und dir sofort einen neuen Onboarding-Link senden.
+                  </p>
+                </div>
+                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                  💡 Dein bisheriger gedruckter QR-Code bleibt dabei zu 100% erhalten.
+                </div>
+                <button
+                  onClick={() => setShowForgotPinInfo(false)}
+                  style={{
+                    background: '#34a853',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '12px',
+                    fontWeight: 800,
+                    fontSize: '0.9rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Verstanden
+                </button>
+              </div>
+            </div>
           )}
 
           <div style={styles.brandFooter}>
@@ -6726,9 +7187,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         inset: 0,
         background: timerRunning ? '#000000' : '#f2f2f7',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: timerRunning ? 'center' : 'flex-start',
         boxSizing: 'border-box',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        padding: timerRunning ? 0 : '24px 16px 48px 16px',
         fontFamily: "'Outfit', 'Urbanist', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif",
         transition: 'background 0.5s ease'
       }}>
@@ -6744,19 +7209,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           .qr-pass-card {
             width: 100%;
-            height: 100%;
             max-width: 440px;
-            max-height: 880px;
+            min-height: auto;
             border-radius: 32px;
             background: #ffffff;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.22), 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.12), 0 10px 25px -5px rgba(0, 0, 0, 0.04);
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
             position: relative;
-            overflow: hidden;
             border: 1px solid rgba(0, 0, 0, 0.06);
             font-family: 'Outfit', 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0 auto;
           }
 
           h1, h2, h3, h4 {
@@ -6766,12 +7230,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           @media (max-width: 640px) {
             .qr-pass-card {
-              max-width: 100vw !important;
-              max-height: 100dvh !important;
-              height: 100dvh !important;
-              border-radius: 0px !important;
+              max-width: 100% !important;
+              border-radius: 28px !important;
               margin: 0 !important;
-              border: none !important;
             }
             button, [role="button"] {
               -webkit-tap-highlight-color: transparent;
@@ -6787,7 +7248,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         <div className="qr-pass-card" style={{ 
           borderRadius: timerRunning ? 0 : '32px',
           background: timerRunning ? '#000000' : '#ffffff',
-          boxShadow: timerRunning ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.22), 0 10px 25px -5px rgba(0, 0, 0, 0.08)',
+          boxShadow: timerRunning ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.12), 0 10px 25px -5px rgba(0, 0, 0, 0.04)',
           border: timerRunning ? 'none' : '1px solid rgba(0, 0, 0, 0.06)'
         }}>
           {/* Header Section with Spectrum Gradient */}
@@ -8831,7 +9292,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         {/* 4. Shoutbox (placed outside the Focus Timer condition so it works on appointments list) */}
         {activeChatOcc && createPortal(
           (() => {
-            const teacherName = activeChatOcc.teacher ? `${activeChatOcc.teacher.first_name || 'Lehrer'} ${activeChatOcc.teacher.last_name || ''}` : 'Lehrkraft';
+            const teacherName = formatTeacherFullName(activeChatOcc.teacher);
             const titleText = `1:1 Shoutbox: ${teacherName}`;
             
             let isFrozen = false;

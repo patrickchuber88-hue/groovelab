@@ -9,8 +9,9 @@ import {
 
 import { renderInstrumentIcon } from '../utils/instruments';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
-import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 import { IDBadgeCard } from './IDBadgeCard';
+import { StudentPinResetModal } from './StudentPinResetModal';
 
 const brandColor = 'var(--primary-color)';
 
@@ -296,33 +297,46 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   }, [isPeerStudent]);
 
-  const handleResetStudentPin = async () => {
-    const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'dieses Schülers';
-    if (!window.confirm(`Möchtest du die PIN von ${sName} wirklich zurücksetzen?\n\nDer Schüler wird beim nächsten App-Aufruf dazu aufgefordert, seinen Geburtstagstag zu bestätigen und eine neue 4-stellige PIN zu vergeben.`)) {
-      return;
-    }
-    try {
-      await supabase.from('activation_days').delete().eq('student_id', student.id);
-      const userResetPayload: any = { 
-        onboarding_pin: null, 
-        personal_pin: null,
-        parent_pin: null,
-        is_pin_activated: false,
-        status: 'offen'
-      };
-      try {
-        await supabase.from('users_raw').update(userResetPayload).eq('id', student.id);
-      } catch (e) {}
-      const { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', student.id);
-      if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
-        delete userResetPayload.onboarding_pin;
-        await supabase.from('users').update(userResetPayload).eq('id', student.id);
-      }
-      await supabase.from('students').update({ onboarding_pin: null, is_pin_activated: false, status: 'offen' }).eq('id', student.id);
-      await supabase.from('pending_students').update({ is_pin_activated: false, status: 'offen' }).eq('id', student.id);
+  const [showPinResetShareModal, setShowPinResetShareModal] = useState(false);
 
-      alert(`Die PIN von ${sName} wurde erfolgreich zurückgesetzt. Das Profil ist für die Neueingabe der PIN freigeschaltet.`);
-      onClose();
+  const handleResetStudentPin = async () => {
+    try {
+      // 1. Try atomic RPC first
+      let rpcOk = false;
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('request_student_pin_reset', {
+          p_student_id: student.id
+        });
+        if (!rpcErr && rpcRes?.success) {
+          rpcOk = true;
+        }
+      } catch (e) {
+        console.warn('request_student_pin_reset RPC notice:', e);
+      }
+
+      // 2. Fallback updates
+      if (!rpcOk) {
+        const userResetPayload: any = { 
+          onboarding_pin: null, 
+          personal_pin: null,
+          parent_pin: null,
+          is_pin_activated: false,
+          status: 'offen'
+        };
+        try {
+          await supabase.from('users_raw').update(userResetPayload).eq('id', student.id);
+        } catch (e) {}
+        const { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', student.id);
+        if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
+          delete userResetPayload.onboarding_pin;
+          await supabase.from('users').update(userResetPayload).eq('id', student.id);
+        }
+        await supabase.from('students').update({ onboarding_pin: null, is_pin_activated: false, status: 'offen' }).eq('id', student.id);
+        await supabase.from('pending_students').update({ is_pin_activated: false, status: 'offen' }).eq('id', student.id);
+      }
+
+      // Open instant link share panel
+      setShowPinResetShareModal(true);
     } catch (err: any) {
       console.error('Fehler beim Zurücksetzen der PIN:', err);
       alert('Fehler beim Zurücksetzen der PIN: ' + err.message);
@@ -1441,7 +1455,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         day_of_week: s.day_of_week,
         status: s.status,
         room: s.rooms?.name || null,
-        teacher: s.teacher ? `${s.teacher.first_name} ${s.teacher.last_name}` : null
+        teacher: s.teacher ? formatTeacherFullName(s.teacher) : null
       })),
       presenceSessions: sessionsList.map((s: any) => ({
         id: s.id,
@@ -1712,7 +1726,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               ${schedulesList.length === 0 ? '<div style="margin-top:4px; color:#64748b; font-style:italic;">Keine Einträge</div>' : `
                 <div style="margin-top:4px; font-size:0.76rem; display:flex; flex-direction:column; gap:4px;">
                   ${schedulesList.map((s: any) => `
-                    <div>&bull; ${getFormattedScheduleDayTime(s.day_of_week, s.time_slot)} (${s.rooms?.name || 'Kein Raum'}) bei ${s.teacher ? `${s.teacher.first_name} ${s.teacher.last_name}` : 'Lehrkraft'} [${s.status}]</div>
+                    <div>&bull; ${getFormattedScheduleDayTime(s.day_of_week, s.time_slot)} (${s.rooms?.name || 'Kein Raum'}) bei ${s.teacher ? formatTeacherFullName(s.teacher) : 'Lehrkraft'} [${s.status}]</div>
                   `).join('')}
                 </div>
               `}
@@ -2734,7 +2748,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                         <span style={{ color: '#cbd5e1' }}>•</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <User size={13} style={{ color: '#94a3b8' }} />
-                          Lehrer: {sched.teacher?.first_name} {sched.teacher?.last_name}
+                          Lehrer: {formatTeacherFullName(sched.teacher)}
                         </span>
                       </div>
                     </div>
@@ -5193,6 +5207,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             </div>
           </div>
         </div>
+      )}
+
+      {/* Student Pin Reset Link Share Modal */}
+      {showPinResetShareModal && (
+        <StudentPinResetModal
+          student={student}
+          onClose={() => setShowPinResetShareModal(false)}
+        />
       )}
     </div>
   );

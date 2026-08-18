@@ -8,7 +8,7 @@ import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
-import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, getGroupTypeLabel, sanitizeBirthDateToDayOnly } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, getGroupTypeLabel, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
@@ -1880,7 +1880,7 @@ export function TeacherDashboard({
 
       // Fallback: direct Supabase swap
       const status = color === 'GREEN' ? 'approved' : 'pending_parent_approval';
-      const teacherName = teacher ? `${teacher.first_name} ${teacher.last_name}` : 'dein Lehrer';
+      const teacherName = teacher ? formatTeacherFullName(teacher) : 'dein Lehrer';
 
       // Direct push triggering helper for fallback
       const triggerFallbackPush = async (studentId: string, title: string, body: string, metadata: any) => {
@@ -2080,7 +2080,7 @@ export function TeacherDashboard({
         await supabase.from('crisis_notifications').insert(notifs);
       }
 
-      const alertMessage = `🚨 LEHRER-KRANKHEIT: Lehrkraft ${teacherProfile.first_name} ${teacherProfile.last_name} hat sich für heute krankgemeldet.`;
+      const alertMessage = `🚨 LEHRER-KRANKHEIT: Lehrkraft ${formatTeacherFullName(teacherProfile)} hat sich für heute krankgemeldet.`;
       await supabase.from('system_alerts').insert({
         school_id: teacherProfile.school_id,
         teacher_id: userId,
@@ -2331,8 +2331,8 @@ export function TeacherDashboard({
 
       // Add Secretary alarm ticket
       const alertMessage = prevSickUntilStr
-        ? `🚨 KRANKHEITS-ANPASSUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat den Krankmeldungszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`
-        : `🚨 NEUE KRANKMELDUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankgemeldet.`;
+        ? `🚨 KRANKHEITS-ANPASSUNG: Lehrkraft ${formatTeacherFullName(profile)} hat den Krankmeldungszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`
+        : `🚨 NEUE KRANKMELDUNG: Lehrkraft ${formatTeacherFullName(profile)} hat sich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankgemeldet.`;
 
       await supabase
         .from('system_alerts')
@@ -2498,7 +2498,7 @@ export function TeacherDashboard({
 
       // Add healthy notice to system alerts with logged duration
       const durationStr = daysDiff > 0 ? ` (Krankheitsdauer: vom ${formattedStartDate} bis zum ${formattedEndDate}, ${daysDiff} ${daysDiff === 1 ? 'Tag' : 'Tage'})` : '';
-      const alertMessage = `🍏 LEHRKRAFT GESUND: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich wieder gesund gemeldet.${durationStr}`;
+      const alertMessage = `🍏 LEHRKRAFT GESUND: Lehrkraft ${formatTeacherFullName(profile)} hat sich wieder gesund gemeldet.${durationStr}`;
       await supabase
         .from('system_alerts')
         .insert({

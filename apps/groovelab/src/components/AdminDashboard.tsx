@@ -17,7 +17,7 @@ import { CampusEventsBoard } from './CampusEventsBoard';
 import { CampusSetupScreen } from './CampusSetupScreen';
 import { StudioAvatar } from './StudioAvatar';
 import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
-import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { AVVModal } from './AVVModal';
@@ -3806,7 +3806,7 @@ export function AdminDashboard({
     if (!studentToDelete) return;
 
     const teacher = teachers.find(t => t.id === studentToDelete.teacher_id);
-    const teacherName = teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : undefined;
+    const teacherName = teacher ? formatTeacherFullName(teacher) : undefined;
     const studentName = `${studentToDelete.first_name || ''} ${studentToDelete.last_name || ''}`.trim() || 'Schüler';
 
     setDeleteStudentModalData({
@@ -5191,7 +5191,7 @@ export function AdminDashboard({
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <span style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coach</span>
-                          <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 850 }}>{band.coach.first_name} {band.coach.last_name ? band.coach.last_name[0] + '.' : ''}</span>
+                          <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 850 }}>{band.coach.first_name} {band.coach.last_name || ''}</span>
                         </div>
                       </div>
                     ) : (
@@ -7127,8 +7127,8 @@ export function AdminDashboard({
         }
 
         const teacherName = s.teacher 
-          ? `${s.teacher.first_name || ''} ${s.teacher.last_name || ''}`.trim()
-          : (s.teacher_name || 'Lehrer');
+          ? formatTeacherFullName(s.teacher)
+          : (s.teacher_name ? formatTeacherFullName(s.teacher_name) : 'Lehrer');
 
         activeLessons.push({
           teacherId: s.teacher_id || 'unknown',
@@ -7153,7 +7153,7 @@ export function AdminDashboard({
         const endMin = startMin + durationMin;
 
         const teacherName = occ.teacher 
-          ? `${occ.teacher.first_name || ''} ${occ.teacher.last_name || ''}`.trim()
+          ? formatTeacherFullName(occ.teacher)
           : 'Lehrer';
 
         activeLessons.push({

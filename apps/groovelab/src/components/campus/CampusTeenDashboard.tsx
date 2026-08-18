@@ -4,7 +4,7 @@ import {
   Check, Volume2, Mic, Calendar, Trophy, Music, Sliders, X, ArrowRight
 } from 'lucide-react';
 import Confetti from 'react-confetti';
-import { ALL_STICKERS } from '../MeisterwerkDocumentationModal';
+import { ALL_STICKERS, getUnifiedStickersMap } from '../MeisterwerkDocumentationModal';
 import { SimpleVoiceRecorder } from './SimpleVoiceRecorder';
 import { cleanHomeworkNotesText } from '../../utils/nameHelper';
 
@@ -186,23 +186,23 @@ export const CampusTeenDashboard: React.FC<CampusTeenDashboardProps> = ({
     });
   }, [progressItems, studentUser]);
 
-  // Unlocked Sticker Calculation (100% Unified with Level 3)
+  // Unlocked Sticker Calculation (100% Unified across all levels)
+  const unlockedStickersMap = useMemo(() => {
+    return getUnifiedStickersMap({
+      practiceMinutes: totalPracticeMinutes,
+      xp: currentXp,
+      streakDays,
+      progressItems: progressItems || []
+    });
+  }, [totalPracticeMinutes, currentXp, streakDays, progressItems]);
+
   const unlockedStickerIds = useMemo(() => {
     const ids = new Set<string>();
-    if (totalPracticeMinutes >= 50) ids.add('fleiss-pionier');
-    if (totalPracticeMinutes >= 250) ids.add('uebe-meister');
-    if (totalPracticeMinutes >= 1000) ids.add('uebe-legende');
-    if (totalPracticeMinutes >= 2000) ids.add('uebe-grossmeister');
-    if (currentXp >= 250) ids.add('xp-sammler');
-    if (currentXp >= 1000) ids.add('xp-champion');
-    if (currentXp >= 2500) ids.add('xp-meister');
-    if (currentXp >= 5000) ids.add('xp-legende');
-    if (streakDays >= 3) ids.add('dranbleiber');
-    if (streakDays >= 7) ids.add('wochen-held');
-    if (streakDays >= 21) ids.add('streak-koenig');
-    if (streakDays >= 30) ids.add('streak-kaiser');
+    Object.keys(unlockedStickersMap).forEach(id => {
+      if (unlockedStickersMap[id].isUnlocked) ids.add(id);
+    });
     return ids;
-  }, [totalPracticeMinutes, currentXp, streakDays]);
+  }, [unlockedStickersMap]);
 
   // Next lesson details
   const nextLessonInfo = useMemo(() => {
