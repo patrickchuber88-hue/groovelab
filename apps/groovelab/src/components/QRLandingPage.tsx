@@ -4490,214 +4490,267 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   const renderHomeworkWidget = (compressed = false) => {
-    // 1. Gather all active Lehrwerk books & pages from localProgress & progressItems
-    const activeBooksMap: Record<string, { num: number; notes: string; status: string }[]> = {};
+    const studentId = profile?.id;
+    const currentWeek = (() => {
+      try {
+        const iso = getISOWeek(new Date());
+        return iso;
+      } catch {
+        return '2026-W34';
+      }
+    })();
+    const currentKw = (() => {
+      try {
+        return currentWeek.split('-W')[1] || '34';
+      } catch {
+        return '34';
+      }
+    })();
 
-    // 1a. From localProgress (offline/cached assignments)
+    const getNormSong = (skillOrItem: any): string => {
+      if (!skillOrItem) return '';
+      if (typeof skillOrItem === 'string') {
+        return skillOrItem.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
+      }
+      const topic = skillOrItem.topic_name || '';
+      if (topic.includes(' - Seite ') || topic.startsWith('Hausaufgabe KW ')) {
+        return '';
+      }
+      if (topic) {
+        return topic.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
+      }
+      const artist = (skillOrItem.songs?.artist || skillOrItem.artist || '').trim();
+      const title = (skillOrItem.songs?.title || skillOrItem.song_title || skillOrItem.title || '').trim();
+      if (artist && title) return `${artist} - ${title}`.toLowerCase();
+      return (title || artist).toLowerCase();
+    };
+
+    const getCanKey = (skillOrItem: any): string => {
+      const raw = getNormSong(skillOrItem);
+      if (!raw) return '';
+      if (raw.includes(' - ')) {
+        return raw.split(' - ')[1].trim().toLowerCase();
+      }
+      return raw.trim().toLowerCase();
+    };
+
+    const cleanPageNotesText = (notes: any): string => {
+      if (!notes) return '';
+      let text = '';
+      if (typeof notes === 'string') {
+        if (notes.startsWith('[') || notes.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(notes);
+            if (Array.isArray(parsed)) {
+              text = parsed.join('\n');
+            } else {
+              text = String(parsed);
+            }
+          } catch {
+            text = notes;
+          }
+        } else {
+          text = notes;
+        }
+      } else if (Array.isArray(notes)) {
+        text = notes.join('\n');
+      } else {
+        text = String(notes);
+      }
+      return text
+        .split('\n')
+        .filter((line: string) => {
+          const trimmed = line.trim();
+          return !trimmed.startsWith('AUDIO:') && 
+                 !trimmed.startsWith('STICKER:') && 
+                 !trimmed.startsWith('LOOP:') &&
+                 !trimmed.startsWith('LATENCY:') &&
+                 !trimmed.startsWith('STUDENT_NOTE_PUBLIC:') && 
+                 !trimmed.startsWith('STUDENT_NOTE_PRIVATE:');
+        })
+        .join('\n')
+        .trim();
+    };
+
+    // 1. Deduplicate progressItems strictly for the current student profile
+    const uniqueItemsMap = new Map<string, any>();
+    (progressItems || []).forEach(item => {
+      if (!item) return;
+      if (studentId && item.student_id && String(item.student_id) !== String(studentId)) return;
+      const canonicalKey = getCanKey(item);
+      const normTitle = getNormSong(item);
+      const name = canonicalKey || normTitle || (item.topic_name || '').trim().toLowerCase();
+      if (name && !uniqueItemsMap.has(name)) {
+        uniqueItemsMap.set(name, item);
+      }
+    });
+    const deduplicatedItems = Array.from(uniqueItemsMap.values());
+
+    const activeHWs = deduplicatedItems.filter(item => {
+      if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+        const parts = item.topic_name.split(' - Seite ');
+        const bookTitle = parts[0].trim();
+        const pageNum = parseInt(parts[1], 10);
+        const book = lehrwerke.find(g => g.title === bookTitle);
+        if (book) {
+          const assignment = (localProgress || []).find((a: any) => 
+            (String(a.lehrwerkId) === String(book.id) || String(a.lehrwerk_id) === String(book.id)) && 
+            (!studentId || String(a.studentId || a.student_id) === String(studentId))
+          );
+          const pageState = assignment?.pageStates?.[pageNum];
+          return pageState?.status === 'homework' || pageState?.isCurrentHomework || pageState?.is_current_homework;
+        }
+      }
+      const localHw = studentId ? (
+        localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+        (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null)
+      ) : null;
+      if (localHw === 'false') return false;
+      const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(item.is_current_homework));
+      return isHw && !item.topic_name?.startsWith('Hausaufgabe KW ');
+    });
+
+    const activeTheories = deduplicatedItems.filter(item => {
+      if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+        const parts = item.topic_name.split(' - Seite ');
+        const bookTitle = parts[0].trim();
+        const pageNum = parseInt(parts[1], 10);
+        const book = lehrwerke.find(g => g.title === bookTitle);
+        if (book) {
+          const assignment = (localProgress || []).find((a: any) => 
+            (String(a.lehrwerkId) === String(book.id) || String(a.lehrwerk_id) === String(book.id)) && 
+            (!studentId || String(a.studentId || a.student_id) === String(studentId))
+          );
+          const pageState = assignment?.pageStates?.[pageNum];
+          return pageState?.status === 'purple';
+        }
+      }
+      return item.status === 'THEORY_DONE' && 
+             item.updated_at && 
+             getISOWeek(new Date(item.updated_at)) === currentWeek &&
+             !item.topic_name?.startsWith('Hausaufgabe KW ');
+    });
+
+    const groupedLehrwerke: Record<string, { pages: number[] }> = {};
+    const otherHWs: any[] = [];
+
     (localProgress || []).forEach((assignment: any) => {
       const assignStdId = String(assignment.studentId || assignment.student_id || '');
-      if (assignStdId !== String(profile?.id) || !assignment.pageStates) return;
-      const assignBookId = String(assignment.lehrwerkId || assignment.lehrwerk_id || '');
-      const book = lehrwerke.find(g => String(g.id) === assignBookId);
-      if (!book) return;
+      if (studentId && assignStdId && assignStdId !== String(studentId)) return;
+
+      const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId || assignment.lehrwerk_id));
+      if (!book || !assignment.pageStates) return;
 
       Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
         if (pState?.status === 'homework' || pState?.isCurrentHomework || pState?.is_current_homework) {
           const pageNum = parseInt(pNumStr, 10);
           if (!isNaN(pageNum)) {
-            if (!activeBooksMap[book.title]) {
-              activeBooksMap[book.title] = [];
+            if (!groupedLehrwerke[book.title]) {
+              groupedLehrwerke[book.title] = { pages: [] };
             }
-            if (!activeBooksMap[book.title].some(p => p.num === pageNum)) {
-              let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
-              if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-                try {
-                  const parsed = JSON.parse(cleanNote);
-                  if (Array.isArray(parsed)) {
-                    cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                  }
-                } catch {}
-              }
-              cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-              activeBooksMap[book.title].push({
-                num: pageNum,
-                notes: cleanNote,
-                status: pState.status || 'homework'
-              });
+            if (!groupedLehrwerke[book.title].pages.includes(pageNum)) {
+              groupedLehrwerke[book.title].pages.push(pageNum);
             }
           }
         }
       });
     });
 
-    // 1b. From progressItems (Supabase database rows)
-    const otherHWs: any[] = [];
-    const latestHwEntry = (progressItems || []).find((i: any) => i && i.topic_name && i.topic_name.startsWith('Hausaufgabe KW '));
-    const latestWeek = latestHwEntry ? getItemWeek(latestHwEntry) : getISOWeek(new Date());
-
-    (progressItems || []).forEach(item => {
-      if (!item) return;
-      const tName = item.topic_name || '';
-      if (tName.startsWith('Hausaufgabe KW ')) return;
-
-      if (tName.includes(' - Seite ')) {
-        const parts = tName.split(' - Seite ');
+    const allActive = [...activeHWs, ...activeTheories];
+    allActive.forEach(item => {
+      if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+        const parts = item.topic_name.split(' - Seite ');
         const bookTitle = parts[0].trim();
+        const book = lehrwerke.find(g => g.title === bookTitle);
+        const isBookAssigned = book && (localProgress || []).some((a: any) => 
+          (String(a.lehrwerkId) === String(book.id) || String(a.lehrwerk_id) === String(book.id)) && 
+          (!studentId || String(a.studentId || a.student_id) === String(studentId))
+        );
+        if (!isBookAssigned && lehrwerke.length > 0) return;
+
         const pageNum = parseInt(parts[1], 10);
-        if (!activeBooksMap[bookTitle]) {
-          activeBooksMap[bookTitle] = [];
+        if (!groupedLehrwerke[bookTitle]) {
+          groupedLehrwerke[bookTitle] = { pages: [] };
         }
-        if (!isNaN(pageNum) && !activeBooksMap[bookTitle].some(p => p.num === pageNum)) {
-          let cleanNote = item.homework_notes || '';
-          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
-            try {
-              const parsed = JSON.parse(cleanNote);
-              if (Array.isArray(parsed)) {
-                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-              }
-            } catch {}
-          }
-          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-          activeBooksMap[bookTitle].push({
-            num: pageNum,
-            notes: cleanNote,
-            status: item.status || 'homework'
-          });
+        if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
+          groupedLehrwerke[bookTitle].pages.push(pageNum);
         }
       } else {
-        let localHw: string | null = null;
-        let cachedNote: string = item.homework_notes || '';
+        const localHw = studentId ? (
+          localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+          (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null)
+        ) : null;
+        if (localHw === 'false') return;
 
-        if (profile?.id) {
-          localHw = localStorage.getItem(`song_hw_${profile.id}_${item.id}`) ?? (item.song_id ? localStorage.getItem(`song_hw_${profile.id}_${item.song_id}`) : null);
-          if (!cachedNote) {
-            cachedNote = localStorage.getItem(`song_note_${profile.id}_${item.id}`) || (item.song_id ? localStorage.getItem(`song_note_${profile.id}_${item.song_id}`) : '') || '';
+        const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(item.is_current_homework));
+        if (!isHw) return;
+
+        const cleanTopic = getNormSong(item);
+        const canKey = getCanKey(item);
+        if (cleanTopic && !otherHWs.some(existing => getCanKey(existing) === canKey || getNormSong(existing) === cleanTopic)) {
+          let cachedNote = '';
+          if (studentId) {
+            cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
+                         (item.song_id ? localStorage.getItem(`song_note_${studentId}_${item.song_id}`) : '') ||
+                         item.homework_notes || '';
+          } else {
+            cachedNote = item.homework_notes || '';
           }
-        }
-
-        if (localHw === null || !cachedNote) {
-          try {
-            for (let k = 0; k < localStorage.length; k++) {
-              const key = localStorage.key(k);
-              if (!key) continue;
-              if (localHw === null && key.startsWith('song_hw_') && (key.endsWith(`_${item.id}`) || (item.song_id && key.endsWith(`_${item.song_id}`)))) {
-                localHw = localStorage.getItem(key);
-              }
-              if (!cachedNote && key.startsWith('song_note_') && (key.endsWith(`_${item.id}`) || (item.song_id && key.endsWith(`_${item.song_id}`)))) {
-                cachedNote = localStorage.getItem(key) || '';
-              }
-            }
-          } catch {}
-        }
-
-        let isSongHw = false;
-        if (localHw === 'true') {
-          isSongHw = true;
-        } else if (localHw === 'false') {
-          isSongHw = false;
-        } else {
-          const itemWeek = getItemWeek(item);
-          const isCurrentWeek = Boolean(itemWeek && itemWeek === latestWeek) || (item.updated_at && getISOWeek(item.updated_at) === latestWeek);
-          const hasActiveNote = Boolean(cachedNote && cachedNote.trim().length > 0);
-          isSongHw = Boolean(item.is_current_homework) && isCurrentWeek && hasActiveNote;
-        }
-
-        if (isSongHw) {
-          const cleanT = (item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
-          if (cleanT && !otherHWs.some(existing => (existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase() === cleanT.toLowerCase())) {
-            if (typeof cachedNote === 'string' && (cachedNote.startsWith('[') || cachedNote.startsWith('{'))) {
-              try {
-                const parsed = JSON.parse(cachedNote);
-                if (Array.isArray(parsed)) {
-                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-                }
-              } catch {}
-            }
-            cachedNote = String(cachedNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-            otherHWs.push({
-              ...item,
-              topic_name: cleanT,
-              homework_notes: cachedNote
-            });
-          }
-        }
-      }
-    });
-
-    // 1c. From activeSongSkills (localStorage sync)
-    (activeSongSkills || []).forEach(skill => {
-      let localHw: string | null = null;
-      let cachedNote: string = skill.homework_notes || '';
-
-      if (profile?.id) {
-        localHw = localStorage.getItem(`song_hw_${profile.id}_${skill.id}`) ??
-                  (skill.song_id ? localStorage.getItem(`song_hw_${profile.id}_${skill.song_id}`) : null) ??
-                  (skill.songs?.id ? localStorage.getItem(`song_hw_${profile.id}_${skill.songs.id}`) : null);
-        if (!cachedNote) {
-          cachedNote = localStorage.getItem(`song_note_${profile.id}_${skill.id}`) ||
-                       (skill.song_id ? localStorage.getItem(`song_note_${profile.id}_${skill.song_id}`) : '') ||
-                       (skill.songs?.id ? localStorage.getItem(`song_note_${profile.id}_${skill.songs.id}`) : '') || '';
-        }
-      }
-
-      if (localHw === null || !cachedNote) {
-        try {
-          for (let k = 0; k < localStorage.length; k++) {
-            const key = localStorage.key(k);
-            if (!key) continue;
-            if (localHw === null && key.startsWith('song_hw_') && (key.endsWith(`_${skill.id}`) || (skill.song_id && key.endsWith(`_${skill.song_id}`)) || (skill.songs?.id && key.endsWith(`_${skill.songs.id}`)))) {
-              localHw = localStorage.getItem(key);
-            }
-            if (!cachedNote && key.startsWith('song_note_') && (key.endsWith(`_${skill.id}`) || (skill.song_id && key.endsWith(`_${skill.song_id}`)) || (skill.songs?.id && key.endsWith(`_${skill.songs.id}`)))) {
-              cachedNote = localStorage.getItem(key) || '';
-            }
-          }
-        } catch {}
-      }
-
-      const isHw = localHw === 'true';
-
-      if (isHw) {
-        const songArtist = skill.songs?.artist || skill.artist || '';
-        const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-        const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-        const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-        const cleanT = fullTitle.replace(/\s*\([^)]*\)\s*$/, '').trim();
-
-        if (cleanT && !otherHWs.some(existing => (existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase() === cleanT.toLowerCase())) {
-          if (typeof cachedNote === 'string' && (cachedNote.startsWith('[') || cachedNote.startsWith('{'))) {
-            try {
-              const parsed = JSON.parse(cachedNote);
-              if (Array.isArray(parsed)) {
-                cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
-              }
-            } catch {}
-          }
-          cachedNote = String(cachedNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
           otherHWs.push({
-            id: skill.id,
-            song_id: skill.song_id || skill.songs?.id,
-            topic_name: cleanT,
-            title: cleanT,
-            is_current_homework: true,
-            status: 'IN_PROGRESS',
+            ...item,
+            topic_name: item.topic_name || item.title || cleanTopic,
             homework_notes: cachedNote
           });
         }
       }
     });
 
-    const lehrwerkeList = Object.entries(activeBooksMap).map(([title, pages]) => {
-      pages.sort((a, b) => a.num - b.num);
-      return { title, pages };
+    // Also check activeSongSkills with localStorage backup for instant sync (strict per-student check)
+    if (studentId) {
+      (activeSongSkills || []).forEach(skill => {
+        if (skill.user_id && String(skill.user_id) !== String(studentId)) return;
+        if (skill.songs && skill.songs.is_campus_active === false) return;
+
+        const skillId = skill.id;
+        const songId = skill.song_id || skill.songs?.id;
+        const localHw = localStorage.getItem(`song_hw_${studentId}_${skillId}`) ??
+                        (songId ? localStorage.getItem(`song_hw_${studentId}_${songId}`) : null);
+
+        const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
+        if (!isHw) return;
+
+        const cleanTopic = getNormSong(skill);
+        const canKey = getCanKey(skill);
+        const alreadyExists = otherHWs.some(existing => 
+          getCanKey(existing) === canKey || getNormSong(existing) === cleanTopic
+        );
+        if (!alreadyExists) {
+          const songArtist = skill.songs?.artist || skill.artist || '';
+          const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+          const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
+          const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+          const cachedNote = localStorage.getItem(`song_note_${studentId}_${skillId}`) ||
+                             (songId ? localStorage.getItem(`song_note_${studentId}_${songId}`) : '') ||
+                             skill.homework_notes || '';
+          otherHWs.push({
+            id: skill.id,
+            song_id: songId,
+            topic_name: fullTitle,
+            is_current_homework: true,
+            status: 'IN_PROGRESS',
+            homework_notes: cachedNote
+          });
+        }
+      });
+    }
+
+    const lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => {
+      info.pages.sort((a: number, b: number) => a - b);
+      return { title, pages: info.pages };
     });
 
-    // 2. Gather all Homework Text Notes & Audio Play-Alongs across all sources
+    // Gather all Notes & Audio Play-Alongs
     const allNotesList: string[] = [];
-
-    // 2a. From progressItems
     (progressItems || []).forEach(item => {
       if (item.homework_notes && item.homework_notes.trim()) {
         try {
@@ -4723,10 +4776,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       }
     });
 
-    // 2b. From localStorage fallback caches (homework notes only)
     try {
-      if (profile?.id) {
-        const cachedHwStr = localStorage.getItem(`campus_homework_notes_${profile.id}`);
+      if (studentId) {
+        const cachedHwStr = localStorage.getItem(`campus_homework_notes_${studentId}`);
         if (cachedHwStr) {
           if (cachedHwStr.startsWith('[') && cachedHwStr.endsWith(']')) {
             const parsed = JSON.parse(cachedHwStr);
@@ -4753,286 +4805,319 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return !t.startsWith("AUDIO:") && !t.includes("STICKER:") && !t.includes("LATENCY:");
     });
 
-    if (lehrwerkeList.length === 0 && otherHWs.length === 0 && notesList.length === 0) {
+    const hasAnyHWItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || filteredTextNotes.length > 0;
+
+    if (!hasAnyHWItems) {
       return (
         <div style={{
-          background: 'rgba(255, 255, 255, 0.75)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          padding: '16px 12px',
+          background: '#ffffff',
+          borderRadius: '14px',
           border: '1.5px dashed #cbd5e1',
-          borderRadius: '24px',
-          padding: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
           textAlign: 'center',
-          color: '#64748b'
+          boxSizing: 'border-box'
         }}>
-          <p style={{ margin: 0, fontSize: '0.85rem', fontStyle: 'italic', fontWeight: 650 }}>
-            Keine aktuellen Hausaufgaben erfasst
-          </p>
+          <span style={{ fontSize: '1.1rem' }}>📖</span>
+          <span style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 650 }}>
+            Noch keine Aufgaben für KW {currentKw} erfasst.
+          </span>
         </div>
       );
     }
 
-    const hasAnyHWItems = lehrwerkeList.length > 0 || otherHWs.length > 0;
-    const currentKw = (() => {
-      try {
-        const iso = getISOWeek(new Date());
-        return iso.replace(/^[0-9]+-W?/, '') || '34';
-      } catch {
-        return '34';
-      }
-    })();
-
     return (
       <div style={{
-        ...styles.card,
-        padding: '20px',
-        gap: '14px',
+        borderRadius: '20px',
         background: '#ffffff',
-        borderRadius: '24px',
-        boxShadow: '0 8px 24px -4px rgba(0,0,0,0.06)',
-        border: '1px solid rgba(0, 0, 0, 0.04)'
+        border: '1px solid rgba(0, 0, 0, 0.06)',
+        padding: '16px 18px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03)',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
-        {/* Header: Schülervorschau (KW XX) matching Master Blueprint */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* Preview Header Bar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{
               width: '24px',
               height: '24px',
-              borderRadius: '6px',
-              background: '#dcfce7',
+              borderRadius: '7px',
+              background: '#34a853',
+              color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#16a34a',
-              flexShrink: 0
+              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)'
             }}>
-              <Calendar size={14} />
+              <Calendar size={13} strokeWidth={2.5} />
             </div>
-            <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
               Schülervorschau (KW {currentKw})
             </span>
           </div>
         </div>
 
-        {/* Lehrwerke Books */}
-        {lehrwerkeList.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {lehrwerkeList.map((item, idx) => {
-              const bookColor = getLehrwerkColor(item.title, lehrwerke);
-              const pagesWithNotes = item.pages.filter(p => p.notes && p.notes.trim().length > 0);
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '2px 0' }}>
+          {/* Lehrwerke Books */}
+          {lehrwerkeList.map((item, idx) => {
+            const bookColor = getLehrwerkColor(item.title, lehrwerke);
+            const bookObj = lehrwerke.find(b => b.title === item.title);
+            const assignedBook = bookObj ? (localProgress || []).find((a: any) => 
+              (String(a.lehrwerkId) === String(bookObj.id) || String(a.lehrwerk_id) === String(bookObj.id)) && 
+              (!studentId || String(a.studentId || a.student_id) === String(studentId))
+            ) : null;
 
-              return (
-                <div key={`lw-${idx}`} style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  paddingBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '10px' : '0',
-                  borderBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '1px solid #f1f5f9' : 'none'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                      <div style={{
-                        width: '28px',
-                        height: '28px',
-                        background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                        borderRadius: '8px',
-                        flexShrink: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.06)',
-                        color: bookColor.text
-                      }}>
-                        <BookOpen size={14} />
-                      </div>
-                      <span style={{
-                        fontSize: '0.94rem',
-                        fontWeight: 850,
-                        color: '#0f172a',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {item.title}
-                      </span>
+            const pagesWithNotes = assignedBook ? item.pages.filter((p: number) => {
+              const pState = assignedBook.pageStates?.[p];
+              if (pState && cleanPageNotesText(pState.homeworkNotes || pState.homework_notes) !== '') return true;
+              const dbItem = allActive.find(x => x.topic_name === `${item.title} - Seite ${p}`);
+              if (dbItem && cleanPageNotesText(dbItem.homework_notes) !== '') return true;
+              return false;
+            }) : [];
+
+            return (
+              <div key={`lw-${idx}`} style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+                paddingBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '10px' : '0',
+                borderBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '1px solid rgba(0, 0, 0, 0.06)' : 'none'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                    <div style={{
+                      width: '26px',
+                      height: '30px',
+                      background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                      borderRadius: '6px',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
+                      color: bookColor.text
+                    }}>
+                      <BookOpen size={13} color={bookColor.text} />
                     </div>
+                    <span style={{
+                      fontSize: '0.90rem',
+                      fontWeight: 850,
+                      color: '#0f172a',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {item.title}
+                    </span>
+                  </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', flexShrink: 0 }}>
-                      {item.pages.map(p => (
-                        <span key={`p-pill-${p.num}`} style={{
-                          fontSize: '0.74rem',
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    {/* Granular Page Badges */}
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      {item.pages.map((p: number) => (
+                        <span key={`p-pill-${p}`} style={{
+                          fontSize: '0.72rem',
                           fontWeight: 800,
                           color: '#15803d',
                           background: '#dcfce7',
-                          padding: '3px 9px',
-                          borderRadius: '99px'
+                          padding: '3px 8px',
+                          borderRadius: '99px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
                         }}>
-                          S. {p.num}
+                          S. {p}
                         </span>
                       ))}
                     </div>
                   </div>
-
-                  {/* Specific Page Notes (Frameless Editorial Flow) */}
-                  {!compressed && pagesWithNotes.map(p => (
-                    <div key={`p-note-${p.num}`} style={{
-                      display: 'flex',
-                      alignItems: 'baseline',
-                      gap: '6px',
-                      fontSize: '0.80rem',
-                      padding: '2px 0',
-                      marginLeft: '38px'
-                    }}>
-                      <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0 }}>S. {p.num}:</span>
-                      <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {p.notes}
-                      </span>
-                    </div>
-                  ))}
                 </div>
-              );
-            })}
-          </div>
-        )}
 
-        {/* Songs List */}
-        {otherHWs.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {otherHWs.map((item, idx) => {
-              const songNote = item.homework_notes ? cleanHomeworkNotesText(item.homework_notes) : '';
-              return (
-                <div key={`song-hw-${idx}`} style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  paddingBottom: idx < otherHWs.length - 1 ? '10px' : '0',
-                  borderBottom: idx < otherHWs.length - 1 ? '1px solid #f1f5f9' : 'none'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                      <div style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '8px',
-                        background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#4338ca',
-                        flexShrink: 0
-                      }}>
-                        <Music size={14} strokeWidth={2.4} />
+                {/* Specific Page Notes (Frameless Editorial Flow) */}
+                {!compressed && pagesWithNotes.map((p: number) => {
+                  const pState = assignedBook?.pageStates?.[p];
+                  let noteText = cleanPageNotesText(pState?.homeworkNotes || pState?.homework_notes);
+                  if (!noteText) {
+                    const dbItem = allActive.find(x => x.topic_name === `${item.title} - Seite ${p}`);
+                    if (dbItem?.homework_notes) {
+                      noteText = cleanPageNotesText(dbItem.homework_notes);
+                    }
+                  }
+
+                  return (
+                    <div key={`p-note-${p}`} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                      fontSize: '0.78rem',
+                      padding: '2px 0',
+                      marginLeft: '36px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
+                        <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0 }}>S. {p}:</span>
+                        <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {noteText}
+                        </span>
                       </div>
-                      <span style={{
-                        fontSize: '0.94rem',
-                        fontWeight: 850,
-                        color: '#0f172a',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+
+          {/* Songs List */}
+          {otherHWs.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {otherHWs.map((item, idx) => {
+                const songNote = cleanPageNotesText(item.homework_notes);
+                return (
+                  <div key={`song-hw-${idx}`} style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    paddingBottom: idx < otherHWs.length - 1 ? '10px' : '0',
+                    borderBottom: idx < otherHWs.length - 1 ? '1px solid rgba(0, 0, 0, 0.06)' : 'none'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                        <div style={{
+                          width: '26px',
+                          height: '26px',
+                          borderRadius: '8px',
+                          background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#4338ca',
+                          flexShrink: 0
+                        }}>
+                          <Music size={13} strokeWidth={2.4} />
+                        </div>
+                        <span style={{
+                          fontSize: '0.90rem',
+                          fontWeight: 850,
+                          color: '#0f172a',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {(item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, '')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Specific Song Practice Note (Frameless Editorial Flow) */}
+                    {!compressed && songNote ? (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: '6px',
+                        fontSize: '0.78rem',
+                        padding: '2px 0',
+                        marginLeft: '36px'
                       }}>
-                        {item.topic_name}
-                      </span>
-                    </div>
+                        <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0 }}>📌 Fahrplan:</span>
+                        <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {songNote}
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
-
-                  {/* Specific Song Practice Note (Frameless Editorial Flow) */}
-                  {!compressed && songNote ? (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'baseline',
-                      gap: '6px',
-                      fontSize: '0.80rem',
-                      padding: '2px 0',
-                      marginLeft: '38px'
-                    }}>
-                      <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0 }}>📌 Fahrplan:</span>
-                      <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {songNote}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Audio Carousel */}
-        {!compressed && audioNotes.length > 0 && (
-          <div style={{ padding: '2px 0', width: '100%', boxSizing: 'border-box' }}>
-            <AudioTrackCarousel
-              tracks={audioNotes.map((note, aIdx) => {
-                const parts = (note || '').trim().substring(6).split('|');
-                return {
-                  url: parts[0],
-                  duration: parseInt(parts[1] || '0', 10),
-                  label: parts[3] || `Aufnahme #${aIdx + 1}`,
-                  idx: aIdx
-                };
+                );
               })}
-              readOnly={true}
-            />
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* General Text Notes */}
-        {!compressed && filteredTextNotes.length > 0 && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-            borderTop: hasAnyHWItems || audioNotes.length > 0 ? '1px dashed #e2e8f0' : 'none',
-            paddingTop: hasAnyHWItems || audioNotes.length > 0 ? '8px' : 0
-          }}>
-            {filteredTextNotes.map((note, idx) => {
-              const trimmed = (note || '').trim();
-              const isPublic = trimmed.includes('STUDENT_NOTE_PUBLIC:');
-              const isPrivate = trimmed.includes('STUDENT_NOTE_PRIVATE:');
+          {/* Audio Badges in Live Preview */}
+          {!compressed && audioNotes.length > 0 && (
+            <div style={{ paddingTop: '2px', width: '100%', boxSizing: 'border-box' }}>
+              <AudioTrackCarousel
+                tracks={audioNotes.map((note, aIdx) => {
+                  const parts = (note || '').trim().substring(6).split('|');
+                  return {
+                    url: parts[0],
+                    duration: parseInt(parts[1] || '0', 10),
+                    label: parts[3] || 'Aufnahme',
+                    originalIdx: aIdx,
+                    idx: aIdx
+                  };
+                })}
+                readOnly={true}
+              />
+            </div>
+          )}
 
-              let cleanText = trimmed;
-              if (isPublic || isPrivate) {
-                if (cleanText.includes('|')) {
-                  cleanText = cleanText.split('|').slice(1).join('|');
-                } else {
-                  cleanText = cleanText.replace(/STUDENT_NOTE_PUBLIC:[^\s]*/gi, '').replace(/STUDENT_NOTE_PRIVATE:[^\s]*/gi, '');
+          {/* Compact Note Indicator in Live Preview */}
+          {!compressed && filteredTextNotes.length > 0 && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              borderTop: (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0) ? '1px dashed #e2e8f0' : 'none',
+              paddingTop: (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0) ? '6px' : 0
+            }}>
+              {filteredTextNotes.map((note, idx) => {
+                const trimmed = (note || '').trim();
+                const isPublic = trimmed.includes('STUDENT_NOTE_PUBLIC:');
+                const isPrivate = trimmed.includes('STUDENT_NOTE_PRIVATE:');
+
+                let cleanText = trimmed;
+                if (isPublic || isPrivate) {
+                  if (cleanText.includes('|')) {
+                    cleanText = cleanText.split('|').slice(1).join('|');
+                  } else {
+                    cleanText = cleanText.replace(/STUDENT_NOTE_PUBLIC:[^\s]*/gi, '').replace(/STUDENT_NOTE_PRIVATE:[^\s]*/gi, '');
+                  }
                 }
-              }
-              cleanText = cleanText.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-              if (!cleanText) return null;
+                cleanText = cleanText.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                if (!cleanText) return null;
 
-              if (isPublic) {
+                if (isPublic) {
+                  return (
+                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.78rem', color: '#166534', fontWeight: 750, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '5px 10px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.85rem' }}>💬</span>
+                      <span>Frage: {cleanText}</span>
+                    </div>
+                  );
+                }
+
+                if (isPrivate) {
+                  return (
+                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.78rem', color: '#dc2626', fontWeight: 750, background: '#fef2f2', border: '1px solid #fecaca', padding: '5px 10px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.85rem' }}>🔒</span>
+                      <span>Notiz: {cleanText}</span>
+                    </div>
+                  );
+                }
+
                 return (
-                  <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.8rem', color: '#166534', fontWeight: 750, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '5px 10px', borderRadius: '8px' }}>
-                    <span style={{ fontSize: '0.85rem' }}>💬</span>
-                    <span>Frage: {cleanText}</span>
+                  <div key={idx} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '2px 0',
+                    fontSize: '0.78rem'
+                  }}>
+                    <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                    <span style={{ fontWeight: 850, color: '#15803d', flexShrink: 0 }}>Hinweis:</span>
+                    <span style={{ color: '#334155', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {cleanText}
+                    </span>
                   </div>
                 );
-              }
-
-              if (isPrivate) {
-                return (
-                  <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.8rem', color: '#dc2626', fontWeight: 750, background: '#fef2f2', border: '1px solid #fecaca', padding: '5px 10px', borderRadius: '8px' }}>
-                    <span style={{ fontSize: '0.85rem' }}>🔒</span>
-                    <span>Notiz: {cleanText}</span>
-                  </div>
-                );
-              }
-
-              return (
-                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <FileText size={14} color="#16a34a" style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: '0.80rem', color: '#15803d', fontWeight: 850 }}>
-                    Hinweis:
-                  </span>
-                  <span style={{ fontSize: '0.82rem', color: '#334155', fontWeight: 600 }}>
-                    {cleanText}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+              })}
+            </div>
+          )}
+        </div>
       </div>
     );
   };
