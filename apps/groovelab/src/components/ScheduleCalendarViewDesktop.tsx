@@ -3985,7 +3985,7 @@ export function ScheduleCalendarViewDesktop({
   const getOtherRoomOccupancies = (dateStr: string, roomId: string) => {
     const dayDate = new Date(dateStr);
     const dayOfWeek = dayDate.getDay() || 7;
-    const intervals: { start: number; end: number; type: string }[] = [];
+    const intervals: { start: number; end: number; type: string; teacherName?: string; title?: string; isOwnBooking?: boolean }[] = [];
 
     // 1. Template schedules of other teachers
     cachedWeekSchedules.forEach((s: any) => {
@@ -3998,7 +3998,8 @@ export function ScheduleCalendarViewDesktop({
           ['cancelled', 'canceled_by_student'].includes(o.status)
         );
         if (!hasCancelledOcc) {
-          intervals.push({ start, end, type: 'template' });
+          const tName = formatTeacherFullName(s.teacher || allSchoolTeachers.find(t => t.id === s.teacher_id));
+          intervals.push({ start, end, type: 'template', teacherName: tName !== 'Lehrkraft' ? tName : '', isOwnBooking: false });
         }
       }
     });
@@ -4012,7 +4013,15 @@ export function ScheduleCalendarViewDesktop({
         const start = timeToMinutes(rb.start_time);
         const end = timeToMinutes(rb.end_time || rb.start_time);
         const duration = end > start ? (end - start) : 45;
-        intervals.push({ start, end: start + duration, type: 'booking' });
+        const isOwn = rb.booked_by === userId;
+        const booker = isOwn
+          ? 'Du'
+          : (rb.user ? formatTeacherFullName(rb.user) : (allSchoolTeachers.find(t => t.id === rb.booked_by) ? formatTeacherFullName(allSchoolTeachers.find(t => t.id === rb.booked_by)) : ''));
+        const title = rb.title || '';
+        const displayLabel = isOwn
+          ? (title || 'Zusatzbuchung')
+          : (booker && booker !== 'Lehrkraft' ? (title && !title.startsWith('Unterricht') ? `${booker} (${title})` : booker) : (title || 'Verwaltung / Buchung'));
+        intervals.push({ start, end: start + duration, type: 'booking', teacherName: displayLabel, title, isOwnBooking: isOwn });
       }
     });
 
@@ -4029,7 +4038,8 @@ export function ScheduleCalendarViewDesktop({
           const start = timeToMinutes(o.start_time);
           const end = start + (o.duration || 45);
           if (!intervals.some(inv => inv.start === start && inv.type === 'template')) {
-            intervals.push({ start, end, type: 'occurrence' });
+            const tName = formatTeacherFullName(o.teacher || allSchoolTeachers.find(t => t.id === o.teacher_id));
+            intervals.push({ start, end, type: 'occurrence', teacherName: tName !== 'Lehrkraft' ? tName : '', isOwnBooking: false });
           }
         }
       }
@@ -4039,13 +4049,19 @@ export function ScheduleCalendarViewDesktop({
     const merged: typeof intervals = [];
     intervals.forEach(inv => {
       if (merged.length === 0) {
-        merged.push(inv);
+        merged.push({ ...inv });
       } else {
         const last = merged[merged.length - 1];
-        if (inv.start < last.end) {
+        if (inv.start < last.end && last.isOwnBooking === inv.isOwnBooking) {
           last.end = Math.max(last.end, inv.end);
+          if (inv.teacherName && !last.teacherName?.includes(inv.teacherName)) {
+            last.teacherName = last.teacherName ? `${last.teacherName}, ${inv.teacherName}` : inv.teacherName;
+          }
+          if (inv.title && !last.title?.includes(inv.title)) {
+            last.title = last.title ? `${last.title}, ${inv.title}` : inv.title;
+          }
         } else {
-          merged.push(inv);
+          merged.push({ ...inv });
         }
       }
     });
@@ -4273,33 +4289,6 @@ export function ScheduleCalendarViewDesktop({
                   ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
                 </span>
               </div>
-              {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers && teachers.length > 0 && selectedTeacherId && setSelectedTeacherId && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
-                  <select
-                    value={selectedTeacherId}
-                    onChange={(e) => setSelectedTeacherId(e.target.value)}
-                    style={{
-                      background: '#ffffff',
-                      border: '1px solid rgba(0, 0, 0, 0.08)',
-                      borderRadius: '6px',
-                      padding: '2px 6px',
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      color: '#1d1d1f',
-                      outline: 'none',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                    }}
-                  >
-                    {teachers.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.first_name} {t.last_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
             </div>
           </div>
 
@@ -5265,40 +5254,98 @@ export function ScheduleCalendarViewDesktop({
                 {selectedRoomIdForXRay && getOtherRoomOccupancies(dateStr, selectedRoomIdForXRay).map((inv, idx) => {
                   const top = (inv.start - dayBaselineMinutes) * 2.5;
                   const height = (inv.end - inv.start) * 2.5;
+                  const roomObj = rooms.find(r => String(r.id) === String(selectedRoomIdForXRay));
+                  const roomName = roomObj?.name || 'Raum';
+                  const formatTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+                  const timeRange = `${formatTime(inv.start)} - ${formatTime(inv.end)}`;
+                  const isOwn = !!inv.isOwnBooking;
+
+                  if (isOwn) {
+                    const bookingTitle = inv.title && !inv.title.startsWith('Unterricht') ? ` (${inv.title})` : '';
+                    return (
+                      <div
+                        key={`xray-${idx}`}
+                        style={{
+                          position: 'absolute',
+                          left: '4px',
+                          right: '4px',
+                          top: `${top}px`,
+                          height: `${height}px`,
+                          background: 'repeating-linear-gradient(-45deg, rgba(34, 197, 94, 0.14) 0px, rgba(34, 197, 94, 0.14) 10px, rgba(240, 253, 244, 0.85) 10px, rgba(240, 253, 244, 0.85) 20px)',
+                          border: '1.5px dashed rgba(34, 197, 94, 0.75)',
+                          borderRadius: '8px',
+                          zIndex: 10,
+                          pointerEvents: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxSizing: 'border-box',
+                          padding: '2px 6px'
+                        }}
+                      >
+                        <span style={{
+                          fontSize: '0.66rem',
+                          fontWeight: 800,
+                          color: '#15803d',
+                          background: 'rgba(255, 255, 255, 0.95)',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(34, 197, 94, 0.4)',
+                          boxShadow: '0 2px 6px rgba(34, 197, 94, 0.12)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '96%'
+                        }}>
+                          ✨ {roomName} von dir reserviert{bookingTitle} • {timeRange}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  const teacherLabel = inv.teacherName ? ` • 👤 ${inv.teacherName}` : '';
                   return (
                     <div
                       key={`xray-${idx}`}
                       style={{
                         position: 'absolute',
-                        left: 0,
-                        right: 0,
+                        left: '4px',
+                        right: '4px',
                         top: `${top}px`,
                         height: `${height}px`,
-                        background: 'repeating-linear-gradient(-45deg, rgba(148, 163, 184, 0.12) 0px, rgba(148, 163, 184, 0.12) 8px, transparent 8px, transparent 16px)',
-                        border: '1.5px dashed rgba(148, 163, 184, 0.4)',
+                        background: 'repeating-linear-gradient(-45deg, rgba(239, 68, 68, 0.14) 0px, rgba(239, 68, 68, 0.14) 10px, rgba(254, 242, 242, 0.7) 10px, rgba(254, 242, 242, 0.7) 20px)',
+                        border: '1.5px dashed rgba(239, 68, 68, 0.7)',
                         borderRadius: '8px',
-                        zIndex: 1,
+                        zIndex: 10,
                         pointerEvents: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxSizing: 'border-box'
+                        boxSizing: 'border-box',
+                        padding: '2px 6px'
                       }}
                     >
                       <span style={{
-                        fontSize: '0.65rem',
-                        fontWeight: 700,
-                        color: '#475569',
+                        fontSize: '0.66rem',
+                        fontWeight: 800,
+                        color: '#dc2626',
                         background: 'rgba(255, 255, 255, 0.95)',
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        border: '1px solid rgba(148, 163, 184, 0.3)',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        boxShadow: '0 2px 6px rgba(239, 68, 68, 0.12)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '3px'
+                        gap: '4px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: '96%'
                       }}>
-                        🔒 Besetzt
+                        🔒 {roomName} belegt • {timeRange}{teacherLabel}
                       </span>
                     </div>
                   );

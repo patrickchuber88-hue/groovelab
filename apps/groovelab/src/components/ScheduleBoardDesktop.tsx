@@ -4507,28 +4507,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               {/* Left: Lehrkraft-Filter & Apple Raster Capsule */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)', minHeight: '36px' }}>
-                  {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers.length > 0 ? (
-                    <>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Users size={11} style={{ strokeWidth: 3 }} /> Lehrkraft:
-                      </span>
-                      <select
-                        value={selectedTeacherId}
-                        onChange={(e) => setSelectedTeacherId(e.target.value)}
-                        style={{ background: 'transparent', border: 'none', fontSize: '0.78rem', fontWeight: 700, color: '#1d1d1f', outline: 'none', cursor: 'pointer', padding: 0 }}
-                      >
-                        {teachers.map(t => (
-                          <option key={t.id} value={t.id}>
-                            {t.first_name} {t.last_name}
-                          </option>
-                        ))}
-                      </select>
-                    </>
-                  ) : (
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                      {currentUserRole === 'teacher' ? 'Dein Designer' : 'Stundenplan-Designer'}
-                    </span>
-                  )}
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                    {currentUserRole === 'teacher' ? 'Dein Designer' : 'Stundenplan-Designer'}
+                  </span>
                 </div>
 
                 {/* 🧲 Apple Raster Selector Capsule */}

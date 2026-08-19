@@ -1,28 +1,433 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Square, Volume2, VolumeX, Music, Clock, Sliders, RotateCcw, Mic, Zap, Activity, CheckCircle2, Sparkles, Star, BookOpen, Check, Settings } from 'lucide-react';
+import { Play, Square, Volume2, VolumeX, Music, Clock, Sliders, RotateCcw, Mic, Zap, Activity, CheckCircle2, Sparkles, Star, BookOpen, Check, Settings, Pause, Headphones, ChevronRight, X } from 'lucide-react';
 import { ACOUSTIC_STUDIO_SAMPLES } from './AcousticDrumSamples';
+import { storeBlob } from '../../utils/blobStorage';
+import { 
+  processPureRawBlob, 
+  safeDecodeAudioData, 
+  ensureCenteredStereoAudioBuffer, 
+  audioBufferToWavBlob, 
+  processPureRawAudioBuffer 
+} from '../../utils/audioMasteringEngine';
 
-// Helper to decode Base64 WAV into AudioBuffer
-const decodeBase64Wav = (ctx: AudioContext, b64Uri: string): AudioBuffer => {
+// Helper to decode Base64 WAV into AudioBuffer with true header sample rate
+const decodeBase64Wav = (ctx: AudioContext | BaseAudioContext, b64Uri: string): AudioBuffer => {
   const base64 = b64Uri.split(',')[1];
   const binaryString = window.atob(base64);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
-  // Synchronous PCM WAV decoding for instant 0ms play
-  const sr = ctx.sampleRate;
-  const numSamples = Math.floor((bytes.length - 44) / 2);
-  const buf = ctx.createBuffer(1, numSamples, sr);
-  const chan = buf.getChannelData(0);
   const dataView = new DataView(bytes.buffer);
+  const sr = dataView.getUint32(24, true) || 44100;
+  const channels = dataView.getUint16(22, true) || 1;
+  const numSamples = Math.floor((bytes.length - 44) / (2 * channels));
+  const buf = ctx.createBuffer(channels, numSamples, sr);
   
-  for (let i = 0; i < numSamples; i++) {
-    const raw = dataView.getInt16(44 + i * 2, true);
-    chan[i] = raw / 32768.0;
+  for (let ch = 0; ch < channels; ch++) {
+    const chanData = buf.getChannelData(ch);
+    for (let i = 0; i < numSamples; i++) {
+      const raw = dataView.getInt16(44 + (i * channels + ch) * 2, true);
+      chanData[i] = raw / 32768.0;
+    }
   }
   return buf;
 };
+
+// 🎧 Studio Logic Pro "Klopfgeist" & Wittner Acoustic Hybrid Engine
+// Beat 1 (Accent): 1.760 Hz (A6) + 3.520 Hz Snap + 880 Hz Body
+// Beats 2, 3, 4:   880 Hz (A5) + 1.760 Hz Snap + 440 Hz Body
+const playKlopfgeistClick = (
+  ctx: AudioContext | BaseAudioContext,
+  time: number,
+  isAccent: boolean,
+  volume: number,
+  destination: AudioNode
+) => {
+  if (volume <= 0.001) return;
+  try {
+    const primaryFreq = isAccent ? 1760 : 880;
+    const snapFreq = isAccent ? 3520 : 1760;
+    const bodyFreq = isAccent ? 880 : 440;
+
+    const primaryOsc = ctx.createOscillator();
+    primaryOsc.type = 'sine';
+    primaryOsc.frequency.setValueAtTime(primaryFreq, time);
+
+    const snapOsc = ctx.createOscillator();
+    snapOsc.type = 'triangle';
+    snapOsc.frequency.setValueAtTime(snapFreq, time);
+
+    const bodyOsc = ctx.createOscillator();
+    bodyOsc.type = 'sine';
+    bodyOsc.frequency.setValueAtTime(bodyFreq, time);
+
+    const clickGain = ctx.createGain();
+    const peakLevel = volume * (isAccent ? 0.95 : 0.68);
+    const decayTime = isAccent ? 0.026 : 0.020;
+
+    clickGain.gain.setValueAtTime(0.0001, time);
+    clickGain.gain.linearRampToValueAtTime(peakLevel, time + 0.0008);
+    clickGain.gain.exponentialRampToValueAtTime(0.00001, time + decayTime);
+
+    const snapGain = ctx.createGain();
+    snapGain.gain.setValueAtTime(0.45, time);
+    snapGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.012);
+
+    const bodyGain = ctx.createGain();
+    bodyGain.gain.setValueAtTime(0.35, time);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, time + decayTime);
+
+    primaryOsc.connect(clickGain);
+    snapOsc.connect(snapGain);
+    snapGain.connect(clickGain);
+    bodyOsc.connect(bodyGain);
+    bodyGain.connect(clickGain);
+
+    clickGain.connect(destination);
+
+    primaryOsc.start(time);
+    snapOsc.start(time);
+    bodyOsc.start(time);
+
+    primaryOsc.stop(time + decayTime + 0.005);
+    snapOsc.stop(time + 0.015);
+    bodyOsc.stop(time + decayTime + 0.005);
+  } catch (_) {}
+};
+
+// 🎛️ IN-THE-BOX DIRECT-STEM BACKING-BEAT MIXER (Phase-Locked & EBU R128 Mastered)
+// 🎛️ IN-THE-BOX DIRECT-STEM BACKING-BEAT MIXER (PDC Phase-Locked & EBU R128 Mastered)
+async function mixMicWithDirectBackingBeat(
+  micBlob: Blob,
+  bpm: number,
+  style: string,
+  variation: 'A' | 'B' | 'C'
+): Promise<{ processedBlob: Blob; processedUrl: string; durationSec: number }> {
+  try {
+    const arrayBuffer = await micBlob.arrayBuffer();
+    const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    let rawMicBuffer: AudioBuffer;
+    try {
+      const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
+      rawMicBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
+    } finally {
+      try { tempCtx.close(); } catch {}
+    }
+
+    const sampleRate = 48000;
+
+    // 🌟 PDC (Plugin Delay Compensation):
+    // Compensate for Output Latency (~25ms) + Input Latency (~30ms) + MediaRecorder Start Offset (~20ms) = ~75ms
+    const LATENCY_COMPENSATION_SEC = 0.075;
+    const trimSamples = Math.min(
+      Math.floor(LATENCY_COMPENSATION_SEC * sampleRate),
+      Math.floor(rawMicBuffer.length * 0.25)
+    );
+
+    const micBuffer = (trimSamples > 0 && rawMicBuffer.length > trimSamples)
+      ? (() => {
+          const compensated = new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(
+            rawMicBuffer.numberOfChannels,
+            rawMicBuffer.length - trimSamples,
+            sampleRate
+          ).createBuffer(rawMicBuffer.numberOfChannels, rawMicBuffer.length - trimSamples, sampleRate);
+
+          for (let ch = 0; ch < rawMicBuffer.numberOfChannels; ch++) {
+            const src = rawMicBuffer.getChannelData(ch);
+            const dest = compensated.getChannelData(ch);
+            dest.set(src.subarray(trimSamples));
+          }
+          return compensated;
+        })()
+      : rawMicBuffer;
+
+    const duration = micBuffer.duration;
+    const totalSamples = Math.max(1, Math.floor(duration * sampleRate));
+
+    const offlineCtx = new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(2, totalSamples, sampleRate);
+
+    // 1. Student Instrument (Microphone) Track - Full presence (0 dBFS)
+    const micSource = offlineCtx.createBufferSource();
+    micSource.buffer = micBuffer;
+    const micGain = offlineCtx.createGain();
+    micGain.gain.setValueAtTime(1.0, 0);
+    micSource.connect(micGain);
+    micGain.connect(offlineCtx.destination);
+    micSource.start(0);
+
+    // 2. Direct Backing Rhythm Track - Studio accompaniment (-14 dBFS)
+    const backingMasterGain = offlineCtx.createGain();
+    backingMasterGain.gain.setValueAtTime(0.20, 0);
+    backingMasterGain.connect(offlineCtx.destination);
+
+    // Render Wooden Rimshot AudioBuffer on offlineCtx
+    const renderOfflineRimBuffer = (): AudioBuffer => {
+      const dur = 0.05;
+      const sr = offlineCtx.sampleRate;
+      const buf = offlineCtx.createBuffer(2, Math.floor(sr * dur), sr);
+      const L = buf.getChannelData(0);
+      const R = buf.getChannelData(1);
+      const len = buf.length;
+
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const woodClick = Math.sin(2 * Math.PI * 980 * t) * Math.exp(-t * 80);
+        const val = woodClick * 0.40;
+        L[i] = val;
+        R[i] = val;
+      }
+      return buf;
+    };
+
+    // Decode sample buffers on offlineCtx
+    const kitBuffers: Record<string, AudioBuffer> = {
+      kick: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.kick),
+      snare: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.snare),
+      hatClosed: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.hatClosed),
+      hatOpen: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.hatOpen),
+      click: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.click),
+      rim: renderOfflineRimBuffer()
+    };
+
+    const playOfflineSample = (buffer: AudioBuffer, volMul = 1.0, time: number) => {
+      if (!buffer || time >= duration) return;
+      const source = offlineCtx.createBufferSource();
+      source.buffer = buffer;
+      const gain = offlineCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(volMul, time + 0.0008);
+      source.connect(gain);
+      gain.connect(backingMasterGain);
+      source.start(time);
+    };
+
+    const isSwing = style === 'swing';
+    const isWaltz = style === 'walzer';
+    const isBallad = style === 'ballad68';
+
+    const stepsPerBar = isSwing ? 12 : (isWaltz ? 12 : (isBallad ? 12 : 16));
+    const stepDuration = isSwing 
+      ? (60.0 / bpm) / 3 
+      : (isBallad ? (60.0 / bpm) / 2 : (60.0 / bpm) / 4);
+
+    let step = 0;
+    while (step * stepDuration < duration) {
+      const time = step * stepDuration;
+      const currentStepInBar = step % stepsPerBar;
+
+      if (style === 'metronome') {
+        const beatIdx = Math.floor(currentStepInBar / 4);
+        if (variation === 'A') {
+          if (currentStepInBar % 4 === 0) playKlopfgeistClick(offlineCtx, time, beatIdx === 0, 1.0, backingMasterGain);
+        } else if (variation === 'B') {
+          if (currentStepInBar % 2 === 0) playKlopfgeistClick(offlineCtx, time, currentStepInBar === 0, 1.0, backingMasterGain);
+        } else {
+          playKlopfgeistClick(offlineCtx, time, currentStepInBar === 0, 1.0, backingMasterGain);
+        }
+      } else if (style === 'rock') {
+        if (variation === 'A') {
+          if (currentStepInBar === 0 || currentStepInBar === 8 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 1.0, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.0, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 1.0 : 0.62, time);
+        } else if (variation === 'B') {
+          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 14) playOfflineSample(kitBuffers.kick, 1.0, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.0, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 1.0 : 0.65, time);
+        } else {
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 1.0, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.0, time);
+          else if (currentStepInBar === 7 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.25, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 1.05 : 0.72, time);
+          else if (currentStepInBar === 11) playOfflineSample(kitBuffers.hatClosed, 0.45, time);
+        }
+      } else if (style === 'hiphop') {
+        if (variation === 'A') {
+          if (currentStepInBar === 0) playOfflineSample(kitBuffers.kick, 1.3, time);
+          else if (currentStepInBar === 3 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 0.9, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.1, time);
+          else if (currentStepInBar === 7 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.22, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(currentStepInBar === 14 ? kitBuffers.hatOpen : kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 0.9 : 0.55, time);
+        } else if (variation === 'B') {
+          if (currentStepInBar === 0 || currentStepInBar === 2 || currentStepInBar === 8 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 1.2, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.1, time);
+          else if (currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.25, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 0.95 : 0.62, time);
+        } else {
+          if (currentStepInBar === 0 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 1.3, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.15, time);
+          if (currentStepInBar === 14 || currentStepInBar === 15) playOfflineSample(kitBuffers.hatClosed, 0.75, time);
+          else if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 1.0 : 0.6, time);
+        }
+      } else if (style === 'singersongwriter') {
+        if (variation === 'A') {
+          if (currentStepInBar === 0 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 0.75, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.click, 0.9, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 0.7 : 0.4, time);
+        } else if (variation === 'B') {
+          if (currentStepInBar === 0 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 0.8, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 0.55, time);
+          else if (currentStepInBar === 7 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.18, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 0.75 : 0.45, time);
+        } else {
+          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 0.85, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 0.65, time);
+          else if (currentStepInBar === 14 || currentStepInBar === 15) playOfflineSample(kitBuffers.click, 0.75, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(currentStepInBar === 10 ? kitBuffers.hatOpen : kitBuffers.hatClosed, currentStepInBar === 10 ? 0.8 : 0.5, time);
+        }
+      } else if (style === 'swing') {
+        if (variation === 'A') {
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineSample(kitBuffers.kick, 0.32, time);
+          if (currentStepInBar === 2) playOfflineSample(kitBuffers.rim, 0.45, time);
+          else if (currentStepInBar === 8) playOfflineSample(kitBuffers.snare, 0.4, time);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineSample(kitBuffers.hatClosed, 1.0, time);
+          else if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.hatOpen, 0.55, time);
+          if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineSample(kitBuffers.rim, 0.25, time);
+        } else if (variation === 'B') {
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineSample(kitBuffers.kick, 0.35, time);
+          if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 11) playOfflineSample(kitBuffers.snare, 0.5, time);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineSample(kitBuffers.hatClosed, 1.05, time);
+          else if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.hatOpen, 0.62, time);
+          if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineSample(kitBuffers.rim, 0.3, time);
+        } else {
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineSample(kitBuffers.kick, 0.5, time);
+          if (currentStepInBar === 9 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSample(kitBuffers.snare, 0.7, time);
+          else if (currentStepInBar === 2 || currentStepInBar === 5) playOfflineSample(kitBuffers.snare, 0.32, time);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineSample(kitBuffers.hatClosed, 1.0, time);
+        }
+      } else if (style === 'latin') {
+        if (variation === 'A') {
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 0.95, time);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 12) playOfflineSample(kitBuffers.rim, 1.0, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 0.8 : 0.48, time);
+        } else if (variation === 'B') {
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.kick, currentStepInBar % 4 === 2 ? 1.15 : 0.6, time);
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineSample(kitBuffers.rim, 0.95, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.75, time);
+        } else {
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 1.0, time);
+          if (currentStepInBar === 0 || currentStepInBar === 2 || currentStepInBar === 3 || currentStepInBar === 5 || currentStepInBar === 6 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 11 || currentStepInBar === 13 || currentStepInBar === 14) {
+            playOfflineSample(kitBuffers.rim, 0.85, time);
+          }
+          if (currentStepInBar % 4 === 2) playOfflineSample(kitBuffers.hatOpen, 0.7, time);
+        }
+      } else if (style === 'funk') {
+        if (variation === 'A') {
+          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 1.15, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.1, time);
+          else if (currentStepInBar === 7 || currentStepInBar === 13 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.28, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(currentStepInBar === 6 || currentStepInBar === 14 ? kitBuffers.hatOpen : kitBuffers.hatClosed, (currentStepInBar === 6 || currentStepInBar === 14) ? 1.0 : (currentStepInBar % 4 === 0 ? 0.95 : 0.55), time);
+          else if (currentStepInBar === 3 || currentStepInBar === 11) playOfflineSample(kitBuffers.hatClosed, 0.35, time);
+        } else if (variation === 'B') {
+          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 1.2, time);
+          else if (currentStepInBar === 4 || currentStepInBar === 12 || currentStepInBar === 14) playOfflineSample(kitBuffers.snare, 1.15, time);
+          else if (currentStepInBar === 2 || currentStepInBar === 8 || currentStepInBar === 15) playOfflineSample(kitBuffers.hatClosed, 0.85, time);
+        } else {
+          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 1.2, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.1, time);
+          else if (currentStepInBar === 13 || currentStepInBar === 14 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.9, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+        }
+      } else if (style === 'reggae') {
+        if (variation === 'A') {
+          if (currentStepInBar === 8) { playOfflineSample(kitBuffers.kick, 1.2, time); playOfflineSample(kitBuffers.snare, 1.05, time); }
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.rim, 0.9, time);
+          if (currentStepInBar === 0) playOfflineSample(kitBuffers.rim, 0.22, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 1.0 : 0.58, time);
+        } else if (variation === 'B') {
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineSample(kitBuffers.kick, 1.15, time);
+          if (currentStepInBar === 8) playOfflineSample(kitBuffers.snare, 1.05, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.rim, 0.85, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.88, time);
+        } else {
+          if (currentStepInBar === 8) playOfflineSample(kitBuffers.kick, 1.2, time);
+          if (currentStepInBar === 8 || currentStepInBar === 14 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 1.0, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.rim, 0.9, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+        }
+      } else if (style === 'walzer') {
+        if (variation === 'A') {
+          if (currentStepInBar === 0) playOfflineSample(kitBuffers.kick, 1.0, time);
+          if (currentStepInBar === 4 || currentStepInBar === 8) { playOfflineSample(kitBuffers.rim, 0.85, time); playOfflineSample(kitBuffers.snare, 0.22, time); }
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar === 0 ? 0.95 : (currentStepInBar === 4 || currentStepInBar === 8 ? 0.72 : 0.45), time);
+        } else if (variation === 'B') {
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineSample(kitBuffers.kick, 0.9, time);
+          if (currentStepInBar === 4 || currentStepInBar === 8) playOfflineSample(kitBuffers.snare, 0.75, time);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 4 || currentStepInBar === 7 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+        } else {
+          if (currentStepInBar === 0) playOfflineSample(kitBuffers.kick, 1.0, time);
+          if (currentStepInBar === 4) playOfflineSample(kitBuffers.snare, 0.7, time);
+          if (currentStepInBar === 8 || currentStepInBar === 9 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSample(kitBuffers.snare, 0.8, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+        }
+      } else if (style === 'ballad68') {
+        if (variation === 'A') {
+          if (currentStepInBar === 0) playOfflineSample(kitBuffers.kick, 1.2, time);
+          else if (currentStepInBar === 5) playOfflineSample(kitBuffers.kick, 0.6, time);
+          if (currentStepInBar === 6) playOfflineSample(kitBuffers.snare, 1.1, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, (currentStepInBar === 0 || currentStepInBar === 6) ? 1.0 : 0.6, time);
+        } else if (variation === 'B') {
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 5) playOfflineSample(kitBuffers.kick, 1.1, time);
+          if (currentStepInBar === 6) playOfflineSample(kitBuffers.snare, 1.15, time);
+          else if (currentStepInBar === 11) playOfflineSample(kitBuffers.rim, 0.5, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.82, time);
+        } else {
+          if (currentStepInBar === 0 || currentStepInBar === 5) playOfflineSample(kitBuffers.kick, 1.2, time);
+          if (currentStepInBar === 6) playOfflineSample(kitBuffers.snare, 1.1, time);
+          else if (currentStepInBar === 10 || currentStepInBar === 11) playOfflineSample(kitBuffers.snare, 0.85, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+        }
+      } else if (style === 'disco') {
+        if (variation === 'A') {
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineSample(kitBuffers.kick, 1.15, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.0, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14 ? kitBuffers.hatOpen : kitBuffers.hatClosed, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 1.05 : 0.5, time);
+        } else if (variation === 'B') {
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineSample(kitBuffers.kick, 1.15, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.0, time);
+          if (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) playOfflineSample(kitBuffers.hatOpen, 1.1, time);
+          else if (currentStepInBar === 3 || currentStepInBar === 7 || currentStepInBar === 11 || currentStepInBar === 15) playOfflineSample(kitBuffers.hatClosed, 0.5, time);
+          else if (currentStepInBar % 4 === 0) playOfflineSample(kitBuffers.hatClosed, 0.85, time);
+        } else {
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 11 || currentStepInBar === 12) playOfflineSample(kitBuffers.kick, 1.1, time);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.1, time);
+          else if (currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.8, time);
+          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+        }
+      } else {
+        // Steady 4/4 groove fallback
+        if (currentStepInBar === 0 || currentStepInBar === 8) playOfflineSample(kitBuffers.kick, 1.0, time);
+        if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 0.9, time);
+        if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.6, time);
+      }
+
+      step++;
+    }
+
+    const renderedBuffer = await offlineCtx.startRendering();
+    processPureRawAudioBuffer(renderedBuffer, { targetLufs: -14.0, targetPeakDb: -1.0 });
+
+    const wavBlob = audioBufferToWavBlob(renderedBuffer, {
+      title: 'Campus-Groovelab Übe-Take',
+      artist: 'Campus-Groovelab'
+    });
+    const processedUrl = URL.createObjectURL(wavBlob);
+
+    return {
+      processedBlob: wavBlob,
+      processedUrl,
+      durationSec: Math.round(renderedBuffer.duration * 10) / 10
+    };
+  } catch (err) {
+    console.warn('[mixMicWithDirectBackingBeat] Falling back to pure raw blob:', err);
+    const fallback = await processPureRawBlob(micBlob, { targetLufs: -14.0, targetPeakDb: -1.0 });
+    return {
+      processedBlob: fallback.processedBlob,
+      processedUrl: fallback.processedUrl,
+      durationSec: fallback.durationSec
+    };
+  }
+}
 
 export interface GroovePracticeCompanionProps {
   useNotebookLayout?: boolean;
@@ -31,6 +436,9 @@ export interface GroovePracticeCompanionProps {
   targetScore?: number;
   isCampusModule?: boolean;
   activeSongContext?: { songTitle: string; targetBpm: number; songId?: string } | null;
+  studentId?: string;
+  student?: any;
+  onNavigateToRecordings?: () => void;
 }
 
 // GroovePracticeCompanion (Student Metronome & Beat Generator with Campus Rhythmus-Coach)
@@ -43,7 +451,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   targetBpm,
   targetScore,
   isCampusModule = true,
-  activeSongContext
+  activeSongContext,
+  studentId,
+  student,
+  onNavigateToRecordings
 }) => {
   const getBeatsPerBar = (style: string) => {
     if (style === 'walzer') return 3;
@@ -118,6 +529,36 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     noteDistribution?: { quartersPct: number; eightsPct: number; sixteenthsPct: number; dottedPct: number };
     microTimingDeltas?: number[];
   } | null>(null);
+
+  // 🔴 Recording Engine & 4-Beat Count-In States
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [isCountingIn, setIsCountingIn] = useState(false);
+  const [countInBeat, setCountInBeat] = useState<number>(1);
+  const [pendingPreviewTake, setPendingPreviewTake] = useState<{ id: string; blob: Blob; blobUrl: string; duration: number; title: string; label: string; date: Date; bpm: number; style: string } | null>(null);
+  const [savedTakeSuccessToast, setSavedTakeSuccessToast] = useState<string | null>(null);
+  const [isSavingTake, setIsSavingTake] = useState(false);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
+  const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
+  const [previewProgress, setPreviewProgress] = useState(0);
+
+  const [limitReachedToast, setLimitReachedToast] = useState(false);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordAudioCtxRef = useRef<AudioContext | null>(null);
+  const recordingStartTimeRef = useRef<number>(0);
+  const countInIntervalRef = useRef<any>(null);
+  const countInPendingRef = useRef<boolean>(false);
+  const countInTimersRef = useRef<any[]>([]);
+  const limitTimerRef = useRef<any>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isRecordingRef = useRef(false);
+  const isCountingInRef = useRef(false);
+
+  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
+  useEffect(() => { isCountingInRef.current = isCountingIn; }, [isCountingIn]);
 
   const micStreamRef = useRef<MediaStream | null>(null);
   const analyserNodeRef = useRef<AnalyserNode | null>(null);
@@ -593,10 +1034,335 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     }
   };
 
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleStopAll = () => {
+    if (countInIntervalRef.current) {
+      clearInterval(countInIntervalRef.current);
+      countInIntervalRef.current = null;
+    }
+    if (limitTimerRef.current) {
+      clearInterval(limitTimerRef.current);
+      limitTimerRef.current = null;
+    }
+    countInTimersRef.current.forEach(t => clearTimeout(t));
+    countInTimersRef.current = [];
+    countInPendingRef.current = false;
+    setIsCountingIn(false);
+    setIsPlaying(false);
+    setRecordSeconds(0);
+
+    if (isRecordingRef.current) {
+      setIsRecording(false);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch (err) {
+          console.warn('[GroovePracticeCompanion] Error stopping mediaRecorder:', err);
+        }
+      }
+    }
+
+    if (recordAudioCtxRef.current && recordAudioCtxRef.current.state !== 'closed') {
+      try {
+        recordAudioCtxRef.current.close();
+      } catch {}
+      recordAudioCtxRef.current = null;
+    }
+  };
+
+  const handleTogglePlay = () => {
+    if (isPlaying || isRecording || isCountingIn) {
+      handleStopAll();
+    } else {
+      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+      setIsPlaying(true);
+    }
+  };
+
+  const startCountInAndRecord = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false,
+          googTypingNoiseDetection: false,
+          channelCount: 1,
+          sampleRate: 48000
+        } as any
+      });
+      recordingStreamRef.current = stream;
+
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const recordAudioCtx = new AudioCtx();
+      recordAudioCtxRef.current = recordAudioCtx;
+      const sourceNode = recordAudioCtx.createMediaStreamSource(stream);
+      const mergerNode = recordAudioCtx.createChannelMerger(2);
+      sourceNode.connect(mergerNode, 0, 0); 
+      sourceNode.connect(mergerNode, 0, 1); 
+      const destNode = recordAudioCtx.createMediaStreamDestination();
+      mergerNode.connect(destNode);
+      const recordStream = destNode.stream;
+
+      let mimeType = '';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
+        else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
+        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+        else if (MediaRecorder.isTypeSupported('audio/aac')) mimeType = 'audio/aac';
+      }
+
+      const recorder = mimeType ? new MediaRecorder(recordStream, { mimeType }) : new MediaRecorder(recordStream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        if (audioChunksRef.current.length === 0) return;
+        const rawBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        let finalBlob = rawBlob;
+        let blobUrl = '';
+        let durationSec = Math.max(1, Math.round((Date.now() - (recordingStartTimeRef.current || Date.now())) / 1000));
+
+        const styleNames: Record<string, string> = {
+          metronome: 'Metronom Klick',
+          singersongwriter: 'Singer-Songwriter (Akustik)',
+          rock: 'Rock & Pop Groove',
+          hiphop: 'Hip-Hop Pocket',
+          swing: 'Jazz Swing',
+          latin: 'Latin Bossa',
+          funk: 'Funk Break',
+          reggae: 'Reggae One-Drop',
+          walzer: 'Walzer (3/4 Takt)',
+          ballad68: '6/8 Ballade',
+          disco: 'Disco (4-on-the-Floor)'
+        };
+        const rhythmLabel = styleNames[selectedStyleRef.current || 'metronome'] || 'Begleit-Rhythmus';
+        const recTitle = `Übe-Begleiter: ${rhythmLabel} (${bpmRef.current} BPM)`;
+
+        try {
+          const mixResult = await mixMicWithDirectBackingBeat(
+            rawBlob,
+            bpmRef.current,
+            selectedStyleRef.current,
+            selectedVariationRef.current
+          );
+          finalBlob = mixResult.processedBlob;
+          blobUrl = mixResult.processedUrl;
+          if (mixResult.durationSec) durationSec = Math.round(mixResult.durationSec);
+        } catch (dspErr) {
+          console.warn('[GroovePracticeCompanion] Direct Beat Mix fallback:', dspErr);
+          try {
+            const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: -14.0, targetPeakDb: -1.0 });
+            finalBlob = pureRawRes.processedBlob;
+            blobUrl = pureRawRes.processedUrl;
+            if (pureRawRes.durationSec) durationSec = Math.round(pureRawRes.durationSec);
+          } catch (e) {
+            blobUrl = URL.createObjectURL(rawBlob);
+          }
+        }
+
+        const recId = `stud-${Date.now()}`;
+
+        setPendingPreviewTake({
+          id: recId,
+          blob: finalBlob,
+          blobUrl: blobUrl,
+          duration: durationSec,
+          title: recTitle,
+          label: recTitle,
+          date: new Date(),
+          bpm: bpmRef.current,
+          style: selectedStyleRef.current
+        });
+        setPreviewCurrentTime(0);
+        setPreviewProgress(0);
+        setIsPreviewPlaying(false);
+
+        if (recordingStreamRef.current) {
+          recordingStreamRef.current.getTracks().forEach(t => t.stop());
+          recordingStreamRef.current = null;
+        }
+        if (recordAudioCtxRef.current && recordAudioCtxRef.current.state !== 'closed') {
+          try {
+            recordAudioCtxRef.current.close();
+          } catch {}
+          recordAudioCtxRef.current = null;
+        }
+      };
+
+      // 🌟 3. Unified AudioContext & Seamless Count-In Engine
+      countInPendingRef.current = true;
+      setIsCountingIn(true);
+      setCountInBeat(1);
+
+      if (isPlaying) {
+        // Restart seamlessly with count-in
+        setIsPlaying(false);
+        setTimeout(() => setIsPlaying(true), 25);
+      } else {
+        setIsPlaying(true);
+      }
+    } catch (err) {
+      console.error('Microphone access failed for practice recording:', err);
+      setIsCountingIn(false);
+      setIsRecording(false);
+      alert('Mikrofon-Zugriff nicht möglich. Bitte erlaube das Mikrofon in den Browser-Einstellungen.');
+    }
+  };
+
+  const handleToggleRecording = () => {
+    if (isRecording || isCountingIn) {
+      handleStopAll();
+    } else {
+      startCountInAndRecord();
+    }
+  };
+
+  const handleTogglePreviewPlay = () => {
+    if (!pendingPreviewTake?.blobUrl) return;
+    if (!previewAudioRef.current || previewAudioRef.current.src !== pendingPreviewTake.blobUrl) {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+      }
+      const audio = new Audio(pendingPreviewTake.blobUrl);
+      audio.ontimeupdate = () => {
+        setPreviewCurrentTime(audio.currentTime);
+        setPreviewProgress(pendingPreviewTake.duration ? (audio.currentTime / pendingPreviewTake.duration) * 100 : 0);
+      };
+      audio.onended = () => {
+        setIsPreviewPlaying(false);
+        setPreviewProgress(0);
+        setPreviewCurrentTime(0);
+      };
+      previewAudioRef.current = audio;
+    }
+    if (isPreviewPlaying) {
+      previewAudioRef.current.pause();
+      setIsPreviewPlaying(false);
+    } else {
+      previewAudioRef.current.play().catch(() => {});
+      setIsPreviewPlaying(true);
+    }
+  };
+
+  const handleSavePendingTake = async () => {
+    if (!pendingPreviewTake) return;
+    setIsSavingTake(true);
+
+    try {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        setIsPreviewPlaying(false);
+      }
+
+      const recId = pendingPreviewTake.id;
+      const blobKey = `campus_audio_${recId}_raw`;
+      await storeBlob(blobKey, pendingPreviewTake.blob).catch(() => {});
+
+      const newRec = {
+        id: recId,
+        url: blobKey,
+        previewUrl: pendingPreviewTake.blobUrl,
+        duration: pendingPreviewTake.duration,
+        date: pendingPreviewTake.date.toISOString(),
+        title: pendingPreviewTake.title,
+        label: pendingPreviewTake.label,
+        visibility: 'private',
+        source: 'practice_companion',
+        bpm: pendingPreviewTake.bpm,
+        style: pendingPreviewTake.style
+      };
+
+      const targetStudentId = studentId || student?.id || (() => {
+        try {
+          const u = localStorage.getItem('groovelab_user');
+          if (u) return JSON.parse(u).id;
+        } catch {}
+        return 'student-default';
+      })();
+
+      const juniorKey = `campus_junior_recordings_${targetStudentId}`;
+      let existing: any[] = [];
+      try {
+        const stored = localStorage.getItem(juniorKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) existing = parsed;
+        }
+      } catch {}
+      const updated = [newRec, ...existing];
+      localStorage.setItem(juniorKey, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('campus-recordings-updated', { detail: { studentId: targetStudentId } }));
+      window.dispatchEvent(new Event('storage'));
+
+      setSavedTakeSuccessToast(pendingPreviewTake.title);
+      setTimeout(() => setSavedTakeSuccessToast(null), 4000);
+      setPendingPreviewTake(null);
+    } catch (e) {
+      console.error('Error saving take:', e);
+    } finally {
+      setIsSavingTake(false);
+    }
+  };
+
+  const handleDiscardPendingTake = () => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current = null;
+    }
+    if (pendingPreviewTake?.blobUrl) {
+      try { URL.revokeObjectURL(pendingPreviewTake.blobUrl); } catch {}
+    }
+    setIsPreviewPlaying(false);
+    setPreviewProgress(0);
+    setPreviewCurrentTime(0);
+    setPendingPreviewTake(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (countInIntervalRef.current) clearInterval(countInIntervalRef.current);
+      if (limitTimerRef.current) clearInterval(limitTimerRef.current);
+      countInTimersRef.current.forEach(t => clearTimeout(t));
+      countInTimersRef.current = [];
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current = null;
+      }
+      if (recordingStreamRef.current) {
+        recordingStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+      if (recordAudioCtxRef.current && recordAudioCtxRef.current.state !== 'closed') {
+        try {
+          recordAudioCtxRef.current.close();
+        } catch {}
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!isPlaying) {
       if (timerIdRef.current) clearInterval(timerIdRef.current);
       if (progressFrameRef.current) cancelAnimationFrame(progressFrameRef.current);
+      countInTimersRef.current.forEach(t => clearTimeout(t));
+      countInTimersRef.current = [];
       if (audioCtxRef.current) {
         audioCtxRef.current.close();
         audioCtxRef.current = null;
@@ -633,9 +1399,71 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     }
     noiseBufferRef.current = noiseBuffer;
 
-    nextNoteTimeRef.current = audioCtx.currentTime + 0.05;
-    barStartAudioTimeRef.current = audioCtx.currentTime + 0.05;
-    current16thNoteRef.current = 0;
+    countInTimersRef.current.forEach(t => clearTimeout(t));
+    countInTimersRef.current = [];
+
+    const isCountInActive = countInPendingRef.current;
+    countInPendingRef.current = false;
+
+    const secondsPerBeat = 60.0 / bpmRef.current;
+    const initialStartTime = audioCtx.currentTime + 0.05;
+
+    if (isCountInActive) {
+      // 🌟 UNIFIED 4-BEAT COUNT-IN (In the EXACT same AudioContext with Klopfgeist!)
+      const c1 = initialStartTime;
+      const c2 = initialStartTime + secondsPerBeat;
+      const c3 = initialStartTime + 2 * secondsPerBeat;
+      const c4 = initialStartTime + 3 * secondsPerBeat;
+      const rhythmStart = initialStartTime + 4 * secondsPerBeat;
+
+      // 1. Audio Scheduling for 4 Count-In Clicks (Audio Thread)
+      playKlopfgeistClick(audioCtx, c1, true, 0.95, masterGain);  // Beat 1: High Pitch Accent
+      playKlopfgeistClick(audioCtx, c2, false, 0.75, masterGain); // Beat 2
+      playKlopfgeistClick(audioCtx, c3, false, 0.75, masterGain); // Beat 3
+      playKlopfgeistClick(audioCtx, c4, false, 0.75, masterGain); // Beat 4
+
+      // 2. Visual UI Counters (Synchronized to Audio Clock)
+      setCountInBeat(1);
+      const t2 = setTimeout(() => setCountInBeat(2), Math.max(0, (c2 - audioCtx.currentTime) * 1000));
+      const t3 = setTimeout(() => setCountInBeat(3), Math.max(0, (c3 - audioCtx.currentTime) * 1000));
+      const t4 = setTimeout(() => setCountInBeat(4), Math.max(0, (c4 - audioCtx.currentTime) * 1000));
+
+      // 3. Exact Seamless Transition to Measure 1 Beat 1 (0ms Delay)
+      const tRec = setTimeout(() => {
+        setIsCountingIn(false);
+        setIsRecording(true);
+        setRecordSeconds(0);
+        recordingStartTimeRef.current = Date.now();
+
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
+          try {
+            mediaRecorderRef.current.start(100);
+          } catch (e) {
+            console.error('Failed to start media recorder:', e);
+          }
+        }
+
+        if (limitTimerRef.current) clearInterval(limitTimerRef.current);
+        limitTimerRef.current = setInterval(() => {
+          const elapsed = Math.round((Date.now() - recordingStartTimeRef.current) / 1000);
+          setRecordSeconds(elapsed);
+          if (elapsed >= 420) {
+            setLimitReachedToast(true);
+            handleStopAll();
+          }
+        }, 1000);
+      }, Math.max(0, (rhythmStart - audioCtx.currentTime) * 1000));
+
+      countInTimersRef.current = [t2, t3, t4, tRec];
+
+      nextNoteTimeRef.current = rhythmStart;
+      barStartAudioTimeRef.current = rhythmStart;
+      current16thNoteRef.current = 0;
+    } else {
+      nextNoteTimeRef.current = initialStartTime;
+      barStartAudioTimeRef.current = initialStartTime;
+      current16thNoteRef.current = 0;
+    }
 
     const syncBarProgress = () => {
       if (!audioCtxRef.current || !isPlayingRef.current) return;
@@ -892,37 +1720,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     const playSnare = (volMul = 1.0) => playSample(kitBuffers.snare, sVol, volMul, 0.015);
     const playRimClick = (volMul = 1.0) => playSample(kitBuffers.rim, sVol, volMul * 0.8, 0.010);
     const playHat = (isOpen = false, volMul = 1.0) => playSample(isOpen ? kitBuffers.hatOpen : kitBuffers.hatClosed, hVol, volMul, 0.018);
-    const playClick = (isAccent = false) => {
-      // 🔊 150%+ Ultra-Loud Sample Playback Boost
-      playSample(kitBuffers.click, mVol, isAccent ? 3.6 : 2.5, 0.005);
-
-      // 🔊 High-Penetration Dual-Oscillator Synth Burst (Cuts 150% louder through acoustic instruments)
-      try {
-        const osc = ctx.createOscillator();
-        const snapOsc = ctx.createOscillator();
-        const g = ctx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(isAccent ? 1600 : 1200, time);
-
-        snapOsc.type = 'triangle';
-        snapOsc.frequency.setValueAtTime(isAccent ? 3200 : 2400, time);
-
-        const clickGainVal = mVol * (isAccent ? 3.0 : 2.0);
-        g.gain.setValueAtTime(0.001, time);
-        g.gain.linearRampToValueAtTime(clickGainVal, time + 0.001);
-        g.gain.exponentialRampToValueAtTime(0.00001, time + 0.040);
-
-        osc.connect(g);
-        snapOsc.connect(g);
-        g.connect(masterGain);
-
-        osc.start(time);
-        snapOsc.start(time);
-        osc.stop(time + 0.045);
-        snapOsc.stop(time + 0.025);
-      } catch (_) {}
-    };
+    const playClick = (isAccent = false) => playKlopfgeistClick(ctx, time, isAccent, mVol, masterGain);
 
     const triggerVisualBeat = (beatIdx: number) => {
       // Record scheduled quarter beat timestamp for Rhythmus-Coach transient alignment
@@ -1190,13 +1988,14 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       display: 'flex',
       flexDirection: 'column',
       flex: 1,
+      height: '100%',
       background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
       borderTop: '1px solid #e2e8f0',
       borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
-      minHeight: '520px',
+      minHeight: 0,
       color: '#1d1d1f',
-      padding: isMobileView ? '16px 16px calc(240px + env(safe-area-inset-bottom, 40px)) 16px' : '32px 28px',
-      gap: '24px',
+      padding: isMobileView ? '16px 16px calc(240px + env(safe-area-inset-bottom, 40px)) 16px' : '16px 20px',
+      gap: '14px',
       width: '100%',
       boxSizing: 'border-box',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
@@ -1261,21 +2060,23 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '24px', flex: 1, width: '100%' }} className="flex-col lg:flex-row">
+      <div style={{ display: 'flex', gap: '18px', flex: 1, width: '100%', minHeight: 0, height: '100%' }} className="flex-col lg:flex-row">
         {/* Left Column: Equalized Metronome Panel */}
         <div style={{
           flex: '1 1 0%',
-          minWidth: isMobileView ? '100%' : '320px',
+          minWidth: isMobileView ? '100%' : '300px',
           display: (!isMobileView || mobileTab === 'metronome') ? 'flex' : 'none',
           flexDirection: 'column',
           alignItems: 'center',
           background: '#ffffff',
           borderRadius: '20px',
           border: '1px solid #e8e8ed',
-          padding: '18px 22px',
+          padding: '16px 20px',
           justifyContent: 'space-between',
-          gap: '12px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)'
+          gap: '8px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
+          height: '100%',
+          boxSizing: 'border-box'
         }}>
           <div style={{ width: '100%', textAlign: 'center' }}>
             <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
@@ -1284,7 +2085,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           </div>
 
           {/* Mechanical Metronome Container */}
-          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '2px 0' }}>
+          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '0' }}>
             <style>{`
               @keyframes swing-anim {
                 0% { transform: rotate(-12deg); }
@@ -1296,7 +2097,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               }
             `}</style>
 
-            <svg width="155" height="185" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
+            <svg width="135" height="160" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
               <defs>
                 {/* Walnut Wood Gradient */}
                 <linearGradient id="walnutWood" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1355,7 +2156,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 d="M 90 12 L 24 195 C 24 201, 30 205, 38 205 L 142 205 C 150 205, 156 201, 156 195 Z" 
                 fill="url(#walnutWood)" 
                 stroke="#2f1d0f" 
-                strokeWidth="2.5"
+                strokeWidth="2.5" 
                 filter="url(#casingShadow)"
               />
               <path 
@@ -1485,15 +2286,15 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           </div>
 
           {/* Constant Metronome Beat Indicator Dots */}
-          <div style={{ display: 'flex', gap: '14px', margin: '5px 0' }}>
+          <div style={{ display: 'flex', gap: '10px', margin: '2px 0' }}>
             {Array.from({ length: 4 }).map((_, idx) => {
               const isActive = (activeBeatIndex !== null && activeBeatIndex !== undefined) ? (activeBeatIndex % 4 === idx) : false;
               return (
                 <div
                   key={idx}
                   style={{
-                    width: '12px',
-                    height: '12px',
+                    width: '10px',
+                    height: '10px',
                     borderRadius: '50%',
                     background: isActive 
                       ? (idx === 0 ? '#ea4335' : '#34a853') 
@@ -1510,14 +2311,14 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
           {/* Takt-Fortschritts-Sweep-Bar */}
           <div style={{
-            width: '160px',
-            height: '5px',
+            width: '140px',
+            height: '4px',
             background: '#e5e5e7',
             borderRadius: '10px',
             overflow: 'hidden',
             position: 'relative',
-            marginTop: '-2px',
-            marginBottom: '4px'
+            marginTop: '-1px',
+            marginBottom: '2px'
           }}>
             <div style={{
               position: 'absolute',
@@ -1534,28 +2335,28 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
           {/* Large Tempo Display */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ fontSize: '3.6rem', fontWeight: 900, color: '#1d1d1f', lineHeight: 1.1, fontFamily: 'SF Mono, monospace' }}>
+            <span style={{ fontSize: '2.5rem', fontWeight: 900, color: '#1d1d1f', lineHeight: 1.05, fontFamily: 'SF Mono, monospace' }}>
               {bpm}
             </span>
-            <span style={{ fontSize: '0.68rem', color: '#86868b', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700 }}>
               BEATS PER MINUTE
             </span>
           </div>
 
           {/* Plus / Minus Tempo Controls */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button
               type="button"
               onClick={() => setBpm(prev => Math.max(40, prev - 5))}
               className="tactile-btn"
               style={{
-                width: '44px',
-                height: '38px',
-                borderRadius: '10px',
+                width: '38px',
+                height: '32px',
+                borderRadius: '8px',
                 background: '#f5f5f7',
                 border: 'none',
                 color: '#1d1d1f',
-                fontSize: '0.8rem',
+                fontSize: '0.74rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
@@ -1570,13 +2371,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               onClick={() => setBpm(prev => Math.max(40, prev - 1))}
               className="tactile-btn"
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
                 background: '#f5f5f7',
                 border: 'none',
                 color: '#1d1d1f',
-                fontSize: '0.8rem',
+                fontSize: '0.74rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
@@ -1591,13 +2392,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               onClick={() => setBpm(prev => Math.min(240, prev + 1))}
               className="tactile-btn"
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
                 background: '#f5f5f7',
                 border: 'none',
                 color: '#1d1d1f',
-                fontSize: '0.8rem',
+                fontSize: '0.74rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
@@ -1612,13 +2413,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               onClick={() => setBpm(prev => Math.min(240, prev + 5))}
               className="tactile-btn"
               style={{
-                width: '44px',
-                height: '38px',
-                borderRadius: '10px',
+                width: '38px',
+                height: '32px',
+                borderRadius: '8px',
                 background: '#f5f5f7',
                 border: 'none',
                 color: '#1d1d1f',
-                fontSize: '0.8rem',
+                fontSize: '0.74rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
@@ -1639,9 +2440,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               background: '#f5f5f7',
               color: '#1d1d1f',
               border: 'none',
-              borderRadius: '12px',
-              padding: '10px',
-              fontSize: '0.72rem',
+              borderRadius: '10px',
+              padding: '7px 10px',
+              fontSize: '0.68rem',
               fontWeight: 800,
               cursor: 'pointer',
               textTransform: 'uppercase',
@@ -1657,67 +2458,332 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               width: '100%',
               background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
               border: '1px solid #34a853',
-              borderRadius: '12px',
-              padding: '10px 14px',
+              borderRadius: '10px',
+              padding: '8px 12px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '6px'
+              justifyContent: 'space-between'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Music size={15} style={{ color: '#34a853' }} />
-                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d' }}>
-                  Song-Übung: <strong>{activeSongContext.songTitle}</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Music size={14} style={{ color: '#34a853' }} />
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#15803d' }}>
+                  Song: <strong>{activeSongContext.songTitle}</strong>
                 </span>
               </div>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#166534', background: '#ffffff', padding: '2px 8px', borderRadius: '8px' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#166534', background: '#ffffff', padding: '2px 6px', borderRadius: '6px' }}>
                 {activeSongContext.targetBpm} BPM
               </span>
             </div>
           )}
 
-          {/* Clean Play/Pause Button */}
-          <button
-            type="button"
-            onClick={() => {
-              if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-                audioCtxRef.current.resume();
-              }
-              setIsPlaying(!isPlaying);
-            }}
-            className="tactile-btn"
-            style={{
+          {/* Dual Action: Starten (Play) + Aufnahme (Record with Count-In) */}
+          <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+            <button
+              type="button"
+              onClick={handleTogglePlay}
+              className="tactile-btn"
+              disabled={isRecording || isCountingIn}
+              style={{
+                flex: 1,
+                background: (isPlaying && !isRecording) ? '#1e293b' : (isRecording || isCountingIn ? '#cbd5e1' : '#34a853'),
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '10px 8px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: (isRecording || isCountingIn) ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                boxShadow: (isPlaying && !isRecording) ? '0 4px 14px rgba(30, 41, 59, 0.3)' : '0 4px 14px rgba(52, 168, 83, 0.3)',
+                transition: 'all 0.2s ease-in-out',
+                opacity: (isRecording || isCountingIn) ? 0.6 : 1
+              }}
+            >
+              {isPlaying && !isRecording ? (
+                <>
+                  <Square size={13} fill="currentColor" />
+                  <span>Stoppen</span>
+                </>
+              ) : (
+                <>
+                  <Play size={13} fill="currentColor" />
+                  <span>Starten</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleToggleRecording}
+              className="tactile-btn"
+              style={{
+                flex: 1,
+                background: isRecording ? '#dc2626' : (isCountingIn ? '#f59e0b' : '#fef2f2'),
+                color: isRecording || isCountingIn ? '#ffffff' : '#dc2626',
+                border: isRecording ? '1.5px solid #ef4444' : (isCountingIn ? '1.5px solid #d97706' : '1.5px solid #fecaca'),
+                borderRadius: '12px',
+                padding: '10px 8px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.55), 0 4px 14px rgba(220, 38, 38, 0.4)' : (isCountingIn ? '0 4px 14px rgba(245, 158, 11, 0.3)' : '0 2px 8px rgba(220, 38, 38, 0.1)'),
+                transition: 'all 0.2s ease-in-out',
+                animation: isRecording ? 'paniniGlow 1.2s infinite alternate' : 'none'
+              }}
+            >
+              {isRecording ? (
+                <>
+                  <Square size={13} fill="currentColor" />
+                  <span>Rec Stopp ({formatTime(recordSeconds)})</span>
+                </>
+              ) : isCountingIn ? (
+                <>
+                  <Clock size={13} className="animate-spin" />
+                  <span>Einzähler {countInBeat}/4</span>
+                </>
+              ) : (
+                <>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#dc2626', flexShrink: 0 }} />
+                  <span>Aufnahme</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* 🎧 Apple / Spotify Take-Decision-Stage (Vorhören, Weiter üben oder Speichern) */}
+          {pendingPreviewTake && (
+            <div style={{
               width: '100%',
-              background: isPlaying ? '#ea4335' : '#34a853',
-              color: '#ffffff',
-              border: 'none',
+              background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              border: '1.5px solid #fde68a',
+              borderRadius: '16px',
+              padding: '14px 16px',
+              boxShadow: '0 8px 24px -4px rgba(245, 158, 11, 0.18), 0 2px 6px rgba(0,0,0,0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              boxSizing: 'border-box'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    boxShadow: '0 3px 8px rgba(245, 158, 11, 0.35)',
+                    flexShrink: 0
+                  }}>
+                    <Headphones size={16} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        🎧 Dein Take zum Vorhören
+                      </span>
+                      <span style={{ fontSize: '0.56rem', color: '#94a3b8' }}>
+                        {new Date(pendingPreviewTake.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <h4 style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', margin: '2px 0 0 0', lineHeight: 1.2 }}>
+                      {pendingPreviewTake.title}
+                    </h4>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleDiscardPendingTake}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  title="Schließen & verwerfen"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Mini Audio Playback Controls */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '10px',
+                padding: '8px 12px',
+                border: '1px solid #fde68a',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <button
+                  type="button"
+                  onClick={handleTogglePreviewPlay}
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '50%',
+                    background: '#f59e0b',
+                    color: '#ffffff',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(245, 158, 11, 0.3)',
+                    flexShrink: 0
+                  }}
+                >
+                  {isPreviewPlaying ? <Pause size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" style={{ marginLeft: '1px' }} />}
+                </button>
+
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <div style={{
+                    width: '100%',
+                    height: '5px',
+                    background: '#fef3c7',
+                    borderRadius: '999px',
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: `${previewProgress}%`,
+                      background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                      borderRadius: '999px',
+                      transition: 'width 0.1s linear'
+                    }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.58rem', color: '#78350f', fontFamily: 'SF Mono, monospace' }}>
+                    <span>{formatTime(previewCurrentTime)}</span>
+                    <span>{formatTime(pendingPreviewTake.duration)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2 Primary Actions: Weiter üben (Löschen) OR An Aufnahmen senden */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+                <button
+                  type="button"
+                  onClick={handleDiscardPendingTake}
+                  className="tactile-btn"
+                  style={{
+                    flex: 1,
+                    background: '#ffffff',
+                    color: '#64748b',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '10px',
+                    padding: '8px 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <RotateCcw size={13} />
+                  <span>Weiter üben</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSavePendingTake}
+                  disabled={isSavingTake}
+                  className="tactile-btn"
+                  style={{
+                    flex: 1.4,
+                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '8px 10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: isSavingTake ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    boxShadow: '0 3px 10px rgba(22, 163, 74, 0.35)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Check size={14} strokeWidth={2.6} />
+                  <span>{isSavingTake ? 'Speichern...' : 'An Aufnahmen senden ⭐'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 🌟 Success Toast when Take was permanently saved */}
+          {savedTakeSuccessToast && (
+            <div style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              border: '1.5px solid #86efac',
               borderRadius: '14px',
-              padding: '14px',
-              fontSize: '0.86rem',
-              fontWeight: 800,
-              cursor: 'pointer',
+              padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              boxShadow: isPlaying ? '0 4px 14px rgba(234, 67, 53, 0.3)' : '0 4px 14px rgba(52, 168, 83, 0.3)',
-              transition: 'all 0.2s ease-in-out'
-            }}
-          >
-            {isPlaying ? (
-              <>
-                <Square size={14} fill="currentColor" />
-                <span>Stoppen</span>
-              </>
-            ) : (
-              <>
-                <Play size={14} fill="currentColor" />
-                <span>Starten</span>
-              </>
-            )}
-          </button>
+              justifyContent: 'space-between',
+              animation: 'scaleIn 0.2s ease-out',
+              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.15)',
+              boxSizing: 'border-box'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle2 size={16} color="#16a34a" />
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534' }}>
+                  ✨ Im Aufnahmen-Modul gesichert!
+                </span>
+              </div>
+              {onNavigateToRecordings && (
+                <button
+                  type="button"
+                  onClick={onNavigateToRecordings}
+                  style={{
+                    background: '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '3px 8px',
+                    fontSize: '0.64rem',
+                    fontWeight: 750,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Öffnen →
+                </button>
+              )}
+            </div>
+          )}
 
           {/* ⭐️ Non-XP 3-Star Summary Card Modal */}
           {summaryCardData && (
@@ -1981,67 +3047,108 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           )}
         </div>
 
-        {/* Right Column: Equalized Drum Beat Generator & Mixer Panel (Generous 50/50 Breathing Room) */}
+        {/* Right Column: Equalized Drum Beat Generator & Mixer Panel (Harmonized Studio Pro) */}
         <div style={{
           flex: '1 1 0%',
           minWidth: isMobileView ? '100%' : '320px',
           display: (!isMobileView || mobileTab === 'rhythms') ? 'flex' : 'none',
           flexDirection: 'column',
           background: '#ffffff',
-          borderRadius: '20px',
-          border: '1px solid #e8e8ed',
-          padding: '24px 26px',
-          gap: '20px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)'
+          borderRadius: '24px',
+          border: '1px solid #e2e8f0',
+          padding: '20px 24px',
+          gap: '14px',
+          boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.04)',
+          height: '100%',
+          boxSizing: 'border-box'
         }}>
+          {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
             <div>
-              <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                 BEAT GENERATOR
               </span>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f', margin: '2px 0 0 0' }}>Begleit-Rhythmen</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: '2px 0 0 0' }}>Begleit-Rhythmen</h3>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-                  audioCtxRef.current.resume();
-                }
-                setIsPlaying(!isPlaying);
-              }}
-              className="tactile-btn"
-              style={{
-                background: isPlaying ? '#ea4335' : '#34a853',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '10px 18px',
-                fontSize: '0.82rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: isPlaying ? '0 4px 14px rgba(234, 67, 53, 0.3)' : '0 4px 14px rgba(52, 168, 83, 0.3)',
-                transition: 'all 0.2s ease-in-out'
-              }}
-            >
-              {isPlaying ? (
-                <>
-                  <Square size={14} fill="currentColor" />
-                  <span>Stoppen</span>
-                </>
-              ) : (
-                <>
-                  <Play size={14} fill="currentColor" />
-                  <span>Starten</span>
-                </>
-              )}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleTogglePlay}
+                className="tactile-btn"
+                disabled={isRecording || isCountingIn}
+                style={{
+                  background: (isPlaying && !isRecording) ? '#1e293b' : (isRecording || isCountingIn ? '#cbd5e1' : '#34a853'),
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '9px 16px',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  cursor: (isRecording || isCountingIn) ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: (isPlaying && !isRecording) ? '0 4px 14px rgba(30, 41, 59, 0.3)' : '0 4px 14px rgba(52, 168, 83, 0.25)',
+                  transition: 'all 0.2s ease-in-out',
+                  opacity: (isRecording || isCountingIn) ? 0.6 : 1
+                }}
+              >
+                {isPlaying && !isRecording ? (
+                  <>
+                    <Square size={14} fill="currentColor" />
+                    <span>Stoppen</span>
+                  </>
+                ) : (
+                  <>
+                    <Play size={14} fill="currentColor" />
+                    <span>Starten</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleToggleRecording}
+                className="tactile-btn"
+                style={{
+                  background: isRecording ? '#dc2626' : (isCountingIn ? '#f59e0b' : '#fef2f2'),
+                  color: isRecording || isCountingIn ? '#ffffff' : '#dc2626',
+                  border: isRecording ? '1.5px solid #ef4444' : (isCountingIn ? '1.5px solid #d97706' : '1.5px solid #fecaca'),
+                  borderRadius: '12px',
+                  padding: '9px 16px',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.55), 0 4px 14px rgba(220, 38, 38, 0.4)' : (isCountingIn ? '0 4px 14px rgba(245, 158, 11, 0.3)' : '0 2px 8px rgba(220, 38, 38, 0.1)'),
+                  transition: 'all 0.2s ease-in-out',
+                  animation: isRecording ? 'paniniGlow 1.2s infinite alternate' : 'none'
+                }}
+              >
+                {isRecording ? (
+                  <>
+                    <Square size={14} fill="currentColor" />
+                    <span>Rec Stopp ({formatTime(recordSeconds)})</span>
+                  </>
+                ) : isCountingIn ? (
+                  <>
+                    <Clock size={14} className="animate-spin" />
+                    <span>Einzähler {countInBeat}/4</span>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#dc2626', flexShrink: 0 }} />
+                    <span>Aufnahme</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Rhythms Selector Grid */}
+          {/* Rhythms Selector Grid (Enlarged, Symmetrical 2-Column Grid) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(2, 1fr)',
@@ -2058,7 +3165,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               { id: 'reggae', label: 'Reggae One-Drop' },
               { id: 'walzer', label: 'Walzer (3/4 Takt)' },
               { id: 'ballad68', label: '6/8 Ballade' },
-              { id: 'disco', label: 'Disco (4-on-the-Floor)' }
+              { id: 'disco', label: 'Disco (4-on-the-Floor)', spanFull: true }
             ].map((styleOpt) => {
               const isSelected = selectedStyle === styleOpt.id;
               return (
@@ -2074,46 +3181,63 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   }}
                   className="tactile-btn"
                   style={{
-                    background: isSelected ? '#34a853' : '#f5f5f7',
-                    color: isSelected ? '#ffffff' : '#1d1d1f',
-                    border: 'none',
+                    gridColumn: (styleOpt as any).spanFull ? '1 / -1' : undefined,
+                    background: isSelected ? '#34a853' : '#f8fafc',
+                    color: isSelected ? '#ffffff' : '#1e293b',
+                    border: isSelected ? '1.5px solid #2d9249' : '1px solid #e2e8f0',
                     borderRadius: '12px',
                     padding: '10px 14px',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
+                    fontSize: '0.80rem',
+                    fontWeight: isSelected ? 800 : 700,
                     cursor: 'pointer',
-                    textAlign: 'left'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    minHeight: '42px',
+                    transition: 'all 0.15s ease',
+                    boxShadow: isSelected ? '0 4px 12px rgba(52, 168, 83, 0.25)' : 'none'
                   }}
                 >
-                  {styleOpt.label}
+                  <span>{styleOpt.label}</span>
+                  {isSelected && (
+                    <span style={{
+                      fontSize: '0.64rem',
+                      fontWeight: 900,
+                      background: 'rgba(255, 255, 255, 0.25)',
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      letterSpacing: '0.04em'
+                    }}>
+                      Aktiv
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
 
-          {/* Master Volume & Power Boost Control */}
+          {/* Master Volume & Power Boost Control (Container Card) */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
-            marginTop: '8px',
-            borderTop: '1px solid #f1f3f5',
-            paddingTop: '14px',
-            background: volMaster > 100 ? 'rgba(234, 179, 8, 0.06)' : 'transparent',
-            borderRadius: '12px',
-            padding: '12px'
+            gap: '6px',
+            background: volMaster > 100 ? 'rgba(234, 179, 8, 0.08)' : '#f8fafc',
+            border: volMaster > 100 ? '1px solid rgba(234, 179, 8, 0.3)' : '1px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '12px 16px',
+            transition: 'all 0.2s ease'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Volume2 style={{ width: '14px', height: '14px', color: volMaster > 100 ? '#d97706' : '#1d1d1f' }} />
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1d1d1f' }}>Master-Lautstärke</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Volume2 style={{ width: '15px', height: '15px', color: volMaster > 100 ? '#d97706' : '#1e293b' }} />
+                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>Master-Lautstärke</span>
                 {volMaster > 100 && (
-                  <span style={{ fontSize: '0.55rem', fontWeight: 800, padding: '2px 6px', borderRadius: '6px', background: '#eab308', color: '#ffffff', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: '0.56rem', fontWeight: 800, padding: '2px 6px', borderRadius: '6px', background: '#eab308', color: '#ffffff', letterSpacing: '0.04em' }}>
                     ⚡ POWER BOOST (+{Math.round((volMaster - 100) / 8.33)}dB)
                   </span>
                 )}
               </div>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: volMaster > 100 ? '#d97706' : '#86868b', fontFamily: 'SF Mono, monospace' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: volMaster > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace' }}>
                 {volMaster}%
               </span>
             </div>
@@ -2124,25 +3248,26 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               value={volMaster}
               onChange={(e) => setVolMaster(Number(e.target.value))}
               className="groovelab-fader"
-              style={{ flex: 1 }}
+              style={{ width: '100%' }}
             />
           </div>
 
-          {/* Beat Variations Selector */}
+          {/* Beat Variations Selector (Container Card) */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             gap: '8px',
-            marginTop: '8px',
-            borderTop: '1px solid #f1f3f5',
-            paddingTop: '14px'
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '12px 16px'
           }}>
-            <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               Groove-Variationen
             </span>
             <div style={{
               display: 'flex',
-              gap: '6px'
+              gap: '8px'
             }}>
               {[
                 { id: 'A', label: 'Variante A: Standard' },
@@ -2158,17 +3283,17 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     className="tactile-btn"
                     style={{
                       flex: 1,
-                      background: isSelected ? '#eab308' : '#f5f5f7',
-                      color: isSelected ? '#ffffff' : '#1d1d1f',
-                      border: 'none',
+                      background: isSelected ? '#eab308' : '#ffffff',
+                      color: isSelected ? '#ffffff' : '#334155',
+                      border: isSelected ? '1.5px solid #ca8a04' : '1px solid #cbd5e1',
                       borderRadius: '10px',
-                      padding: '8px 4px',
-                      fontSize: '0.66rem',
-                      fontWeight: 700,
+                      padding: '9px 8px',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
                       cursor: 'pointer',
                       textAlign: 'center',
-                      transition: 'all 0.2s ease-in-out',
-                      boxShadow: isSelected ? '0 2px 8px rgba(234, 179, 8, 0.3)' : 'none'
+                      transition: 'all 0.15s ease-in-out',
+                      boxShadow: isSelected ? '0 3px 8px rgba(234, 179, 8, 0.3)' : '0 1px 2px rgba(0,0,0,0.03)'
                     }}
                   >
                     {varOpt.label}
@@ -2178,20 +3303,21 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             </div>
           </div>
 
-          {/* Mixer Channel Strips */}
+          {/* Mixer Channel Strips (Container Card) */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '14px',
-            marginTop: '10px',
-            borderTop: '1px solid #f1f3f5',
-            paddingTop: '16px'
+            gap: '10px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '12px 16px'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+              <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                 INSTRUMENTEN MIXER
               </span>
-              <span style={{ fontSize: '0.55rem', color: '#5f6368', background: '#f5f5f7', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, border: '1px solid #e5e7eb' }}>
+              <span style={{ fontSize: '0.58rem', color: '#334155', background: '#ffffff', padding: '2px 8px', borderRadius: '6px', fontWeight: 800, border: '1px solid #cbd5e1' }}>
                 🥁 {selectedStyle === 'singersongwriter' ? 'Singer-Songwriter Soft Mahogany Kit' :
                      selectedStyle === 'swing' ? 'Smoky Vintage Jazz Brush Kit' :
                      selectedStyle === 'hiphop' ? 'Dark Tape Boom-Bap Sub Kit' :
@@ -2206,10 +3332,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             </div>
 
             {selectedStyle === 'metronome' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Klick-Lautstärke</span>
-                  <span style={{ fontSize: '0.62rem', color: volMetronome > 100 ? '#d97706' : '#86868b', fontFamily: 'SF Mono, monospace', fontWeight: 700 }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>Klick-Lautstärke</span>
+                  <span style={{ fontSize: '0.66rem', color: volMetronome > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace', fontWeight: 800 }}>
                     {volMetronome}% {volMetronome > 100 && '⚡'}
                   </span>
                 </div>
@@ -2219,15 +3345,16 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       type="button"
                       onClick={() => toggleMute('click')}
                       style={{
-                        width: '24px',
-                        height: '24px',
+                        width: '26px',
+                        height: '26px',
                         borderRadius: '6px',
                         border: 'none',
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
+                        fontSize: '0.65rem',
+                        fontWeight: 900,
                         cursor: 'pointer',
-                        background: isMuted('click') ? '#ea4335' : '#f5f5f7',
-                        color: isMuted('click') ? '#ffffff' : '#5f6368',
+                        background: isMuted('click') ? '#ea4335' : '#ffffff',
+                        color: isMuted('click') ? '#ffffff' : '#64748b',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                         transition: 'all 0.15s ease-in-out'
                       }}
                     >
@@ -2237,15 +3364,16 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       type="button"
                       onClick={() => toggleSolo('click')}
                       style={{
-                        width: '24px',
-                        height: '24px',
+                        width: '26px',
+                        height: '26px',
                         borderRadius: '6px',
                         border: 'none',
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
+                        fontSize: '0.65rem',
+                        fontWeight: 900,
                         cursor: 'pointer',
-                        background: isSolo('click') ? '#eab308' : '#f5f5f7',
-                        color: isSolo('click') ? '#ffffff' : '#5f6368',
+                        background: isSolo('click') ? '#eab308' : '#ffffff',
+                        color: isSolo('click') ? '#ffffff' : '#64748b',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                         transition: 'all 0.15s ease-in-out'
                       }}
                     >
@@ -2264,12 +3392,16 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 </div>
               </div>
             ) : (
-              <>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobileView ? '1fr' : 'repeat(2, 1fr)',
+                gap: '10px 16px'
+              }}>
                 {/* Bass Drum (Kick) Channel */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Bass Drum (Kick)</span>
-                    <span style={{ fontSize: '0.62rem', color: volKick > 100 ? '#d97706' : '#86868b', fontFamily: 'SF Mono, monospace', fontWeight: 700 }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>Bass Drum (Kick)</span>
+                    <span style={{ fontSize: '0.62rem', color: volKick > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace', fontWeight: 800 }}>
                       {volKick}% {volKick > 100 && '⚡'}
                     </span>
                   </div>
@@ -2284,10 +3416,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           borderRadius: '6px',
                           border: 'none',
                           fontSize: '0.62rem',
-                          fontWeight: 800,
+                          fontWeight: 900,
                           cursor: 'pointer',
-                          background: isMuted('kick') ? '#ea4335' : '#f5f5f7',
-                          color: isMuted('kick') ? '#ffffff' : '#5f6368',
+                          background: isMuted('kick') ? '#ea4335' : '#ffffff',
+                          color: isMuted('kick') ? '#ffffff' : '#64748b',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
                           transition: 'all 0.15s ease-in-out'
                         }}
                       >
@@ -2302,10 +3435,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           borderRadius: '6px',
                           border: 'none',
                           fontSize: '0.62rem',
-                          fontWeight: 800,
+                          fontWeight: 900,
                           cursor: 'pointer',
-                          background: isSolo('kick') ? '#eab308' : '#f5f5f7',
-                          color: isSolo('kick') ? '#ffffff' : '#5f6368',
+                          background: isSolo('kick') ? '#eab308' : '#ffffff',
+                          color: isSolo('kick') ? '#ffffff' : '#64748b',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
                           transition: 'all 0.15s ease-in-out'
                         }}
                       >
@@ -2325,10 +3459,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 </div>
 
                 {/* Snare Drum Channel */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Snare Drum</span>
-                    <span style={{ fontSize: '0.62rem', color: volSnare > 100 ? '#d97706' : '#86868b', fontFamily: 'SF Mono, monospace', fontWeight: 700 }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>Snare Drum</span>
+                    <span style={{ fontSize: '0.62rem', color: volSnare > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace', fontWeight: 800 }}>
                       {volSnare}% {volSnare > 100 && '⚡'}
                     </span>
                   </div>
@@ -2343,10 +3477,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           borderRadius: '6px',
                           border: 'none',
                           fontSize: '0.62rem',
-                          fontWeight: 800,
+                          fontWeight: 900,
                           cursor: 'pointer',
-                          background: isMuted('snare') ? '#ea4335' : '#f5f5f7',
-                          color: isMuted('snare') ? '#ffffff' : '#5f6368',
+                          background: isMuted('snare') ? '#ea4335' : '#ffffff',
+                          color: isMuted('snare') ? '#ffffff' : '#64748b',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
                           transition: 'all 0.15s ease-in-out'
                         }}
                       >
@@ -2361,10 +3496,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           borderRadius: '6px',
                           border: 'none',
                           fontSize: '0.62rem',
-                          fontWeight: 800,
+                          fontWeight: 900,
                           cursor: 'pointer',
-                          background: isSolo('snare') ? '#eab308' : '#f5f5f7',
-                          color: isSolo('snare') ? '#ffffff' : '#5f6368',
+                          background: isSolo('snare') ? '#eab308' : '#ffffff',
+                          color: isSolo('snare') ? '#ffffff' : '#64748b',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
                           transition: 'all 0.15s ease-in-out'
                         }}
                       >
@@ -2384,10 +3520,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 </div>
 
                 {/* Hi-Hat Channel */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Hi-Hat</span>
-                    <span style={{ fontSize: '0.62rem', color: volHat > 100 ? '#d97706' : '#86868b', fontFamily: 'SF Mono, monospace', fontWeight: 700 }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>Hi-Hat</span>
+                    <span style={{ fontSize: '0.62rem', color: volHat > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace', fontWeight: 800 }}>
                       {volHat}% {volHat > 100 && '⚡'}
                     </span>
                   </div>
@@ -2402,10 +3538,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           borderRadius: '6px',
                           border: 'none',
                           fontSize: '0.62rem',
-                          fontWeight: 800,
+                          fontWeight: 900,
                           cursor: 'pointer',
-                          background: isMuted('hat') ? '#ea4335' : '#f5f5f7',
-                          color: isMuted('hat') ? '#ffffff' : '#5f6368',
+                          background: isMuted('hat') ? '#ea4335' : '#ffffff',
+                          color: isMuted('hat') ? '#ffffff' : '#64748b',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
                           transition: 'all 0.15s ease-in-out'
                         }}
                       >
@@ -2420,10 +3557,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           borderRadius: '6px',
                           border: 'none',
                           fontSize: '0.62rem',
-                          fontWeight: 800,
+                          fontWeight: 900,
                           cursor: 'pointer',
-                          background: isSolo('hat') ? '#eab308' : '#f5f5f7',
-                          color: isSolo('hat') ? '#ffffff' : '#5f6368',
+                          background: isSolo('hat') ? '#eab308' : '#ffffff',
+                          color: isSolo('hat') ? '#ffffff' : '#64748b',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
                           transition: 'all 0.15s ease-in-out'
                         }}
                       >
@@ -2441,7 +3579,68 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     />
                   </div>
                 </div>
-              </>
+
+                {/* Metronom Klick Channel (in Drum Mode) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>Metronom Klick</span>
+                    <span style={{ fontSize: '0.62rem', color: volMetronome > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace', fontWeight: 800 }}>
+                      {volMetronome}% {volMetronome > 100 && '⚡'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleMute('click')}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '0.62rem',
+                          fontWeight: 900,
+                          cursor: 'pointer',
+                          background: isMuted('click') ? '#ea4335' : '#ffffff',
+                          color: isMuted('click') ? '#ffffff' : '#64748b',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                          transition: 'all 0.15s ease-in-out'
+                        }}
+                      >
+                        M
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleSolo('click')}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '0.62rem',
+                          fontWeight: 900,
+                          cursor: 'pointer',
+                          background: isSolo('click') ? '#eab308' : '#ffffff',
+                          color: isSolo('click') ? '#ffffff' : '#64748b',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                          transition: 'all 0.15s ease-in-out'
+                        }}
+                      >
+                        S
+                      </button>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="200"
+                      value={volMetronome}
+                      onChange={(e) => setVolMetronome(Number(e.target.value))}
+                      className="groovelab-fader"
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -2774,6 +3973,174 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* 🔴 4-Beat Count-In HUD Overlay */}
+      {isCountingIn && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          zIndex: 999999,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          animation: 'fadeIn 0.15s ease'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '28px',
+            padding: '32px 40px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '16px',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.35)',
+            border: '2px solid rgba(239, 68, 68, 0.2)',
+            maxWidth: '340px',
+            width: '90%',
+            animation: 'scaleIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#fee2e2',
+              color: '#dc2626',
+              padding: '5px 14px',
+              borderRadius: '999px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase'
+            }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#dc2626', animation: 'pulse 1s infinite' }} />
+              <span>Aufnahme startet...</span>
+            </div>
+
+            {/* Big Animated Count Number */}
+            <div
+              key={countInBeat}
+              style={{
+                fontSize: '5rem',
+                fontWeight: 900,
+                color: '#dc2626',
+                lineHeight: 1,
+                fontFamily: 'SF Pro Display, -apple-system, sans-serif',
+                animation: 'countdownPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+              }}
+            >
+              {countInBeat}
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '10px',
+              marginTop: '4px'
+            }}>
+              {[1, 2, 3, 4].map(b => (
+                <div
+                  key={b}
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '50%',
+                    background: b <= countInBeat ? '#dc2626' : '#e2e8f0',
+                    transition: 'all 0.15s ease',
+                    transform: b === countInBeat ? 'scale(1.3)' : 'scale(1)',
+                    boxShadow: b === countInBeat ? '0 0 10px rgba(220, 38, 38, 0.5)' : 'none'
+                  }}
+                />
+              ))}
+            </div>
+
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+              Mache dich bereit für Takt 1 ({bpm} BPM)
+            </span>
+
+            <button
+              type="button"
+              onClick={handleStopAll}
+              style={{
+                marginTop: '6px',
+                background: '#f1f5f9',
+                color: '#64748b',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '6px 14px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ⏱️ 7-Minuten Limit Reached Toast */}
+      {limitReachedToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(15, 23, 42, 0.92)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          color: '#ffffff',
+          padding: '12px 20px',
+          borderRadius: '16px',
+          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.28)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          zIndex: 999999,
+          maxWidth: '460px',
+          width: '92%',
+          animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            background: '#22c55e',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            flexShrink: 0
+          }}>
+            <CheckCircle2 size={18} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h5 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, color: '#ffffff' }}>
+              7-Minuten-Aufnahmelimit erreicht!
+            </h5>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.7rem', color: '#cbd5e1', lineHeight: 1.3 }}>
+              Deine Aufnahme wurde sicher gespeichert. Das Metronom läuft für dich weiter!
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setLimitReachedToast(false)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              padding: '4px'
+            }}
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
     </div>

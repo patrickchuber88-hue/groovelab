@@ -221,6 +221,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     window.location.replace('/');
   };
 
+  const getISOWeekLocal = (d: Date) => {
+    const target = new Date(d.valueOf());
+    const dayNr = (d.getDay() + 6) % 7;
+    target.setDate(target.getDate() - dayNr + 3);
+    const firstThursday = target.valueOf();
+    target.setMonth(0, 1);
+    if (target.getDay() !== 4) {
+      target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+    }
+    return Math.ceil((firstThursday - target.valueOf()) / 604800000) + 1;
+  };
+
   // Admin Mobile Stats
   const [adminStats, setAdminStats] = useState({ activeStudents: 0, activeTeachers: 0, pendingActivations: 0 });
   const [loadingAdminStats, setLoadingAdminStats] = useState(false);
@@ -1165,7 +1177,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers/Lehrers/Admins holen
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
         const upperToken = token.toUpperCase();
-        const selectFields = 'id, first_name, last_name, role, roles, school_id, teacher_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals';
+        const selectFields = 'id, first_name, last_name, role, roles, school_id, teacher_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, weekly_jokers_used, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals';
         const minimalFields = 'id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, is_pin_activated, has_parent_pin';
 
         let userData: any = null;
@@ -2581,26 +2593,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           };
           const diffDays = getDaysBetween(lastSecuredDate, todayStr);
           const totalMissedDays = diffDays - 1;
-
-          const getISOWeekLocal = (d: Date) => {
-            const target = new Date(d.valueOf());
-            const dayNr = (d.getDay() + 6) % 7;
-            target.setDate(target.getDate() - dayNr + 3);
-            const firstThursday = target.valueOf();
-            target.setMonth(0, 1);
-            if (target.getDay() !== 4) {
-              target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
-            }
-            return Math.ceil((firstThursday - target.valueOf()) / 604800000) + 1;
-          };
           
           const currentWeek = getISOWeekLocal(new Date());
           const lastJokerWeek = profile?.joker_used_at ? getISOWeekLocal(new Date(profile.joker_used_at)) : null;
-          const isJokerAvailable = !profile?.joker_used_at || lastJokerWeek !== currentWeek;
+          const usedJokersThisWeek = lastJokerWeek === currentWeek ? ((profile as any)?.weekly_jokers_used || 1) : 0;
+          const availableShields = Math.max(0, 3 - usedJokersThisWeek);
 
           let unprotectedMissedDays = totalMissedDays;
-          if (isJokerAvailable && currentStreak > 0) {
-            unprotectedMissedDays = totalMissedDays - 1;
+          if (availableShields > 0 && currentStreak > 0) {
+            const shieldsToUse = Math.min(availableShields, totalMissedDays);
+            unprotectedMissedDays = Math.max(0, totalMissedDays - shieldsToUse);
             usedJokerThisSession = true;
           }
 
@@ -2686,10 +2688,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       }
 
       if (usedJokerThisSession) {
+        const lastJokerWeek = profile?.joker_used_at ? getISOWeekLocal(new Date(profile.joker_used_at)) : null;
+        const currentWeek = getISOWeekLocal(new Date());
+        const prevUsed = lastJokerWeek === currentWeek ? ((profile as any)?.weekly_jokers_used || 1) : 0;
+        const newWeeklyUsed = Math.min(3, prevUsed + 1);
+
         await supabase.from('users').update({
-          joker_used_at: new Date().toISOString()
+          joker_used_at: new Date().toISOString(),
+          weekly_jokers_used: newWeeklyUsed
         }).eq('id', profile.id);
         profile.joker_used_at = new Date().toISOString();
+        (profile as any).weekly_jokers_used = newWeeklyUsed;
       }
 
       broadcastPracticeUpdate(profile.id, { metrics });
@@ -8932,10 +8941,35 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               Tagesserie
                             </span>
                           </div>
-                          <div style={{ marginTop: '10px' }}>
+                          <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '4px' }}>
                             <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>
                               {(stats?.streak_flame || avatar?.streak_flame || 0) === 1 ? '1 Tag' : `${stats?.streak_flame || avatar?.streak_flame || 0} Tage`}
                             </span>
+                            {(() => {
+                              const currentWeek = getISOWeekLocal(new Date());
+                              const lastJokerWeek = profile?.joker_used_at ? getISOWeekLocal(new Date(profile.joker_used_at)) : null;
+                              const usedJokersThisWeek = lastJokerWeek === currentWeek ? ((profile as any)?.weekly_jokers_used || 1) : 0;
+                              const availableShields = Math.max(0, 3 - usedJokersThisWeek);
+                              return (
+                                <span style={{
+                                  fontSize: '0.58rem',
+                                  fontWeight: 800,
+                                  background: 'rgba(255, 255, 255, 0.22)',
+                                  backdropFilter: 'blur(6px)',
+                                  WebkitBackdropFilter: 'blur(6px)',
+                                  border: '1px solid rgba(255, 255, 255, 0.35)',
+                                  color: '#ffffff',
+                                  padding: '2px 6px',
+                                  borderRadius: '6px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
+                                }} title={`${availableShields}/3 Schutzschilde in KW ${currentWeek} bereit`}>
+                                  <Shield size={9} fill={availableShields > 0 ? '#38bdf8' : 'none'} color="#ffffff" />
+                                  <span>{availableShields}/3 Schilde</span>
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
 

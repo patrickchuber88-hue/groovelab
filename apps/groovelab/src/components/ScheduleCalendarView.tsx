@@ -4056,11 +4056,11 @@ export function ScheduleCalendarView({
   const getOtherRoomOccupancies = (dateStr: string, roomId: string) => {
     const dayDate = new Date(dateStr);
     const dayOfWeek = dayDate.getDay() || 7;
-    const rawList: { start: number; end: number; type: string; title: string; teacherName?: string }[] = [];
+    const intervals: { start: number; end: number; type: string; teacherName?: string; title?: string; isOwnBooking?: boolean }[] = [];
 
-    // 1. Template schedules of teachers for this room
+    // 1. Template schedules of other teachers for this room
     cachedWeekSchedules.forEach((s: any) => {
-      if (s.room_id === roomId && s.day_of_week === dayOfWeek) {
+      if (s.room_id === roomId && s.teacher_id !== userId && s.day_of_week === dayOfWeek) {
         const start = timeToMinutes(s.time_slot);
         const end = start + (s.duration || 45);
         const hasCancelledOcc = cachedWeekOccurrences.some(o => 
@@ -4069,15 +4069,8 @@ export function ScheduleCalendarView({
           ['cancelled', 'canceled_by_student'].includes(o.status)
         );
         if (!hasCancelledOcc) {
-          const studentName = `${s.first_name || ''} ${s.last_name || ''}`.trim();
-          const teacherName = s.teacher_name || (s.teachers ? `${s.teachers.first_name || ''} ${s.teachers.last_name || ''}`.trim() : '');
-          rawList.push({
-            start,
-            end,
-            type: 'template',
-            title: studentName || s.instrument || 'Unterricht',
-            teacherName: teacherName || undefined
-          });
+          const tName = formatTeacherFullName(s.teacher || allSchoolTeachers.find(t => t.id === s.teacher_id));
+          intervals.push({ start, end, type: 'template', teacherName: tName !== 'Lehrkraft' ? tName : '', isOwnBooking: false });
         }
       }
     });
@@ -4085,22 +4078,27 @@ export function ScheduleCalendarView({
     // 2. Room bookings (of other teachers and manual reservations)
     cachedWeekRoomBookings.forEach((rb: any) => {
       if (rb.room_id === roomId && rb.date === dateStr) {
+        if (rb.booked_by === userId && rb.title?.startsWith('Unterricht:')) {
+          return;
+        }
         const start = timeToMinutes(rb.start_time);
         const end = timeToMinutes(rb.end_time || rb.start_time);
         const duration = end > start ? (end - start) : 45;
-        rawList.push({
-          start,
-          end: start + duration,
-          type: 'booking',
-          title: rb.title || 'Raumbuchung',
-          teacherName: rb.booked_by_name || rb.teacher_name || undefined
-        });
+        const isOwn = rb.booked_by === userId;
+        const booker = isOwn
+          ? 'Du'
+          : (rb.user ? formatTeacherFullName(rb.user) : (allSchoolTeachers.find(t => t.id === rb.booked_by) ? formatTeacherFullName(allSchoolTeachers.find(t => t.id === rb.booked_by)) : ''));
+        const title = rb.title || '';
+        const displayLabel = isOwn
+          ? (title || 'Zusatzbuchung')
+          : (booker && booker !== 'Lehrkraft' ? (title && !title.startsWith('Unterricht') ? `${booker} (${title})` : booker) : (title || 'Verwaltung / Buchung'));
+        intervals.push({ start, end: start + duration, type: 'booking', teacherName: displayLabel, title, isOwnBooking: isOwn });
       }
     });
 
-    // 3. Occurrences for this room
+    // 3. Occurrences for this room of other teachers
     cachedWeekOccurrences.forEach((o: any) => {
-      if (o.date === dateStr && o.status !== 'cancelled') {
+      if (o.teacher_id !== userId && o.date === dateStr && o.status !== 'cancelled') {
         const booking = cachedWeekRoomBookings.find(b => 
           b.date === o.date && 
           b.start_time?.substring(0, 5) === o.start_time?.substring(0, 5) &&
@@ -4110,34 +4108,32 @@ export function ScheduleCalendarView({
         if (currentRoomId === roomId) {
           const start = timeToMinutes(o.start_time);
           const end = start + (o.duration || 45);
-          if (!rawList.some(inv => inv.start === start && Math.abs(inv.end - end) < 5)) {
-            const studentName = `${o.first_name || ''} ${o.last_name || ''}`.trim();
-            rawList.push({
-              start,
-              end,
-              type: 'occurrence',
-              title: studentName || o.instrument || 'Unterricht',
-              teacherName: o.teacher_name || undefined
-            });
+          if (!intervals.some(inv => inv.start === start && inv.type === 'template')) {
+            const tName = formatTeacherFullName(o.teacher || allSchoolTeachers.find(t => t.id === o.teacher_id));
+            intervals.push({ start, end, type: 'occurrence', teacherName: tName !== 'Lehrkraft' ? tName : '', isOwnBooking: false });
           }
         }
       }
     });
 
-    rawList.sort((a, b) => a.start - b.start);
+    intervals.sort((a, b) => a.start - b.start);
 
-    const merged: typeof rawList = [];
-    rawList.forEach(inv => {
+    const merged: typeof intervals = [];
+    intervals.forEach(inv => {
       if (merged.length === 0) {
-        merged.push(inv);
+        merged.push({ ...inv });
       } else {
         const last = merged[merged.length - 1];
-        if (inv.start < last.end && Math.abs(inv.start - last.start) < 15) {
+        if (inv.start < last.end && last.isOwnBooking === inv.isOwnBooking) {
           last.end = Math.max(last.end, inv.end);
-          if (!last.teacherName && inv.teacherName) last.teacherName = inv.teacherName;
-          if ((!last.title || last.title === 'Unterricht') && inv.title) last.title = inv.title;
+          if (inv.teacherName && !last.teacherName?.includes(inv.teacherName)) {
+            last.teacherName = last.teacherName ? `${last.teacherName}, ${inv.teacherName}` : inv.teacherName;
+          }
+          if (inv.title && !last.title?.includes(inv.title)) {
+            last.title = last.title ? `${last.title}, ${inv.title}` : inv.title;
+          }
         } else {
-          merged.push(inv);
+          merged.push({ ...inv });
         }
       }
     });
@@ -4445,20 +4441,6 @@ export function ScheduleCalendarView({
                     ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
                   </span>
                 </div>
-                {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers && teachers.length > 0 && selectedTeacherId && setSelectedTeacherId && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
-                    <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
-                    <select
-                      value={selectedTeacherId}
-                      onChange={(e) => setSelectedTeacherId(e.target.value)}
-                      style={{ background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '6px', padding: '2px 6px', fontSize: '0.68rem', fontWeight: 700, color: '#1d1d1f', outline: 'none', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
-                    >
-                      {teachers.map(t => (
-                        <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -5282,66 +5264,100 @@ export function ScheduleCalendarView({
                   const formatTimeStr = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
                   const startTimeStr = formatTimeStr(inv.start);
                   const endTimeStr = formatTimeStr(inv.end);
+                  const timeRange = `${startTimeStr} - ${endTimeStr}`;
+                  const isOwn = !!inv.isOwnBooking;
 
-                  const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-                  const primaryColor = isCampus ? '#34a853' : '#ea4335';
-                  const bgGradient = isCampus 
-                    ? 'linear-gradient(135deg, rgba(230, 244, 234, 0.96) 0%, rgba(209, 250, 229, 0.96) 100%)'
-                    : 'linear-gradient(135deg, rgba(254, 242, 242, 0.96) 0%, rgba(254, 226, 226, 0.96) 100%)';
-                  const borderColor = primaryColor;
+                  if (isOwn) {
+                    const bookingTitle = inv.title && !inv.title.startsWith('Unterricht') ? ` (${inv.title})` : '';
+                    return (
+                      <div
+                        key={`xray-booking-${idx}`}
+                        style={{
+                          position: 'absolute',
+                          left: '4px',
+                          right: '4px',
+                          top: `${top}px`,
+                          height: `${height}px`,
+                          background: 'repeating-linear-gradient(-45deg, rgba(34, 197, 94, 0.14) 0px, rgba(34, 197, 94, 0.14) 10px, rgba(240, 253, 244, 0.85) 10px, rgba(240, 253, 244, 0.85) 20px)',
+                          border: '1.5px dashed rgba(34, 197, 94, 0.75)',
+                          borderRadius: '8px',
+                          zIndex: 10,
+                          boxShadow: '0 2px 8px rgba(34, 197, 94, 0.10)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '2px 6px',
+                          boxSizing: 'border-box',
+                          overflow: 'hidden',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <span style={{
+                          fontSize: '0.66rem',
+                          fontWeight: 800,
+                          color: '#15803d',
+                          background: 'rgba(255, 255, 255, 0.95)',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(34, 197, 94, 0.4)',
+                          boxShadow: '0 2px 6px rgba(34, 197, 94, 0.12)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '96%'
+                        }}>
+                          ✨ {roomName} von dir reserviert{bookingTitle} • {timeRange}
+                        </span>
+                      </div>
+                    );
+                  }
 
+                  const teacherLabel = inv.teacherName ? ` • 👤 ${inv.teacherName}` : '';
                   return (
                     <div
                       key={`xray-booking-${idx}`}
                       style={{
                         position: 'absolute',
-                        left: '6px',
-                        right: '6px',
+                        left: '4px',
+                        right: '4px',
                         top: `${top}px`,
                         height: `${height}px`,
-                        background: bgGradient,
-                        border: `2px solid ${borderColor}`,
-                        borderRadius: '10px',
-                        zIndex: 20,
-                        boxShadow: '0 4px 14px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06)',
+                        background: 'repeating-linear-gradient(-45deg, rgba(239, 68, 68, 0.14) 0px, rgba(239, 68, 68, 0.14) 10px, rgba(254, 242, 242, 0.7) 10px, rgba(254, 242, 242, 0.7) 20px)',
+                        border: '1.5px dashed rgba(239, 68, 68, 0.7)',
+                        borderRadius: '8px',
+                        zIndex: 10,
+                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.10)',
                         display: 'flex',
-                        flexDirection: 'column',
+                        alignItems: 'center',
                         justifyContent: 'center',
-                        padding: '4px 10px',
+                        padding: '2px 6px',
                         boxSizing: 'border-box',
                         overflow: 'hidden',
-                        pointerEvents: 'auto',
-                        transition: 'all 0.2s ease'
+                        pointerEvents: 'none'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                          <span style={{ 
-                            fontSize: '0.68rem', 
-                            fontWeight: 900, 
-                            color: primaryColor, 
-                            background: 'white', 
-                            padding: '1px 6px', 
-                            borderRadius: '5px',
-                            border: `1px solid ${primaryColor}40`,
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            🔒 Besetzt • {roomName}
-                          </span>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {inv.title || inv.teacherName || 'Raumbuchung'}
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
-                          {startTimeStr} - {endTimeStr}
-                        </span>
-                      </div>
-                      {height > 44 && inv.teacherName && (
-                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginTop: '2px' }}>
-                          👤 {inv.teacherName}
-                        </div>
-                      )}
+                      <span style={{
+                        fontSize: '0.66rem',
+                        fontWeight: 800,
+                        color: '#dc2626',
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        boxShadow: '0 2px 6px rgba(239, 68, 68, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: '96%'
+                      }}>
+                        🔒 {roomName} belegt • {timeRange}{teacherLabel}
+                      </span>
                     </div>
                   );
                 })}

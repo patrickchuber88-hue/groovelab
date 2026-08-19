@@ -5172,20 +5172,22 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.04em' }}>CLICK LAUTSTÄRKE</span>
                     <span style={{ fontSize: '0.58rem', color: '#334155', fontWeight: 800, fontFamily: 'SF Mono, monospace', background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>{loopstationMetronomeVolume}%</span>
                   </div>
                   <div style={{
                     position: 'relative',
                     width: '100%',
-                    height: '20px',
+                    height: '6px',
                     borderRadius: '999px',
                     background: '#e2e8f0',
-                    overflow: 'hidden',
+                    overflow: 'visible',
                     boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.08)',
                     display: 'flex',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    marginTop: '5px',
+                    marginBottom: '5px'
                   }}>
                     <div style={{
                       position: 'absolute',
@@ -5199,22 +5201,18 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     }} />
                     <div style={{
                       position: 'absolute',
-                      left: `calc(${Math.min(95, Math.max(5, loopstationMetronomeVolume))}% - 9px)`,
-                      width: '18px',
-                      height: '18px',
+                      left: `calc(${Math.min(96, Math.max(4, loopstationMetronomeVolume))}% - 7px)`,
+                      width: '14px',
+                      height: '14px',
                       borderRadius: '50%',
                       background: '#ffffff',
-                      boxShadow: '0 2px 5px rgba(0,0,0,0.22)',
-                      border: '0.5px solid rgba(0,0,0,0.08)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.20)',
+                      border: '0.5px solid rgba(0,0,0,0.1)',
                       pointerEvents: 'none',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '1px'
-                    }}>
-                      <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
-                      <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
-                    </div>
+                      justifyContent: 'center'
+                    }} />
                     <input
                       type="range"
                       min="0"
@@ -5223,9 +5221,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                       onChange={(e) => setLoopstationMetronomeVolume(parseInt(e.target.value))}
                       style={{
                         position: 'absolute',
-                        inset: 0,
+                        inset: '-6px 0',
                         width: '100%',
-                        height: '100%',
+                        height: '18px',
                         opacity: 0,
                         cursor: 'pointer',
                         margin: 0,
@@ -5249,7 +5247,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 border: '1.5px solid rgba(0, 0, 0, 0.04)'
               }}>
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '0.52rem', color: '#1d1d1f', fontWeight: 800, letterSpacing: '0.04em' }}>LATENZ-AUSGLEICH</span>
                       <span 
@@ -5291,13 +5289,15 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                   <div style={{
                     position: 'relative',
                     width: '100%',
-                    height: '20px',
+                    height: '6px',
                     borderRadius: '999px',
                     background: '#e2e8f0',
-                    overflow: 'hidden',
+                    overflow: 'visible',
                     boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.08)',
                     display: 'flex',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    marginTop: '5px',
+                    marginBottom: '5px'
                   }}>
                     <div style={{
                       position: 'absolute',
@@ -5311,22 +5311,18 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     }} />
                     <div style={{
                       position: 'absolute',
-                      left: `calc(${Math.min(95, Math.max(5, ((syncOffsetMs + 150) / 500) * 100))}% - 9px)`,
-                      width: '18px',
-                      height: '18px',
+                      left: `calc(${Math.min(96, Math.max(4, ((syncOffsetMs + 150) / 500) * 100))}% - 7px)`,
+                      width: '14px',
+                      height: '14px',
                       borderRadius: '50%',
                       background: '#ffffff',
-                      boxShadow: '0 2px 5px rgba(0,0,0,0.22)',
-                      border: '0.5px solid rgba(0,0,0,0.08)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.20)',
+                      border: '0.5px solid rgba(0,0,0,0.1)',
                       pointerEvents: 'none',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '1px'
-                    }}>
-                      <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
-                      <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
-                    </div>
+                      justifyContent: 'center'
+                    }} />
                     <input
                       type="range"
                       min="-150"
@@ -5344,9 +5340,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                       }}
                       style={{
                         position: 'absolute',
-                        inset: 0,
+                        inset: '-6px 0',
                         width: '100%',
-                        height: '100%',
+                        height: '18px',
                         opacity: 0,
                         cursor: 'pointer',
                         margin: 0,
@@ -5477,13 +5473,29 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '210px', marginLeft: '8px' }}>
+                    {/* Miniature Speaker Icon */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: track.isMuted || track.volume === 0 ? '#94a3b8' : (track.volume < 50 ? '#16a34a' : '#15803d'),
+                      flexShrink: 0
+                    }}>
+                      {track.isMuted || track.volume === 0 ? (
+                        <VolumeX size={13} />
+                      ) : track.volume < 50 ? (
+                        <Volume1 size={13} />
+                      ) : (
+                        <Volume2 size={13} />
+                      )}
+                    </div>
+
                     <div style={{
                       position: 'relative',
                       width: '100%',
-                      height: '22px',
+                      height: '6px',
                       borderRadius: '999px',
                       background: '#e2e8f0',
-                      overflow: 'hidden',
+                      overflow: 'visible',
                       boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.08)',
                       display: 'flex',
                       alignItems: 'center'
@@ -5502,46 +5514,19 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                         transition: 'width 0.05s ease-out'
                       }} />
 
-                      {/* Miniature Speaker Icon Inside Capsule */}
-                      <div style={{
-                        position: 'absolute',
-                        left: '7px',
-                        zIndex: 2,
-                        pointerEvents: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        color: track.volume > 22 ? '#ffffff' : '#64748b',
-                        transition: 'color 0.1s ease'
-                      }}>
-                        {track.isMuted || track.volume === 0 ? (
-                          <VolumeX size={11} />
-                        ) : track.volume < 50 ? (
-                          <Volume1 size={11} />
-                        ) : (
-                          <Volume2 size={11} />
-                        )}
-                      </div>
-
                       {/* Tactile Floating Glass/Aluminum Knob */}
                       <div style={{
                         position: 'absolute',
-                        left: `calc(${Math.min(94, Math.max(6, track.volume))}% - 9px)`,
-                        width: '18px',
-                        height: '18px',
+                        left: `calc(${Math.min(96, Math.max(4, track.volume))}% - 7px)`,
+                        width: '14px',
+                        height: '14px',
                         borderRadius: '50%',
                         background: '#ffffff',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.22)',
-                        border: '0.5px solid rgba(0,0,0,0.08)',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.20)',
+                        border: '0.5px solid rgba(0,0,0,0.1)',
                         pointerEvents: 'none',
-                        zIndex: 3,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '1px'
-                      }}>
-                        <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
-                        <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
-                      </div>
+                        zIndex: 3
+                      }} />
 
                       {/* Native Invisible Accessible Range Input */}
                       <input
@@ -5552,9 +5537,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                         onChange={(e) => handleVolumeChange(track.id, parseInt(e.target.value))}
                         style={{
                           position: 'absolute',
-                          inset: 0,
+                          inset: '-6px 0',
                           width: '100%',
-                          height: '100%',
+                          height: '18px',
                           opacity: 0,
                           cursor: 'pointer',
                           margin: 0,

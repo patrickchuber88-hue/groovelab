@@ -1342,24 +1342,45 @@ function MobileBriefingView({
                       <div style={{ fontSize: '0.55rem', color: '#94a3b8' }}>{level === 3 ? 20 : level === 2 ? 15 : 10} Min</div>
                     </div>
                   </div>
-                  {/* Joker indicator */}
+                  {/* 3 Schutzschilde indicator */}
                   {(() => {
                     const currentWeek = getISOWeek(new Date());
                     const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                    const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+                    const usedJokersThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
+                    const availableShields = Math.max(0, 3 - usedJokersThisWeek);
                     
                     return (
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
-                        <span style={{ color: '#64748b', fontWeight: 650 }}>Wöchentlicher Joker:</span>
-                        <span style={{ 
-                          color: isJokerAvailable ? '#34a853' : '#ef4444', 
-                          fontWeight: 800,
-                          background: isJokerAvailable ? '#e6f4ea' : '#fef2f2',
-                          padding: '2px 8px',
-                          borderRadius: '100px'
-                        }}>
-                          {isJokerAvailable ? '👍 Bereit' : '❌ Verbraucht'}
+                        <span style={{ color: '#475569', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Shield size={12} color="#0284c7" />
+                          3 Schutzschilde (KW {currentWeek}):
                         </span>
+                        <div style={{ display: 'flex', gap: '3px' }}>
+                          {[1, 2, 3].map((shieldNum) => {
+                            const isShieldActive = shieldNum <= availableShields;
+                            return (
+                              <div
+                                key={`modal-shield-${shieldNum}`}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '2px 6px',
+                                  borderRadius: '6px',
+                                  background: isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)',
+                                  border: isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)',
+                                  color: isShieldActive ? '#0369a1' : '#b45309',
+                                  fontSize: '0.62rem',
+                                  fontWeight: 850
+                                }}
+                                title={isShieldActive ? `Schutzschild ${shieldNum} bereit` : `Schutzschild ${shieldNum} als Glut-Schutz verbraucht`}
+                              >
+                                <Shield size={9} color={isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : 'none'} />
+                                <span>{isShieldActive ? `${shieldNum}` : 'Glut'}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     );
                   })()}
@@ -4653,13 +4674,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
 
       let saveBlob = juniorRecordedBlob;
-      if (hasTresor) {
-        try {
-          const pureRawResult = await processPureRawBlob(juniorRecordedBlob, { targetLufs: -13.0, targetPeakDb: -1.0 });
-          saveBlob = pureRawResult.processedBlob;
-        } catch (dspErr) {
-          console.warn('[saveJuniorRecording] Pure RAW DSP note:', dspErr);
-        }
+      try {
+        // 🌟 Universal EBU R128 Pure RAW Loudness Staging (-14.0 LUFS / -1.0 dBTP True-Peak Guard)
+        const pureRawResult = await processPureRawBlob(juniorRecordedBlob, { targetLufs: -14.0, targetPeakDb: -1.0 });
+        saveBlob = pureRawResult.processedBlob;
+      } catch (dspErr) {
+        console.warn('[saveJuniorRecording] Pure RAW DSP note:', dspErr);
       }
 
       const recUniqueId = `rec_${studentId}_${Date.now()}`;
@@ -9208,22 +9228,50 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     {(() => {
                       const currentWeek = getISOWeek(new Date());
                       const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                      const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+                      const usedJokersThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
+                      const availableShields = Math.max(0, 3 - usedJokersThisWeek);
+                      
+                      if (isTodayHoliday) {
+                        return (
+                          <span style={{ 
+                            fontSize: '0.6rem', 
+                            fontWeight: 800, 
+                            background: 'rgba(255, 255, 255, 0.2)', 
+                            backdropFilter: 'blur(8px)',
+                            WebkitBackdropFilter: 'blur(8px)',
+                            border: '1px solid rgba(255, 255, 255, 0.4)', 
+                            color: '#ffffff',
+                            padding: '5px 8px', 
+                            borderRadius: '10px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            lineHeight: '1.1',
+                            textAlign: 'center',
+                            letterSpacing: '0.03em',
+                            flexShrink: 0
+                          }} title="Ferienpause aktiv: Streak ist sicher eingefroren!">
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><Palmtree size={10} /> Ferien</span>
+                            <span style={{ fontWeight: 900, color: '#fef08a' }}>2× XP</span>
+                          </span>
+                        );
+                      }
                       
                       return (
                         <span style={{ 
                           fontSize: '0.6rem', 
                           fontWeight: 800, 
-                          background: isJokerAvailable 
-                            ? 'rgba(255, 255, 255, 0.16)' 
-                            : 'rgba(0, 0, 0, 0.2)',
+                          background: availableShields > 0 
+                            ? 'rgba(255, 255, 255, 0.18)' 
+                            : 'rgba(0, 0, 0, 0.25)',
                           backdropFilter: 'blur(8px)',
                           WebkitBackdropFilter: 'blur(8px)',
-                          border: isJokerAvailable 
-                            ? '1px solid rgba(255, 255, 255, 0.4)' 
-                            : '1px solid rgba(255, 255, 255, 0.08)',
-                          color: isJokerAvailable ? '#ffffff' : 'rgba(255, 255, 255, 0.45)',
-                          padding: '5px 9px', 
+                          border: availableShields > 0 
+                            ? '1px solid rgba(255, 255, 255, 0.45)' 
+                            : '1px solid rgba(255, 255, 255, 0.1)',
+                          color: availableShields > 0 ? '#ffffff' : 'rgba(255, 255, 255, 0.45)',
+                          padding: '5px 8px', 
                           borderRadius: '10px',
                           display: 'flex',
                           flexDirection: 'column',
@@ -9231,21 +9279,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           justifyContent: 'center',
                           lineHeight: '1.1',
                           textAlign: 'center',
-                          letterSpacing: '0.04em',
-                          textTransform: 'uppercase',
+                          letterSpacing: '0.03em',
                           flexShrink: 0
-                        }} title="1 Joker pro Woche verfügbar">
-                          {isJokerAvailable ? (
-                            <>
-                              <span style={{ opacity: 0.8 }}>Joker</span>
-                              <span style={{ fontWeight: 900 }}>Bereit</span>
-                            </>
-                          ) : (
-                            <>
-                              <span style={{ opacity: 0.6 }}>Joker</span>
-                              <span style={{ fontWeight: 900, opacity: 0.8 }}>Verbraucht</span>
-                            </>
-                          )}
+                        }} title={`${availableShields}/3 Schutzschilde in KW ${currentWeek} bereit (Glut-Schutz bei verpassten Tagen)`}>
+                          <div style={{ display: 'flex', gap: '2px', marginBottom: '2px' }}>
+                            {[1, 2, 3].map(sNum => (
+                              <Shield 
+                                key={`kpi-s-${sNum}`} 
+                                size={9} 
+                                fill={sNum <= availableShields ? '#ffffff' : 'none'} 
+                                color={sNum <= availableShields ? '#ffffff' : 'rgba(255,255,255,0.4)'} 
+                              />
+                            ))}
+                          </div>
+                          <span style={{ fontWeight: 900 }}>{availableShields}/3 Schilde</span>
                         </span>
                       );
                     })()}
@@ -11154,6 +11201,30 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </span>
                         </div>
 
+                        {/* Holiday Freeze Banner if School Holiday */}
+                        {isTodayHoliday && (
+                          <div style={{
+                            background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                            border: '1.5px solid #a7f3d0',
+                            borderRadius: '12px',
+                            padding: '8px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: '4px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Palmtree size={14} color="#059669" />
+                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#065f46' }}>
+                                Ferienpause aktiv (Streak sicher eingefroren)
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#059669', color: '#ffffff', padding: '2px 8px', borderRadius: '100px' }}>
+                              ✨ 2× XP
+                            </span>
+                          </div>
+                        )}
+
                         {/* 7-Segment Visual Progress Bar in Smaragdgrün */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', height: '4px' }}>
                           {weekDays.map((d, dIdx) => (
@@ -11199,11 +11270,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 subLabel = 'Heute';
                               }
                             } else if (day.isJoker) {
-                              bg = '#fff7ed';
-                              border = '1px solid #f97316';
-                              textColor = '#c2410c';
-                              iconElement = <Shield size={14} color="#f97316" fill="#f97316" />;
-                              subLabel = 'Joker';
+                              bg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
+                              border = '1px solid #38bdf8';
+                              textColor = '#0369a1';
+                              iconElement = <Shield size={14} color="#0284c7" fill="#0284c7" />;
+                              subLabel = 'Schild';
                             } else if (day.hasMastered) {
                               bg = 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)';
                               border = '1px solid #34a853';
@@ -11258,33 +11329,50 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           })}
                         </div>
 
-                        {/* Informative Footer Bar with Joker Status */}
+                        {/* Informative Footer Bar with 3 Schutzschilde Status */}
                         {(() => {
                           const currentWeek = getISOWeek(now);
                           const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                          const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+                          const usedJokersThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
+                          const availableShields = Math.max(0, 3 - usedJokersThisWeek);
 
                           return (
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#64748b', fontWeight: 700, borderTop: '1px solid #f1f5f9', paddingTop: '8px', flexWrap: 'wrap', gap: '6px' }}>
                               <span>Wochenzeit: <strong style={{ color: '#1e293b' }}>{weekTotalMins} Min.</strong></span>
-                              <span 
-                                style={{ 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '4px',
-                                  background: isJokerAvailable ? '#fff7ed' : '#f1f5f9', 
-                                  border: isJokerAvailable ? '1px solid #fed7aa' : '1px solid #e2e8f0', 
-                                  color: isJokerAvailable ? '#c2410c' : '#94a3b8', 
-                                  padding: '2px 8px', 
-                                  borderRadius: '100px',
-                                  fontSize: '0.64rem',
-                                  fontWeight: 800
-                                }}
-                                title={isJokerAvailable ? 'Der Joker schützt deinen Streak automatisch bei 1 verpassten Tag pro Woche!' : 'Joker für diese Woche verbraucht. Nächster Joker ab Montag verfügbar.'}
-                              >
-                                <Shield size={11} color={isJokerAvailable ? '#ea580c' : '#94a3b8'} fill={isJokerAvailable ? '#ea580c' : 'none'} />
-                                {isJokerAvailable ? '1× Joker bereit' : 'Joker verbraucht'}
-                              </span>
+                              
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  <Shield size={11} color="#0284c7" />
+                                  3 Schilde (KW {currentWeek}):
+                                </span>
+                                <div style={{ display: 'flex', gap: '3px' }}>
+                                  {[1, 2, 3].map((shieldNum) => {
+                                    const isShieldActive = shieldNum <= availableShields;
+                                    return (
+                                      <div
+                                        key={`logbook-shield-${shieldNum}`}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '3px',
+                                          padding: '2px 7px',
+                                          borderRadius: '6px',
+                                          background: isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)',
+                                          border: isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)',
+                                          color: isShieldActive ? '#0369a1' : '#b45309',
+                                          fontSize: '0.62rem',
+                                          fontWeight: 850
+                                        }}
+                                        title={isShieldActive ? `Schutzschild ${shieldNum} bereit (Glut-Schutz bei verpasstem Tag)` : `Schutzschild ${shieldNum} als Glut-Schutz verbraucht`}
+                                      >
+                                        <Shield size={9} color={isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : 'none'} />
+                                        <span>{isShieldActive ? `Schild ${shieldNum}` : 'Glut'}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
                               <span>Tagesziel: <strong style={{ color: '#34a853' }}>3 Min. am Stück</strong></span>
                             </div>
                           );
@@ -18543,10 +18631,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontSize: '0.70rem', fontWeight: 850, color: '#475569', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  <Shield size={12} color="#f97316" />
+                                  <Shield size={12} color="#0284c7" />
                                   3 Schutzschilde (KW {currentWeek}):
                                 </span>
-                                <span style={{ fontSize: '0.70rem', fontWeight: 900, color: availableShields > 0 ? '#15803d' : '#b91c1c' }}>
+                                <span style={{ fontSize: '0.70rem', fontWeight: 900, color: availableShields > 0 ? '#0284c7' : '#b91c1c' }}>
                                   {availableShields}/3 bereit
                                 </span>
                               </div>
@@ -18562,13 +18650,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       gap: '4px',
                                       padding: '4px 6px',
                                       borderRadius: '6px',
-                                      background: isShieldActive ? 'rgba(52, 168, 83, 0.1)' : 'rgba(249, 115, 22, 0.1)',
-                                      border: isShieldActive ? '1px solid rgba(52, 168, 83, 0.25)' : '1px dashed rgba(249, 115, 22, 0.3)',
-                                      color: isShieldActive ? '#15803d' : '#c2410c',
+                                      background: isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)',
+                                      border: isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)',
+                                      color: isShieldActive ? '#0369a1' : '#b45309',
                                       fontSize: '0.65rem',
                                       fontWeight: 800
                                     }}>
-                                      <Shield size={10} fill={isShieldActive ? 'currentColor' : 'none'} />
+                                      <Shield size={10} color={isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : 'none'} />
                                       <span>{isShieldActive ? `Schild ${shieldNum}` : 'Glut-Schutz'}</span>
                                     </div>
                                   );
@@ -23895,16 +23983,45 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                 {celebrationDetails.usedJokerThisSession && (
                   <div style={{
-                    fontSize: '0.75rem',
-                    color: '#c2410c',
-                    fontWeight: 700,
-                    background: '#fff7ed',
-                    border: '1px solid #fed7aa',
-                    padding: '8px 12px',
-                    borderRadius: '14px',
-                    width: '100%'
+                    fontSize: '0.78rem',
+                    color: '#0369a1',
+                    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                    border: '1.5px solid #38bdf8',
+                    padding: '12px 14px',
+                    borderRadius: '16px',
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    boxShadow: '0 4px 16px rgba(2, 132, 199, 0.12)',
+                    animation: 'popIn 0.3s ease-out'
                   }}>
-                    🎯 Joker eingesetzt – dein Streak von {celebrationDetails.streak} Tagen gerettet!
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      boxShadow: '0 3px 10px rgba(2, 132, 199, 0.35)'
+                    }}>
+                      <Shield size={18} color="#ffffff" fill="#ffffff" />
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontWeight: 900, color: '#0369a1', fontSize: '0.82rem' }}>
+                          Schutzschild aktiv! 🔥
+                        </span>
+                        <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#dbeafe', color: '#1d4ed8', padding: '1px 6px', borderRadius: '100px' }}>
+                          Glut-Schutz
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.70rem', color: '#475569', fontWeight: 650, marginTop: '2px' }}>
+                        Dein <strong>{celebrationDetails.streak}-Tage-Streak</strong> wurde gerettet und glimmt geschützt weiter!
+                      </div>
+                    </div>
                   </div>
                 )}
 

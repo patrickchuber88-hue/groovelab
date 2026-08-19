@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Volume2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { processPureRawBlob } from '../../utils/audioMasteringEngine';
 
 interface SimpleVoiceRecorderProps {
   studentId: string;
@@ -22,6 +23,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [normalizedBlob, setNormalizedBlob] = useState<Blob | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -29,6 +31,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioStreamRef = useRef<MediaStream | null>(null);
+  const recordAudioCtxRef = useRef<AudioContext | null>(null);
   const timerRef = useRef<any>(null);
   const audioElemRef = useRef<HTMLAudioElement | null>(null);
 
@@ -37,6 +40,9 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
     return () => {
       if (audioStreamRef.current) {
         audioStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (recordAudioCtxRef.current && recordAudioCtxRef.current.state !== 'closed') {
+        try { recordAudioCtxRef.current.close(); } catch {}
       }
       if (timerRef.current) clearInterval(timerRef.current);
       if (audioElemRef.current) {
@@ -50,12 +56,47 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
     try {
       setUploadSuccess(false);
       setAudioUrl(null);
+      setNormalizedBlob(null);
       audioChunksRef.current = [];
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // 🌟 1. Pure Raw Studio Sound Microphone Stream
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false,
+          googTypingNoiseDetection: false,
+          channelCount: 1,
+          sampleRate: 48000
+        } as any
+      });
       audioStreamRef.current = stream;
 
-      const mediaRecorder = new MediaRecorder(stream);
+      // 🌟 2. WebAudio Dual-Channel Center Bridge
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const recordAudioCtx = new AudioCtx();
+      recordAudioCtxRef.current = recordAudioCtx;
+      const sourceNode = recordAudioCtx.createMediaStreamSource(stream);
+      const mergerNode = recordAudioCtx.createChannelMerger(2);
+      sourceNode.connect(mergerNode, 0, 0); // Left
+      sourceNode.connect(mergerNode, 0, 1); // Right
+      const destNode = recordAudioCtx.createMediaStreamDestination();
+      mergerNode.connect(destNode);
+      const recordStream = destNode.stream;
+
+      let mimeType = '';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
+        else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
+        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+        else if (MediaRecorder.isTypeSupported('audio/aac')) mimeType = 'audio/aac';
+      }
+
+      const mediaRecorder = mimeType ? new MediaRecorder(recordStream, { mimeType }) : new MediaRecorder(recordStream);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -64,15 +105,36 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
         }
       };
 
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const localUrl = URL.createObjectURL(audioBlob);
+      mediaRecorder.onstop = async () => {
+        const rawBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
+        
+        // 🌟 3. Universal EBU R128 Pure RAW Loudness Staging (-14.0 LUFS / -1.0 dBTP True-Peak Guard)
+        let finalBlob = rawBlob;
+        let localUrl = '';
+        try {
+          const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: -14.0, targetPeakDb: -1.0 });
+          finalBlob = pureRawRes.processedBlob;
+          localUrl = pureRawRes.processedUrl;
+          if (pureRawRes.durationSec) {
+            setRecordingDuration(Math.round(pureRawRes.durationSec));
+          }
+        } catch (dspErr) {
+          console.warn('[SimpleVoiceRecorder] Pure RAW DSP fallback:', dspErr);
+          localUrl = URL.createObjectURL(rawBlob);
+        }
+
+        setNormalizedBlob(finalBlob);
         setAudioUrl(localUrl);
 
         // Turn off microphone hardware light immediately
         if (audioStreamRef.current) {
           audioStreamRef.current.getTracks().forEach(track => track.stop());
           audioStreamRef.current = null;
+        }
+        recordStream.getTracks().forEach(track => track.stop());
+        if (recordAudioCtxRef.current && recordAudioCtxRef.current.state !== 'closed') {
+          try { recordAudioCtxRef.current.close(); } catch {}
+          recordAudioCtxRef.current = null;
         }
       };
 
@@ -115,16 +177,21 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
   };
 
   const handleUploadAndSave = async () => {
-    if (!audioUrl || audioChunksRef.current.length === 0) return;
+    if (!audioUrl) return;
+    const blobToUpload = normalizedBlob || (audioChunksRef.current.length > 0 ? new Blob(audioChunksRef.current, { type: 'audio/webm' }) : null);
+    if (!blobToUpload) return;
+
     try {
       setIsUploading(true);
-      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-      const fileName = `audio/memo_${studentId}_${Date.now()}.webm`;
+      const isWav = blobToUpload.type.includes('wav');
+      const fileExt = isWav ? 'wav' : (blobToUpload.type.includes('mp4') ? 'mp4' : 'webm');
+      const contentType = isWav ? 'audio/wav' : (blobToUpload.type || 'audio/webm');
+      const fileName = `audio/memo_${studentId}_${Date.now()}.${fileExt}`;
 
       const { data, error } = await supabase.storage
         .from('campus-assets')
-        .upload(fileName, audioBlob, {
-          contentType: 'audio/webm',
+        .upload(fileName, blobToUpload, {
+          contentType,
           upsert: true
         });
 
