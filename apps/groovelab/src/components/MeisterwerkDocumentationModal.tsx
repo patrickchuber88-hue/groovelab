@@ -25,16 +25,16 @@ const getSimulatedNow = (): Date => {
 
 export const ALL_STICKERS = [
   // Meilensteine / Üben (Einmalig)
-  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: '50 Minuten fokussiert geübt und musiziert!', equiv: 'Klasse Start! Regelmäßiges Üben legt das Fundament für deinen Klang.', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true, category: 'ueben', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: '250 Minuten konzentriert am Instrument gearbeitet!', equiv: 'Starke Routine: Deine Koordination, Rhythmik und Spieltechnik wachsen spürbar.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true, category: 'ueben', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: 'Über 1.000 Minuten engagierte Übezeit erreicht!', equiv: 'Echte Ausdauer: Du beherrschst deine Stücke mit musikalischer Sicherheit und Ausdruck.', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true, category: 'ueben', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'uebe-grossmeister', emoji: '🏆', title: 'Übe-Großmeister', desc: 'Grandiose 2.000 Minuten Übezeit gemeistert!', equiv: 'Höchste Meisterschaft: Dein Instrument ist dein zweites Zuhause – souverän im Klang und Ausdruck.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)', auto: true, category: 'ueben', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: '20 Minuten fokussiert geübt und musiziert!', equiv: 'Klasse Start! Regelmäßiges Üben legt das Fundament für deinen Klang.', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true, category: 'ueben', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: '100 Minuten konzentriert am Instrument gearbeitet!', equiv: 'Starke Routine: Deine Koordination, Rhythmik und Spieltechnik wachsen spürbar.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true, category: 'ueben', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: '500 Minuten engagierte Übezeit gemeistert!', equiv: 'Echte Ausdauer: Du beherrschst deine Stücke mit musikalischer Sicherheit und Ausdruck.', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true, category: 'ueben', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'uebe-grossmeister', emoji: '🏆', title: 'Übe-Großmeister', desc: 'Grandiose 1.500 Minuten Übezeit gemeistert!', equiv: 'Höchste Meisterschaft: Dein Instrument ist dein zweites Zuhause – souverän im Klang und Ausdruck.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)', auto: true, category: 'ueben', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
   // XP (Einmalig)
-  { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '250 XP durch fleißige Unterrichts- und Übe-Einheiten gesammelt!', equiv: 'Erste Erfolge: Du erreichst deine wöchentlichen Aufgaben mit Begeisterung.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true, category: 'xp', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'xp-champion', emoji: '🎖️', title: 'XP-Champion', desc: '1.000 XP gesammelt – kontinuierlicher Fortschritt im Unterricht!', equiv: 'Konstanter Fleiß: Du setzt Aufgaben und musikalische Herausforderungen zielstrebig um.', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', auto: true, category: 'xp', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'xp-meister', emoji: '🌌', title: 'XP-Meister', desc: '2.500 XP erreicht – herausragender Einsatz im Musikschuljahr!', equiv: 'Fortgeschrittenes Niveau: Du meisterst Theorie, Gehörbildung und Spielpraxis mit Bravour.', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', auto: true, category: 'xp', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'xp-legende', emoji: '💎', title: 'XP-Legende', desc: '5.000 XP gesammelt – das höchste musikalische Engagement-Level!', equiv: 'Spitzenleistung: Vorbildlicher Lernwille und meisterhafte musikalische Entwicklung.', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.15)', auto: true, category: 'xp', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '100 XP durch fleißige Unterrichts- und Übe-Einheiten gesammelt!', equiv: 'Erste Erfolge: Du erreichst deine wöchentlichen Aufgaben mit Begeisterung.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true, category: 'xp', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'xp-champion', emoji: '🎖️', title: 'XP-Champion', desc: '500 XP gesammelt – kontinuierlicher Fortschritt im Unterricht!', equiv: 'Konstanter Fleiß: Du setzt Aufgaben und musikalische Herausforderungen zielstrebig um.', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', auto: true, category: 'xp', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'xp-meister', emoji: '🌌', title: 'XP-Meister', desc: '1.500 XP erreicht – herausragender Einsatz im Musikschuljahr!', equiv: 'Fortgeschrittenes Niveau: Du meisterst Theorie, Gehörbildung und Spielpraxis mit Bravour.', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', auto: true, category: 'xp', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'xp-legende', emoji: '💎', title: 'XP-Legende', desc: '3.500 XP gesammelt – das höchste musikalische Engagement-Level!', equiv: 'Spitzenleistung: Vorbildlicher Lernwille und meisterhafte musikalische Entwicklung.', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.15)', auto: true, category: 'xp', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
   // Streaks (Einmalig)
   { id: 'dranbleiber', emoji: '🔥', title: 'Dranbleiber', desc: '3 Tage hintereinander am Instrument geübt!', equiv: 'Kurze, tägliche Einheiten festigen Bewegungsabläufe und Notenlesen am besten.', color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', auto: true, category: 'streaks', rarity: 'common', rarityLabel: 'Standard', multi: false },
@@ -171,12 +171,12 @@ export const getUnifiedStickerStatus = (
   let autoDetailTopic = '';
 
   if (sticker.category === 'ueben') {
-    const target = sticker.id === 'fleiss-pionier' ? 50 : sticker.id === 'uebe-meister' ? 250 : sticker.id === 'uebe-legende' ? 1000 : 2000;
+    const target = sticker.id === 'fleiss-pionier' ? 20 : sticker.id === 'uebe-meister' ? 100 : sticker.id === 'uebe-legende' ? 500 : 1500;
     isMilestoneUnlocked = practiceMinutes >= target;
     progressText = isMilestoneUnlocked ? `${target} Min. geübt` : `Noch ${Math.max(1, target - practiceMinutes)} Min. Üben`;
     autoDetailTopic = `${target} Min. konzentriert geübt`;
   } else if (sticker.category === 'xp') {
-    const target = sticker.id === 'xp-sammler' ? 250 : sticker.id === 'xp-champion' ? 1000 : sticker.id === 'xp-meister' ? 2500 : 5000;
+    const target = sticker.id === 'xp-sammler' ? 100 : sticker.id === 'xp-champion' ? 500 : sticker.id === 'xp-meister' ? 1500 : 3500;
     isMilestoneUnlocked = xp >= target;
     progressText = isMilestoneUnlocked ? `${target} XP erreicht` : `Noch ${Math.max(1, target - xp)} XP`;
     autoDetailTopic = `${target} XP Meilenstein erreicht`;
@@ -249,6 +249,56 @@ export const cleanNotesText = (text: string | null | undefined): string => {
     .trim();
 };
 
+export const checkIsAudioTresorActive = (studentObj?: any): boolean => {
+  if (typeof window !== 'undefined') {
+    // 1. Direct school overrides (from live Secretary / Admin booking)
+    try {
+      const overridesStr = localStorage.getItem('groovelab_school_overrides') || localStorage.getItem('campus_school_overrides');
+      if (overridesStr) {
+        const overrides = JSON.parse(overridesStr);
+        const sId = studentObj?.school_id || (studentObj as any)?.schoolId || (studentObj as any)?.schools?.id || (studentObj as any)?.school?.id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_last_school_id');
+        if (sId && overrides[sId] !== undefined) {
+          const addonGb = Number(overrides[sId].storage_addon_gb ?? -1);
+          if (addonGb === 0) return false;
+          if (addonGb > 0 && overrides[sId].storage_addon_status !== 'cancelled') {
+            return true;
+          }
+        }
+        if (sId && overrides[sId] && Number(overrides[sId].storage_addon_gb || 0) === 0) {
+          return false;
+        }
+        const allEntries = Object.values(overrides) as any[];
+        const activeEntry = allEntries.find(e => Number(e.storage_addon_gb || 0) > 0 && e.storage_addon_status !== 'cancelled');
+        if (activeEntry && !sId) {
+          return true;
+        }
+      }
+    } catch (e) {}
+
+    // 2. Direct storage flags
+    if (localStorage.getItem('groovelab_storage_addon_active') === 'false' || localStorage.getItem('campus_storage_addon_active') === 'false') {
+      return false;
+    }
+    if (localStorage.getItem('groovelab_storage_addon_active') === 'true' || localStorage.getItem('campus_storage_addon_active') === 'true') {
+      return true;
+    }
+    const storedGb = Number(localStorage.getItem('groovelab_storage_addon_gb') || localStorage.getItem('campus_storage_addon_gb') || 0);
+    if (storedGb > 0) return true;
+  }
+
+  if (!studentObj) return false;
+
+  const sch = studentObj.schools || studentObj.school;
+  if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
+    return true;
+  }
+  if (Number(studentObj.storage_addon_gb || 0) > 0 && studentObj.storage_addon_status !== 'cancelled') {
+    return true;
+  }
+
+  return false;
+};
+
 interface MeisterwerkDocumentationModalProps {
   student: Student;
   onClose: () => void;
@@ -265,6 +315,7 @@ interface MeisterwerkDocumentationModalProps {
   initialStreak?: number;
   initialPracticeMinutes?: number;
   initialMasteredSongsCount?: number;
+  hasTresorStorage?: boolean;
 }
 
 interface ProgressItem {
@@ -488,7 +539,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   initialXp,
   initialStreak,
   initialPracticeMinutes,
-  initialMasteredSongsCount
+  initialMasteredSongsCount,
+  hasTresorStorage: propHasTresor
 }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -1329,6 +1381,107 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const useNotebookLayout = false;
   const recordingTimerRef = React.useRef<any>(null);
   const accumulatedTranscriptRef = React.useRef<string>('');
+  const [hasTresorStorage, setHasTresorStorage] = useState<boolean>(() => {
+    if (propHasTresor === true) return true;
+    return checkIsAudioTresorActive(student);
+  });
+
+  useEffect(() => {
+    if (propHasTresor === true) {
+      setHasTresorStorage(true);
+    } else {
+      setHasTresorStorage(checkIsAudioTresorActive(student));
+    }
+  }, [propHasTresor, student]);
+
+  useEffect(() => {
+    let active = true;
+    const checkTresor = async () => {
+      if (propHasTresor === true || checkIsAudioTresorActive(student)) {
+        if (active) setHasTresorStorage(true);
+        return;
+      }
+      let targetSchoolId = 
+        student?.school_id || 
+        (student as any)?.schoolId || 
+        (student as any)?.schools?.id ||
+        (student as any)?.school?.id ||
+        sessionStorage.getItem('groovelab_school_id') || 
+        localStorage.getItem('groovelab_school_id') || 
+        sessionStorage.getItem('campus_school_id') ||
+        localStorage.getItem('campus_school_id') ||
+        localStorage.getItem('groovelab_last_school_id') ||
+        localStorage.getItem('school_id');
+
+      if (!targetSchoolId) {
+        try {
+          const cachedUser = JSON.parse(localStorage.getItem('groovelab_cached_user') || '{}');
+          if (cachedUser?.school_id) targetSchoolId = cachedUser.school_id;
+        } catch (e) {}
+      }
+
+      if (!targetSchoolId && student?.id && student.id !== 'teacher-self') {
+        try {
+          const { data: stRec } = await supabase
+            .from('users')
+            .select('school_id')
+            .eq('id', student.id)
+            .maybeSingle();
+          if (stRec?.school_id) targetSchoolId = stRec.school_id;
+        } catch (e) {}
+      }
+
+      if (!targetSchoolId) {
+        try {
+          const currentUid = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id');
+          if (currentUid) {
+            const { data: uRec } = await supabase
+              .from('users')
+              .select('school_id')
+              .eq('id', currentUid)
+              .maybeSingle();
+            if (uRec?.school_id) targetSchoolId = uRec.school_id;
+          }
+        } catch (e) {}
+      }
+
+      if (targetSchoolId) {
+        try {
+          const { data: sch } = await supabase
+            .from('schools')
+            .select('storage_addon_gb, storage_addon_status')
+            .eq('id', targetSchoolId)
+            .maybeSingle();
+          if (active && sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
+            setHasTresorStorage(true);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // Fallback: check if the primary active school has booked Audio-Tresor
+      try {
+        const { data: activeSchools } = await supabase
+          .from('schools')
+          .select('id, storage_addon_gb, storage_addon_status')
+          .gt('storage_addon_gb', 0)
+          .neq('storage_addon_status', 'cancelled')
+          .limit(1);
+        if (active && activeSchools && activeSchools.length > 0) {
+          setHasTresorStorage(true);
+        }
+      } catch (e) {}
+    };
+    checkTresor();
+    return () => { active = false; };
+  }, [student, propHasTresor]);
+
+  const formatRecordTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
   useEffect(() => {
     return () => {
       if (recordingTimerRef.current) {
@@ -1444,7 +1597,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Audio Recorder logic
   const startRecordingAudio = async () => {
     const audioNotesCount = homeworkNotesList.filter(note => note.startsWith("AUDIO:")).length;
-    if (audioNotesCount >= 12) {
+    if (!hasTresorStorage && audioNotesCount >= 12) {
       alert("Limit erreicht! Du hast bereits 12 Sprachaufnahmen in diesem Protokoll. Bitte lösche eine alte Sprachaufnahme, bevor du eine neue aufnimmst.");
       return;
     }
@@ -1459,8 +1612,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       });
       // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
       let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
-      let hasTresorStorage = false;
-      if (targetSchoolId) {
+      let effectiveTresor = hasTresorStorage;
+      if (targetSchoolId && !effectiveTresor) {
         try {
           const { data: sch } = await supabase
             .from('schools')
@@ -1468,7 +1621,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             .eq('id', targetSchoolId)
             .maybeSingle();
           if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
-            hasTresorStorage = true;
+            effectiveTresor = true;
+            setHasTresorStorage(true);
           }
         } catch (e) {}
       }
@@ -1551,7 +1705,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         };
 
         try {
-          const fileExt = blob.type.includes('wav') ? 'wav' : blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'mp3';
+          const fileExt = hasTresorStorage ? 'wav' : (blob.type.includes('wav') ? 'wav' : blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'mp3');
+          const contentType = hasTresorStorage ? 'audio/wav' : (blob.type || 'audio/webm');
           const fileName = `${student.id}_feedback_${Date.now()}.${fileExt}`;
           const filePath = `recordings/${fileName}`;
           
@@ -1560,7 +1715,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             const { error: uploadErr } = await supabase.storage
               .from('campus-assets')
               .upload(filePath, blob, { 
-                contentType: blob.type || (hasTresorStorage ? 'audio/wav' : 'audio/webm'),
+                contentType,
                 cacheControl: 'private, max-age=3600' 
               });
               
@@ -1609,10 +1764,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 .maybeSingle();
               if (schoolData) {
                 const currentBytes = Number(schoolData.storage_used_bytes || 0);
+                const updatedBytes = currentBytes + blob.size;
                 await supabase
                   .from('schools')
-                  .update({ storage_used_bytes: currentBytes + blob.size })
+                  .update({ storage_used_bytes: updatedBytes })
                   .eq('id', targetSchoolId);
+
+                // Keep local school overrides in sync
+                try {
+                  const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+                  const overrides = JSON.parse(overridesStr);
+                  if (overrides[targetSchoolId]) {
+                    overrides[targetSchoolId].storage_used_bytes = updatedBytes;
+                    localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+                  }
+                } catch (e) {}
               }
             } catch (quotaErr) {
               console.warn('[Meisterwerk] Storage quota update note:', quotaErr);
@@ -1633,10 +1799,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       setMediaRecorderInstance(recorder);
       mediaRecorderRef.current = recorder;
       
+      const maxRecordSeconds = effectiveTresor ? 420 : 60;
+
       recordingTimerRef.current = setInterval(() => {
         durationInSeconds += 1;
         setAudioDuration(durationInSeconds);
-        if (durationInSeconds >= 60) {
+        if (durationInSeconds >= maxRecordSeconds) {
           stopRecordingAudio(recorder);
         }
       }, 1000);
@@ -2107,9 +2275,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const activeTId = await getCurrentTeacherId();
       
       let query = supabase.from('lehrwerke').select('*');
-      const schoolId = student?.school_id || (student as any)?.schoolId || studentSchoolId || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id') || localStorage.getItem('school_id');
-      if (schoolId) {
-        query = query.or(`school_id.eq.${schoolId},school_id.is.null`);
+      const schoolId = resolvedSchoolId || student?.school_id || (student as any)?.schoolId || studentSchoolId || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id') || localStorage.getItem('school_id');
+      const effectiveTeacherId = teacherId || activeTId;
+
+      let conditions: string[] = [];
+      if (schoolId) conditions.push(`school_id.eq.${schoolId}`);
+      if (effectiveTeacherId) conditions.push(`teacher_id.eq.${effectiveTeacherId}`);
+      conditions.push(`school_id.is.null`);
+
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
       }
       const { data: lehrwerkeData, error } = await query.order('title');
       if (error) console.warn('Lehrwerke load note:', error);
@@ -2131,7 +2306,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const parsedCustom = JSON.parse(storedCustom);
           if (Array.isArray(parsedCustom)) {
             parsedCustom.forEach(c => {
-              if (c && c.id && !mapped.some(m => m.id === c.id)) {
+              if (c && c.id && !mapped.some(m => String(m.id) === String(c.id))) {
                 mapped.push({
                   ...c,
                   totalPages: c.totalPages || c.total_pages || 50,
@@ -2149,7 +2324,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const storedAssigned = localStorage.getItem('student_lehrwerke_progress');
       if (storedAssigned) {
         const parsedAssigned = JSON.parse(storedAssigned);
-        const filtered = parsedAssigned.filter((item: any) => item.studentId === student.id);
+        const filtered = parsedAssigned.filter((item: any) => String(item.studentId) === String(student.id));
         setAssignedLehrwerke(filtered);
       } else {
         setAssignedLehrwerke([]);
@@ -3305,20 +3480,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Assign textbook to student inside the modal
   const handleAssignLehrwerk = (lehrwerkId: string) => {
     if (!lehrwerkId) return;
-    const book = globalLehrwerke.find(b => b.id === lehrwerkId);
+    const book = globalLehrwerke.find(b => String(b.id) === String(lehrwerkId));
     if (!book) return;
 
     try {
       const stored = localStorage.getItem('student_lehrwerke_progress');
       const parsed = stored ? JSON.parse(stored) : [];
       
-      if (parsed.some((item: any) => item.studentId === student.id && item.lehrwerkId === lehrwerkId)) {
+      if (parsed.some((item: any) => String(item.studentId) === String(student.id) && String(item.lehrwerkId) === String(lehrwerkId))) {
         return;
       }
 
       const newAssignment = {
         studentId: student.id,
         lehrwerkId: lehrwerkId,
+        bookTitle: book.title,
+        lehrwerkTitle: book.title,
+        totalPages: book.totalPages || 50,
         assignedAt: new Date().toISOString(),
         visibility: 'private',
         pageStates: {}
@@ -3326,6 +3504,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       const updated = [...parsed, newAssignment];
       localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+      setAssignedLehrwerke(prev => [...prev.filter(a => String(a.lehrwerkId) !== String(lehrwerkId)), newAssignment]);
       loadLehrwerke();
       setActiveLehrwerkId(lehrwerkId);
       setShowAssignDropdown(false);
@@ -3669,15 +3848,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         : activeSongSkills.filter(s => s.progress === 100 || s.status === 'MASTERED').length;
 
       const autoAwards = [
-        { id: 'fleiss-pionier', value: isDemoMode ? 5 : 50, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
-        { id: 'uebe-meister', value: isDemoMode ? 15 : 250, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
-        { id: 'uebe-legende', value: isDemoMode ? 30 : 1000, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
-        { id: 'uebe-grossmeister', value: isDemoMode ? 40 : 2000, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+        { id: 'fleiss-pionier', value: isDemoMode ? 5 : 20, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+        { id: 'uebe-meister', value: isDemoMode ? 15 : 100, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+        { id: 'uebe-legende', value: isDemoMode ? 30 : 500, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
+        { id: 'uebe-grossmeister', value: isDemoMode ? 40 : 1500, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
 
-        { id: 'xp-sammler', value: isDemoMode ? 50 : 250, current: studentXP, context: `${studentXP} XP erreicht` },
-        { id: 'xp-champion', value: isDemoMode ? 150 : 1000, current: studentXP, context: `${studentXP} XP erreicht` },
-        { id: 'xp-meister', value: isDemoMode ? 300 : 2500, current: studentXP, context: `${studentXP} XP erreicht` },
-        { id: 'xp-legende', value: isDemoMode ? 500 : 5000, current: studentXP, context: `${studentXP} XP erreicht` },
+        { id: 'xp-sammler', value: isDemoMode ? 50 : 100, current: studentXP, context: `${studentXP} XP erreicht` },
+        { id: 'xp-champion', value: isDemoMode ? 150 : 500, current: studentXP, context: `${studentXP} XP erreicht` },
+        { id: 'xp-meister', value: isDemoMode ? 300 : 1500, current: studentXP, context: `${studentXP} XP erreicht` },
+        { id: 'xp-legende', value: isDemoMode ? 500 : 3500, current: studentXP, context: `${studentXP} XP erreicht` },
 
         { id: 'dranbleiber', value: isDemoMode ? 1 : 3, current: studentStreak, context: `${studentStreak} Tage Streak` },
         { id: 'wochen-held', value: isDemoMode ? 2 : 7, current: studentStreak, context: `${studentStreak} Tage Streak` },
@@ -3807,6 +3986,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         await supabase
           .from('progress_matrix')
           .insert(row);
+      }
+
+      // Automatically award +15 Campus-XP when a textbook page is freshly mastered
+      if (targetStatus === 'MASTERED') {
+        const pageKey = `xp_awarded_page_${student.id}_${lehrwerkId}_${pageNum}`;
+        const alreadyAwarded = localStorage.getItem(pageKey);
+        if (!alreadyAwarded) {
+          localStorage.setItem(pageKey, 'true');
+          await awardCampusXP(15, `Lehrwerk gemeistert: ${book.title} - S. ${pageNum}`);
+        }
       }
 
       // Add to session log
@@ -4304,6 +4493,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         const remaining = prev.filter(item => !isSongMatch(item, skill || { topic_name: fullTitle }));
         return [finalItem, ...remaining];
       });
+
+      // Automatically award +100 Campus-XP when a song is freshly marked as 100% MASTERED
+      if (targetStatus === 'MASTERED' || skillPercent === 100) {
+        const songXpKey = `xp_awarded_song_${student.id}_${skillId || songTitle}`;
+        const alreadyAwarded = localStorage.getItem(songXpKey);
+        if (!alreadyAwarded) {
+          localStorage.setItem(songXpKey, 'true');
+          await awardCampusXP(100, `Song zu 100% gemeistert: ${songTitle}`);
+        }
+      }
 
       // Add to session log
       if (targetHomework || targetStatus === 'THEORY_DONE') {
@@ -6578,6 +6777,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 readOnly={readOnly}
                 setActiveViewMode={setActiveViewMode}
                 useNotebookLayout={useNotebookLayout}
+                hasTresorStorage={hasTresorStorage}
               />
             </div>
           ) : activeViewMode === 'practice' ? (
@@ -6686,6 +6886,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>🎙️ Neue Lehrkraft-Aufnahme</span>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 650 }}>
+                          {hasTresorStorage ? '(max. 7 Min.)' : '(max. 60s)'}
+                        </span>
                       </span>
                       {!isRecordingAudio ? (
                         <button
@@ -6733,7 +6936,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           className="hover-scale"
                         >
                           <span style={{ width: '7px', height: '7px', background: '#ffffff', display: 'inline-block' }} />
-                          <span>Stopp ({audioDuration}s / 60s)</span>
+                          <span>Stopp ({hasTresorStorage ? `${formatRecordTime(audioDuration)} / 7:00 Min.` : `${audioDuration}s / 60s`})</span>
                         </button>
                       )}
                     </div>
@@ -7087,18 +7290,40 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         }
                       } catch {}
 
+                      const schoolObj = (student as any)?.schools || (student as any)?.school;
+                      let overridesData: any = {};
+                      try {
+                        const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+                        const allOverrides = JSON.parse(overridesStr);
+                        const sId = student?.school_id || schoolObj?.id;
+                        if (sId && allOverrides[sId]) overridesData = allOverrides[sId];
+                      } catch (e) {}
+
+                      const activeAddonGb = Number(overridesData.storage_addon_gb ?? schoolObj?.storage_addon_gb ?? 0);
+                      const totalCapGb = 1.0 + activeAddonGb;
+                      const usedBytes = Number(overridesData.storage_used_bytes ?? schoolObj?.storage_used_bytes ?? 0);
+                      const usedGb = usedBytes / (1024 * 1024 * 1024);
+                      const isStorageOverCap = hasTresorStorage && activeAddonGb > 0 && usedGb >= totalCapGb;
+
                       const monthlyLimit = 240;
-                      const isLimitReached = studentRecordingsTotalSec >= monthlyLimit;
+                      const effectiveTresorAvailable = hasTresorStorage && !isStorageOverCap;
+                      const isLimitReached = !effectiveTresorAvailable && studentRecordingsTotalSec >= monthlyLimit;
 
                       return (
                         <>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>🎙️ Selbstaufnahme (max. 60s)</span>
+                              <span>🎙️ Selbstaufnahme {effectiveTresorAvailable ? '(max. 7 Min.)' : '(max. 60s)'}</span>
                             </span>
-                            <span style={{ fontSize: '0.70rem', color: isLimitReached ? '#dc2626' : '#6366f1', fontWeight: 800, background: isLimitReached ? '#fee2e2' : '#eef2ff', padding: '2px 8px', borderRadius: '100px' }}>
-                              ⏱️ {studentRecordingsTotalSec}s / {monthlyLimit}s verbraucht
-                            </span>
+                            {effectiveTresorAvailable ? (
+                              <span style={{ fontSize: '0.70rem', color: '#15803d', fontWeight: 850, background: '#dcfce7', padding: '2px 8px', borderRadius: '100px' }}>
+                                ✨ Unbegrenzt (Audio-Tresor)
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.70rem', color: isLimitReached ? '#dc2626' : '#6366f1', fontWeight: 800, background: isLimitReached ? '#fee2e2' : '#eef2ff', padding: '2px 8px', borderRadius: '100px' }}>
+                                ⏱️ {studentRecordingsTotalSec}s / {monthlyLimit}s verbraucht {isStorageOverCap ? '(Cloud voll)' : ''}
+                              </span>
+                            )}
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
@@ -7173,7 +7398,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 className="hover-scale"
                               >
                                 <span style={{ width: '8px', height: '8px', background: '#ffffff', borderRadius: '2px', display: 'inline-block' }} />
-                                <span>Aufnahme beenden ({audioDuration}s / 60s)</span>
+                                <span>Aufnahme beenden ({hasTresorStorage ? `${formatRecordTime(audioDuration)} / 7:00 Min.` : `${audioDuration}s / 60s`})</span>
                               </button>
                             )}
                           </div>
@@ -9591,7 +9816,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             </button>
                           </div>
                           {globalLehrwerke
-                            .filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id))
+                            .filter(g => !assignedLehrwerke.some(a => String(a.lehrwerkId) === String(g.id)))
                             .map(g => (
                               <button
                                 key={g.id}
@@ -9640,7 +9865,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               </button>
                             ))
                           }
-                          {globalLehrwerke.filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id)).length === 0 && (
+                          {globalLehrwerke.filter(g => !assignedLehrwerke.some(a => String(a.lehrwerkId) === String(g.id))).length === 0 && (
                             <span style={{ fontSize: '0.72rem', color: '#7d7d82', padding: '6px 8px', textAlign: 'center', fontStyle: 'italic' }}>
                               Alle Mediathek-Bücher zugewiesen
                             </span>
@@ -12491,13 +12716,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
                           }}>
                             {/* Studio Header */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>
                                   🎙️ Play-Along Studio
                                 </span>
                                 <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 650 }}>
-                                  (max. 60s)
+                                  {hasTresorStorage ? '(max. 7 Min.)' : '(max. 60s)'}
                                 </span>
                               </div>
 
@@ -12510,7 +12735,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     background: '#0f172a',
                                     color: '#ffffff',
                                     border: 'none',
-                                    padding: '5px 12px',
+                                    padding: '6px 14px',
                                     borderRadius: '10px',
                                     fontSize: '0.74rem',
                                     fontWeight: 800,
@@ -12519,7 +12744,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     alignItems: 'center',
                                     gap: '6px',
                                     boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                                    transition: 'all 0.15s ease'
+                                    transition: 'all 0.15s ease',
+                                    flexShrink: 0
                                   }}
                                   className="hover-scale"
                                 >
@@ -12534,7 +12760,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     background: '#ef4444',
                                     color: '#ffffff',
                                     border: 'none',
-                                    padding: '5px 12px',
+                                    padding: '6px 14px',
                                     borderRadius: '10px',
                                     fontSize: '0.74rem',
                                     fontWeight: 800,
@@ -12542,14 +12768,53 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
-                                    boxShadow: '0 0 12px rgba(239, 68, 68, 0.4)'
+                                    boxShadow: '0 0 12px rgba(239, 68, 68, 0.4)',
+                                    flexShrink: 0
                                   }}
                                 >
                                   <span style={{ width: '7px', height: '7px', background: 'currentColor', display: 'inline-block' }} />
-                                  <span>Stopp ({audioDuration}s / 60s)</span>
+                                  <span>Stopp ({hasTresorStorage ? `${formatRecordTime(audioDuration)} / 7:00 Min.` : `${audioDuration}s / 60s`})</span>
                                 </button>
                               )}
                             </div>
+
+                            {/* Title Input Field before Recording */}
+                            {!isRecordingAudio && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', marginTop: '2px' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Name der Aufnahme (z. B. Akkordwechsel G-Dur & D-Dur)..."
+                                  value={audioLabel}
+                                  onChange={(e) => setAudioLabel(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      startRecordingAudio();
+                                    }
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    fontSize: '0.78rem',
+                                    padding: '7px 12px',
+                                    borderRadius: '10px',
+                                    border: '1.5px solid #e2e8f0',
+                                    background: '#f8fafc',
+                                    color: '#0f172a',
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = '#34a853';
+                                    e.currentTarget.style.background = '#ffffff';
+                                  }}
+                                  onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                    e.currentTarget.style.background = '#f8fafc';
+                                  }}
+                                />
+                              </div>
+                            )}
 
                             {/* Active Live Recording Pulse Banner */}
                             {isRecordingAudio && (
@@ -12566,7 +12831,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b91c1c', fontWeight: 850 }}>
                                   <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'pulse 1.2s infinite' }} />
-                                  <span>Mikrofon aktiv... {audioDuration}s</span>
+                                  <span>
+                                    Mikrofon aktiv {audioLabel.trim() ? `für „${audioLabel.trim()}“` : ''}... {hasTresorStorage ? `${formatRecordTime(audioDuration)} / 7:00 Min.` : `${audioDuration}s / 60s`}
+                                  </span>
                                 </div>
                                 <button
                                   type="button"
@@ -12587,9 +12854,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               </div>
                             )}
 
+                            {/* Uploading Status Indicator */}
                             {isUploadingAudio && (
-                              <div style={{ fontSize: '0.76rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>⏳</span> Audio wird gesichert und zur Vorschau hinzugefügt...
+                              <div style={{
+                                fontSize: '0.74rem',
+                                color: '#15803d',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontWeight: 700,
+                                padding: '4px 2px'
+                              }}>
+                                <span>⏳</span> Aufnahme wird gesichert und zur Schülervorschau hinzugefügt...
                               </div>
                             )}
                           </div>
@@ -15498,9 +15774,10 @@ const InlineAudioPlayer: React.FC<{
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // 16 dynamic waveform bar heights for ultra-crisp modern audio pill look
-  const waveformHeights = [40, 65, 30, 85, 55, 95, 70, 45, 80, 100, 60, 90, 75, 45, 80, 50];
+  // 24 dynamic waveform bar heights for organic audio visualization
+  const waveformHeights = [35, 65, 30, 85, 55, 95, 70, 45, 80, 100, 60, 90, 75, 45, 80, 50, 70, 85, 40, 90, 60, 75, 45, 30];
   const progressRatio = duration > 0 ? currentTime / duration : 0;
+  const isActiveOrPlaying = isPlaying || currentTime > 0;
 
   const formattedDate = (() => {
     if (!date) return '';
@@ -15513,89 +15790,147 @@ const InlineAudioPlayer: React.FC<{
     }
   })();
 
+  const cleanTitle = label && label.trim() !== '' ? label.trim() : 'Aufnahme';
+
   return (
     <div style={{
       background: '#ffffff',
       borderRadius: '16px',
       border: isPlaying ? `1.5px solid ${themeColor}` : '1.5px solid #e2e8f0',
-      padding: '8px 12px',
+      padding: '10px 12px',
       width: '100%',
       boxShadow: isPlaying ? `0 4px 16px ${themeColor}22, 0 1px 3px rgba(0,0,0,0.04)` : '0 2px 6px rgba(0,0,0,0.02)',
       display: 'flex',
-      alignItems: 'center',
-      gap: '10px',
+      flexDirection: 'column',
+      gap: '8px',
       boxSizing: 'border-box',
       position: 'relative',
       transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
     }}>
       <audio ref={audioRef} src={resolvedUrl} />
 
-      {/* Play / Pause Circular Button with Apple Bounce */}
-      <button
-        type="button"
-        onClick={(e) => togglePlay(e)}
-        style={{
-          width: '34px',
-          height: '34px',
-          borderRadius: '50%',
-          background: isPlaying ? themeColor : `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}ee 100%)`,
-          color: '#ffffff',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          boxShadow: isPlaying ? `0 0 12px ${themeColor}66` : `0 2px 6px ${themeColor}40`,
-          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-        }}
-        className="hover-scale"
-        title={isPlaying ? 'Pause' : 'Abspielen'}
-      >
-        {isPlaying ? (
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
-            <rect x="6" y="5" width="4" height="14" rx="1.5" />
-            <rect x="14" y="5" width="4" height="14" rx="1.5" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style={{ marginLeft: '2px' }}>
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
+      {/* Main Row: Play button + 100% Legible Title & Details + Controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+        {/* Play / Pause Circular Button */}
+        <button
+          type="button"
+          onClick={(e) => togglePlay(e)}
+          style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '50%',
+            background: isPlaying ? themeColor : `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}ee 100%)`,
+            color: '#ffffff',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            boxShadow: isPlaying ? `0 0 12px ${themeColor}66` : `0 2px 6px ${themeColor}40`,
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+          className="hover-scale"
+          title={isPlaying ? 'Pause' : 'Abspielen'}
+        >
+          {isPlaying ? (
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+              <rect x="6" y="5" width="4" height="14" rx="1.5" />
+              <rect x="14" y="5" width="4" height="14" rx="1.5" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ marginLeft: '2px' }}>
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          )}
+        </button>
 
-      {/* Center Waveform & Metadata */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
-            <span style={{
-              fontSize: '0.78rem',
-              fontWeight: 850,
-              color: '#0f172a',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-              {label || 'Aufnahme'}
-            </span>
-            {formattedDate && (
-              <span style={{
-                fontSize: '0.66rem',
-                fontWeight: 700,
-                color: '#94a3b8',
-                whiteSpace: 'nowrap',
-                flexShrink: 0
-              }}>
-                • {formattedDate}
-              </span>
-            )}
-          </div>
-          <span style={{ fontSize: '0.68rem', fontWeight: 750, color: '#64748b', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-            {formatTime(currentTime)} / {formatTime(duration)}
+        {/* Title & Metadata (100% Readable, Never Truncated) */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span style={{
+            fontSize: '0.84rem',
+            fontWeight: 850,
+            color: '#0f172a',
+            lineHeight: 1.25,
+            wordBreak: 'break-word',
+            display: 'block'
+          }}>
+            {cleanTitle}
           </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+            {formattedDate && <span>{formattedDate}</span>}
+            {formattedDate && <span>•</span>}
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {isActiveOrPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : `${formatTime(duration)} min`}
+            </span>
+          </div>
         </div>
 
-        {/* Interactive Soundwave Bar Track */}
+        {/* Right Controls: Speed + Badge + Delete */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={() => setPlaybackRate(prev => prev === 1 ? 0.8 : (prev === 0.8 ? 0.6 : 1))}
+            style={{
+              background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
+              border: playbackRate !== 1 ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
+              color: playbackRate !== 1 ? '#2563eb' : '#64748b',
+              borderRadius: '8px',
+              padding: '3px 6px',
+              fontSize: '0.66rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              flexShrink: 0
+            }}
+            title="Tempo anpassen"
+          >
+            {playbackRate}x
+          </button>
+
+          {badge && (
+            <span style={{
+              fontSize: '0.66rem',
+              fontWeight: 800,
+              background: badgeBg,
+              color: badgeColor,
+              padding: '3px 8px',
+              borderRadius: '100px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center'
+            }}>
+              {badge}
+            </span>
+          )}
+
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                padding: '4px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+              title="Aufnahme löschen"
+            >
+              <Trash2 size={13} strokeWidth={2} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Audio Waveform Track: Displayed on Play / Active Playback */}
+      {isActiveOrPlaying && (
         <div 
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
@@ -15609,9 +15944,12 @@ const InlineAudioPlayer: React.FC<{
             display: 'flex',
             alignItems: 'center',
             gap: '2.5px',
-            height: '16px',
+            height: '18px',
             cursor: 'pointer',
-            padding: '1px 0'
+            padding: '2px 4px',
+            background: '#f8fafc',
+            borderRadius: '8px',
+            marginTop: '2px'
           }}
           title="Klicken zum Spulen"
         >
@@ -15626,76 +15964,13 @@ const InlineAudioPlayer: React.FC<{
                   height: `${h}%`,
                   minHeight: '3px',
                   borderRadius: '2px',
-                  background: isFilled ? themeColor : '#e2e8f0',
-                  transition: 'background 0.1s ease, height 0.15s ease'
+                  background: isFilled ? themeColor : '#cbd5e1',
+                  transition: 'background 0.08s ease, height 0.15s ease'
                 }}
               />
             );
           })}
         </div>
-      </div>
-
-      {/* Speed Button (1x / 0.8x / 0.6x) */}
-      <button
-        type="button"
-        onClick={() => setPlaybackRate(prev => prev === 1 ? 0.8 : (prev === 0.8 ? 0.6 : 1))}
-        style={{
-          background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
-          border: playbackRate !== 1 ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
-          color: playbackRate !== 1 ? '#2563eb' : '#64748b',
-          borderRadius: '8px',
-          padding: '3px 6px',
-          fontSize: '0.66rem',
-          fontWeight: 800,
-          cursor: 'pointer',
-          flexShrink: 0
-        }}
-        title="Tempo anpassen"
-      >
-        {playbackRate}x
-      </button>
-
-      {/* Optional Badge */}
-      {badge && (
-        <span style={{
-          fontSize: '0.66rem',
-          fontWeight: 800,
-          background: badgeBg,
-          color: badgeColor,
-          padding: '3px 8px',
-          borderRadius: '100px',
-          whiteSpace: 'nowrap',
-          flexShrink: 0,
-          display: 'inline-flex',
-          alignItems: 'center'
-        }}>
-          {badge}
-        </span>
-      )}
-
-      {/* Delete Icon Button */}
-      {onDelete && (
-        <button
-          type="button"
-          onClick={onDelete}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#94a3b8',
-            cursor: 'pointer',
-            padding: '4px',
-            borderRadius: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            transition: 'all 0.15s'
-          }}
-          className="hover-scale"
-          title="Aufnahme löschen"
-        >
-          <Trash2 size={13} style={{ color: '#ef4444' }} />
-        </button>
       )}
     </div>
   );

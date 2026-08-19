@@ -12,7 +12,7 @@ import { renderInstrumentIcon } from '../utils/instruments';
 import { StudentDetailModal } from './StudentDetailModal';
 import { ScheduleBoard } from './ScheduleBoard';
 import { StudentScheduleSlotsModal } from './StudentScheduleSlotsModal';
-import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
 import { CampusSetupScreen } from './CampusSetupScreen';
 import { StudioAvatar } from './StudioAvatar';
@@ -39,6 +39,17 @@ const cleanRoomName = (name: string | null | undefined): string => {
 const capitalizeName = (str: string | null | undefined): string => {
   if (!str) return '';
   return str.trim().split(/\s+/).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+};
+
+const getSimulatedNow = (): Date => {
+  const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+  if (!simStr) return new Date();
+  const parts = simStr.split('-').map(Number);
+  if (parts.length !== 3 || isNaN(parts[0])) return new Date();
+  const baseSim = new Date(parts[0], parts[1] - 1, parts[2], 14, 0, 0);
+  const simStartTime = Number(localStorage.getItem('groovelab_simulated_start_timestamp') || Date.now());
+  const elapsedMinutes = Math.floor((Date.now() - simStartTime) / 60000);
+  return new Date(baseSim.getTime() + elapsedMinutes * 60000);
 };
 
 const DEFAULT_IMPRESSUM = `Angaben gemäß § 5 TMG
@@ -3210,7 +3221,7 @@ export function AdminDashboard({
       : (openingHours?.groovelab_stats_reset_at || openingHours?.stats_reset_at);
     const resetDate = resetDateStr ? new Date(resetDateStr) : null;
 
-    const now = new Date();
+    const now = getSimulatedNow();
     const currentMonth = now.getMonth();
     const startYear = currentMonth >= 8 ? now.getFullYear() : now.getFullYear() - 1;
     const annualStartDate = new Date(startYear, 8, 1, 0, 0, 0, 0);
@@ -3302,7 +3313,7 @@ export function AdminDashboard({
     });
 
     filteredFocusLogs.forEach((log: any) => {
-      const mins = log.duration_minutes || 0;
+      const mins = log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0);
       totalMins += mins;
 
       // Classify as lab mins if there was an active school station check-in around this focus log
@@ -12609,7 +12620,7 @@ export function AdminDashboard({
       const classCount = classmateIds.length;
 
       // MoM performance percentage
-      const now = new Date();
+      const now = getSimulatedNow();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
       const startOfCurrentMonth = new Date(currentYear, currentMonth, 1, 0, 0, 0, 0);
@@ -12625,20 +12636,20 @@ export function AdminDashboard({
         if (!log.created_at) return false;
         const d = new Date(log.created_at);
         return classmateIds.includes(log.user_id) && d >= startOfCurrentMonth && d <= now;
-      }).reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
+      }).reduce((sum: number, log: any) => sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0)), 0);
 
       const previousMonthMins = classFocusLogs.filter((log: any) => {
         if (!log.created_at) return false;
         const d = new Date(log.created_at);
         return classmateIds.includes(log.user_id) && d >= startOfPreviousMonth && d <= limitOfPreviousMonth;
-      }).reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
+      }).reduce((sum: number, log: any) => sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0)), 0);
 
       const momPercent = previousMonthMins > 0
         ? Math.round(((currentMonthMins - previousMonthMins) / previousMonthMins) * 100)
         : (currentMonthMins > 0 ? 100 : 0);
 
       // Weekly activity rate
-      const startOfWeek = new Date();
+      const startOfWeek = new Date(now);
       const day = startOfWeek.getDay();
       const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
       startOfWeek.setDate(diff);
@@ -18030,7 +18041,8 @@ export function AdminDashboard({
             first_name: selectedStudentForTageskompass.first_name,
             last_name: selectedStudentForTageskompass.last_name,
             photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg',
-            is_campus_active: selectedStudentForTageskompass.is_campus_active
+            is_campus_active: selectedStudentForTageskompass.is_campus_active,
+            school_id: selectedStudentForTageskompass.school_id || admin?.school_id
           }}
           onClose={() => {
             setShowTageskompassModal(false);
@@ -18039,6 +18051,7 @@ export function AdminDashboard({
           }}
           teacherId={userId}
           initialLehrwerkId={initialLehrwerkIdForTageskompass || undefined}
+          hasTresorStorage={checkIsAudioTresorActive(selectedStudentForTageskompass) || checkIsAudioTresorActive(admin)}
           onProfileClick={(student) => {
             setShowTageskompassModal(false);
             setSelectedStudentForTageskompass(null);
@@ -18055,11 +18068,13 @@ export function AdminDashboard({
             first_name: admin?.first_name || 'Lehrer',
             last_name: admin?.last_name || '',
             photo_url: admin?.photo_url || '/campus_login_hero.png',
-            is_campus_active: true
+            is_campus_active: true,
+            school_id: admin?.school_id
           }}
           onClose={() => setShowTeacherToolsModal(false)}
           teacherId={userId}
           isTeacherTools={true}
+          hasTresorStorage={checkIsAudioTresorActive(admin)}
         />
       )}
 

@@ -21,6 +21,7 @@ import { supabase } from '../../lib/supabase';
 // @ts-ignore
 import * as lamejs from '@breezystack/lamejs';
 import { processPureRawAudioBuffer, audioBufferToWavBlob } from '../../utils/audioMasteringEngine';
+import { checkIsAudioTresorActive } from '../MeisterwerkDocumentationModal';
 
 export interface Track {
   id: number;
@@ -43,6 +44,7 @@ export interface GrooveLoopstationProps {
   readOnly: boolean;
   setActiveViewMode?: (mode: 'document' | 'recordings' | 'loopstation') => void;
   useNotebookLayout?: boolean;
+  hasTresorStorage?: boolean;
 }
 
 interface VolumeKnobProps {
@@ -149,7 +151,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   notifyHomeworkChange,
   readOnly,
   setActiveViewMode,
-  useNotebookLayout = false
+  useNotebookLayout = false,
+  hasTresorStorage: propHasTresor
 }) => {
   const [tracks, setTracks] = useState<Track[]>([
     { id: 1, url: null, blob: null, volume: 80, isMuted: false, isRecording: false, isWaiting: false, isSoloed: false },
@@ -506,37 +509,154 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const savedLoopAudioRef = useRef<HTMLAudioElement | null>(null);
   const savedLoopSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const calibrationStreamRef = useRef<MediaStream | null>(null);
+  const [hasTresorStorage, setHasTresorStorage] = useState<boolean>(() => {
+    if (propHasTresor === true) return true;
+    return checkIsAudioTresorActive(student);
+  });
 
-  const savedLoops = homeworkNotesList
+  useEffect(() => {
+    if (propHasTresor === true) {
+      setHasTresorStorage(true);
+    } else {
+      setHasTresorStorage(checkIsAudioTresorActive(student));
+    }
+  }, [propHasTresor, student]);
+
+  useEffect(() => {
+    let active = true;
+    const checkTresor = async () => {
+      if (propHasTresor === true || checkIsAudioTresorActive(student)) {
+        if (active) setHasTresorStorage(true);
+        return;
+      }
+      let targetSchoolId = 
+        student?.school_id || 
+        (student as any)?.schoolId || 
+        student?.schools?.id ||
+        (student as any)?.school?.id ||
+        sessionStorage.getItem('groovelab_school_id') || 
+        localStorage.getItem('groovelab_school_id') || 
+        sessionStorage.getItem('campus_school_id') ||
+        localStorage.getItem('campus_school_id') ||
+        localStorage.getItem('groovelab_last_school_id') ||
+        localStorage.getItem('school_id');
+
+      if (!targetSchoolId) {
+        try {
+          const cachedUser = JSON.parse(localStorage.getItem('groovelab_cached_user') || '{}');
+          if (cachedUser?.school_id) targetSchoolId = cachedUser.school_id;
+        } catch (e) {}
+      }
+
+      if (!targetSchoolId && student?.id && student.id !== 'teacher-self') {
+        try {
+          const { data: stRec } = await supabase
+            .from('users')
+            .select('school_id')
+            .eq('id', student.id)
+            .maybeSingle();
+          if (stRec?.school_id) targetSchoolId = stRec.school_id;
+        } catch (e) {}
+      }
+
+      if (!targetSchoolId) {
+        try {
+          const currentUid = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id');
+          if (currentUid) {
+            const { data: uRec } = await supabase
+              .from('users')
+              .select('school_id')
+              .eq('id', currentUid)
+              .maybeSingle();
+            if (uRec?.school_id) targetSchoolId = uRec.school_id;
+          }
+        } catch (e) {}
+      }
+
+      if (targetSchoolId) {
+        try {
+          const { data: sch } = await supabase
+            .from('schools')
+            .select('storage_addon_gb, storage_addon_status')
+            .eq('id', targetSchoolId)
+            .maybeSingle();
+          if (active && sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
+            setHasTresorStorage(true);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // Fallback: check if the primary active school has booked Audio-Tresor
+      try {
+        const { data: activeSchools } = await supabase
+          .from('schools')
+          .select('id, storage_addon_gb, storage_addon_status')
+          .gt('storage_addon_gb', 0)
+          .neq('storage_addon_status', 'cancelled')
+          .limit(1);
+        if (active && activeSchools && activeSchools.length > 0) {
+          setHasTresorStorage(true);
+        }
+      } catch (e) {}
+    };
+    checkTresor();
+    return () => { active = false; };
+  }, [student, propHasTresor]);
+
+  const userRoleInSession = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
+  const isTeacherViewer = !readOnly && userRoleInSession !== 'student';
+
+  const allSavedLoops = (homeworkNotesList || [])
     .filter(note => note.startsWith('LOOP:'))
     .map(note => {
       const parts = note.replace('LOOP:', '').split('|');
+      const creatorRole = parts[4] || 'student';
+      const visibility = parts[5] || (creatorRole === 'teacher' ? 'shared_with_teacher' : 'private');
       return {
         url: parts[0],
         duration: parts[1],
         date: parts[2],
         label: parts[3] || 'Loop-Mix',
-        creatorRole: parts[4] || 'student',
+        creatorRole,
+        visibility,
         originalStr: note
       };
     });
 
+  const savedLoops = allSavedLoops.filter(loop => {
+    if (!isTeacherViewer) return true; // Student sees all their loops
+    // Teacher sees loops made by teacher OR loops explicitly shared by student
+    return loop.creatorRole === 'teacher' || loop.visibility === 'shared_with_teacher' || loop.visibility === 'shared';
+  });
+
+  const handleToggleLoopVisibility = async (loop: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const newVisibility = loop.visibility === 'shared_with_teacher' ? 'private' : 'shared_with_teacher';
+    const updatedOriginalStr = `LOOP:${loop.url}|${loop.duration}|${loop.date}|${loop.label}|${loop.creatorRole}|${newVisibility}`;
+    
+    const updatedList = (homeworkNotesList || []).map((note: string) => {
+      if (note === loop.originalStr || (note.startsWith('LOOP:') && note.includes(loop.url))) {
+        return updatedOriginalStr;
+      }
+      return note;
+    });
+
+    if (setHomeworkNotesList) setHomeworkNotesList(updatedList);
+    if (syncHomeworkNotes) await syncHomeworkNotes(updatedList);
+    if (notifyHomeworkChange) notifyHomeworkChange();
+    if (selectedSavedLoop?.url === loop.url) {
+      setSelectedSavedLoop({ ...selectedSavedLoop, visibility: newVisibility, originalStr: updatedOriginalStr });
+    }
+  };
+
   useEffect(() => {
     if (activeSubTab === 'saved' && homeworkNotesList) {
-      const filtered = homeworkNotesList.filter((note: string) => note.startsWith('LOOP:'));
-      if (filtered.length > 0 && !selectedSavedLoop) {
-        const parts = filtered[0].replace('LOOP:', '').split('|');
-        setSelectedSavedLoop({
-          url: parts[0],
-          duration: parts[1],
-          date: parts[2],
-          label: parts[3] || 'Loop-Mix',
-          creatorRole: parts[4] || 'student',
-          originalStr: filtered[0]
-        });
+      if (savedLoops.length > 0 && !selectedSavedLoop) {
+        setSelectedSavedLoop(savedLoops[0]);
       }
     }
-  }, [activeSubTab, homeworkNotesList, selectedSavedLoop]);
+  }, [activeSubTab, homeworkNotesList, selectedSavedLoop, savedLoops]);
 
   useEffect(() => {
     return () => {
@@ -2172,22 +2292,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         }
       });
       // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
-      let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
-      let hasTresorStorage = false;
-      if (targetSchoolId) {
-        try {
-          const { data: sch } = await supabase
-            .from('schools')
-            .select('storage_addon_gb, storage_addon_status')
-            .eq('id', targetSchoolId)
-            .maybeSingle();
-          if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
-            hasTresorStorage = true;
-          }
-        } catch (e) {}
-      }
-
-      const targetBitrate = hasTresorStorage ? 256000 : 96000;
+      const effectiveTresor = hasTresorStorage || Boolean(propHasTresor);
+      const targetBitrate = effectiveTresor ? 256000 : 96000;
       let mimeType = 'audio/webm;codecs=opus';
       if (typeof MediaRecorder !== 'undefined') {
         if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -2559,7 +2665,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
 
-    if (currentMonthSavedLoops.length >= 3) {
+    if (!hasTresorStorage && currentMonthSavedLoops.length >= 3) {
       alert("Monats-Limit erreicht! Du hast in diesem Kalendermonat bereits 3 gespeicherte Loops im Protokoll. Du kannst deinen neuen Song weiterhin unbegrenzt als MP3 herunterladen oder im Tab 'Gespeicherte Loops' einen alten Loop löschen.");
       return;
     }
@@ -2628,39 +2734,36 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       processPureRawAudioBuffer(renderedBuffer, { targetLufs: -13.0, targetPeakDb: -1.0, isLoop: false });
 
       // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
-      let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
-      if (!targetSchoolId && student?.id) {
+      let targetSchoolId = 
+        student?.school_id || 
+        (student as any)?.schoolId || 
+        student?.schools?.id ||
+        (student as any)?.school?.id ||
+        sessionStorage.getItem('groovelab_school_id') || 
+        localStorage.getItem('groovelab_school_id') || 
+        sessionStorage.getItem('campus_school_id') || 
+        localStorage.getItem('campus_school_id') || 
+        localStorage.getItem('groovelab_last_school_id') || 
+        localStorage.getItem('school_id');
+
+      if (!targetSchoolId && student?.id && student.id !== 'teacher-self') {
         try {
           const { data: stRec } = await supabase
-            .from('students')
+            .from('users')
             .select('school_id')
             .eq('id', student.id)
             .maybeSingle();
           if (stRec?.school_id) targetSchoolId = stRec.school_id;
-        } catch (stErr) {
-          console.warn('[Loopstation] School lookup note:', stErr);
-        }
+        } catch (stErr) {}
       }
 
-      let hasTresorStorage = false;
-      if (targetSchoolId) {
-        try {
-          const { data: sch } = await supabase
-            .from('schools')
-            .select('storage_addon_gb, storage_addon_status')
-            .eq('id', targetSchoolId)
-            .maybeSingle();
-          if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
-            hasTresorStorage = true;
-          }
-        } catch (e) {}
-      }
+      const effectiveTresor = hasTresorStorage || Boolean(propHasTresor);
 
       let mixBlob: Blob;
       let contentType = 'audio/mp3';
       let fileExt = 'mp3';
 
-      if (hasTresorStorage) {
+      if (effectiveTresor) {
         // 💎 High-End Audiophile Lossless 24-Bit / 48 kHz Studio-WAV Master (Audio-Tresor Active)
         mixBlob = audioBufferToWavBlob(renderedBuffer, { title: sanitizedLabel, artist: student?.first_name || 'Campus Artist' });
         contentType = 'audio/wav';
@@ -2669,8 +2772,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         // 📦 Standard Voice & Space-Saving MP3/WebM Compression
         try {
           mixBlob = bufferToMp3(renderedBuffer);
+          contentType = 'audio/mp3';
+          fileExt = 'mp3';
         } catch (mp3Err) {
-          console.warn("MP3 conversion failed, falling back to WAV format:", mp3Err);
+          console.warn("MP3 conversion fallback to WAV:", mp3Err);
           mixBlob = bufferToWav(renderedBuffer);
           contentType = 'audio/wav';
           fileExt = 'wav';
@@ -2687,8 +2792,11 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       if (error) throw error;
 
       const publicUrl = supabase.storage.from('campus-assets').getPublicUrl(filePath).data.publicUrl;
-      const creatorRole = readOnly ? 'student' : 'teacher';
-      const audioMetaStr = `LOOP:${publicUrl}|${Math.round(masterLoopDuration / 1000)}|${new Date().toISOString()}|${sanitizedLabel}|${creatorRole}`;
+      const userRoleInSession = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
+      const isStudentSession = userRoleInSession === 'student' || readOnly;
+      const creatorRole = isStudentSession ? 'student' : 'teacher';
+      const initialVisibility = isStudentSession ? 'private' : 'shared_with_teacher';
+      const audioMetaStr = `LOOP:${publicUrl}|${Math.round(masterLoopDuration / 1000)}|${new Date().toISOString()}|${sanitizedLabel}|${creatorRole}|${initialVisibility}`;
 
       // 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
       if (targetSchoolId && mixBlob?.size) {
@@ -2700,10 +2808,21 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             .maybeSingle();
           if (schoolData) {
             const currentBytes = Number(schoolData.storage_used_bytes || 0);
+            const updatedBytes = currentBytes + mixBlob.size;
             await supabase
               .from('schools')
-              .update({ storage_used_bytes: currentBytes + mixBlob.size })
+              .update({ storage_used_bytes: updatedBytes })
               .eq('id', targetSchoolId);
+
+            // Keep local school overrides in sync
+            try {
+              const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+              const overrides = JSON.parse(overridesStr);
+              if (overrides[targetSchoolId]) {
+                overrides[targetSchoolId].storage_used_bytes = updatedBytes;
+                localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+              }
+            } catch (e) {}
           }
         } catch (quotaErr) {
           console.warn('[Loopstation] Storage quota update note:', quotaErr);
@@ -3182,7 +3301,76 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
         const usedCount = currentMonthSavedLoops.length;
-        const isFull = usedCount >= 3;
+        const isFull = !hasTresorStorage && usedCount >= 3;
+
+        const schoolObj = (student as any)?.schools || (student as any)?.school;
+        let overridesData: any = {};
+        try {
+          const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+          const allOverrides = JSON.parse(overridesStr);
+          const sId = student?.school_id || schoolObj?.id;
+          if (sId && allOverrides[sId]) overridesData = allOverrides[sId];
+        } catch (e) {}
+
+        const activeAddonGb = Number(overridesData.storage_addon_gb ?? schoolObj?.storage_addon_gb ?? 0);
+        const totalCapGb = 1.0 + activeAddonGb;
+        const usedBytes = Number(overridesData.storage_used_bytes ?? schoolObj?.storage_used_bytes ?? 0);
+        const usedGb = usedBytes / (1024 * 1024 * 1024);
+        const isStorageOverCap = hasTresorStorage && activeAddonGb > 0 && usedGb >= totalCapGb;
+
+        if (hasTresorStorage && isStorageOverCap) {
+          return (
+            <div style={{
+              width: "100%",
+              padding: "10px 16px",
+              borderRadius: "14px",
+              background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+              border: "1.5px solid #fde68a",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "0.76rem",
+              boxSizing: "border-box",
+              marginBottom: "14px",
+              boxShadow: "0 2px 8px rgba(245, 158, 11, 0.08)"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#92400e", fontWeight: 800 }}>
+                <span style={{ fontSize: "1.05rem" }}>⚠️</span>
+                <span>Audio-Tresor voll belegt ({totalCapGb} GB von {totalCapGb} GB) • Gespeicherte Loops &amp; Aufnahmen bleiben 100% erhalten. Für neue Aufnahmen gilt vorübergehend das Basis-Kontingent (max. 3 Loops / Monat • max. 60s).</span>
+              </div>
+              <span style={{ fontSize: '0.70rem', color: '#b45309', fontWeight: 850, background: '#ffffff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #fcd34d', whiteSpace: 'nowrap' }}>
+                Basis-Kontingent aktiv
+              </span>
+            </div>
+          );
+        }
+
+        if (hasTresorStorage) {
+          return (
+            <div style={{
+              width: "100%",
+              padding: "10px 16px",
+              borderRadius: "14px",
+              background: "linear-gradient(135deg, rgba(240, 253, 244, 0.9) 0%, rgba(220, 252, 231, 0.8) 100%)",
+              border: "1.5px solid #86efac",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "0.76rem",
+              boxSizing: "border-box",
+              marginBottom: "14px",
+              boxShadow: "0 2px 8px rgba(34, 197, 94, 0.08)"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#15803d", fontWeight: 850 }}>
+                <span style={{ fontSize: "1.05rem" }}>✨</span>
+                <span>Unbegrenzter Audio-Tresor aktiv: Nimm so viele Loops &amp; Jam-Tracks auf wie du möchtest!</span>
+              </div>
+              <span style={{ fontSize: '0.70rem', color: '#16a34a', fontWeight: 800, background: '#ffffff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bbf7d0' }}>
+                💎 Lossless Studio-Qualität
+              </span>
+            </div>
+          );
+        }
 
         return (
           <div style={{
@@ -5248,9 +5436,66 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                         transition: 'all 0.2s ease'
                       }}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5px', flex: 1 }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1d1d1f' }}>{loop.label}</span>
-                        <span style={{ fontSize: '0.58rem', color: '#86868b' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1d1d1f' }}>{loop.label}</span>
+                          
+                          {/* Loop Origin & Privacy Badge */}
+                          {loop.creatorRole === 'teacher' ? (
+                            <span style={{
+                              fontSize: '0.66rem',
+                              fontWeight: 800,
+                              background: '#dcfce7',
+                              color: '#15803d',
+                              padding: '2px 8px',
+                              borderRadius: '100px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              👨‍🏫 Vom Lehrer
+                            </span>
+                          ) : isTeacherViewer ? (
+                            <span style={{
+                              fontSize: '0.66rem',
+                              fontWeight: 800,
+                              background: '#ede9fe',
+                              color: '#6d28d9',
+                              padding: '2px 8px',
+                              borderRadius: '100px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              🎓 Freigegeben
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleLoopVisibility(loop, e)}
+                              style={{
+                                background: loop.visibility === 'shared_with_teacher' ? '#ede9fe' : '#f1f5f9',
+                                color: loop.visibility === 'shared_with_teacher' ? '#6d28d9' : '#475569',
+                                border: loop.visibility === 'shared_with_teacher' ? '1px solid #c4b5fd' : '1px solid #cbd5e1',
+                                padding: '2px 8px',
+                                borderRadius: '100px',
+                                fontSize: '0.66rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className="hover-scale"
+                              title={loop.visibility === 'shared_with_teacher' ? "Klicken, um diesen Loop wieder privat zu machen (für Lehrkraft unsichtbar)" : "Klicken, um diesen Loop für deine Lehrkraft freizugeben"}
+                            >
+                              <span>{loop.visibility === 'shared_with_teacher' ? '🎓 Für Lehrkraft freigegeben' : '🔒 Privat (nur für dich)'}</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 600 }}>
                           {new Date(loop.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr • {loop.duration}s
                         </span>
                         <div style={{
@@ -5258,7 +5503,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                           height: '4px',
                           background: isSelected ? 'rgba(52, 168, 83, 0.15)' : '#e5e5ea',
                           borderRadius: '2px',
-                          marginTop: '6px',
+                          marginTop: '4px',
                           position: 'relative',
                           overflow: 'hidden'
                         }}>

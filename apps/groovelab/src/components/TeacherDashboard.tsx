@@ -5,7 +5,7 @@ import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
-import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, getGroupTypeLabel, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
@@ -4831,6 +4831,12 @@ export function TeacherDashboard({
           if (sd) {
             setSchoolData(sd);
             setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
+            if (Number(sd.storage_addon_gb || 0) > 0 && sd.storage_addon_status !== 'cancelled') {
+              localStorage.setItem('groovelab_storage_addon_active', 'true');
+              localStorage.setItem('campus_storage_addon_active', 'true');
+              localStorage.setItem('groovelab_storage_addon_gb', String(sd.storage_addon_gb));
+              localStorage.setItem('campus_storage_addon_gb', String(sd.storage_addon_gb));
+            }
           }
         });
         // Prepare Student Query: fetch assigned students in the school
@@ -7095,10 +7101,13 @@ export function TeacherDashboard({
                           const parts = note.substring(5).split('|');
                           const label = parts[3] || 'Loop-Mix';
                           const duration = parts[1] || '8';
+                          const creatorRole = parts[4] || 'student';
+                          const visibility = parts[5] || (creatorRole === 'teacher' ? 'shared_with_teacher' : 'private');
+                          if (creatorRole === 'student' && visibility === 'private') return null;
                           return (
                             <div key={`prev-note-${idx}`}>
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
-                                🎵 Loop-Mix: "{label}" ({duration}s)
+                                🎵 {creatorRole === 'teacher' ? 'Lehrer-Loop' : 'Schüler-Loop'}: "{label}" ({duration}s)
                               </span>
                             </div>
                           );
@@ -7230,10 +7239,13 @@ export function TeacherDashboard({
                           const parts = note.substring(5).split('|');
                           const label = parts[3] || 'Loop-Mix';
                           const duration = parts[1] || '8';
+                          const creatorRole = parts[4] || 'student';
+                          const visibility = parts[5] || (creatorRole === 'teacher' ? 'shared_with_teacher' : 'private');
+                          if (creatorRole === 'student' && visibility === 'private') return null;
                           return (
                             <div key={`curr-note-${idx}`}>
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
-                                🎵 Loop-Mix: "{label}" ({duration}s)
+                                🎵 {creatorRole === 'teacher' ? 'Lehrer-Loop' : 'Schüler-Loop'}: "{label}" ({duration}s)
                               </span>
                             </div>
                           );
@@ -9556,9 +9568,14 @@ export function TeacherDashboard({
       />
        {docStudent && (
         <MeisterwerkDocumentationModal 
-          student={docStudent} 
+          student={{
+            ...docStudent,
+            school_id: teacher?.school_id || docStudent.school_id,
+            schools: schoolData || docStudent.schools
+          }} 
           onClose={() => setDocStudent(null)} 
           teacherId={userId}
+          hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(docStudent)}
           onProfileClick={(student) => {
             setDocStudent(null);
             setSelectedStudentProfile(student);

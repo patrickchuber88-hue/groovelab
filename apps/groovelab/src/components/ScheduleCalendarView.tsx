@@ -35,7 +35,7 @@ import {
   Edit3
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName } from '../utils/nameHelper';
-import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
 import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
 interface ScheduleOccurrence {
   id: string;
@@ -8094,7 +8094,10 @@ return (
             {docStudent && (
               <React.Suspense fallback={<LiquidGlassSkeleton type="modal" />}>
                 <MeisterwerkDocumentationModal 
-                  student={docStudent} 
+                  student={{
+                    ...docStudent,
+                    school_id: schoolId || docStudent.school_id
+                  }} 
                   onClose={() => {
                     setDocStudent(null);
                     if (occ?.student_id) {
@@ -8102,6 +8105,7 @@ return (
                     }
                   }} 
                   teacherId={userId}
+                  hasTresorStorage={checkIsAudioTresorActive(docStudent)}
                 />
               </React.Suspense>
             )}

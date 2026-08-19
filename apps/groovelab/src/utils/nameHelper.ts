@@ -300,4 +300,62 @@ export function sanitizeBirthDateToDayOnly(dateStr?: string | null): string {
   }
 }
 
+/**
+ * Resolves the display instrument or subject for a lesson or profile:
+ * - A student only has status 'Musiker' if they have NOT been assigned to any teacher.
+ * - Once assigned to a teacher, a concrete instrument/subject is always used (or resolved from the teacher's instrument).
+ * - 'Musiker' or generic placeholders are never displayed as a lesson instrument/subject.
+ */
+export function formatDisplaySubjectOrInstrument(
+  item?: any,
+  teacher?: any
+): string | null {
+  if (!item && !teacher) return null;
+
+  const isInvalidInstrument = (val?: string | null): boolean => {
+    if (!val) return true;
+    const clean = String(val).trim().toLowerCase();
+    return (
+      clean === '' ||
+      clean === 'musiker' ||
+      clean === 'musikerin' ||
+      clean === 'instrument' ||
+      clean === 'keines' ||
+      clean === 'none' ||
+      clean === '-' ||
+      clean === 'null' ||
+      clean === 'undefined'
+    );
+  };
+
+  const rawItemInst = (
+    item?.instrument ||
+    item?.student?.instrument ||
+    item?.subject ||
+    item?.student_instrument ||
+    item?.purpose ||
+    ''
+  ).trim();
+
+  if (!isInvalidInstrument(rawItemInst)) {
+    return rawItemInst;
+  }
+
+  // Fallback to teacher's instrument / subject
+  const teacherObj = teacher || item?.teacher || item?.teachers;
+  const rawTeacherInst = (
+    teacherObj?.instrument ||
+    teacherObj?.subject ||
+    teacherObj?.main_instrument ||
+    ''
+  ).trim();
+
+  if (!isInvalidInstrument(rawTeacherInst)) {
+    return rawTeacherInst;
+  }
+
+  return null;
+}
+
+
 

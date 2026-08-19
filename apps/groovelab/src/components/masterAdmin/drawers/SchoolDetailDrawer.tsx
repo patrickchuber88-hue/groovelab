@@ -81,9 +81,15 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   const baseStorageGb = 1.0;
   const totalStorageGb = baseStorageGb + extraStorageGb;
   const storageUsedBytes = Number(school?.storage_used_bytes || 0);
-  const usedStorageGb = Number((storageUsedBytes / (1024 * 1024 * 1024)).toFixed(2));
-  const freeStorageGb = Math.max(0, Number((totalStorageGb - usedStorageGb).toFixed(2)));
+  const usedStorageGb = storageUsedBytes / (1024 * 1024 * 1024);
+  const usedStorageMb = storageUsedBytes / (1024 * 1024);
+  const freeStorageGb = Math.max(0, totalStorageGb - usedStorageGb);
   const storagePercentage = Math.min(100, Math.round((usedStorageGb / totalStorageGb) * 100));
+
+  const formattedUsedStorage = (storageUsedBytes > 0 && usedStorageGb < 0.10)
+    ? `${usedStorageMb.toFixed(1).replace('.', ',')} MB`
+    : `${usedStorageGb.toFixed(2).replace('.', ',')} GB`;
+  const formattedStoragePct = storageUsedBytes > 0 && storagePercentage < 1 ? '< 1%' : `${storagePercentage}%`;
 
   const currentAddonPackage = STORAGE_PACKAGES.find(p => p.gb === extraStorageGb) || {
     gb: extraStorageGb,
@@ -801,7 +807,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
 
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-                    {usedStorageGb.toFixed(2).replace('.', ',')} GB / {totalStorageGb} GB
+                    {formattedUsedStorage} / {totalStorageGb} GB
                   </div>
                   <span style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 800 }}>
                     {freeStorageGb.toFixed(2).replace('.', ',')} GB frei ({100 - storagePercentage} %)
@@ -813,7 +819,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.76rem', fontWeight: 700 }}>
                   <span style={{ color: '#64748b' }}>Aktuelle Auslastung</span>
-                  <span style={{ color: storagePercentage > 80 ? '#dc2626' : '#059669', fontWeight: 800 }}>{storagePercentage} % belegt</span>
+                  <span style={{ color: storagePercentage > 80 ? '#dc2626' : '#059669', fontWeight: 800 }}>{formattedStoragePct} belegt</span>
                 </div>
                 <div style={{ height: '12px', borderRadius: '100px', background: '#f1f5f9', overflow: 'hidden' }}>
                   <div style={{

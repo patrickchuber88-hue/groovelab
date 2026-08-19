@@ -1251,19 +1251,139 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     return 'briefing';
   });
 
-  // 🎙️ Live Audio-Tresor Storage & Quota Auto-Refresh on Licenses tab view
+  // 🎙️ Live Audio-Tresor Storage & Quota Auto-Refresh with Live File Aggregation
   useEffect(() => {
     if (secretarySubTab === 'licenses' && currentSchoolProfile?.id) {
       const refreshStorageQuota = async () => {
         try {
-          const { data } = await supabase
+          const { data: schData } = await supabase
             .from('schools')
             .select('storage_used_bytes, storage_addon_gb, storage_addon_status, storage_addon_monthly_fee')
             .eq('id', currentSchoolProfile.id)
             .maybeSingle();
 
-          if (data && typeof data.storage_used_bytes === 'number') {
-            setCurrentSchoolProfile((prev: any) => prev ? ({ ...prev, ...data }) : prev);
+          let usedBytes = Number(schData?.storage_used_bytes || 0);
+
+          // 🎙️ AUTOMATIC LIVE STORAGE SCANNER: Multi-source aggregation (Cloud + Local Audio + Milestones + Loops)
+          try {
+            let aggregatedBytes = 0;
+
+            // 1. Scan localStorage for all student recordings & audio biography milestones
+            if (typeof window !== 'undefined') {
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key) continue;
+
+                // Audio Biography Milestones
+                if (key.startsWith('campus_audio_biography_milestones_')) {
+                  try {
+                    const milestones = JSON.parse(localStorage.getItem(key) || '[]');
+                    if (Array.isArray(milestones)) {
+                      for (const ms of milestones) {
+                        if (ms.audioUrl || ms.audio_url || ms.blobKey || ms.audioBlob) {
+                          const sz = Number(ms.size || ms.fileSize || ms.bytes || 0);
+                          aggregatedBytes += sz > 0 ? sz : 18.5 * 1024 * 1024;
+                        }
+                      }
+                    }
+                  } catch (e) {}
+                }
+
+                // Junior & Studio Recordings
+                if (key.startsWith('campus_junior_recordings_') || key.startsWith('campus_recordings_')) {
+                  try {
+                    const recs = JSON.parse(localStorage.getItem(key) || '[]');
+                    if (Array.isArray(recs)) {
+                      for (const rec of recs) {
+                        if (rec.url || rec.blobKey || rec.blob) {
+                          const sz = Number(rec.size || rec.fileSize || rec.bytes || 0);
+                          const dur = Number(rec.duration || 0);
+                          const estimated = dur > 0 ? Math.max(1024 * 1024, dur * 192000) : 14.2 * 1024 * 1024;
+                          aggregatedBytes += sz > 0 ? sz : estimated;
+                        }
+                      }
+                    }
+                  } catch (e) {}
+                }
+
+                // Saved Loops
+                if (key.startsWith('campus_saved_loops_')) {
+                  try {
+                    const loops = JSON.parse(localStorage.getItem(key) || '[]');
+                    if (Array.isArray(loops)) {
+                      for (const l of loops) {
+                        if (l.url || l.blobKey) {
+                          const sz = Number(l.size || l.fileSize || 0);
+                          aggregatedBytes += sz > 0 ? sz : 22.8 * 1024 * 1024;
+                        }
+                      }
+                    }
+                  } catch (e) {}
+                }
+
+                // Homework notes with AUDIO: or LOOP:
+                if (key.startsWith('campus_homework_notes_')) {
+                  try {
+                    const notes = JSON.parse(localStorage.getItem(key) || '[]');
+                    if (Array.isArray(notes)) {
+                      for (const note of notes) {
+                        if (typeof note === 'string') {
+                          if (note.startsWith('AUDIO:')) {
+                            aggregatedBytes += 12.5 * 1024 * 1024;
+                          } else if (note.startsWith('LOOP:')) {
+                            aggregatedBytes += 22.8 * 1024 * 1024;
+                          }
+                        }
+                      }
+                    }
+                  } catch (e) {}
+                }
+              }
+            }
+
+            // 2. Scan cloud bucket folders
+            const folders = ['recordings', 'loops', 'audio-biography'];
+            for (const folder of folders) {
+              try {
+                const { data: files } = await supabase.storage
+                  .from('campus-assets')
+                  .list(folder, { limit: 500 });
+                if (files && files.length > 0) {
+                  for (const file of files) {
+                    const fileSize = Number(file.metadata?.size || 0);
+                    if (fileSize > 0) {
+                      aggregatedBytes += fileSize;
+                    }
+                  }
+                }
+              } catch (folderErr) {
+                console.warn(`[Storage Scan] Folder ${folder} scan note:`, folderErr);
+              }
+            }
+
+            if (aggregatedBytes > 0) {
+              usedBytes = Math.max(usedBytes, aggregatedBytes);
+              if (usedBytes > Number(schData?.storage_used_bytes || 0)) {
+                await supabase
+                  .from('schools')
+                  .update({ storage_used_bytes: usedBytes })
+                  .eq('id', currentSchoolProfile.id);
+              }
+              try {
+                const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+                const overrides = JSON.parse(overridesStr);
+                if (overrides[currentSchoolProfile.id]) {
+                  overrides[currentSchoolProfile.id].storage_used_bytes = usedBytes;
+                  localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+                }
+              } catch (e) {}
+            }
+          } catch (scanErr) {
+            console.warn('[Storage Scan] Aggregation note:', scanErr);
+          }
+
+          if (schData) {
+            setCurrentSchoolProfile((prev: any) => prev ? ({ ...prev, ...schData, storage_used_bytes: usedBytes }) : prev);
           }
         } catch (err) {
           console.warn('[Storage] Auto-refresh quota note:', err);
@@ -1914,6 +2034,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [selectedStorageAddonGb, setSelectedStorageAddonGb] = useState<number>(0);
   const [selectedStorageAddonFee, setSelectedStorageAddonFee] = useState<number>(0);
   const [showStorageManagerModal, setShowStorageManagerModal] = useState<boolean>(false);
+  const [showStorageTerminationModal, setShowStorageTerminationModal] = useState<boolean>(false);
+  const [storageTerminationDays, setStorageTerminationDays] = useState<number>(30);
   const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showConfirmExtra, setShowConfirmExtra] = useState<boolean>(false);
@@ -3571,6 +3693,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         }
 
         setCurrentSchoolProfile(schoolData);
+        if (Number(schoolData.storage_addon_gb || 0) > 0 && schoolData.storage_addon_status !== 'cancelled') {
+          localStorage.setItem('groovelab_storage_addon_active', 'true');
+          localStorage.setItem('campus_storage_addon_active', 'true');
+          localStorage.setItem('groovelab_storage_addon_gb', String(schoolData.storage_addon_gb));
+          localStorage.setItem('campus_storage_addon_gb', String(schoolData.storage_addon_gb));
+        }
         setSchoolName(schoolData.name);
         setSchoolSubdomain(schoolData.subdomain || '');
         setOpeningHours(schoolData.opening_hours);
@@ -15080,6 +15208,242 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       </button>
                     </div>
                   )}
+
+                  {/* ⏳ Active Audio-Tresor Termination & Grace Period Monitor */}
+                  {(() => {
+                    const termStatus = currentSchoolProfile?.storage_termination_status;
+                    const termDeadline = currentSchoolProfile?.storage_termination_deadline;
+                    if (termStatus !== 'active_grace_period') return null;
+
+                    const deadlineDate = termDeadline ? new Date(termDeadline) : new Date();
+                    const now = new Date();
+                    const diffDays = Math.max(0, Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+                    const deadlineStr = deadlineDate.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+
+                    // Count how many students have downloaded backup
+                    let downloadedCount = 0;
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const k = localStorage.key(i);
+                      if (k && k.startsWith('campus_storage_backup_downloaded_') && localStorage.getItem(k) === 'true') {
+                        downloadedCount++;
+                      }
+                    }
+                    const totalStudents = students.length || 1;
+                    const backupPct = Math.min(100, Math.round((downloadedCount / totalStudents) * 100));
+
+                    return (
+                      <div style={{
+                        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                        border: '1.5px solid #86efac',
+                        borderRadius: '24px',
+                        padding: '20px 24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '16px',
+                        boxShadow: '0 10px 25px -5px rgba(34, 197, 94, 0.12)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div style={{
+                            background: '#dcfce7',
+                            borderRadius: '16px',
+                            padding: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid #86efac'
+                          }}>
+                            <span style={{ fontSize: '1.5rem' }}>⏳</span>
+                          </div>
+                          <div>
+                            <strong style={{ display: 'block', fontSize: '1rem', color: '#14532d', marginBottom: '4px' }}>
+                              Audio-Tresor Kündigung aktiv • Stichtag: {deadlineStr} ({diffDays === 0 ? 'Heute!' : `noch ${diffDays} Tage`})
+                            </strong>
+                            <span style={{ fontSize: '0.84rem', color: '#166534', lineHeight: '1.4' }}>
+                              {downloadedCount} von {totalStudents} Schülern haben ihre Aufnahmen bereits als ZIP gesichert ({backupPct}%).
+                              Am Stichtag wird der Cloud-Speicher geleert und dein Tarif automatisch auf Standard (0,00 €) umgestellt.
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (confirm("Möchtest du die Kündigung abbrechen und den Audio-Tresor aktiv behalten?")) {
+                                try {
+                                  await supabase.from('schools').update({ storage_termination_status: 'cancelled', storage_termination_deadline: null }).eq('id', schoolId);
+                                  const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+                                  const overrides = JSON.parse(overridesStr);
+                                  if (overrides[schoolId]) {
+                                    delete overrides[schoolId].storage_termination_status;
+                                    delete overrides[schoolId].storage_termination_deadline;
+                                    localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+                                  }
+                                  setCurrentSchoolProfile((prev: any) => prev ? { ...prev, storage_termination_status: null, storage_termination_deadline: null } : prev);
+                                  window.dispatchEvent(new Event('groovelab_school_updated'));
+                                } catch (e) {}
+                              }
+                            }}
+                            style={{
+                              background: '#ffffff',
+                              color: '#475569',
+                              border: '1.5px solid #cbd5e1',
+                              borderRadius: '12px',
+                              padding: '9px 14px',
+                              fontWeight: 800,
+                              fontSize: '0.78rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Kündigung abbrechen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (confirm(`Möchtest du den Stichtag jetzt sofort ausführen? Der Cloud-Speicher wird geleert und dein Paket auf Standard (0,00 €) umgestellt.`)) {
+                                try {
+                                  await supabase.from('schools').update({
+                                    storage_used_bytes: 0,
+                                    storage_addon_gb: 0,
+                                    storage_addon_monthly_fee: 0,
+                                    storage_addon_status: 'active',
+                                    storage_termination_status: 'completed'
+                                  }).eq('id', schoolId);
+
+                                  const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+                                  const overrides = JSON.parse(overridesStr);
+                                  overrides[schoolId] = {
+                                    ...(overrides[schoolId] || {}),
+                                    storage_used_bytes: 0,
+                                    storage_addon_gb: 0,
+                                    storage_addon_monthly_fee: 0,
+                                    storage_addon_status: 'active',
+                                    storage_termination_status: 'completed'
+                                  };
+                                  localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+                                  localStorage.setItem('groovelab_storage_addon_active', 'false');
+                                  localStorage.setItem('campus_storage_addon_active', 'false');
+                                  localStorage.setItem('groovelab_storage_addon_gb', '0');
+                                  localStorage.setItem('campus_storage_addon_gb', '0');
+
+                                  setCurrentSchoolProfile((prev: any) => prev ? {
+                                    ...prev,
+                                    storage_used_bytes: 0,
+                                    storage_addon_gb: 0,
+                                    storage_addon_monthly_fee: 0,
+                                    storage_addon_status: 'active',
+                                    storage_termination_status: 'completed'
+                                  } : prev);
+
+                                  window.dispatchEvent(new Event('groovelab_school_updated'));
+                                  alert("✅ Audio-Tresor erfolgreich bereinigt. Tarif wurde auf 0,00 € (Standard 1 GB) umgestellt.");
+                                } catch (e: any) {
+                                  alert("Fehler: " + e.message);
+                                }
+                              }
+                            }}
+                            style={{
+                              background: '#16a34a',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '12px',
+                              padding: '9px 16px',
+                              fontWeight: 800,
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+                            }}
+                          >
+                            Stichtag jetzt ausführen (0,00 €)
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 🎙️ Enterprise Audio-Tresor Storage Proactive Capacity Monitor (85% & 95% Thresholds) */}
+                  {(() => {
+                    const activeAddonGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
+                    const baseGb = 1.0;
+                    const currentTotalCapGb = baseGb + activeAddonGb;
+                    const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                    const usedGb = usedBytes / (1024 * 1024 * 1024);
+                    const usedMb = usedBytes / (1024 * 1024);
+                    const usagePct = currentTotalCapGb > 0 ? (usedGb / currentTotalCapGb) * 100 : 0;
+                    
+                    if (usagePct < 85) return null;
+
+                    const isCritical = usagePct >= 95;
+                    const formattedUsed = usedBytes > 0 && usedGb < 0.10 
+                      ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+                      : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+                    const nextTierGb = activeAddonGb < 5 ? 5 : activeAddonGb < 10 ? 10 : activeAddonGb < 20 ? 20 : activeAddonGb < 50 ? 50 : activeAddonGb < 100 ? 100 : 250;
+
+                    return (
+                      <div style={{
+                        background: isCritical ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' : 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                        border: isCritical ? '1.5px solid #fecaca' : '1.5px solid #fde68a',
+                        borderRadius: '24px',
+                        padding: '20px 24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '16px',
+                        boxShadow: isCritical ? '0 10px 25px -5px rgba(239, 68, 68, 0.12)' : '0 10px 25px -5px rgba(245, 158, 11, 0.10)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div style={{
+                            background: isCritical ? '#fee2e2' : '#fef3c7',
+                            borderRadius: '16px',
+                            padding: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: isCritical ? '1px solid #fca5a5' : '1px solid #fcd34d'
+                          }}>
+                            <HardDrive size={24} style={{ color: isCritical ? '#dc2626' : '#d97706' }} />
+                          </div>
+                          <div>
+                            <strong style={{ display: 'block', fontSize: '1rem', color: isCritical ? '#991b1b' : '#92400e', marginBottom: '4px' }}>
+                              {isCritical 
+                                ? `🚨 Kritische Speicherauslastung: Audio-Tresor zu ${Math.round(usagePct)}% belegt!`
+                                : `⚠️ Speicher-Vorwarnung: Audio-Tresor zu ${Math.round(usagePct)}% belegt`
+                              }
+                            </strong>
+                            <span style={{ fontSize: '0.84rem', color: isCritical ? '#7f1d1d' : '#78350f', lineHeight: '1.4' }}>
+                              {formattedUsed} von {currentTotalCapGb} GB belegt. {isCritical 
+                                ? 'Der 5% Kulanz-Puffer ist aktiv. Bitte erweitere jetzt dein Speichervolumen, um Unterbrechungen im Unterricht zu vermeiden.' 
+                                : 'Erweitere rechtzeitig dein Speichervolumen, damit Schüler und Lehrkräfte weiterhin nahtlos in Studio-Qualität aufnehmen können.'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedStorageAddonGb(nextTierGb);
+                            setShowStorageManagerModal(true);
+                          }}
+                          style={{
+                            background: isCritical ? '#dc2626' : '#d97706',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '12px',
+                            padding: '10px 20px',
+                            fontWeight: 800,
+                            fontSize: '0.84rem',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            boxShadow: isCritical ? '0 4px 12px rgba(220, 38, 38, 0.25)' : '0 4px 12px rgba(217, 119, 6, 0.25)',
+                            transition: 'transform 0.15s, background-color 0.15s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = isCritical ? '#b91c1c' : '#b45309'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = isCritical ? '#dc2626' : '#d97706'}
+                        >
+                          {isCritical ? `Jetzt auf +${nextTierGb} GB erweitern` : 'Speicher anpassen'}
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                   {/* AVV Warning Banner */}
                   {!isAvvSigned && (
@@ -27014,7 +27378,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                     </div>
 
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>
-                                                      <span>{usedBytes > 0 && usedGb < 0.01 ? `${(usedBytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB` : `${usedGb.toFixed(2).replace('.', ',')} GB`} von {totalCapGb} GB belegt</span>
+                                                      <span>{formattedUsed} von {totalCapGb} GB belegt ({formattedPct})</span>
                                                       <span style={{ color: usagePct > 80 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>{freeGb.toFixed(2).replace('.', ',')} GB frei ({100 - usagePct}%)</span>
                                                     </div>
 
@@ -32951,6 +33315,53 @@ status: status,
                 })}
               </div>
 
+              {/* 📢 Storage Termination & Grace Period Option */}
+              {usedGb > 1.0 && (
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1.5px dashed #cbd5e1',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>📦</span>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.78rem', color: '#0f172a' }}>
+                        Möchtest du den Audio-Tresor kündigen (0,00 €)?
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                        Starte eine faire Download-Frist, damit Schüler ihre Aufnahmen als ZIP sichern können.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowStorageManagerModal(false);
+                      setShowStorageTerminationModal(true);
+                    }}
+                    style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '10px',
+                      padding: '7px 12px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                    }}
+                  >
+                    📢 Kündigung mit Schüler-Frist
+                  </button>
+                </div>
+              )}
+
               {/* Security & Compliance Box in Modal */}
               <div style={{
                 background: '#f8fafc',
@@ -33022,6 +33433,10 @@ status: status,
                           storage_addon_status: 'active'
                         };
                         localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+                        localStorage.setItem('groovelab_storage_addon_active', selectedStorageAddonGb > 0 ? 'true' : 'false');
+                        localStorage.setItem('campus_storage_addon_active', selectedStorageAddonGb > 0 ? 'true' : 'false');
+                        localStorage.setItem('groovelab_storage_addon_gb', String(selectedStorageAddonGb));
+                        localStorage.setItem('campus_storage_addon_gb', String(selectedStorageAddonGb));
                         window.dispatchEvent(new Event('groovelab_school_updated'));
                       } catch (e) {
                         console.error(e);
@@ -33053,6 +33468,225 @@ status: status,
                   }}
                 >
                   Änderung verbindlich speichern
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 📢 Modal for Audio-Tresor Termination & Student Grace Period Setup */}
+      {showStorageTerminationModal && (() => {
+        const deadlineDate = new Date();
+        deadlineDate.setDate(deadlineDate.getDate() + storageTerminationDays);
+        const deadlineStr = deadlineDate.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: '20px'
+            }}
+            onClick={() => setShowStorageTerminationModal(false)}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                width: '100%',
+                maxWidth: '600px',
+                padding: '28px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                border: '1px solid #e2e8f0',
+                boxSizing: 'border-box'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '12px',
+                    background: '#fef3c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <span style={{ fontSize: '1.4rem' }}>📦</span>
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+                      Audio-Tresor Kündigungs-Assistent
+                    </h3>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b' }}>
+                      Faire Download-Frist für Schüler einleiten &amp; Speicher nach Ablauf auf 0,00 € zurücksetzen
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStorageTerminationModal(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Step 1: Frist wählen */}
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
+                  1. Wähle die Download-Frist für deine Schüler &amp; Eltern:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  {[
+                    { days: 14, label: '14 Tage Frist', desc: 'Kurzfristig' },
+                    { days: 30, label: '30 Tage Frist', desc: 'Empfohlen' },
+                    { days: 60, label: '60 Tage Frist', desc: 'Schuljahres-Ende' }
+                  ].map(opt => (
+                    <div
+                      key={opt.days}
+                      onClick={() => setStorageTerminationDays(opt.days)}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '12px',
+                        border: '2px solid',
+                        borderColor: storageTerminationDays === opt.days ? '#34a853' : '#e2e8f0',
+                        background: storageTerminationDays === opt.days ? '#f0fdf4' : '#ffffff',
+                        cursor: 'pointer',
+                        textAlign: 'center'
+                      }}
+                    >
+                      <div style={{ fontWeight: 800, fontSize: '0.84rem', color: storageTerminationDays === opt.days ? '#166534' : '#0f172a' }}>
+                        {opt.label}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>
+                        {opt.desc}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 2: Vorschau der Schülermaske */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '14px 16px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+                  👁️ So sieht der automatische Hinweis beim Schüler-Login aus:
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.45 }}>
+                  <em>„Deine Musikschule stellt den Cloud-Audio-Tresor zum <strong>{deadlineStr}</strong> um. Sichere dir deine Songs &amp; Meisterwerke jetzt als ZIP-Archiv!“</em>
+                </div>
+                <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.68rem', background: '#dcfce7', color: '#166534', padding: '3px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                    ✓ 1-Klick ZIP-Download
+                  </span>
+                  <span style={{ fontSize: '0.68rem', background: '#e0e7ff', color: '#4338ca', padding: '3px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                    ✓ Automatisch sortiert (/Meisterwerke, /Loops)
+                  </span>
+                </div>
+              </div>
+
+              {/* Step 3: Was passiert am Stichtag */}
+              <div style={{ fontSize: '0.70rem', color: '#64748b', lineHeight: 1.4, marginBottom: '20px' }}>
+                ℹ️ <strong>Was passiert am Stichtag ({deadlineStr})?</strong><br />
+                Der Cloud-Speicher wird physisch geleert und dein Tarif wird <strong>vollautomatisch auf das kostenlose Standard-Paket (0,00 €)</strong> umgestellt. Es entstehen keine weiteren Kosten.
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowStorageTerminationModal(false)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontSize: '0.78rem',
+                    fontWeight: 750,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const deadlineIso = deadlineDate.toISOString();
+                      const payload: any = {
+                        storage_termination_status: 'active_grace_period',
+                        storage_termination_deadline: deadlineIso
+                      };
+
+                      let { error } = await supabase
+                        .from('schools')
+                        .update(payload)
+                        .eq('id', schoolId);
+
+                      if (error && (error.message.includes('storage_termination') || error.message.includes('schema cache'))) {
+                        console.warn("Storage termination DB note:", error.message);
+                      }
+
+                      // Persist in overrides
+                      try {
+                        const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+                        const overrides = JSON.parse(overridesStr);
+                        overrides[schoolId] = {
+                          ...(overrides[schoolId] || {}),
+                          storage_termination_status: 'active_grace_period',
+                          storage_termination_deadline: deadlineIso
+                        };
+                        localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+                        window.dispatchEvent(new Event('groovelab_school_updated'));
+                      } catch (e) {
+                        console.error(e);
+                      }
+
+                      setCurrentSchoolProfile((prev: any) => prev ? {
+                        ...prev,
+                        storage_termination_status: 'active_grace_period',
+                        storage_termination_deadline: deadlineIso
+                      } : prev);
+
+                      setShowStorageTerminationModal(false);
+                      alert(`✅ Kündigung mit Download-Frist erfolgreich aktiviert! Stichtag: ${deadlineStr}. Deine Schüler werden ab sofort beim Login zum ZIP-Download eingeladen.`);
+                    } catch (err: any) {
+                      alert("Fehler beim Aktivieren: " + err.message);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 22px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: '#ffffff',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(5, 150, 105, 0.25)'
+                  }}
+                >
+                  📢 Kündigung mit Frist ({storageTerminationDays} Tage) aktivieren
                 </button>
               </div>
             </div>

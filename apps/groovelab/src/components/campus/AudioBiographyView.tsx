@@ -1072,25 +1072,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         console.warn('[Storage Check] Overrides check error:', e);
       }
 
-      // 7. Check if any billing booking is active across localStorage
-      let isAnyBillingBooked = false;
-      try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && k.startsWith('isBillingBooked_') && localStorage.getItem(k) === 'true') {
-            isAnyBillingBooked = true;
-            break;
-          }
-        }
-      } catch (e) {}
-
       if (!isCancelled) {
-        let activeGb = Number(schoolData?.storage_addon_gb || schoolData?.storage_addon_pending_gb || 0);
-        if (activeGb === 0 && (isAnyBillingBooked || schoolData?.status === 'active' || schoolData?.is_trial === true)) {
-          const fallbackBooked = Number(localStorage.getItem('selectedStorageAddonGb') || 20);
-          activeGb = fallbackBooked;
-        }
-
+        const activeGb = Number(schoolData?.storage_addon_gb || 0);
         const isStatusValid = schoolData?.storage_addon_status !== 'cancelled';
         const isAddonActive = activeGb > 0 && isStatusValid;
 
@@ -2266,6 +2249,16 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 .from('schools')
                 .update({ storage_used_bytes: newBytes })
                 .eq('id', targetSchoolId) as any);
+
+              // Keep local school overrides in sync
+              try {
+                const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+                const overrides = JSON.parse(overridesStr);
+                if (overrides[targetSchoolId]) {
+                  overrides[targetSchoolId].storage_used_bytes = newBytes;
+                  localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+                }
+              } catch (e) {}
             }
           } catch (err: any) {
             console.warn('[Storage] Async quota update note:', err);

@@ -4,7 +4,7 @@ import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
-  ChevronLeft, ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
+  ChevronLeft, ChevronRight, Coffee, Clock, Timer, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
   Mic, Disc, Trash2, Download, Key, Delete, Headphones
@@ -15,7 +15,7 @@ import { CampusEventsBoard } from './CampusEventsBoard';
 import { createPortal } from 'react-dom';
 import Confetti from 'react-confetti';
 import { QRCodeModal } from './QRCodeModal';
-import { MeisterwerkDocumentationModal, ALL_STICKERS, getUnifiedStickersMap, getUnifiedStickerStatus } from './MeisterwerkDocumentationModal';
+import { MeisterwerkDocumentationModal, checkIsAudioTresorActive, ALL_STICKERS, getUnifiedStickersMap, getUnifiedStickerStatus } from './MeisterwerkDocumentationModal';
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
 import { cleanHomeworkNotesText, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
@@ -26,6 +26,8 @@ import { CampusTeenDashboard } from './campus/CampusTeenDashboard';
 import { CampusLevelSelectModal } from './campus/CampusLevelSelectModal';
 import { AudioTrackCarousel, AudioTrackItem } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
+import { processPureRawBlob } from '../utils/audioMasteringEngine';
+import { downloadStudentAudioBackup } from '../utils/audioBackupHelper';
 
 const showMissionsFeature = false;
 
@@ -239,6 +241,17 @@ const HERO_CLASSES = [
   { id: 'keyboardist', name: 'Tasten-Magier', icon: '🎹', desc: 'Synthesizer und Klavier beherrschen' },
   { id: 'vocalist', name: 'Vocal-Star', icon: '🎤', desc: 'Die Bühne mit deiner Stimme erobern' }
 ];
+
+const getSimulatedNow = (): Date => {
+  const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+  if (!simStr) return new Date();
+  const parts = simStr.split('-').map(Number);
+  if (parts.length !== 3 || isNaN(parts[0])) return new Date();
+  const baseSim = new Date(parts[0], parts[1] - 1, parts[2], 14, 0, 0);
+  const simStartTime = Number(localStorage.getItem('groovelab_simulated_start_timestamp') || Date.now());
+  const elapsedMinutes = Math.floor((Date.now() - simStartTime) / 60000);
+  return new Date(baseSim.getTime() + elapsedMinutes * 60000);
+};
 
 const toLocalYYYYMMDD = (d: Date) => {
   const yyyy = d.getFullYear();
@@ -3582,7 +3595,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       if (classmatesErr) throw classmatesErr;
 
       if (classmates && classmates.length > 0) {
-        const now = new Date();
+        const now = getSimulatedNow();
         const monday = new Date(now);
         const day = now.getDay();
         const diff = day === 0 ? -6 : 1 - day;
@@ -3593,21 +3606,32 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         sunday.setDate(monday.getDate() + 6);
         sunday.setHours(23, 59, 59, 999);
 
-        const classmateIds = classmates.map((c: any) => c.id);
+        const classmateAndSelfIds = Array.from(new Set([...classmates.map((c: any) => c.id), studentId]));
 
         const { data: practiceData, error: practiceErr } = await supabase
-          .from('practice_sessions')
-          .select('student_id, duration_minutes')
-          .in('student_id', classmateIds)
+          .from('fokus_logs')
+          .select('user_id, duration_minutes, duration_seconds')
+          .in('user_id', classmateAndSelfIds)
           .gte('created_at', monday.toISOString())
           .lte('created_at', sunday.toISOString());
 
         if (practiceErr) throw practiceErr;
 
+        let combinedPractice = practiceData || [];
+        try {
+          const localLogsKey = `cg_local_fokus_logs_${studentId}`;
+          const localLogs = JSON.parse(localStorage.getItem(localLogsKey) || '[]');
+          if (localLogs && localLogs.length > 0) {
+            const remoteIds = new Set(combinedPractice.map((l: any) => l.id));
+            const missingLocal = localLogs.filter((l: any) => !remoteIds.has(l.id));
+            combinedPractice = [...missingLocal, ...combinedPractice];
+          }
+        } catch (e) {}
+
         const list = classmates.map((student: any) => {
-          const mins = (practiceData || [])
-            .filter((s: any) => s.student_id === student.id)
-            .reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+          const mins = (combinedPractice || [])
+            .filter((s: any) => s.user_id === student.id)
+            .reduce((sum: number, s: any) => sum + (s.duration_minutes || (s.duration_seconds ? Math.round(s.duration_seconds / 60) : 0)), 0);
           return {
             name: `${student.first_name || ''} ${student.last_name ? student.last_name.trim().charAt(0) + '.' : ''}`.trim() || 'Schüler',
             minutes: mins
@@ -4198,6 +4222,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   // Übe-Board / Gyro-Detox Engine state
   const [sessionActive, setSessionActive] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const secondsElapsedRef = useRef(0);
+  useEffect(() => {
+    secondsElapsedRef.current = secondsElapsed;
+  }, [secondsElapsed]);
   const [selectedTopic, setSelectedTopic] = useState('');
   const [isPhoneFlat, setIsPhoneFlat] = useState(false);
   const isPhoneFlatRef = useRef(isPhoneFlat);
@@ -4258,6 +4286,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   useEffect(() => {
     isExtraTimeRef.current = isExtraTime;
   }, [isExtraTime]);
+
+  // Calculate student's personal average practice minutes per active day
+  const personalAverageMinutes = useMemo(() => {
+    if (!fokusLogs || fokusLogs.length === 0) return 3;
+    const daysMap = new Map<string, number>();
+    fokusLogs.forEach((log: any) => {
+      const day = log.created_at ? String(log.created_at).slice(0, 10) : '';
+      if (day) {
+        const mins = log.duration_minutes || (log.duration_seconds ? log.duration_seconds / 60 : 0);
+        daysMap.set(day, (daysMap.get(day) || 0) + mins);
+      }
+    });
+    if (daysMap.size === 0) return 3;
+    const totalMins = Array.from(daysMap.values()).reduce((a, b) => a + b, 0);
+    const avg = totalMins / daysMap.size;
+    return Math.max(1, Math.round(avg * 10) / 10);
+  }, [fokusLogs]);
 
   // JUNIOR (LEVEL 1 • 6-10 JAHRE) - MODAL & AUDIO STATES
   const [progressItems, setProgressItems] = useState<any[]>([]);
@@ -4553,24 +4598,80 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     if (!juniorRecordedBlob || !studentId) return;
     setJuniorIsSaving(true);
     try {
+      let hasTresor = false;
+      const targetSchoolId = studentUser?.school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+      if (targetSchoolId) {
+        try {
+          const { data: sch } = await supabase
+            .from('schools')
+            .select('storage_addon_gb, storage_addon_status')
+            .eq('id', targetSchoolId)
+            .maybeSingle();
+          if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
+            hasTresor = true;
+          }
+        } catch (e) {}
+      }
+
+      let saveBlob = juniorRecordedBlob;
+      if (hasTresor) {
+        try {
+          const pureRawResult = await processPureRawBlob(juniorRecordedBlob, { targetLufs: -13.0, targetPeakDb: -1.0 });
+          saveBlob = pureRawResult.processedBlob;
+        } catch (dspErr) {
+          console.warn('[saveJuniorRecording] Pure RAW DSP note:', dspErr);
+        }
+      }
+
       const recUniqueId = `rec_${studentId}_${Date.now()}`;
-      const isMp4 = juniorRecordedBlob.type.includes('mp4');
-      const fileExt = isMp4 ? 'mp4' : 'webm';
+      const fileExt = hasTresor ? 'wav' : (saveBlob.type.includes('mp4') ? 'mp4' : 'webm');
+      const contentType = hasTresor ? 'audio/wav' : (saveBlob.type || 'audio/webm');
       const fileName = `meisterwerk_${studentId}_${Date.now()}.${fileExt}`;
       const filePath = `recordings/${fileName}`;
       
       // 1. Store directly in local IndexedDB vault first (100% resilient)
-      await storeBlob(`campus_audio_${recUniqueId}_raw`, juniorRecordedBlob);
+      await storeBlob(`campus_audio_${recUniqueId}_raw`, saveBlob);
 
       let finalAudioUrl = '';
       try {
         const { error: upErr } = await supabase.storage
           .from('campus-assets')
-          .upload(filePath, juniorRecordedBlob, { contentType: juniorRecordedBlob.type, cacheControl: '3600' });
+          .upload(filePath, saveBlob, { contentType, cacheControl: '3600' });
         
         if (!upErr) {
           const { data: pubData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
           finalAudioUrl = pubData?.publicUrl || '';
+
+          // 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
+          if (targetSchoolId && saveBlob?.size) {
+            try {
+              const { data: schoolData } = await supabase
+                .from('schools')
+                .select('storage_used_bytes')
+                .eq('id', targetSchoolId)
+                .maybeSingle();
+              if (schoolData) {
+                const currentBytes = Number(schoolData.storage_used_bytes || 0);
+                const updatedBytes = currentBytes + saveBlob.size;
+                await supabase
+                  .from('schools')
+                  .update({ storage_used_bytes: updatedBytes })
+                  .eq('id', targetSchoolId);
+
+                // Keep local school overrides in sync
+                try {
+                  const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+                  const overrides = JSON.parse(overridesStr);
+                  if (overrides[targetSchoolId]) {
+                    overrides[targetSchoolId].storage_used_bytes = updatedBytes;
+                    localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+                  }
+                } catch (e) {}
+              }
+            } catch (quotaErr) {
+              console.warn('[JuniorStudio] Storage quota update note:', quotaErr);
+            }
+          }
         }
       } catch (cloudErr) {
         console.warn('Cloud storage notice:', cloudErr);
@@ -5303,27 +5404,30 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .select('*')
         .eq('user_id', studentId)
         .order('created_at', { ascending: false });
-      if (!error && data) {
-        setFokusLogs(data);
-        
-        // Calculate if target is completed today
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayLogs = data.filter((log: any) => log.created_at && log.created_at.startsWith(todayStr));
-        const nonExtraMinutes = todayLogs
-          .filter((log: any) => !log.is_extra)
-          .reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
-        
-        // Fetch current avatar streak
-        const { data: avatarRecord } = await supabase
-          .from('avatars')
-          .select('streak_flame')
-          .eq('user_id', studentId)
-          .maybeSingle();
-        
-        const streak = avatarRecord?.streak_flame || 0;
-        const targetMins = getTargetMinutes(streak);
-        setHasCompletedTargetToday(nonExtraMinutes >= targetMins);
-      }
+
+      let combinedLogs: any[] = (!error && data) ? data : [];
+      try {
+        const localLogsKey = `cg_local_fokus_logs_${studentId}`;
+        const localLogs = JSON.parse(localStorage.getItem(localLogsKey) || '[]');
+        if (localLogs && localLogs.length > 0) {
+          const remoteIds = new Set(combinedLogs.map((l: any) => l.id));
+          const missingLocal = localLogs.filter((l: any) => !remoteIds.has(l.id));
+          combinedLogs = [...missingLocal, ...combinedLogs];
+        }
+      } catch (e) {}
+
+      setFokusLogs(combinedLogs);
+      
+      // Calculate if target is completed today using local simulated date
+      const todayStr = toLocalYYYYMMDD(getSimulatedNow());
+      const todayLogs = combinedLogs.filter((log: any) => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === todayStr);
+      const nonExtraMinutes = todayLogs
+        .filter((log: any) => !log.is_extra)
+        .reduce((sum: number, log: any) => sum + (log.duration_minutes || (log.duration_seconds ? Math.floor(log.duration_seconds / 60) : 0)), 0);
+      
+      const streak = avatar?.streak_flame || 0;
+      const targetMins = getTargetMinutes(streak);
+      setHasCompletedTargetToday(nonExtraMinutes >= targetMins || todayLogs.some((l: any) => (l.duration_seconds || 0) >= 180 || (l.duration_minutes || 0) >= 3));
     } catch (err) {
       console.error('Error fetching fokus logs:', err);
     }
@@ -5340,14 +5444,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }> = {};
     
     // Initialize placeholders for the last 7 days starting from user activation date
-    const now = new Date();
+    const now = getSimulatedNow();
     const actDateStr = studentUser?.activated_at || (studentUser?.is_pin_activated ? studentUser?.created_at : null);
     // Rule: Der Start des Übe-Streaks startet erst mit der PIN-Aktivierung des Schülers! Davor werden keine Streaks/Fehltage erfasst.
     const activationDate = actDateStr ? new Date(actDateStr) : new Date();
     const startOfActivation = new Date(activationDate.getFullYear(), activationDate.getMonth(), activationDate.getDate());
 
     for (let i = 0; i < 7; i++) {
-      const d = new Date();
+      const d = new Date(now);
       d.setDate(now.getDate() - i);
       const startOfD = new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
@@ -5394,12 +5498,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const seconds = log.duration_seconds || ((log.duration_minutes || 0) * 60);
       
       // Pädagogische Regel: Fokus-Meisterschaft erfordert EINE Einheit am Stück (>= 180s)
-      if (!log.is_extra && seconds >= 180) {
-        groups[dateStr].hasMasteredSession = true;
-        groups[dateStr].focusSeconds = 180;
-        groups[dateStr].extraSeconds += (seconds - 180);
+      if (!log.is_extra) {
+        if (seconds >= 180) {
+          groups[dateStr].hasMasteredSession = true;
+          groups[dateStr].focusSeconds = 180;
+          groups[dateStr].extraSeconds += (seconds - 180);
+        } else {
+          groups[dateStr].focusSeconds += seconds;
+        }
       } else {
-        // Freie Übezeit / Teil-Übezeit
+        // Freie Übezeit / Extrazeit
         groups[dateStr].extraSeconds += seconds;
       }
 
@@ -6050,16 +6158,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     if (!studentUser?.school_id) return;
 
     const channel = supabase
-      .channel('realtime_student_class_focus_logs')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fokus_logs' }, () => {
-        fetchClassHighlights(studentUser.school_id, studentUser.teacher_id, true);
+      .channel(`realtime_student_focus_${studentId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fokus_logs' }, (payload) => {
+        if (studentUser?.school_id) {
+          fetchClassHighlights(studentUser.school_id, studentUser.teacher_id, true);
+        }
+        if (payload.new && (payload.new as any).user_id === studentId) {
+          fetchFokusLogs();
+        }
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [studentUser?.school_id, studentUser?.teacher_id]);
+  }, [studentUser?.school_id, studentUser?.teacher_id, studentId]);
 
   const fetchRanking = async () => {
     setRankingLoading(true);
@@ -6194,6 +6307,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
         setSecondsElapsed(prev => {
           const nextVal = prev + 1;
+          secondsElapsedRef.current = nextVal;
           if (!isExtraTimeRef.current && nextVal >= targetSeconds) {
             setIsExtraTime(true);
             playSuccessChime();
@@ -6285,15 +6399,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         });
       } else {
         if (!isExtraTimeRef.current) {
-          // During the focus minutes: HARD RESET TO 0 IMMEDIATELY on interruption (no grace period)
-          setSecondsElapsed(0);
-          setIsExtraTime(false);
-          setIsGraceActive(false);
-          setSessionActive(false);
-          playBeep(330, 600); // Fail tone
-          if (navigator.vibrate) {
-            navigator.vibrate([400, 100, 400]);
-          }
+          // Pause session on interruption instead of destroying the elapsed practice seconds
+          setIsPhoneFlat(false);
+          playBeep(330, 200); // Warning tone
         } else {
           // Once the focus minutes are reached: START FRIENDLY COUNTDOWN
           setIsGraceActive(true);
@@ -6370,6 +6478,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         isOrientedFlat = false;
         currentFlatType = 'none';
         setIsPhoneFlat(false);
+      } else if (!usesSensors) {
+        isOrientedFlat = true;
+        currentFlatType = 'face-up';
+        setIsPhoneFlat(true);
       }
     };
 
@@ -6463,12 +6575,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
     setSessionActive(false);
 
+    const currentElapsedSecs = secondsElapsedRef.current || secondsElapsed;
     const streak = avatar?.streak_flame || 0;
     const targetMins = getTargetMinutes(streak);
     const targetSeconds = targetMins * 60;
 
-    // Schutz gegen versehentliches Antippen (< 10 Sekunden) -> stilles Beenden ohne Fehlermeldung
-    if (secondsElapsed < 10) {
+    // Wenn 0 Sekunden geübt wurden, stilles Beenden
+    if (currentElapsedSecs <= 0) {
       if (currentLogIdRef.current) {
         try {
           await supabase.from('fokus_logs').delete().eq('id', currentLogIdRef.current);
@@ -6489,10 +6602,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
 
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const yesterday = new Date();
+      const simNow = getSimulatedNow();
+      const todayStr = toLocalYYYYMMDD(simNow);
+      const yesterday = new Date(simNow.getTime());
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const yesterdayStr = toLocalYYYYMMDD(yesterday);
 
       // Fetch current stats
       const { data: stats } = await supabase
@@ -6501,7 +6615,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .eq('student_id', studentId)
         .maybeSingle();
 
-      const startOfDay = new Date();
+      const startOfDay = new Date(simNow.getTime());
       startOfDay.setHours(0, 0, 0, 0);
 
       // Check if focus time was already logged earlier today (excluding current session heartbeats)
@@ -6519,25 +6633,29 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       );
 
       // Did this session complete the daily target?
-      const sessionCompletedTarget = !alreadyCompletedTargetEarlierToday && (secondsElapsed >= targetSeconds);
+      const sessionCompletedTarget = !alreadyCompletedTargetEarlierToday && (currentElapsedSecs >= targetSeconds);
 
-      // Pädagogische 2-Stufen Minuten-Aufteilung (Großzügiges Runden ab 10 Sek. auf mindestens 1 Minute)
+      // Regel: Fokus-Sessions sind IMMER genau solange wie die Zielübezeit (targetSeconds).
+      // Alles was darunter liegt, wird NICHT als Fokus-Session gezählt (sondern als freie/zusätzliche Übezeit verbucht).
+      // Alles was darüber liegt, wird als zusätzliche Übezeit (extraSeconds) verbucht.
       let focusSeconds = 0;
       let focusMinutes = 0;
       let extraSeconds = 0;
       let extraMinutes = 0;
 
       if (sessionCompletedTarget) {
+        // Ziel erreicht: Genau die Zielzeit ist die Fokus-Session
         focusSeconds = targetSeconds;
         focusMinutes = targetMins;
-        extraSeconds = Math.max(0, secondsElapsed - targetSeconds);
-        extraMinutes = Math.round(extraSeconds / 60);
+        // Alles darüber hinaus ist zusätzliche Übezeit
+        extraSeconds = Math.max(0, currentElapsedSecs - targetSeconds);
+        extraMinutes = Math.floor(extraSeconds / 60);
       } else {
-        // Unter dem Tagesziel: Jede Session ab 10 Sek. wird wohlwollend als mindestens 1 Minute Übezeit verbucht!
-        focusMinutes = Math.max(1, Math.round(secondsElapsed / 60) || 1);
-        focusSeconds = Math.max(secondsElapsed, focusMinutes * 60);
-        extraSeconds = 0;
-        extraMinutes = 0;
+        // Unter dem Tagesziel: Wird NICHT als Fokus-Session gezählt, sondern als freie Übezeit erfasst
+        focusSeconds = 0;
+        focusMinutes = 0;
+        extraSeconds = currentElapsedSecs;
+        extraMinutes = Math.floor(currentElapsedSecs / 60);
       }
 
       const effectiveFocusMinutes = alreadyCompletedTargetEarlierToday ? 0 : focusMinutes;
@@ -6554,21 +6672,38 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const xpEligibleExtraMins = Math.min(effectiveExtraMinutes, remainingXpEligibleExtraMins);
       const xpGained = effectiveFocusMinutes + xpEligibleExtraMins;
 
-      let totalFocus = totalMinutes;
-      let monthlyFocus = totalMinutes;
-      let currentXp = xpGained;
-      let streakFlame = streak;
+      let baseTotalFocus = 0;
+      let baseMonthlyFocus = 0;
+      let baseXp = avatar?.xp || 0;
+      let baseStreak = avatar?.streak_flame || 0;
       let lastPracticeDate = null;
       let lastSecuredDate = null;
 
+      try {
+        const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || 'null');
+        if (localStats) {
+          baseTotalFocus = Math.max(baseTotalFocus, localStats.total_focus_minutes || 0);
+          baseMonthlyFocus = Math.max(baseMonthlyFocus, localStats.monthly_focus_minutes || 0);
+          if (localStats.current_xp) baseXp = Math.max(baseXp, localStats.current_xp);
+          if (localStats.streak_flame) baseStreak = Math.max(baseStreak, localStats.streak_flame);
+          lastPracticeDate = localStats.last_practice_date || null;
+          lastSecuredDate = lastPracticeDate;
+        }
+      } catch (e) {}
+
       if (stats) {
-        totalFocus = (stats.total_focus_minutes || 0) + totalMinutes;
-        monthlyFocus = (stats.monthly_focus_minutes || 0) + totalMinutes;
-        currentXp = (stats.current_xp || 0) + xpGained;
-        streakFlame = stats.streak_flame || 0;
-        lastPracticeDate = stats.last_practice_date ? String(stats.last_practice_date) : null;
+        baseTotalFocus = Math.max(baseTotalFocus, stats.total_focus_minutes || 0);
+        baseMonthlyFocus = Math.max(baseMonthlyFocus, stats.monthly_focus_minutes || 0);
+        baseXp = Math.max(baseXp, stats.current_xp || 0);
+        baseStreak = Math.max(baseStreak, stats.streak_flame || 0);
+        lastPracticeDate = stats.last_practice_date ? String(stats.last_practice_date) : lastPracticeDate;
         lastSecuredDate = lastPracticeDate;
       }
+
+      let totalFocus = baseTotalFocus + totalMinutes;
+      let monthlyFocus = baseMonthlyFocus + totalMinutes;
+      let currentXp = baseXp + xpGained;
+      let streakFlame = baseStreak;
 
       if (studentUser?.joker_used_at) {
         const jokerDateStr = toLocalYYYYMMDD(new Date(studentUser.joker_used_at));
@@ -6617,20 +6752,40 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         ? getFlameLevelName(streakFlame)
         : getFlameLevelName(streak);
 
-      // 1. Update or Insert Primary Fokus Log in DB
-      let finalPrimaryLogId = currentLogIdRef.current;
-      if (currentLogIdRef.current) {
-        const { error: updateErr } = await supabase
-          .from('fokus_logs')
-          .update({
-            duration_seconds: focusSeconds,
-            duration_minutes: focusMinutes,
-            flame_level: activeFlameLevel,
-            is_extra: false
-          })
-          .eq('id', currentLogIdRef.current);
-        if (updateErr) {
-          console.error('Update primary log failed, falling back to insert:', updateErr);
+      // 1. Update or Insert Primary / Extra Log in DB
+      let finalPrimaryLogId = null;
+      let finalExtraLogId = null;
+
+      if (focusSeconds > 0) {
+        if (currentLogIdRef.current) {
+          const { error: updateErr } = await supabase
+            .from('fokus_logs')
+            .update({
+              duration_seconds: focusSeconds,
+              duration_minutes: focusMinutes,
+              flame_level: activeFlameLevel,
+              is_extra: false
+            })
+            .eq('id', currentLogIdRef.current);
+          if (!updateErr) {
+            finalPrimaryLogId = currentLogIdRef.current;
+          } else {
+            console.error('Update primary log failed, falling back to insert:', updateErr);
+            const { data: insData } = await supabase
+              .from('fokus_logs')
+              .insert({
+                user_id: studentId,
+                duration_seconds: focusSeconds,
+                duration_minutes: focusMinutes,
+                is_extra: false,
+                flame_level: activeFlameLevel,
+                created_at: simNow.toISOString()
+              })
+              .select('id')
+              .single();
+            if (insData) finalPrimaryLogId = insData.id;
+          }
+        } else {
           const { data: insData } = await supabase
             .from('fokus_logs')
             .insert({
@@ -6638,53 +6793,76 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               duration_seconds: focusSeconds,
               duration_minutes: focusMinutes,
               is_extra: false,
-              flame_level: activeFlameLevel
+              flame_level: activeFlameLevel,
+              created_at: simNow.toISOString()
             })
             .select('id')
             .single();
           if (insData) finalPrimaryLogId = insData.id;
         }
-      } else {
-        const { data: insData } = await supabase
-          .from('fokus_logs')
-          .insert({
-            user_id: studentId,
-            duration_seconds: focusSeconds,
-            duration_minutes: focusMinutes,
-            is_extra: false,
-            flame_level: activeFlameLevel
-          })
-          .select('id')
-          .single();
-        if (insData) finalPrimaryLogId = insData.id;
-      }
 
-      // 2. Update or Insert Extra Log in DB if extra time occurred
-      let finalExtraLogId = currentExtraLogIdRef.current;
-      if (extraSeconds > 0) {
-        if (currentExtraLogIdRef.current) {
-          await supabase
+        // Additional extra time beyond the daily focus target
+        if (extraSeconds > 0) {
+          if (currentExtraLogIdRef.current) {
+            await supabase
+              .from('fokus_logs')
+              .update({
+                duration_seconds: extraSeconds,
+                duration_minutes: extraMinutes,
+                is_extra: true,
+                flame_level: activeFlameLevel
+              })
+              .eq('id', currentExtraLogIdRef.current);
+            finalExtraLogId = currentExtraLogIdRef.current;
+          } else {
+            const { data: insExtra } = await supabase
+              .from('fokus_logs')
+              .insert({
+                user_id: studentId,
+                duration_seconds: extraSeconds,
+                duration_minutes: extraMinutes,
+                is_extra: true,
+                flame_level: activeFlameLevel,
+                created_at: simNow.toISOString()
+              })
+              .select('id')
+              .single();
+            if (insExtra) finalExtraLogId = insExtra.id;
+          }
+        }
+      } else if (extraSeconds > 0) {
+        // Session under daily target: update existing heartbeat row to extra session (compatible with anti-cheat trigger)
+        const targetLogId = currentLogIdRef.current || currentExtraLogIdRef.current;
+        if (targetLogId) {
+          const { error: updateErr } = await supabase
             .from('fokus_logs')
             .update({
               duration_seconds: extraSeconds,
               duration_minutes: extraMinutes,
-              flame_level: activeFlameLevel,
-              is_extra: true
+              is_extra: true,
+              flame_level: activeFlameLevel
             })
-            .eq('id', currentExtraLogIdRef.current);
+            .eq('id', targetLogId);
+          if (!updateErr) {
+            finalExtraLogId = targetLogId;
+          } else {
+            console.error('Update extra log failed:', updateErr);
+          }
         } else {
-          const { data: insExtra } = await supabase
+          const { data: insExtra, error: insExtraErr } = await supabase
             .from('fokus_logs')
             .insert({
               user_id: studentId,
               duration_seconds: extraSeconds,
               duration_minutes: extraMinutes,
               is_extra: true,
-              flame_level: activeFlameLevel
+              flame_level: activeFlameLevel,
+              created_at: simNow.toISOString()
             })
             .select('id')
             .single();
           if (insExtra) finalExtraLogId = insExtra.id;
+          if (insExtraErr) console.error('Insert extra log failed:', insExtraErr);
         }
       }
 
@@ -6713,16 +6891,36 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           streak_flame: streakFlame,
           last_focus_date: sessionCompletedTarget ? todayStr : (avatarRecord.last_focus_date || todayStr)
         }).eq('id', avatarRecord.id);
-
-        try {
-          localStorage.setItem(`cg_offline_practice_${studentId}`, JSON.stringify({
-            last_focus_date: todayStr,
-            streak_flame: streakFlame,
-            xp: currentXp,
-            saved_at: new Date().toISOString()
-          }));
-        } catch (e) {}
+      } else {
+        await supabase.from('avatars').insert({
+          user_id: studentId,
+          xp: currentXp,
+          streak_flame: streakFlame,
+          evolution_level: 1,
+          avatar_style: 'standard',
+          instrument_type: studentUser?.instrument || 'Guitar',
+          last_focus_date: sessionCompletedTarget ? todayStr : todayStr
+        });
       }
+
+      try {
+        localStorage.setItem(`cg_offline_practice_${studentId}`, JSON.stringify({
+          last_focus_date: todayStr,
+          streak_flame: streakFlame,
+          xp: currentXp,
+          total_focus_minutes: totalFocus,
+          monthly_focus_minutes: monthlyFocus,
+          saved_at: new Date().toISOString()
+        }));
+        localStorage.setItem(`cg_offline_stats_${studentId}`, JSON.stringify({
+          total_focus_minutes: totalFocus,
+          monthly_focus_minutes: monthlyFocus,
+          streak_flame: streakFlame,
+          current_xp: currentXp,
+          last_practice_date: sessionCompletedTarget ? todayStr : (stats?.last_practice_date || todayStr),
+          saved_at: new Date().toISOString()
+        }));
+      } catch (e) {}
 
       // 5. Update user's joker_used_at if consumed
       if (usedJokerThisSession) {
@@ -6733,28 +6931,43 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
 
       // 6. Optimistic React State Updates (instant UI reaction)
-      const newLogEntry = {
-        id: finalPrimaryLogId || `temp-${Date.now()}`,
+      const newLogEntry = focusSeconds > 0 ? {
+        id: finalPrimaryLogId || `local-${Date.now()}`,
         user_id: studentId,
         duration_seconds: focusSeconds,
         duration_minutes: focusMinutes,
         is_extra: false,
         flame_level: activeFlameLevel,
-        created_at: new Date().toISOString()
-      };
+        created_at: simNow.toISOString()
+      } : null;
       const newExtraEntry = extraSeconds > 0 ? {
-        id: finalExtraLogId || `temp-extra-${Date.now()}`,
+        id: finalExtraLogId || `local-extra-${Date.now()}`,
         user_id: studentId,
         duration_seconds: extraSeconds,
         duration_minutes: extraMinutes,
         is_extra: true,
         flame_level: activeFlameLevel,
-        created_at: new Date().toISOString()
+        created_at: simNow.toISOString()
       } : null;
 
-      setFokusLogs(prev => [
+      const newEntries = [
         ...(newExtraEntry ? [newExtraEntry] : []),
-        newLogEntry,
+        ...(newLogEntry ? [newLogEntry] : [])
+      ];
+
+      // Store in localStorage immediately so local logs are 100% resilient
+      try {
+        const localLogsKey = `cg_local_fokus_logs_${studentId}`;
+        const existingLocal = JSON.parse(localStorage.getItem(localLogsKey) || '[]');
+        const updatedLocal = [
+          ...newEntries,
+          ...existingLocal.filter((l: any) => l.id !== currentLogIdRef.current && l.id !== currentExtraLogIdRef.current && l.id !== finalPrimaryLogId && l.id !== finalExtraLogId)
+        ];
+        localStorage.setItem(localLogsKey, JSON.stringify(updatedLocal));
+      } catch (e) {}
+
+      setFokusLogs(prev => [
+        ...newEntries,
         ...prev.filter(l => l.id !== currentLogIdRef.current && l.id !== currentExtraLogIdRef.current && l.id !== finalPrimaryLogId && l.id !== finalExtraLogId)
       ]);
 
@@ -6763,7 +6976,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       if (sessionCompletedTarget) {
         setHasCompletedTargetToday(true);
       }
-      setAvatar(prev => prev ? { ...prev, xp: currentXp, streak_flame: streakFlame } : prev);
+      setAvatar((prev: any) => ({
+        ...(prev || {
+          avatar_style: 'standard',
+          instrument_type: studentUser?.instrument || 'Guitar',
+          evolution_level: 1,
+          asset_path: getInstrumentAvatarUrl(studentUser?.instrument),
+          id: `local-avatar-${studentId}`,
+          user_id: studentId
+        }),
+        xp: currentXp,
+        streak_flame: streakFlame,
+        last_focus_date: todayStr
+      }));
 
       setCelebrationDetails({
         xpGained: xpGained,
@@ -6772,7 +6997,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         usedJokerThisSession: usedJokerThisSession,
         streak: streak,
         sessionMinutes: totalMinutes,
-        exactSeconds: secondsElapsed,
+        exactSeconds: currentElapsedSecs,
         dailyGoal: targetMins
       });
       setCelebrationRingProgress(0);
@@ -6792,7 +7017,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       currentExtraLogIdRef.current = null;
       fetchStudentAndAvatar(true);
       fetchStudentProgress(true);
-      fetchFokusLogs();
       setSidebarTab('logbook');
       isFinishingSessionRef.current = false;
 
@@ -7426,11 +7650,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
 
       // 2. Fetch focus logs since September of current academic year for class annual statistics
-      const startOfCurrentMonth = new Date();
-      startOfCurrentMonth.setDate(1);
-      startOfCurrentMonth.setHours(0, 0, 0, 0);
+      const now = getSimulatedNow();
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
 
-      const now = new Date();
       const currentMonth = now.getMonth();
       const startYear = currentMonth >= 8 ? now.getFullYear() : now.getFullYear() - 1;
       const annualStartDate = new Date(startYear, 8, 1, 0, 0, 0, 0);
@@ -7443,17 +7665,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const [classmateLogsRes, otherLogsRes] = await Promise.all([
         supabase
           .from('fokus_logs')
-          .select('user_id, duration_minutes, created_at')
+          .select('user_id, duration_minutes, duration_seconds, created_at')
           .in('user_id', classmateAndSelfIds)
           .gte('created_at', annualStartDate.toISOString()),
         otherStudentIds.length > 0 ? supabase
           .from('fokus_logs')
-          .select('user_id, duration_minutes, created_at')
+          .select('user_id, duration_minutes, duration_seconds, created_at')
           .in('user_id', otherStudentIds)
           .gte('created_at', queryStartDate.toISOString()) : Promise.resolve({ data: [] })
       ]);
 
-      const focusLogs = [...(classmateLogsRes.data || []), ...(otherLogsRes.data || [])];
+      let focusLogs = [...(classmateLogsRes.data || []), ...(otherLogsRes.data || [])];
+
+      // Merge local personal logs for offline resilience and immediate UI reflection
+      try {
+        const localLogsKey = `cg_local_fokus_logs_${studentId}`;
+        const localLogs = JSON.parse(localStorage.getItem(localLogsKey) || '[]');
+        if (localLogs && localLogs.length > 0) {
+          const remoteIds = new Set(focusLogs.map((l: any) => l.id));
+          const missingLocal = localLogs.filter((l: any) => !remoteIds.has(l.id));
+          focusLogs = [...missingLocal, ...focusLogs];
+        }
+      } catch (e) {}
 
       setClassFocusLogs(focusLogs || []);
 
@@ -7466,12 +7699,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       // 4. Compute highlights for classmates ONLY
       const highlights: any[] = [];
+      const classmateIdsSet = new Set(classmateAndSelfIds);
       
-      classmates.forEach((student: any) => {
-        const studentLogs = (focusLogs || []).filter(log => log.user_id === student.id && new Date(log.created_at) >= startOfCurrentMonth);
-        const studentSkills = (skills || []).filter(sk => sk.user_id === student.id && sk.last_practiced_at && new Date(sk.last_practiced_at) >= startOfCurrentMonth);
+      const allClassStudents = classmates.some(c => c.id === studentId) 
+        ? classmates 
+        : [...classmates, { id: studentId, first_name: studentUser?.first_name || '', last_name: studentUser?.last_name || '' }];
 
-        const monthlyMins = studentLogs.reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
+      allClassStudents.forEach((student: any) => {
+        const studentLogs = (focusLogs || []).filter(log => {
+          if (!log.created_at) return false;
+          const logDate = new Date(log.created_at);
+          return log.user_id === student.id && logDate >= startOfCurrentMonth && logDate <= now;
+        });
+        const studentSkills = (skills || []).filter(sk => {
+          if (!sk.last_practiced_at) return false;
+          const skillDate = new Date(sk.last_practiced_at);
+          return sk.user_id === student.id && skillDate >= startOfCurrentMonth && skillDate <= now;
+        });
+
+        const monthlyMins = studentLogs.reduce((sum: number, log: any) => {
+          return sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0));
+        }, 0);
 
         // Monthly Streak (weeks with practice)
         const monthlyWeeks = new Set();
@@ -7517,18 +7765,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       // 5. Calculate class total mins vs other school mins since resetDate (used for donut chart)
       const filteredFocusLogs = (focusLogs || []).filter((log: any) => {
+        if (!log.created_at) return false;
+        const logDate = new Date(log.created_at);
         if (resetDate) {
-          return new Date(log.created_at) >= resetDate;
+          return logDate >= resetDate && logDate <= now;
         }
-        return new Date(log.created_at) >= startOfCurrentMonth;
+        return logDate >= startOfCurrentMonth && logDate <= now;
       });
 
       let classMinsVal = 0;
       let otherClassMinsVal = 0;
-      const classmateIdsSet = new Set(classmates.map(c => c.id));
 
       filteredFocusLogs.forEach((log: any) => {
-        const mins = log.duration_minutes || 0;
+        const mins = log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0);
         if (classmateIdsSet.has(log.user_id)) {
           classMinsVal += mins;
         } else {
@@ -7540,13 +7789,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setOtherClassMins(otherClassMinsVal);
 
       // 6. Calculate weekly focus minutes for classmates and current student (last 7 days)
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       
-      const weeklyLogs = (focusLogs || []).filter((log: any) => new Date(log.created_at) >= oneWeekAgo);
+      const weeklyLogs = (focusLogs || []).filter((log: any) => {
+        if (!log.created_at) return false;
+        const logDate = new Date(log.created_at);
+        return logDate >= oneWeekAgo && logDate <= now;
+      });
       
-      const classWeeklySum = weeklyLogs.filter(log => classmateIdsSet.has(log.user_id)).reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
-      const myWeeklySum = weeklyLogs.filter(log => log.user_id === studentId).reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+      const classWeeklySum = weeklyLogs.filter(log => classmateIdsSet.has(log.user_id)).reduce((sum, log) => {
+        return sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0));
+      }, 0);
+      const myWeeklySum = weeklyLogs.filter(log => log.user_id === studentId).reduce((sum, log) => {
+        return sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0));
+      }, 0);
       
       setClassWeeklyFocus(classWeeklySum);
       setMyWeeklyFocus(myWeeklySum);
@@ -7568,8 +7824,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
       setError(null);
 
-      // Stage 1: Fetch user, avatar, stats, briefing, emails, missions, pins, and personal logs in parallel
-      const [userRes, avatarRes, statsRes, briefingRes, emailRes, missionRes, pinsRes, logsRes] = await Promise.all([
+      // Stage 1: Fetch user, avatar, stats, briefing, emails, missions, pins, personal logs, progress matrix, and song skills in parallel
+      const [userRes, avatarRes, statsRes, briefingRes, emailRes, missionRes, pinsRes, logsRes, matrixRes, skillsRes] = await Promise.all([
         supabase
           .from('users')
           .select('*, schools(*)')
@@ -7603,12 +7859,32 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           .from('fokus_logs')
           .select('*')
           .eq('user_id', studentId)
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('progress_matrix')
+          .select('*')
+          .eq('student_id', studentId),
+        supabase
+          .from('user_song_skills')
+          .select('*, songs(*)')
+          .eq('user_id', studentId)
       ]);
 
       if (userRes.error) throw userRes.error;
       const user = userRes.data;
       if (!user) return;
+
+      if (user.schools) {
+        try {
+          const overridesStr = localStorage.getItem('groovelab_school_overrides') || localStorage.getItem('campus_school_overrides');
+          if (overridesStr) {
+            const overrides = JSON.parse(overridesStr);
+            if (user.schools.id && overrides[user.schools.id]) {
+              user.schools = { ...user.schools, ...overrides[user.schools.id] };
+            }
+          }
+        } catch (e) {}
+      }
 
       let resolvedInst = user.instrument;
       if (!resolvedInst || resolvedInst === 'Allgemein' || resolvedInst === 'Musiker' || resolvedInst === 'Schüler' || resolvedInst === 'Instrument') {
@@ -7722,7 +7998,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       } catch (e) {}
 
       if (lastSecuredDateStr && activeStreak > 0) {
-        const todayStr = toLocalYYYYMMDD(new Date());
+        const todayStr = toLocalYYYYMMDD(getSimulatedNow());
         const diffDays = getDaysBetweenLocal(lastSecuredDateStr, todayStr);
         if (diffDays > 1) {
           if (isDisasterProtected) {
@@ -7761,15 +8037,143 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
       }
 
-      if (!avatarRecord && user.is_app_user) {
-        setShowSelector(true);
-      } else {
-        setAvatar(avatarRecord);
+      const statsData = statsRes.data;
+      const allLoadedLogs = logsRes.data || [];
+      const computedTotalMinutesFromLogs = Math.round(allLoadedLogs.reduce((sum: number, l: any) => sum + (l.duration_seconds || ((l.duration_minutes || 0) * 60)), 0) / 60);
+
+      let effectiveTotalFocus = Math.max(statsData?.total_focus_minutes || 0, computedTotalMinutesFromLogs);
+      let effectiveMonthlyFocus = Math.max(statsData?.monthly_focus_minutes || 0, computedTotalMinutesFromLogs);
+
+      let effectiveAvatar = avatarRecord ? { ...avatarRecord } : {
+        avatar_style: 'standard',
+        instrument_type: user.instrument || 'Guitar',
+        evolution_level: 1,
+        xp: statsData?.current_xp || 0,
+        asset_path: getInstrumentAvatarUrl(user.instrument),
+        streak_flame: statsData?.streak_flame || 0,
+        id: `local-avatar-${studentId}`,
+        user_id: studentId
+      } as any;
+
+      if (statsData?.current_xp) {
+        effectiveAvatar.xp = Math.max(effectiveAvatar.xp || 0, statsData.current_xp);
+      }
+      if (statsData?.streak_flame) {
+        effectiveAvatar.streak_flame = Math.max(effectiveAvatar.streak_flame || 0, statsData.streak_flame);
       }
 
-      const statsData = statsRes.data;
-      setMonthlyFocusMinutes(statsData?.monthly_focus_minutes || 0);
-      setTotalFocusMinutes(statsData?.total_focus_minutes || 0);
+      // Compute XP directly from all practice logs, mastered songs (+50 XP), and mastered pages (+10 XP)
+      const computedXpFromLogs = allLoadedLogs.reduce((sum: number, log: any) => {
+        if (log.xp_earned) return sum + log.xp_earned;
+        const isMastered = !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3);
+        const extraMins = log.is_extra ? Math.floor((log.duration_seconds || ((log.duration_minutes || 0) * 60)) / 60) : 0;
+        return sum + (isMastered ? 3 : 0) + extraMins;
+      }, 0);
+
+      // Mastered Songs (+50 XP each)
+      const masteredSongsSet = new Set<string>();
+      (skillsRes.data || []).forEach((skill: any) => {
+        if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
+          const title = skill.songs?.title || skill.title || skill.song_title;
+          if (title) masteredSongsSet.add(title.toLowerCase().trim());
+        }
+      });
+      (matrixRes.data || []).forEach((item: any) => {
+        const rawTopic = (item.topic_name || item.title || '').trim();
+        if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase().startsWith('test')) return;
+        if (item.status === 'MASTERED' || (item.progress_percent || 0) === 100) {
+          const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
+          if (cleanT) masteredSongsSet.add(cleanT.toLowerCase());
+        }
+      });
+
+      // Mastered Lehrwerk Pages (+10 XP each)
+      const masteredPagesSet = new Set<string>();
+      (matrixRes.data || []).forEach((item: any) => {
+        const rawTopic = (item.topic_name || item.title || '').trim();
+        if (rawTopic.includes(' - Seite ') && (item.status === 'MASTERED' || (item.progress_percent || 0) === 100)) {
+          masteredPagesSet.add(rawTopic.toLowerCase());
+        }
+      });
+
+      const songsXp = masteredSongsSet.size * 50;
+      const lehrwerkPagesXp = masteredPagesSet.size * 10;
+      const groundTruthTotalXp = computedXpFromLogs + songsXp + lehrwerkPagesXp;
+
+      effectiveAvatar.xp = Math.max(effectiveAvatar.xp || 0, statsData?.current_xp || 0, groundTruthTotalXp);
+
+      const masteredDates = new Set<string>();
+      allLoadedLogs.forEach((log: any) => {
+        if (!log.created_at) return;
+        const dStr = toLocalYYYYMMDD(new Date(log.created_at));
+        const isMastered = !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3);
+        if (isMastered) masteredDates.add(dStr);
+      });
+
+      const nowSim = getSimulatedNow();
+      let checkDate = new Date(nowSim);
+      let checkDateStr = toLocalYYYYMMDD(checkDate);
+      let computedStreakFromLogs = 0;
+      if (masteredDates.has(checkDateStr)) {
+        computedStreakFromLogs = 1;
+        while (true) {
+          checkDate.setDate(checkDate.getDate() - 1);
+          const prevStr = toLocalYYYYMMDD(checkDate);
+          if (masteredDates.has(prevStr)) {
+            computedStreakFromLogs += 1;
+          } else {
+            break;
+          }
+        }
+      } else {
+        checkDate.setDate(checkDate.getDate() - 1);
+        const yestStr = toLocalYYYYMMDD(checkDate);
+        if (masteredDates.has(yestStr)) {
+          computedStreakFromLogs = 1;
+          while (true) {
+            checkDate.setDate(checkDate.getDate() - 1);
+            const prevStr = toLocalYYYYMMDD(checkDate);
+            if (masteredDates.has(prevStr)) {
+              computedStreakFromLogs += 1;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+      effectiveAvatar.streak_flame = Math.max(effectiveAvatar.streak_flame || 0, computedStreakFromLogs);
+
+      try {
+        const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || 'null');
+        if (localStats) {
+          effectiveTotalFocus = Math.max(effectiveTotalFocus, localStats.total_focus_minutes || 0);
+          effectiveMonthlyFocus = Math.max(effectiveMonthlyFocus, localStats.monthly_focus_minutes || 0);
+          if (localStats.current_xp !== undefined && localStats.current_xp !== null) {
+            effectiveAvatar.xp = Math.max(effectiveAvatar.xp || 0, localStats.current_xp);
+          }
+          if (localStats.streak_flame !== undefined && localStats.streak_flame !== null) {
+            effectiveAvatar.streak_flame = Math.max(effectiveAvatar.streak_flame || 0, localStats.streak_flame);
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || 'null');
+        if (localPractice) {
+          if (localPractice.xp !== undefined && localPractice.xp !== null) effectiveAvatar.xp = Math.max(effectiveAvatar.xp || 0, localPractice.xp);
+          if (localPractice.streak_flame !== undefined && localPractice.streak_flame !== null) effectiveAvatar.streak_flame = Math.max(effectiveAvatar.streak_flame || 0, localPractice.streak_flame);
+          if (localPractice.total_focus_minutes) effectiveTotalFocus = Math.max(effectiveTotalFocus, localPractice.total_focus_minutes);
+          if (localPractice.monthly_focus_minutes) effectiveMonthlyFocus = Math.max(effectiveMonthlyFocus, localPractice.monthly_focus_minutes);
+        }
+      } catch (e) {}
+
+      if (!avatarRecord && user.is_app_user) {
+        setShowSelector(true);
+      }
+      setAvatar(effectiveAvatar);
+
+      setMonthlyFocusMinutes(effectiveMonthlyFocus);
+      setTotalFocusMinutes(effectiveTotalFocus);
 
       const localAnchor = (typeof window !== 'undefined' && studentId)
         ? (localStorage.getItem(`cg_practice_anchor_${studentId}`) || localStorage.getItem(`practice_anchor_${studentId}`) || null)
@@ -7799,19 +8203,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setStudentMissionProgress(missionRes.data || null);
       setStudentPins(pinsRes.data || []);
 
-      // Assign personal fokus logs immediately (anti-waterfall)
-      if (!logsRes.error && logsRes.data) {
-        setFokusLogs(logsRes.data);
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayLogs = logsRes.data.filter((log: any) => log.created_at && log.created_at.startsWith(todayStr));
-        const nonExtraMinutes = todayLogs
-          .filter((log: any) => !log.is_extra)
-          .reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
-        
-        const streak = avatarRecord?.streak_flame || 0;
-        const targetMins = getTargetMinutes(streak);
-        setHasCompletedTargetToday(nonExtraMinutes >= targetMins);
-      }
+      // Assign personal fokus logs immediately (anti-waterfall & offline merge)
+      let combinedLogs: any[] = (!logsRes.error && logsRes.data) ? logsRes.data : [];
+      try {
+        const localLogsKey = `cg_local_fokus_logs_${studentId}`;
+        const localLogs = JSON.parse(localStorage.getItem(localLogsKey) || '[]');
+        if (localLogs && localLogs.length > 0) {
+          const remoteIds = new Set(combinedLogs.map((l: any) => l.id));
+          const missingLocal = localLogs.filter((l: any) => !remoteIds.has(l.id));
+          combinedLogs = [...missingLocal, ...combinedLogs];
+        }
+      } catch (e) {}
+
+      setFokusLogs(combinedLogs);
+      const todayStr = toLocalYYYYMMDD(getSimulatedNow());
+      const todayLogs = combinedLogs.filter((log: any) => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === todayStr);
+      const nonExtraMinutes = todayLogs
+        .filter((log: any) => !log.is_extra)
+        .reduce((sum: number, log: any) => sum + (log.duration_minutes || (log.duration_seconds ? Math.floor(log.duration_seconds / 60) : 0)), 0);
+      
+      const streak = avatarRecord?.streak_flame || 0;
+      const targetMins = getTargetMinutes(streak);
+      setHasCompletedTargetToday(nonExtraMinutes >= targetMins || todayLogs.some((l: any) => (l.duration_seconds || 0) >= 180 || (l.duration_minutes || 0) >= 3));
 
       // Stage 2: Fetch classmates, highlights, announcements, and school goals in parallel (all depend on user config)
       if (user.school_id) {
@@ -7894,8 +8307,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
         // Process classmates weekly practice minutes (depends on classmates list)
         if (classmatesRes.data && classmatesRes.data.length > 0 && goals.length > 0) {
-          const classmateIds = classmatesRes.data.map((c: any) => c.id);
-          const now = new Date();
+          const classmateAndSelfIds = Array.from(new Set([...classmatesRes.data.map((c: any) => c.id), user.id, studentId]));
+          const now = getSimulatedNow();
           const monday = new Date(now);
           const day = now.getDay();
           const diff = day === 0 ? -6 : 1 - day;
@@ -7906,14 +8319,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           sunday.setHours(23, 59, 59, 999);
 
           const { data: practiceData } = await supabase
-            .from('practice_sessions')
-            .select('duration_minutes')
-            .in('student_id', classmateIds)
+            .from('fokus_logs')
+            .select('user_id, duration_minutes, duration_seconds')
+            .in('user_id', classmateAndSelfIds)
             .gte('created_at', monday.toISOString())
             .lte('created_at', sunday.toISOString());
 
-          const totalMins = (practiceData || []).reduce(
-            (sum: number, s: any) => sum + (s.duration_minutes || 0), 0
+          let combinedPractice = practiceData || [];
+          try {
+            const localLogsKey = `cg_local_fokus_logs_${studentId}`;
+            const localLogs = JSON.parse(localStorage.getItem(localLogsKey) || '[]');
+            if (localLogs && localLogs.length > 0) {
+              const remoteIds = new Set(combinedPractice.map((l: any) => l.id));
+              const missingLocal = localLogs.filter((l: any) => !remoteIds.has(l.id));
+              combinedPractice = [...missingLocal, ...combinedPractice];
+            }
+          } catch (e) {}
+
+          const totalMins = (combinedPractice || []).reduce(
+            (sum: number, s: any) => sum + (s.duration_minutes || (s.duration_seconds ? Math.round(s.duration_seconds / 60) : 0)), 0
           );
           setClassWeeklyMins(totalMins);
         }
@@ -8565,11 +8989,60 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Gesammelte XP</span>
                     <Star size={15} fill="currentColor" />
                   </div>
-                  <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{avatar?.xp || 0} XP</span>
+                  <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{(() => {
+                    let xpVal = avatar?.xp || 0;
+                    try {
+                      const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
+                      if (localStats.current_xp) xpVal = Math.max(xpVal, localStats.current_xp);
+                      const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || '{}');
+                      if (localPractice.xp) xpVal = Math.max(xpVal, localPractice.xp);
+                    } catch (e) {}
+                    
+                    const logsXp = (fokusLogs || []).reduce((sum, log) => {
+                      if (log.xp_earned) return sum + log.xp_earned;
+                      const isMastered = !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3);
+                      const extraMins = log.is_extra ? Math.floor((log.duration_seconds || ((log.duration_minutes || 0) * 60)) / 60) : 0;
+                      return sum + (isMastered ? 3 : 0) + extraMins;
+                    }, 0);
+
+                    // Mastered Songs (+50 XP each)
+                    const masteredSongsSet = new Set<string>();
+                    (activeSongSkills || []).forEach((skill: any) => {
+                      if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
+                        const title = skill.songs?.title || skill.title || skill.song_title;
+                        if (title) masteredSongsSet.add(title.toLowerCase().trim());
+                      }
+                    });
+                    (progressItems || []).forEach((item: any) => {
+                      const rawTopic = (item.topic_name || item.title || '').trim();
+                      if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase().startsWith('test')) return;
+                      if (item.status === 'MASTERED' || (item.progress_percent || 0) === 100) {
+                        const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                        if (cleanT) masteredSongsSet.add(cleanT.toLowerCase());
+                      }
+                    });
+
+                    // Mastered Lehrwerk Pages (+10 XP each)
+                    const masteredPagesSet = new Set<string>();
+                    (progressItems || []).forEach((item: any) => {
+                      const rawTopic = (item.topic_name || item.title || '').trim();
+                      if (rawTopic.includes(' - Seite ') && (item.status === 'MASTERED' || (item.progress_percent || 0) === 100)) {
+                        masteredPagesSet.add(rawTopic.toLowerCase());
+                      }
+                    });
+
+                    const songsXp = masteredSongsSet.size * 50;
+                    const pagesXp = masteredPagesSet.size * 10;
+                    const groundTruthXp = logsXp + songsXp + pagesXp;
+
+                    xpVal = Math.max(xpVal, groundTruthXp);
+                    
+                    return `${xpVal} XP`;
+                  })()}</span>
                 </div>
               )}
 
-              {/* Card 2: Practice Minutes */}
+              {/* Card 2: Lifetime Practice Minutes (Gesamtzeit) */}
               {flamesActive && (
                 <div style={{ 
                   flex: '1 1 0px',
@@ -8584,10 +9057,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   gap: '6px'
                 }} className="kpi-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Übeminuten</span>
+                    <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Gesamtzeit</span>
                     <Clock size={15} />
                   </div>
-                  <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{totalFocusMinutes || 0} Min.</span>
+                  <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{(() => {
+                    const dbSecs = (fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                    const liveSecs = sessionActive ? secondsElapsed : 0;
+                    let localSecs = 0;
+                    try {
+                      const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
+                      if (localStats.total_focus_minutes) localSecs = Math.max(localSecs, localStats.total_focus_minutes * 60);
+                    } catch (e) {}
+                    const totalSecs = Math.max(dbSecs + liveSecs, (totalFocusMinutes || 0) * 60, localSecs);
+                    if (totalSecs > 0 && totalSecs < 60) {
+                      return `${Math.round(totalSecs)} Sek.`;
+                    }
+                    const mins = Math.floor(totalSecs / 60);
+                    const remainingSecs = Math.round(totalSecs % 60);
+                    if (remainingSecs > 0) {
+                      return `${mins}m ${remainingSecs}s`;
+                    }
+                    return `${mins} Min.`;
+                  })()}</span>
                 </div>
               )}
 
@@ -8609,8 +9100,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <Activity size={15} />
                 </div>
                 <span style={{ fontSize: '1.2rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '5px' }} className="kpi-card-value">{(() => {
-                  const todayStr = new Date().toISOString().split('T')[0];
-                  const todayLogs = fokusLogs.filter(log => log.created_at && log.created_at.startsWith(todayStr));
+                  const todayStr = toLocalYYYYMMDD(getSimulatedNow());
+                  const todayLogs = (fokusLogs || []).filter(log => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === todayStr);
                   
                   // DB sums
                   const dbFocusSecs = todayLogs.filter(l => !l.is_extra).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
@@ -8631,19 +9122,37 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   
                   const totalFocusSecs = dbFocusSecs + liveFocusSecs;
                   const totalExtraSecs = dbExtraSecs + liveExtraSecs;
+                  const totalDaySecs = totalFocusSecs + totalExtraSecs;
+                  
+                  if (totalDaySecs === 0) {
+                    return `0 Min.`;
+                  }
+                  if (totalDaySecs > 0 && totalDaySecs < 60) {
+                    return `${Math.round(totalDaySecs)} Sek. Frei`;
+                  }
                   
                   const focusMin = Math.floor(totalFocusSecs / 60);
-                  const extraMin = Math.floor(totalExtraSecs / 60);
                   
                   if (totalExtraSecs > 0) {
-                    return (
-                      <>
-                        <span>{focusMin}m</span>
-                        <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 800 }}>({extraMin}m Ex)</span>
-                      </>
-                    );
+                    const extraFormatted = totalExtraSecs < 60 
+                      ? `${Math.round(totalExtraSecs)}s Frei` 
+                      : (totalExtraSecs % 60 === 0 
+                          ? `${Math.floor(totalExtraSecs / 60)}m Frei` 
+                          : `${Math.floor(totalExtraSecs / 60)}m ${Math.round(totalExtraSecs % 60)}s Frei`);
+                    
+                    if (totalFocusSecs > 0) {
+                      return (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                          <span>{focusMin} Min. Fokus</span>
+                          <span style={{ fontSize: '0.74rem', opacity: 0.95, fontWeight: 800, background: 'rgba(255, 255, 255, 0.22)', padding: '1px 6px', borderRadius: '6px' }}>
+                            + {extraFormatted}
+                          </span>
+                        </span>
+                      );
+                    }
+                    return extraFormatted;
                   }
-                  return `${focusMin} Min`;
+                  return `${focusMin} Min.`;
                 })()}</span>
               </div>
 
@@ -8670,7 +9179,58 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '5px', marginTop: '6px' }} className="kpi-streak-footer">
                     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 'fit-content' }}>
                       <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }} className="kpi-card-value">
-                        {avatar?.streak_flame || 0} Tage
+                        {(() => {
+                          let streakVal = avatar?.streak_flame || 0;
+                          try {
+                            const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
+                            if (localStats.streak_flame) streakVal = Math.max(streakVal, localStats.streak_flame);
+                            const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || '{}');
+                            if (localPractice.streak_flame) streakVal = Math.max(streakVal, localPractice.streak_flame);
+                          } catch (e) {}
+                          
+                          const masteredDates = new Set<string>();
+                          (fokusLogs || []).forEach(log => {
+                            if (!log.created_at) return;
+                            const dStr = toLocalYYYYMMDD(new Date(log.created_at));
+                            const isMastered = !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3);
+                            if (isMastered) masteredDates.add(dStr);
+                          });
+                          
+                          const nowSim = getSimulatedNow();
+                          let checkDate = new Date(nowSim);
+                          let checkDateStr = toLocalYYYYMMDD(checkDate);
+                          let logsStreak = 0;
+                          if (masteredDates.has(checkDateStr)) {
+                            logsStreak = 1;
+                            while (true) {
+                              checkDate.setDate(checkDate.getDate() - 1);
+                              const prevStr = toLocalYYYYMMDD(checkDate);
+                              if (masteredDates.has(prevStr)) {
+                                logsStreak += 1;
+                              } else {
+                                break;
+                              }
+                            }
+                          } else {
+                            checkDate.setDate(checkDate.getDate() - 1);
+                            const yestStr = toLocalYYYYMMDD(checkDate);
+                            if (masteredDates.has(yestStr)) {
+                              logsStreak = 1;
+                              while (true) {
+                                checkDate.setDate(checkDate.getDate() - 1);
+                                const prevStr = toLocalYYYYMMDD(checkDate);
+                                if (masteredDates.has(prevStr)) {
+                                  logsStreak += 1;
+                                } else {
+                                  break;
+                                }
+                              }
+                            }
+                          }
+                          
+                          streakVal = Math.max(streakVal, logsStreak);
+                          return `${streakVal} ${streakVal === 1 ? 'Tag' : 'Tage'}`;
+                        })()}
                       </span>
                     </div>
                     
@@ -8777,10 +9337,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </div>
                     <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
                       {(() => {
-                        if (totalFocusMinutes >= 2000) return 'Stufe 4: Übe-Großmeister';
-                        if (totalFocusMinutes >= 1000) return 'Stufe 3: Übe-Legende';
-                        if (totalFocusMinutes >= 250) return 'Stufe 2: Übe-Meister';
-                        if (totalFocusMinutes >= 50) return 'Stufe 1: Fleiß-Pionier';
+                        const logsMins = Math.round((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
+                        const effMins = Math.max(totalFocusMinutes || 0, logsMins);
+                        if (effMins >= 1500) return 'Stufe 4: Übe-Großmeister';
+                        if (effMins >= 500) return 'Stufe 3: Übe-Legende';
+                        if (effMins >= 100) return 'Stufe 2: Übe-Meister';
+                        if (effMins >= 20) return 'Stufe 1: Fleiß-Pionier';
                         return 'Stufe 0: Übe-Starter';
                       })()}
                     </h3>
@@ -8789,30 +9351,32 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {(() => {
+                    const logsMins = Math.round((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
+                    const effMins = Math.max(totalFocusMinutes || 0, logsMins);
                     let nextStickerName = 'Fleiß-Pionier';
-                    let targetMin = 50;
+                    let targetMin = 20;
                     let prevMin = 0;
-                    if (totalFocusMinutes >= 1000) {
+                    if (effMins >= 500) {
                       nextStickerName = 'Übe-Großmeister';
-                      targetMin = 2000;
-                      prevMin = 1000;
-                    } else if (totalFocusMinutes >= 250) {
+                      targetMin = 1500;
+                      prevMin = 500;
+                    } else if (effMins >= 100) {
                       nextStickerName = 'Übe-Legende';
-                      targetMin = 1000;
-                      prevMin = 250;
-                    } else if (totalFocusMinutes >= 50) {
+                      targetMin = 500;
+                      prevMin = 100;
+                    } else if (effMins >= 20) {
                       nextStickerName = 'Übe-Meister';
-                      targetMin = 250;
-                      prevMin = 50;
+                      targetMin = 100;
+                      prevMin = 20;
                     }
 
-                    const isMax = totalFocusMinutes >= 2000;
-                    const progressPct = isMax ? 100 : Math.min(100, Math.max(0, ((totalFocusMinutes - prevMin) / (targetMin - prevMin)) * 100));
+                    const isMax = effMins >= 1500;
+                    const progressPct = isMax ? 100 : Math.min(100, Math.max(0, ((effMins - prevMin) / (targetMin - prevMin)) * 100));
 
                     return (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0, 0, 0, 0.18)', padding: '4px 10px', borderRadius: '999px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
                         <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
-                          {isMax ? 'Großmeister-Status erreicht' : `${totalFocusMinutes}/${targetMin} Min. zu ${nextStickerName}`}
+                          {isMax ? 'Großmeister-Status erreicht' : `${effMins}/${targetMin} Min. zu ${nextStickerName}`}
                         </span>
                         <div style={{ width: '48px', height: '5px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '999px', overflow: 'hidden' }}>
                           <div style={{ width: `${progressPct}%`, height: '100%', background: 'linear-gradient(90deg, #facc15 0%, #fde047 100%)', borderRadius: '999px', transition: 'width 0.5s ease' }} />
@@ -8872,30 +9436,39 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   background: 'rgba(255, 255, 255, 0.2)',
                   zIndex: 0
                 }}>
-                  <div style={{
-                    width: `${Math.min(100, Math.max(0, (totalFocusMinutes / 2000) * 100))}%`,
-                    height: '100%',
-                    background: 'linear-gradient(90deg, #facc15 0%, #fde047 100%)',
-                    transition: 'width 0.5s ease'
-                  }} />
+                  {(() => {
+                    const logsMins = Math.round((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
+                    const effMins = Math.max(totalFocusMinutes || 0, logsMins);
+                    return (
+                      <div style={{
+                        width: `${Math.min(100, Math.max(0, (effMins / 1500) * 100))}%`,
+                        height: '100%',
+                        background: 'linear-gradient(90deg, #facc15 0%, #fde047 100%)',
+                        transition: 'width 0.5s ease'
+                      }} />
+                    );
+                  })()}
                 </div>
 
-                {[
-                  { stage: 1, id: 'fleiss-pionier', title: 'Fleiß-Pionier', desc: '50 Min', icon: '🐝', done: (totalFocusMinutes >= 50), current: (totalFocusMinutes < 50) },
-                  { stage: 2, id: 'uebe-meister', title: 'Übe-Meister', desc: '250 Min', icon: '🦉', done: (totalFocusMinutes >= 250), current: (totalFocusMinutes >= 50 && totalFocusMinutes < 250) },
-                  { stage: 3, id: 'uebe-legende', title: 'Übe-Legende', desc: '1000 Min', icon: '👑', done: (totalFocusMinutes >= 1000), current: (totalFocusMinutes >= 250 && totalFocusMinutes < 1000) },
-                  { stage: 4, id: 'uebe-grossmeister', title: 'Übe-Großmeister', desc: '2000 Min', icon: '🏆', done: (totalFocusMinutes >= 2000), current: (totalFocusMinutes >= 1000 && totalFocusMinutes < 2000) }
-                ].map((node) => (
-                  <div
-                    key={node.stage}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '4px',
-                      zIndex: 1,
-                      minWidth: '68px'
-                    }}
+                {(() => {
+                  const logsMins = Math.round((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
+                  const effMins = Math.max(totalFocusMinutes || 0, logsMins);
+                  return [
+                    { stage: 1, id: 'fleiss-pionier', title: 'Fleiß-Pionier', desc: '20 Min', icon: '🐝', done: (effMins >= 20), current: (effMins < 20) },
+                    { stage: 2, id: 'uebe-meister', title: 'Übe-Meister', desc: '100 Min', icon: '🦉', done: (effMins >= 100), current: (effMins >= 20 && effMins < 100) },
+                    { stage: 3, id: 'uebe-legende', title: 'Übe-Legende', desc: '500 Min', icon: '👑', done: (effMins >= 500), current: (effMins >= 100 && effMins < 500) },
+                    { stage: 4, id: 'uebe-grossmeister', title: 'Übe-Großmeister', desc: '1500 Min', icon: '🏆', done: (effMins >= 1500), current: (effMins >= 500 && effMins < 1500) }
+                  ].map((node) => (
+                    <div
+                      key={node.stage}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px',
+                        zIndex: 1,
+                        minWidth: '68px'
+                      }}
                     title={`${node.title}: ${node.desc}`}
                   >
                     <div style={{
@@ -8945,7 +9518,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       {node.title}
                     </span>
                   </div>
-                ))}
+                ));
+              })()}
               </div>
             </div>
 
@@ -9293,7 +9867,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                            nextCheckpointSecondsRef.current = Math.floor(Math.random() * 180) + 300; // 5-8 minutes
 
                            // Query focus log today and insert initial heartbeat log
-                           const startOfDay = new Date();
+                           const simNow = getSimulatedNow();
+                           const startOfDay = new Date(simNow.getTime());
                            startOfDay.setHours(0, 0, 0, 0);
 
                            supabase
@@ -9313,7 +9888,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                    duration_minutes: 0,
                                    duration_seconds: 0,
                                    is_extra: isExtra,
-                                   flame_level: getFlameLevelName(avatar?.streak_flame || 0)
+                                   flame_level: getFlameLevelName(avatar?.streak_flame || 0),
+                                   created_at: simNow.toISOString()
                                  })
                                  .select('id')
                                  .single()
@@ -10106,378 +10682,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </>
                   )}
 
-                  {/* 2.5 Live Match Celebration Modal Portal */}
-                  {matchCelebrationData && createPortal(
-                    <div
-                      style={{
-                        position: 'fixed',
-                        inset: 0,
-                        zIndex: 10006,
-                        background: 'rgba(9, 9, 11, 0.82)',
-                        backdropFilter: 'blur(24px)',
-                        WebkitBackdropFilter: 'blur(24px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '20px',
-                        color: '#ffffff',
-                        fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
-                        animation: 'fadeIn 0.25s ease'
-                      }}
-                    >
-                      <Confetti width={typeof window !== 'undefined' ? window.innerWidth : 400} height={typeof window !== 'undefined' ? window.innerHeight : 800} recycle={false} numberOfPieces={280} gravity={0.22} />
-                      <div
-                        style={{
-                          width: '100%',
-                          maxWidth: '420px',
-                          background: 'linear-gradient(180deg, #18181b 0%, #09090b 100%)',
-                          border: '2px solid rgba(52, 168, 83, 0.45)',
-                          borderRadius: '28px',
-                          padding: '32px 24px',
-                          textAlign: 'center',
-                          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.8), 0 0 50px rgba(52, 168, 83, 0.25)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: '18px',
-                          position: 'relative'
-                        }}
-                      >
-                        <div style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 900,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.1em',
-                          color: '#86efac',
-                          background: 'rgba(34, 197, 94, 0.15)',
-                          padding: '4px 14px',
-                          borderRadius: '99px',
-                          border: '1px solid rgba(34, 197, 94, 0.3)'
-                        }}>
-                          ✨ Live aus deinem Unterricht
-                        </div>
-
-                        <div>
-                          <h3 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 950, color: '#ffffff', letterSpacing: '-0.02em' }}>
-                            Song-Match geprüft! 🎯
-                          </h3>
-                          <p style={{ margin: 0, fontSize: '0.84rem', color: '#a1a1aa', lineHeight: 1.4 }}>
-                            Deine Lehrkraft hat dein Können für <strong style={{ color: '#ffffff' }}>{matchCelebrationData.songTitle}</strong> gematcht!
-                          </p>
-                        </div>
-
-                        {/* Holographic 3-Tier Sticker Card */}
-                        <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                          <MeisterOhrSticker
-                            matchedAt={matchCelebrationData.matchedAt}
-                            teacherPercent={matchCelebrationData.teacherPercent}
-                            studentPercent={matchCelebrationData.studentPercent}
-                            xpAmount={matchCelebrationData.xpAmount}
-                            isCompact={false}
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setMatchCelebrationData(null)}
-                          style={{
-                            width: '100%',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                            color: '#ffffff',
-                            padding: '14px',
-                            borderRadius: '16px',
-                            fontSize: '0.94rem',
-                            fontWeight: 900,
-                            cursor: 'pointer',
-                            boxShadow: '0 6px 20px rgba(22, 163, 74, 0.45)',
-                            transition: 'all 0.15s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px'
-                          }}
-                          className="hover-scale"
-                        >
-                          <Sparkles size={18} />
-                          <span>🚀 Weiter rocken!</span>
-                        </button>
-                      </div>
-                    </div>
-                  , document.body)}
-
-                  {/* 3. Celebration / Success Logbook Overlay */}
-                  {showCelebration && celebrationDetails && createPortal(
-                    <div 
-                      style={{
-                        position: 'fixed',
-                        inset: 0,
-                        zIndex: 10003, // Topmost layer
-                        background: 'rgba(9, 9, 11, 0.75)',
-                        backdropFilter: 'blur(20px)',
-                        WebkitBackdropFilter: 'blur(20px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '24px',
-                        color: '#ffffff',
-                        userSelect: 'none',
-                        fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif'
-                      }}
-                    >
-                      <div style={{
-                        width: '100%',
-                        maxWidth: '360px',
-                        background: 'rgba(24, 24, 27, 0.9)',
-                        border: '1px solid rgba(52, 168, 83, 0.2)',
-                        borderRadius: '32px',
-                        padding: '40px 30px',
-                        textAlign: 'center',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '24px',
-                        position: 'relative'
-                      }}>
-                        {/* Animated Progress Ring Container */}
-                        <div style={{ position: 'relative', width: '160px', height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
-                          {/* Canvas for Particle Explosion */}
-                          <canvas
-                            ref={celebrationCanvasRef}
-                            width={320}
-                            height={320}
-                            style={{
-                              position: 'absolute',
-                              top: '-80px',
-                              left: '-80px',
-                              width: '320px',
-                              height: '320px',
-                              pointerEvents: 'none',
-                              zIndex: 10
-                            }}
-                          />
-
-                          {/* SVG circular progress bar */}
-                          <svg width="160" height="160" viewBox="0 0 160 160" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
-                            {/* Background Track */}
-                            <circle
-                              cx="80"
-                              cy="80"
-                              r="70"
-                              fill="transparent"
-                              stroke="rgba(255, 255, 255, 0.08)"
-                              strokeWidth="8"
-                            />
-                            {/* Foreground Progress */}
-                            <circle
-                              cx="80"
-                              cy="80"
-                              r="70"
-                              fill="transparent"
-                              stroke="url(#celebrationProgressGrad)"
-                              strokeWidth="8"
-                              strokeDasharray="439.82"
-                              strokeDashoffset={439.82 - 439.82 * celebrationRingProgress}
-                              strokeLinecap="round"
-                              style={{
-                                transition: 'stroke-dashoffset 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                              }}
-                            />
-                            <defs>
-                              <linearGradient id="celebrationProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stopColor="#34a853" />
-                                <stop offset="100%" stopColor="#34a853" />
-                              </linearGradient>
-                            </defs>
-                          </svg>
-
-                          {/* Flame Icon & Streak Count in Center */}
-                          <div style={{
-                            position: 'absolute',
-                            inset: 0,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            zIndex: 5
-                          }}>
-                            <Flame
-                              size={36}
-                              color="#ea580c"
-                              fill="#ea580c"
-                              style={{
-                                filter: 'drop-shadow(0 2px 8px rgba(234, 88, 12, 0.5))',
-                                transform: 'scale(1)',
-                                animation: 'pulse 2s infinite ease-in-out'
-                              }}
-                            />
-                            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#ffffff', marginTop: '2px', lineHeight: 1 }}>
-                              {celebrationDetails.streakFlame}
-                            </span>
-                            <span style={{ fontSize: '0.55rem', fontWeight: 900, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '1px' }}>
-                              Tage Streak
-                            </span>
-                          </div>
-                        </div>
-
-                        <div>
-                          <h3 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#34a853', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
-                            Großartig geübt!
-                          </h3>
-                          <p style={{ fontSize: '0.88rem', color: '#a1a1aa', fontWeight: 500, lineHeight: 1.5, margin: 0 }}>
-                            Deine Übe-Session wurde erfolgreich im Log-Buch gespeichert!
-                          </p>
-                        </div>
-
-                        <div style={{
-                          width: '100%',
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid rgba(255, 255, 255, 0.05)',
-                          borderRadius: '20px',
-                          padding: '16px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px',
-                          textAlign: 'left'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                            <span style={{ color: '#71717a', fontWeight: 600 }}>Geübte Zeit:</span>
-                            <span style={{ color: '#ffffff', fontWeight: 800 }}>
-                              {celebrationDetails?.exactSeconds ? (
-                                `${String(Math.floor(celebrationDetails.exactSeconds / 60)).padStart(2, '0')}:${String(celebrationDetails.exactSeconds % 60).padStart(2, '0')} Min. ⏱️`
-                              ) : (
-                                `${celebrationDetails.sessionMinutes} Min. ⏱️`
-                              )}
-                            </span>
-                          </div>
-
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                            <span style={{ color: '#71717a', fontWeight: 600 }}>XP erhalten:</span>
-                            <span style={{ color: '#38bdf8', fontWeight: 800 }}>+{celebrationDetails.xpGained} XP ⚡</span>
-                          </div>
-                          
-                          {celebrationDetails.sessionCompletedTarget ? (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                              <span style={{ color: '#71717a', fontWeight: 600 }}>Tagesziel:</span>
-                              <span style={{ color: '#34a853', fontWeight: 800 }}>Erreicht! 🏆</span>
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                <span style={{ color: '#71717a', fontWeight: 600 }}>Tages-Ziel:</span>
-                                <span style={{ color: '#eab308', fontWeight: 800 }}>Noch {celebrationDetails?.dailyGoal || 3} Min. am Stück zur Flamme 🔥</span>
-                              </div>
-                              <div style={{
-                                background: 'rgba(234, 179, 8, 0.08)',
-                                border: '1px solid rgba(234, 179, 8, 0.2)',
-                                borderRadius: '12px',
-                                padding: '8px 10px',
-                                fontSize: '0.74rem',
-                                color: '#fef08a',
-                                lineHeight: 1.4,
-                                textAlign: 'center',
-                                fontWeight: 600
-                              }}>
-                                💡 <strong>Streak-Regel:</strong> Der Tages-Streak zählt, wenn du die <strong>{celebrationDetails?.dailyGoal || 3} Min. in einer Session am Stück</strong> übst. Deine bisherige Übezeit ist sicher gespeichert und du kannst es heute jederzeit nochmal versuchen! 🎸
-                              </div>
-                            </div>
-                          )}
-
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                            <span style={{ color: '#71717a', fontWeight: 600 }}>Streak:</span>
-                            <span style={{ color: '#fb923c', fontWeight: 800 }}>{celebrationDetails.streakFlame} Tage 🔥</span>
-                          </div>
-
-                          {celebrationDetails.usedJokerThisSession && (
-                            <div style={{ fontSize: '0.78rem', color: '#fb923c', fontWeight: 600, marginTop: '4px', textAlign: 'center', background: 'rgba(251, 146, 60, 0.08)', padding: '6px 12px', borderRadius: '10px' }}>
-                              🎯 Joker eingesetzt, um deinen Streak von {celebrationDetails.streak} Tagen zu retten!
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Stimmungs-Check Section */}
-                        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                          <span style={{ fontSize: '0.78rem', color: '#a1a1aa', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            Wie war deine Übe-Session?
-                          </span>
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '2px' }}>
-                            {[
-                              { mood: 'sad', emoji: '😕', label: 'Schwer' },
-                              { mood: 'neutral', emoji: '🙂', label: 'Ganz gut' },
-                              { mood: 'happy', emoji: '😎', label: 'Super!' }
-                            ].map(item => {
-                              const isSelected = lastSelectedMood === item.mood;
-                              return (
-                                <button
-                                  key={item.mood}
-                                  onClick={() => handleSaveMood(item.mood as 'sad' | 'neutral' | 'happy')}
-                                  style={{
-                                    background: isSelected ? 'rgba(52, 168, 83, 0.15)' : 'rgba(255, 255, 255, 0.03)',
-                                    border: isSelected ? '2.5px solid #34a853' : '2.5px solid rgba(255, 255, 255, 0.08)',
-                                    borderRadius: '20px',
-                                    width: '64px',
-                                    height: '64px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    gap: '4px',
-                                    transform: isSelected ? 'scale(1.1)' : 'scale(1)',
-                                    boxShadow: isSelected ? '0 0 15px rgba(52, 168, 83, 0.25)' : 'none'
-                                  }}
-                                  onMouseOver={e => {
-                                    if (!isSelected) {
-                                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
-                                      e.currentTarget.style.transform = 'scale(1.05)';
-                                    }
-                                  }}
-                                  onMouseOut={e => {
-                                    if (!isSelected) {
-                                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                                      e.currentTarget.style.transform = 'scale(1)';
-                                    }
-                                  }}
-                                >
-                                  <span style={{ fontSize: '1.4rem', lineHeight: 1 }}>{item.emoji}</span>
-                                  <span style={{ fontSize: '0.52rem', fontWeight: 800, color: isSelected ? '#34a853' : '#a1a1aa', textTransform: 'uppercase' }}>
-                                    {item.label}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => {
-                            setShowCelebration(false);
-                            setLastSelectedMood(null);
-                          }}
-                          style={{
-                            width: '100%',
-                            background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-                            color: 'white',
-                            border: 'none',
-                            padding: '14px 20px',
-                            borderRadius: '16px',
-                            fontWeight: 800,
-                            fontSize: '0.9rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 15px rgba(52, 168, 83, 0.2)',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                        >
-                          Log-Buch ansehen
-                        </button>
-                      </div>
-                    </div>
-                  , document.body)}
-
                   <div style={{ display: 'flex', gap: '14px', width: '100%', maxWidth: '350px' }}>
                     <button
                       onClick={finishPracticeSession}
@@ -10563,7 +10767,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   borderRadius: '12px',
                   transition: 'all 0.3s ease'
                 }}>
-                  {sidebarTab === 'logbook' ? <Flame size={18} fill="currentColor" /> : <Calendar size={18} />}
+                  {sidebarTab === 'logbook' ? <Flame size={18} fill="#ea580c" color="#ea580c" /> : <Calendar size={18} />}
                 </div>
                 <div>
                   <h4 style={{ fontWeight: 850, fontSize: '18px', color: '#1e293b', margin: 0 }}>
@@ -10604,7 +10808,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </>
                 ) : (
                   <>
-                    <Flame size={12} fill="currentColor" />
+                    <Flame size={12} fill="#ea580c" color="#ea580c" />
                     <span>Log-Buch</span>
                   </>
                 )}
@@ -10662,7 +10866,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                         if (minutes > 0) {
                           if (minutes <= 15) {
-                            // Level 1: ultra light green
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6fbf0 100%)';
                             border = '1px solid #e6f4ea';
                             labelColor = '#34a853';
@@ -10670,7 +10873,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             numColor = '#34a853';
                             shadow = '0 2px 6px rgba(52, 168, 83, 0.04)';
                           } else if (minutes <= 60) {
-                            // Level 2: soft green
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                             border = '1px solid #e6f4ea';
                             labelColor = '#34a853';
@@ -10678,7 +10880,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             numColor = '#34a853';
                             shadow = '0 3px 8px rgba(52, 168, 83, 0.07)';
                           } else if (minutes <= 180) {
-                            // Level 3: medium green
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                             border = '1px solid #e6f4ea';
                             labelColor = '#34a853';
@@ -10686,7 +10887,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             numColor = '#34a853';
                             shadow = '0 4px 12px rgba(52, 168, 83, 0.12)';
                           } else {
-                            // Level 4 (Master): Solid emerald jewel
                             bg = 'linear-gradient(135deg, #34a853 0%, #34a853 100%)';
                             border = '1px solid #34a853';
                             labelColor = 'rgba(255, 255, 255, 0.8)';
@@ -10702,8 +10902,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             style={{
                               background: bg,
                               border: border,
-                              borderRadius: '16px',
-                              padding: '12px 4px',
+                              borderRadius: '14px',
+                              padding: '8px 4px',
                               display: 'flex',
                               flexDirection: 'column',
                               alignItems: 'center',
@@ -10790,510 +10990,586 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 );
               })()
             ) : (
-              /* List entries */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '480px', overflowY: 'auto', paddingRight: '4px' }} className="animation-fade-in">
+              /* 2-TIER HYBRID SOUND JOURNAL (MASTERPIECE DUO EDITION) */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }} className="animation-fade-in">
                 {(() => {
-                  const grouped = getGroupedLogs();
-                  if (grouped.length === 0) {
-                    return (
-                      <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic', padding: '40px 10px' }}>
-                        Noch keine Einträge im Log-Buch vorhanden. Starte deine erste Fokus-Session! 🚀
-                      </div>
-                    );
+                  const now = getSimulatedNow();
+                  const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, ...
+                  const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+                  const monday = new Date(now);
+                  monday.setDate(now.getDate() + mondayOffset);
+                  monday.setHours(0, 0, 0, 0);
+
+                  const dayNamesShort = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+                  const dayNamesFull = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+                  const monthNamesShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+                  const monthNamesFull = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+                  // 1. Calculate 7-Day Current Week Strip
+                  const weekDays = [];
+                  let weekPracticedCount = 0;
+                  let weekTotalSeconds = 0;
+
+                  for (let i = 0; i < 7; i++) {
+                    const d = new Date(monday);
+                    d.setDate(monday.getDate() + i);
+
+                    const isToday = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                    const isFuture = d > now && !isToday;
+
+                    const dayLogs = (fokusLogs || []).filter(log => {
+                      if (!log.created_at) return false;
+                      return toLocalYYYYMMDD(new Date(log.created_at)) === toLocalYYYYMMDD(d);
+                    });
+
+                    let totalDaySecs = dayLogs.reduce((sum, log) => {
+                      return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
+                    }, 0);
+
+                    if (isToday && sessionActive && secondsElapsed > 0) {
+                      totalDaySecs += secondsElapsed;
+                    }
+
+                    const hasMastered = dayLogs.some(log => !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3)) || totalDaySecs >= 180;
+                    const isJoker = Boolean(studentUser?.joker_used_at && (() => {
+                      const jd = new Date(studentUser.joker_used_at);
+                      return toLocalYYYYMMDD(jd) === toLocalYYYYMMDD(d);
+                    })());
+
+                    if (totalDaySecs > 0 || hasMastered || isJoker) {
+                      weekPracticedCount += 1;
+                    }
+                    weekTotalSeconds += totalDaySecs;
+
+                    weekDays.push({
+                      dayName: dayNamesShort[i],
+                      dayNumber: d.getDate(),
+                      isToday,
+                      isFuture,
+                      totalDaySecs,
+                      totalMins: Math.round(totalDaySecs / 60),
+                      hasMastered,
+                      isJoker
+                    });
                   }
 
-                  // Group by month
-                  const groupedByMonth: Record<string, { label: string, key: string, entries: typeof grouped, practiceDays: number }> = {};
-                  const monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+                  const weekTotalMins = Math.round(weekTotalSeconds / 60);
 
-                  grouped.forEach(entry => {
+                  // 2. Format Friendly Date Helper
+                  const formatFriendlyDate = (dateStr: string) => {
+                    const parts = dateStr.split('.');
+                    if (parts.length < 3) return dateStr;
+                    const day = parseInt(parts[0], 10);
+                    const monthIndex = parseInt(parts[1], 10) - 1;
+                    const year = 2000 + parseInt(parts[2], 10);
+                    const d = new Date(year, monthIndex, day);
+
+                    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const targetStart = new Date(year, monthIndex, day);
+                    const diffDays = Math.round((todayStart.getTime() - targetStart.getTime()) / (1000 * 60 * 60 * 24));
+
+                    if (diffDays === 0) return `Heute (${dayNamesFull[d.getDay()]})`;
+                    if (diffDays === 1) return `Gestern (${dayNamesFull[d.getDay()]})`;
+                    if (diffDays === 2) return `Vorgestern (${dayNamesFull[d.getDay()]})`;
+                    return `${dayNamesFull[d.getDay()]}, ${day}. ${monthNamesShort[monthIndex]}`;
+                  };
+
+                  // 3. Process Grouped Logs for Success Stream
+                  const rawGrouped = getGroupedLogs();
+                  
+                  // Filter to genuine practice sessions (> 0s) or Joker days, excluding today (handled by Hero Card)
+                  const todayDd = String(now.getDate()).padStart(2, '0');
+                  const todayMm = String(now.getMonth() + 1).padStart(2, '0');
+                  const todayYy = String(now.getFullYear()).substring(2);
+                  const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
+
+                  const todayGroup = rawGrouped.find(g => g.date === todayDateStr);
+                  const dayLogsToday = (fokusLogs || []).filter(log => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === toLocalYYYYMMDD(now));
+                  const dayLogsSecs = dayLogsToday.reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                  const todayTotalSecs = Math.max(
+                    (todayGroup?.focusSeconds || 0) + (todayGroup?.extraSeconds || 0),
+                    dayLogsSecs
+                  ) + (sessionActive ? secondsElapsed : 0);
+                  const todayHasMastered = Boolean(
+                    todayGroup?.hasMasteredSession || 
+                    dayLogsToday.some(l => !l.is_extra && (l.duration_seconds >= 180 || (l.duration_minutes || 0) >= 3)) || 
+                    todayTotalSecs >= 180
+                  );
+
+                  // Group past genuine practice sessions by Month
+                  const pastPracticedLogs = rawGrouped.filter(g => {
+                    const totalSecs = (g.focusSeconds || 0) + (g.extraSeconds || 0);
+                    const isJoker = Boolean(studentUser?.joker_used_at && (() => {
+                      const jd = new Date(studentUser.joker_used_at);
+                      const dd = String(jd.getDate()).padStart(2, '0');
+                      const mm = String(jd.getMonth() + 1).padStart(2, '0');
+                      const yy = String(jd.getFullYear()).substring(2);
+                      return `${dd}.${mm}.${yy}` === g.date;
+                    })());
+                    return g.date !== todayDateStr && (totalSecs > 0 || isJoker);
+                  });
+
+                  const monthsMap: Record<string, { label: string, key: string, entries: typeof pastPracticedLogs, totalMins: number, practiceDays: number }> = {};
+
+                  // Ensure current month is always present in list
+                  const currentMonthKey = `${now.getMonth()}-${now.getFullYear()}`;
+                  monthsMap[currentMonthKey] = {
+                    label: `${monthNamesFull[now.getMonth()]} ${now.getFullYear()}`,
+                    key: currentMonthKey,
+                    entries: [],
+                    totalMins: todayHasMastered || todayTotalSecs > 0 ? Math.round(todayTotalSecs / 60) : 0,
+                    practiceDays: todayHasMastered || todayTotalSecs > 0 ? 1 : 0
+                  };
+
+                  pastPracticedLogs.forEach(entry => {
                     const parts = entry.date.split('.');
                     if (parts.length < 3) return;
                     const monthIndex = parseInt(parts[1], 10) - 1;
                     const yearFull = 2000 + parseInt(parts[2], 10);
                     const key = `${monthIndex}-${yearFull}`;
-                    const label = `${monthNames[monthIndex]} ${yearFull}`;
 
-                    if (!groupedByMonth[key]) {
-                      groupedByMonth[key] = {
-                        label,
+                    if (!monthsMap[key]) {
+                      monthsMap[key] = {
+                        label: `${monthNamesFull[monthIndex]} ${yearFull}`,
                         key,
                         entries: [],
+                        totalMins: 0,
                         practiceDays: 0
                       };
                     }
-                    groupedByMonth[key].entries.push(entry);
-                    
-                    // Count as practice day ONLY if target was completed (>= 180s focus or >= 60s extra)
-                    const practiced = !entry.isPlaceholder || entry.focusSeconds >= 180 || entry.extraSeconds >= 60;
-                    if (practiced) {
-                      groupedByMonth[key].practiceDays += 1;
-                    }
+                    monthsMap[key].entries.push(entry);
+                    const totalSecs = (entry.focusSeconds || 0) + (entry.extraSeconds || 0);
+                    monthsMap[key].totalMins += Math.round(totalSecs / 60);
+                    monthsMap[key].practiceDays += 1;
                   });
 
-                  const months = Object.values(groupedByMonth);
-
-                  // Sort months by year and month index descending
-                  months.sort((a, b) => {
+                  const sortedMonths = Object.values(monthsMap).sort((a, b) => {
                     const [aMonth, aYear] = a.key.split('-').map(Number);
                     const [bMonth, bYear] = b.key.split('-').map(Number);
                     if (aYear !== bYear) return bYear - aYear;
                     return bMonth - aMonth;
                   });
 
-                  return months.map((month, mIdx) => {
-                    const isExpanded = expandedMonths[month.key] !== undefined 
-                      ? expandedMonths[month.key] 
-                      : mIdx === 0; // first month is expanded by default
-
-                    const toggleMonth = () => {
-                      setExpandedMonths(prev => ({
-                        ...prev,
-                        [month.key]: !isExpanded
-                      }));
-                    };
-
-                    return (
-                      <div key={month.key} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {/* Month Header Accordion Toggle */}
-                        <div 
-                          onClick={toggleMonth}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '16px',
-                            padding: '12px 16px',
-                            cursor: 'pointer',
-                            userSelect: 'none',
-                            transition: 'all 0.2s ease-in-out'
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <ChevronRight 
-                              size={16} 
-                              style={{ 
-                                color: '#64748b', 
-                                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', 
-                                transition: 'transform 0.2s ease-in-out' 
-                              }} 
-                            />
-                            <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>
-                              {month.label}
-                            </span>
-                          </div>
-                          
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      
+                      {/* 🌟 TIER 1: 7-TAGE-WOCHEN-TRACKER (SMARAGDGRÜNER MASTER-TRACKER) */}
+                      <div style={{
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '22px',
+                        padding: '16px 18px',
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}>
+                        {/* Header with 7-Segment Progress */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Flame size={15} color="#ea580c" fill="#ea580c" />
+                            Diese Woche
+                          </span>
                           <span style={{ 
-                            fontSize: '0.7rem', 
+                            fontSize: '0.68rem', 
                             fontWeight: 800, 
-                            color: month.practiceDays > 0 ? '#34a853' : '#64748b',
-                            background: month.practiceDays > 0 ? '#e6f4ea' : '#f1f5f9',
-                            padding: '4px 10px',
-                            borderRadius: '100px',
-                            letterSpacing: '0.02em'
+                            color: weekPracticedCount > 0 ? '#166534' : '#ea580c', 
+                            background: weekPracticedCount > 0 ? '#e6f4ea' : '#fff7ed', 
+                            border: weekPracticedCount > 0 ? '1px solid #bbf7d0' : '1px solid #fed7aa', 
+                            padding: '2px 10px', 
+                            borderRadius: '100px' 
                           }}>
-                            {month.practiceDays} {month.practiceDays === 1 ? 'Übetag' : 'Übetage'}
+                            {weekPracticedCount} von 7 Tagen gemeistert
                           </span>
                         </div>
 
-                        {/* Collapsible Content */}
-                        {isExpanded && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', paddingLeft: '8px' }}>
-                            {month.entries.map((group, idx) => {
-                              const now = new Date();
-                              const todayDd = String(now.getDate()).padStart(2, '0');
-                              const todayMm = String(now.getMonth() + 1).padStart(2, '0');
-                              const todayYy = String(now.getFullYear()).substring(2);
-                              const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
+                        {/* 7-Segment Visual Progress Bar in Smaragdgrün */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', height: '4px' }}>
+                          {weekDays.map((d, dIdx) => (
+                            <div 
+                              key={dIdx} 
+                              style={{ 
+                                height: '100%', 
+                                borderRadius: '100px', 
+                                background: d.hasMastered 
+                                  ? 'linear-gradient(90deg, #34a853, #22c55e)' 
+                                  : (d.totalDaySecs > 0 ? '#86efac' : (d.isJoker ? '#f97316' : '#e2e8f0')),
+                                transition: 'all 0.3s ease'
+                              }} 
+                            />
+                          ))}
+                        </div>
 
-                              const isToday = group.date === todayDateStr;
-                              
-                              const jokerDateStr = (() => {
-                                if (!studentUser?.joker_used_at) return null;
-                                const jd = new Date(studentUser.joker_used_at);
-                                const dd = String(jd.getDate()).padStart(2, '0');
-                                const mm = String(jd.getMonth() + 1).padStart(2, '0');
-                                const yy = String(jd.getFullYear()).substring(2);
-                                return `${dd}.${mm}.${yy}`;
-                              })();
-                              const isJokerDay = jokerDateStr === group.date;
-                              const getFlameIconSize = (flame: string) => {
-                                if (flame === 'Helden-Feuer') return 18;
-                                if (flame === 'Mittlere Flamme') return 15;
-                                return 12;
-                              };
-                              const iconSize = getFlameIconSize(group.flameLevel);
-                              const totalDaySeconds = (group.focusSeconds || 0) + (group.extraSeconds || 0);
-                              const hasMastered = Boolean(group.hasMasteredSession || group.focusSeconds >= 180) && !group.isPlaceholder;
-                              
-                              let borderLeftColor = '#e2e8f0';
-                              if (hasMastered) {
-                                borderLeftColor = '#34a853'; // Green (Mastered)
-                              } else if (isJokerDay) {
-                                borderLeftColor = '#f97316'; // Same hue as Streak path KPI (Orange)
-                              } else if (isToday) {
-                                borderLeftColor = '#eab308'; // Yellow (Active)
+                        {/* 7 Day Trophy Coins Grid */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(7, 1fr)',
+                          gap: '6px'
+                        }}>
+                          {weekDays.map((day, idx) => {
+                            let bg = '#f8fafc';
+                            let border = '1px solid #f1f5f9';
+                            let textColor = '#64748b';
+                            let iconElement = <span style={{ fontSize: '0.65rem', color: '#cbd5e1', fontWeight: 900 }}>·</span>;
+                            let subLabel = day.isFuture ? '·' : (day.totalMins > 0 ? `${day.totalMins}m` : 'Pause');
+
+                            if (day.isToday) {
+                              if (day.hasMastered) {
+                                bg = 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)';
+                                border = '1.5px solid #34a853';
+                                textColor = '#166534';
+                                iconElement = <Flame size={15} color="#34a853" fill="#34a853" />;
+                                subLabel = day.totalMins > 0 ? `${day.totalMins}m` : '3m';
                               } else {
-                                borderLeftColor = '#94a3b8'; // Slate/Grey (Not practiced / target not reached)
+                                bg = 'linear-gradient(135deg, #fffbeb 0%, #fefce8 100%)';
+                                border = '1.5px solid #ca8a04';
+                                textColor = '#854d0e';
+                                iconElement = <span style={{ fontSize: '0.75rem', lineHeight: 1 }}>✨</span>;
+                                subLabel = 'Heute';
                               }
+                            } else if (day.isJoker) {
+                              bg = '#fff7ed';
+                              border = '1px solid #f97316';
+                              textColor = '#c2410c';
+                              iconElement = <Shield size={14} color="#f97316" fill="#f97316" />;
+                              subLabel = 'Joker';
+                            } else if (day.hasMastered) {
+                              bg = 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)';
+                              border = '1px solid #34a853';
+                              textColor = '#166534';
+                              iconElement = <Flame size={14} color="#34a853" fill="#34a853" />;
+                              subLabel = `${day.totalMins}m`;
+                            } else if (day.totalDaySecs > 0) {
+                              bg = '#f0fdf4';
+                              border = '1px solid #86efac';
+                              textColor = '#15803d';
+                              iconElement = <Flame size={13} color="#22c55e" />;
+                              subLabel = `${day.totalMins}m`;
+                            } else if (!day.isFuture) {
+                              bg = '#f8fafc';
+                              border = '1px solid #f1f5f9';
+                              textColor = '#94a3b8';
+                              iconElement = <span style={{ fontSize: '0.62rem', color: '#cbd5e1' }}>☕</span>;
+                              subLabel = 'Pause';
+                            }
 
-                              const timeUntilMidnight = (() => {
-                                if (!isToday) return null;
-                                const midnight = new Date();
-                                midnight.setHours(24, 0, 0, 0);
-                                const diff = midnight.getTime() - now.getTime();
-                                const hrs = Math.floor(diff / (1000 * 60 * 60));
-                                const mins = Math.floor((diff / (1000 * 60)) % 60);
-                                const secs = Math.floor((diff / 1000) % 60);
-                                return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-                              })();
-
-                              const fSeconds = group.focusSeconds;
-                              const eSeconds = group.extraSeconds;
-
-                              const focusMins = Math.floor(fSeconds / 60);
-                              const focusSecs = fSeconds % 60;
-                              const extraMins = Math.floor(eSeconds / 60);
-                              const extraSecs = eSeconds % 60;
-                              
-                              const textParts = [];
-                              if (fSeconds > 0) {
-                                if (focusSecs > 0) {
-                                  textParts.push(`Fokuszeit (+${focusMins}:${String(focusSecs).padStart(2, '0')}m)`);
-                                } else {
-                                  textParts.push(`Fokuszeit (+${focusMins}m)`);
-                                }
-                              }
-                              if (eSeconds > 0) {
-                                if (fSeconds > 0) {
-                                  if (extraSecs > 0) {
-                                    textParts.push(`+${extraMins}:${String(extraSecs).padStart(2, '0')}m (extra)`);
-                                  } else {
-                                    textParts.push(`+${extraMins}m (extra)`);
-                                  }
-                                } else {
-                                  if (extraSecs > 0) {
-                                    textParts.push(`Freie Übezeit (+${extraMins}:${String(extraSecs).padStart(2, '0')}m)`);
-                                  } else {
-                                    textParts.push(`Freie Übezeit (+${extraMins}m)`);
-                                  }
-                                }
-                              }
-                              const statusText = textParts.join(' - ');
-
-                              const cardElement = (() => {
-                                if (group.isPlaceholder) {
-                                  if (isToday) {
-                                    return (
-                                      <div 
-                                        style={{ 
-                                          background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.03) 0%, rgba(234, 179, 8, 0.01) 100%)', 
-                                          border: '1px dashed rgba(234, 179, 8, 0.25)', 
-                                          borderRadius: '16px', 
-                                          padding: '12px 14px',
-                                          display: 'flex',
-                                          flexDirection: 'row',
-                                          justifyContent: 'space-between',
-                                          alignItems: 'center',
-                                          gap: '12px',
-                                          borderLeft: `4px solid ${borderLeftColor}`,
-                                          boxShadow: '0 2px 8px rgba(234, 179, 8, 0.01)'
-                                        }}
-                                      >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1, flexWrap: 'wrap' }}>
-                                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ca8a04', fontFamily: 'monospace' }}>
-                                            {group.date}
-                                          </span>
-                                          <span style={{ 
-                                            fontSize: '0.58rem', 
-                                            fontWeight: 900, 
-                                            background: 'rgba(234, 179, 8, 0.08)', 
-                                            color: '#ca8a04', 
-                                            padding: '1px 6px', 
-                                            borderRadius: '100px', 
-                                            letterSpacing: '0.04em', 
-                                            textTransform: 'uppercase' 
-                                          }}>
-                                            Aktiv
-                                          </span>
-                                          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
-                                            - Sichere dir deinen Übe-Streak!
-                                          </span>
-                                        </div>
-                                        
-                                        {timeUntilMidnight && (
-                                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                                            <span style={{ 
-                                              fontSize: '0.68rem', 
-                                              fontWeight: 800, 
-                                              color: '#a16207', 
-                                              background: '#fef9c3',
-                                              padding: '2px 6px',
-                                              borderRadius: '6px',
-                                              display: 'inline-flex', 
-                                              alignItems: 'center', 
-                                              gap: '3px', 
-                                              fontFamily: 'monospace' 
-                                            }}>
-                                              ⏳ {timeUntilMidnight}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  } else if (isJokerDay) {
-                                    return (
-                                      <div 
-                                        style={{ 
-                                          background: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', 
-                                          border: '1px solid #c2410c', 
-                                          borderRadius: '16px', 
-                                          padding: '12px 14px',
-                                          display: 'flex',
-                                          flexDirection: 'row',
-                                          justifyContent: 'space-between',
-                                          alignItems: 'center',
-                                          gap: '12px',
-                                          boxShadow: '0 4px 12px rgba(194, 65, 12, 0.12)'
-                                        }}
-                                      >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', fontFamily: 'monospace' }}>
-                                            {group.date}
-                                          </span>
-                                          <span style={{ 
-                                            fontSize: '0.58rem', 
-                                            fontWeight: 900, 
-                                            background: 'rgba(255, 255, 255, 0.22)', 
-                                            color: '#ffffff', 
-                                            padding: '1px 6px', 
-                                            borderRadius: '100px', 
-                                            letterSpacing: '0.04em', 
-                                            textTransform: 'uppercase' 
-                                          }}>
-                                            Joker eingesetzt
-                                          </span>
-                                        </div>
-                                        
-                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                                          <Shield size={iconSize} fill="#ffffff" color="#ffffff" />
-                                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
-                                            Joker
-                                          </span>
-                                        </div>
-                                      </div>
-                                    );
-                                  } else {
-                                    const currentWeek = getISOWeek(new Date());
-                                    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                                    const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
-
-                                    return (
-                                      <div 
-                                        style={{ 
-                                          background: '#f8fafc', 
-                                          border: '1px solid #f1f5f9', 
-                                          borderRadius: '16px', 
-                                          padding: '10px 14px',
-                                          display: 'flex',
-                                          flexDirection: 'row',
-                                          justifyContent: 'space-between',
-                                          alignItems: 'center',
-                                          gap: '12px',
-                                          borderLeft: '4px solid #cbd5e1'
-                                        }}
-                                      >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                                          <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#94a3b8', fontFamily: 'monospace' }}>
-                                            {group.date}
-                                          </span>
-                                          <span style={{ 
-                                            fontSize: '0.68rem', 
-                                            fontWeight: 700, 
-                                            color: '#94a3b8',
-                                            letterSpacing: '0.01em'
-                                          }}>
-                                            Ruhetag 💤
-                                          </span>
-                                        </div>
-                                        
-                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, opacity: 0.4 }}>
-                                          <Flame 
-                                            size={iconSize - 2} 
-                                            fill="none" 
-                                            color="#94a3b8" 
-                                          />
-                                        </div>
-                                      </div>
-                                    );
-                                  }
-                                } else if (hasMastered) {
-                                  const isJustFinished = isToday && lastFinishedTimestamp && (Date.now() - lastFinishedTimestamp < 8000);
-                                  return (
-                                    <div 
-                                      style={{ 
-                                        background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', 
-                                        border: '1px solid #34a853', 
-                                        borderRadius: '16px', 
-                                        padding: '12px 14px',
-                                        display: 'flex',
-                                        flexDirection: 'row',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        gap: '12px',
-                                        boxShadow: isJustFinished ? '0 0 16px rgba(52, 168, 83, 0.6)' : '0 4px 12px rgba(19, 115, 51, 0.12)',
-                                        animation: isJustFinished ? 'logPulseGlow 2s infinite' : 'none'
-                                      }}
-                                    >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                                        {isJustFinished && (
-                                          <span style={{ 
-                                            fontSize: '0.55rem', 
-                                            fontWeight: 900, 
-                                            background: '#ffffff', 
-                                            color: '#34a853', 
-                                            padding: '2px 6px', 
-                                            borderRadius: '100px', 
-                                            letterSpacing: '0.04em',
-                                            textTransform: 'uppercase',
-                                            animation: 'pulseSoft 1.5s infinite'
-                                          }}>
-                                            Neu!
-                                          </span>
-                                        )}
-                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap' }}>
-                                          {group.date}
-                                        </span>
-                                        {statusText && (
-                                          <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#e6f4ea', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            - {statusText}
-                                          </span>
-                                        )}
-                                      </div>
-                                      
-                                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-                                        <Flame size={iconSize} fill="#ffffff" color="#ffffff" />
-                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
-                                          {group.flameLevel}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                }
-
-                                const isJustFinished = isToday && lastFinishedTimestamp && (Date.now() - lastFinishedTimestamp < 8000);
-                                return (
-                                  <div 
-                                    style={{ 
-                                      background: '#f8fafc', 
-                                      border: '1px solid #e2e8f0', 
-                                      borderRadius: '16px', 
-                                      padding: '12px 14px',
-                                      display: 'flex',
-                                      flexDirection: 'row',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'center',
-                                      gap: '12px',
-                                      borderLeft: `4px solid ${borderLeftColor}`,
-                                      boxShadow: isJustFinished ? '0 0 16px rgba(234, 179, 8, 0.6)' : 'none',
-                                      animation: isJustFinished ? 'logPulseGlowYellow 2s infinite' : 'none'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                                      {isJustFinished && (
-                                        <span style={{ 
-                                          fontSize: '0.55rem', 
-                                          fontWeight: 900, 
-                                          background: '#eab308', 
-                                          color: '#ffffff', 
-                                          padding: '2px 6px', 
-                                          borderRadius: '100px', 
-                                          letterSpacing: '0.04em',
-                                          textTransform: 'uppercase',
-                                          animation: 'pulseSoft 1.5s infinite'
-                                        }}>
-                                          Neu!
-                                        </span>
-                                      )}
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
-                                        {group.date}
-                                      </span>
-                                      {statusText && (
-                                        <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          - {statusText}
-                                        </span>
-                                      )}
-                                    </div>
-                                    
-                                    <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexShrink: 0 }}>
-                                      {isToday ? (
-                                        <>
-                                          <Clock size={13} color="#ca8a04" />
-                                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ca8a04' }}>
-                                            Noch {Math.max(1, Math.ceil((180 - totalDaySeconds) / 60))}m zur Flamme
-                                          </span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Clock size={13} color="#64748b" />
-                                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>
-                                            Geübt
-                                          </span>
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })();
-
-                              const isStreakActive = hasMastered;
-                              const activeColor = hasMastered ? '#34a853' : (totalDaySeconds > 0 ? '#ca8a04' : '#cbd5e1');
-
-
-
-                              return (
-                                <div key={idx} style={{ display: 'flex', gap: '12px', position: 'relative' }}>
-                                  {/* Left side timeline column */}
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '16px', position: 'relative', flexShrink: 0 }}>
-                                    {/* Dot/Node */}
-                                    <div style={{
-                                      width: '10px',
-                                      height: '10px',
-                                      borderRadius: '50%',
-                                      background: isStreakActive ? activeColor : '#cbd5e1',
-                                      boxShadow: isStreakActive ? `0 0 6px ${activeColor}` : 'none',
-                                      border: '2px solid #ffffff',
-                                      zIndex: 2,
-                                      marginTop: '18px'
-                                    }} />
-                                    {/* Connector line to the next item */}
-                                    {idx < month.entries.length - 1 && (
-                                      <div style={{
-                                        position: 'absolute',
-                                        top: '25px',
-                                        bottom: '-20px',
-                                        width: '2px',
-                                        borderLeft: isStreakActive ? `2px solid ${activeColor}` : '2px dashed #cbd5e1',
-                                        zIndex: 1
-                                      }} />
-                                    )}
-                                  </div>
-                                  {/* Right side card */}
-                                  <div style={{ flex: 1, minWidth: 0, paddingBottom: idx === month.entries.length - 1 ? '0' : '8px' }}>
-                                    {cardElement}
-                                  </div>
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  background: bg,
+                                  border: border,
+                                  borderRadius: '16px',
+                                  padding: '8px 2px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '2px',
+                                  minHeight: '62px',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  boxShadow: day.isToday && day.hasMastered 
+                                    ? '0 4px 12px rgba(52, 168, 83, 0.15)' 
+                                    : (day.isToday ? '0 4px 12px rgba(202, 138, 4, 0.12)' : 'none')
+                                }}
+                              >
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: textColor, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                  {day.dayName}
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '18px' }}>
+                                  {iconElement}
                                 </div>
-                              );
-                            })}
+                                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: textColor }}>
+                                  {subLabel}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Informative Footer Bar with Joker Status */}
+                        {(() => {
+                          const currentWeek = getISOWeek(now);
+                          const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+                          const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+
+                          return (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#64748b', fontWeight: 700, borderTop: '1px solid #f1f5f9', paddingTop: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                              <span>Wochenzeit: <strong style={{ color: '#1e293b' }}>{weekTotalMins} Min.</strong></span>
+                              <span 
+                                style={{ 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '4px',
+                                  background: isJokerAvailable ? '#fff7ed' : '#f1f5f9', 
+                                  border: isJokerAvailable ? '1px solid #fed7aa' : '1px solid #e2e8f0', 
+                                  color: isJokerAvailable ? '#c2410c' : '#94a3b8', 
+                                  padding: '2px 8px', 
+                                  borderRadius: '100px',
+                                  fontSize: '0.64rem',
+                                  fontWeight: 800
+                                }}
+                                title={isJokerAvailable ? 'Der Joker schützt deinen Streak automatisch bei 1 verpassten Tag pro Woche!' : 'Joker für diese Woche verbraucht. Nächster Joker ab Montag verfügbar.'}
+                              >
+                                <Shield size={11} color={isJokerAvailable ? '#ea580c' : '#94a3b8'} fill={isJokerAvailable ? '#ea580c' : 'none'} />
+                                {isJokerAvailable ? '1× Joker bereit' : 'Joker verbraucht'}
+                              </span>
+                              <span>Tagesziel: <strong style={{ color: '#34a853' }}>3 Min. am Stück</strong></span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* 🌟 TIER 2: ERFOLGS-STREAM (PURE PRAXIS-ERFOLGE) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        
+                        {/* 🏆 HEUTE-HERO-KARTE IN INDIGO-LILA (XP BELOHNUNGS-ZONE) */}
+                        {todayHasMastered ? (
+                          <div style={{
+                            background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+                            border: '1.5px solid #6366f1',
+                            borderRadius: '20px',
+                            padding: '14px 16px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            boxShadow: '0 4px 14px rgba(99, 102, 241, 0.12)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{
+                                width: '38px',
+                                height: '38px',
+                                borderRadius: '12px',
+                                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 2px 8px rgba(99, 102, 241, 0.35)'
+                              }}>
+                                <Flame size={20} color="#ffffff" fill="#ffffff" />
+                              </div>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#4338ca' }}>
+                                    Heute ({dayNamesFull[now.getDay()]})
+                                  </span>
+                                  <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#6366f1', color: '#ffffff', padding: '1px 7px', borderRadius: '100px', textTransform: 'uppercase' }}>
+                                    Gemeistert
+                                  </span>
+                                </div>
+                                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', fontWeight: 700, color: '#4f46e5' }}>
+                                  {(() => {
+                                    const focusSecs = todayGroup?.focusSeconds || (todayHasMastered ? 180 : 0);
+                                    const extraSecs = todayGroup?.extraSeconds || Math.max(0, todayTotalSecs - focusSecs);
+                                    const fMins = Math.floor(focusSecs / 60);
+                                    if (extraSecs > 0) {
+                                      const extraStr = extraSecs < 60 ? `${extraSecs} Sek.` : `${Math.floor(extraSecs / 60)} Min. ${extraSecs % 60 > 0 ? (extraSecs % 60) + ' Sek.' : ''}`.trim();
+                                      return `Tages-Flamme entfacht! 🔥 • ${fMins} Min. Fokus + ${extraStr} Frei`;
+                                    }
+                                    return `Tages-Flamme entfacht! 🔥 • ${fMins} Min. geübt`;
+                                  })()}
+                                </p>
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#4338ca', background: '#ffffff', border: '1px solid #c4b5fd', padding: '4px 10px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(99, 102, 241, 0.1)' }}>
+                              +{(() => {
+                                const extraSecs = todayGroup?.extraSeconds || Math.max(0, todayTotalSecs - 180);
+                                const extraXp = Math.floor(extraSecs / 60);
+                                return 3 + extraXp;
+                              })()} XP ⚡
+                            </span>
+                          </div>
+                        ) : (
+                          <div style={{
+                            background: 'linear-gradient(135deg, #fffbeb 0%, #fefce8 100%)',
+                            border: '1.5px dashed #ca8a04',
+                            borderRadius: '20px',
+                            padding: '14px 16px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            boxShadow: '0 2px 10px rgba(202, 138, 4, 0.06)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{
+                                width: '38px',
+                                height: '38px',
+                                borderRadius: '12px',
+                                background: '#ca8a04',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 2px 8px rgba(202, 138, 4, 0.25)'
+                              }}>
+                                <Timer size={20} color="#ffffff" />
+                              </div>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#854d0e' }}>
+                                    Heute ({dayNamesFull[now.getDay()]})
+                                  </span>
+                                  <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fef08a', color: '#854d0e', padding: '1px 6px', borderRadius: '100px', textTransform: 'uppercase' }}>
+                                    Offen
+                                  </span>
+                                </div>
+                                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', fontWeight: 700, color: '#a16207' }}>
+                                  {todayTotalSecs > 0 
+                                    ? `Bereits ${Math.round(todayTotalSecs / 60)} Min. geübt • Noch ${Math.max(1, Math.ceil((180 - todayTotalSecs) / 60))} Min. am Stück zur Flamme!`
+                                    : 'Entfache heute deine Tages-Flamme! (3 Min. am Stück) 🎯'}
+                                </p>
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e', background: '#ffffff', border: '1px solid #fde047', padding: '4px 8px', borderRadius: '10px' }}>
+                              +3 XP möglich
+                            </span>
                           </div>
                         )}
+
+                        {/* 📅 MONATS-ABSCHNITTE FÜR HISTORISCHE SESSIONS */}
+                        {sortedMonths.map((month, mIdx) => {
+                          const isExpanded = expandedMonths[month.key] !== undefined 
+                            ? expandedMonths[month.key] 
+                            : mIdx === 0;
+
+                          const toggleMonth = () => {
+                            setExpandedMonths(prev => ({
+                              ...prev,
+                              [month.key]: !isExpanded
+                            }));
+                          };
+
+                          return (
+                            <div key={month.key} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                              
+                              {/* Month Header Accordion */}
+                              <div
+                                onClick={toggleMonth}
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  background: '#f8fafc',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '16px',
+                                  padding: '10px 14px',
+                                  cursor: 'pointer',
+                                  userSelect: 'none',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <ChevronRight 
+                                    size={15} 
+                                    style={{ 
+                                      color: '#64748b', 
+                                      transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', 
+                                      transition: 'transform 0.2s ease-in-out' 
+                                    }} 
+                                  />
+                                  <span style={{ fontWeight: 850, fontSize: '0.82rem', color: '#1e293b' }}>
+                                    {month.label}
+                                  </span>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <span style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 800,
+                                    color: month.practiceDays > 0 ? '#166534' : '#64748b',
+                                    background: month.practiceDays > 0 ? '#e6f4ea' : '#f1f5f9',
+                                    border: month.practiceDays > 0 ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                    padding: '3px 8px',
+                                    borderRadius: '100px'
+                                  }}>
+                                    {month.practiceDays} {month.practiceDays === 1 ? 'Übetag' : 'Übetage'} • {month.totalMins}m
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Collapsed/Expanded List of Past Sessions */}
+                              {isExpanded && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {month.entries.length === 0 ? (
+                                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.74rem', fontStyle: 'italic', padding: '16px 10px', background: '#fafafa', borderRadius: '14px', border: '1px dashed #e2e8f0' }}>
+                                      Noch keine vergangenen Sessions in diesem Monat archiviert. 🚀
+                                    </div>
+                                  ) : (
+                                    month.entries.map((entry, eIdx) => {
+                                      const fSecs = entry.focusSeconds || 0;
+                                      const eSecs = entry.extraSeconds || 0;
+                                      const totalSecs = fSecs + eSecs;
+                                      const totalMins = Math.round(totalSecs / 60);
+                                      const xp = totalMins;
+
+                                      return (
+                                        <div
+                                          key={eIdx}
+                                          style={{
+                                            background: '#ffffff',
+                                            border: entry.hasMasteredSession ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                            borderRadius: '16px',
+                                            padding: '12px 14px',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                                            borderLeft: entry.hasMasteredSession ? '4px solid #34a853' : '4px solid #eab308'
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <div style={{
+                                              width: '32px',
+                                              height: '32px',
+                                              borderRadius: '10px',
+                                              background: entry.hasMasteredSession ? '#e6f4ea' : '#fefce8',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center'
+                                            }}>
+                                              <Flame size={16} color={entry.hasMasteredSession ? '#34a853' : '#ca8a04'} fill={entry.hasMasteredSession ? '#34a853' : 'none'} />
+                                            </div>
+                                            <div>
+                                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
+                                                {formatFriendlyDate(entry.date)}
+                                              </span>
+                                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
+                                                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#15803d' }}>
+                                                  ⏱️ {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
+                                                </span>
+                                                <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>•</span>
+                                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7' }}>
+                                                  +{xp} XP ⚡
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <span style={{
+                                            fontSize: '0.66rem',
+                                            fontWeight: 800,
+                                            color: entry.hasMasteredSession ? '#166534' : '#854d0e',
+                                            background: entry.hasMasteredSession ? '#e6f4ea' : '#fef9c3',
+                                            padding: '3px 8px',
+                                            borderRadius: '8px',
+                                            border: entry.hasMasteredSession ? '1px solid #bbf7d0' : '1px solid #fef08a'
+                                          }}>
+                                            {entry.flameLevel && entry.flameLevel !== 'Keine Flamme' ? entry.flameLevel : (entry.hasMasteredSession ? 'Gemeistert' : 'Teil-Session')}
+                                          </span>
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  });
+
+                    </div>
+                  );
                 })()}
               </div>
             )}
@@ -11312,7 +11588,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           ) : (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : '1fr 300px',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr minmax(320px, 350px)',
               gap: '24px',
               alignItems: 'start'
             }}>
@@ -11458,7 +11734,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             borderRadius: '100px',
                             border: juniorMediathekFilter === 'homework' ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
                             background: juniorMediathekFilter === 'homework' ? '#e0f2fe' : '#ffffff',
-                            color: juniorMediathekFilter === 'homework' ? '#0369a1' : '#64748b',
                             fontWeight: 850,
                             fontSize: '0.8rem',
                             cursor: 'pointer',
@@ -11479,19 +11754,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                 {/* Unified Smart Search Field */}
                 <div style={{ position: 'relative', width: '100%' }}>
-                  <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
                   <input 
-                    placeholder="Songs nach Titel/Interpret oder Lehrwerke nach Titel/Autor durchsuchen..." 
+                    placeholder="Songs oder Lehrwerke suchen…" 
                     value={songSearch}
                     onChange={e => setSongSearch(e.target.value)}
                     style={{ 
                       width: '100%', 
-                      padding: '12px 14px 12px 48px', 
+                      padding: '11px 14px 11px 44px', 
                       borderRadius: '14px', 
                       border: '1px solid #e2e8f0', 
                       background: '#f8fafc', 
                       fontWeight: 600, 
-                      fontSize: '0.92rem', 
+                      fontSize: '0.88rem', 
                       outline: 'none', 
                       transition: 'all 0.2s', 
                       boxSizing: 'border-box',
@@ -11500,7 +11775,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   />
                 </div>
 
-                {/* Apple-Style Curated Playlist Flow (1 Unified Column Feed) */}
+                {/* Apple-Style Curated Playlist Flow */}
                 {(() => {
                   const brandColor = studentUser?.schools?.brand_color || '#34a853';
                   
@@ -11531,7 +11806,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   const showLehrwerkeSection = juniorMediathekFilter === 'all' || juniorMediathekFilter === 'lehrwerke';
 
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
                       
                       {/* Apple-Music Hero Spotlight: "Deine heutige Mission" */}
                       {activeMissionSong && (
@@ -11539,28 +11814,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           onClick={() => setSelectedSongForDetail(activeMissionSong)}
                           style={{
                             background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                            borderRadius: '28px',
-                            padding: '24px',
+                            borderRadius: '22px',
+                            padding: '20px',
                             color: '#ffffff',
                             position: 'relative',
                             overflow: 'hidden',
-                            boxShadow: '0 12px 32px -4px rgba(15, 23, 42, 0.25)',
+                            boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.18)',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '16px',
+                            gap: '14px',
                             cursor: 'pointer',
-                            border: '1px solid rgba(255, 255, 255, 0.1)'
+                            border: '1px solid rgba(255, 255, 255, 0.08)'
                           }}
-                          className="hover-scale"
+                          className="hover-scale-subtle"
                         >
                           {/* Ambient glow accent */}
                           <div style={{
                             position: 'absolute',
                             top: '-30px',
                             right: '-30px',
-                            width: '180px',
-                            height: '180px',
-                            background: 'radial-gradient(circle, rgba(34, 197, 94, 0.35) 0%, transparent 70%)',
+                            width: '160px',
+                            height: '160px',
+                            background: 'radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, transparent 70%)',
                             pointerEvents: 'none'
                           }} />
 
@@ -11572,28 +11847,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               gap: '6px',
                               background: 'rgba(34, 197, 94, 0.2)',
                               color: '#4ade80',
-                              border: '1px solid rgba(34, 197, 94, 0.4)',
-                              padding: '4px 12px',
+                              border: '1px solid rgba(34, 197, 94, 0.35)',
+                              padding: '3px 10px',
                               borderRadius: '100px',
-                              fontSize: '0.72rem',
-                              fontWeight: 900,
-                              letterSpacing: '0.04em',
+                              fontSize: '0.70rem',
+                              fontWeight: 850,
+                              letterSpacing: '0.03em',
                               textTransform: 'uppercase'
                             }}>
-                              <Star size={12} fill="#4ade80" />
+                              <Star size={11} fill="#4ade80" />
                               <span>Deine heutige Mission</span>
                             </div>
-                            <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>Tippe für Details</span>
+                            <span style={{ fontSize: '0.70rem', color: '#94a3b8', fontWeight: 700 }}>Tippe für Details</span>
                           </div>
 
                           {/* Hero Main Content */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', zIndex: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', zIndex: 2 }}>
                             {renderSongVinylCover(getSongColor(activeMissionSong.title || ''), 'md')}
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <h3 style={{ margin: '0 0 4px 0', fontSize: '1.45rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                              <h3 style={{ margin: '0 0 3px 0', fontSize: '1.30rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                                 {activeMissionSong.title}
                               </h3>
-                              <p style={{ margin: 0, fontSize: '0.88rem', color: '#cbd5e1', fontWeight: 650 }}>
+                              <p style={{ margin: 0, fontSize: '0.84rem', color: '#cbd5e1', fontWeight: 650 }}>
                                 von {activeMissionSong.artist}
                               </p>
                             </div>
@@ -11612,43 +11887,43 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                               color: '#ffffff',
                               border: 'none',
-                              padding: '12px 18px',
-                              borderRadius: '14px',
-                              fontWeight: 900,
-                              fontSize: '0.88rem',
+                              padding: '10px 16px',
+                              borderRadius: '12px',
+                              fontWeight: 850,
+                              fontSize: '0.85rem',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               gap: '8px',
-                              boxShadow: '0 4px 16px rgba(34, 197, 94, 0.35)',
+                              boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
                               transition: 'all 0.2s ease'
                             }}
                           >
-                            <Play size={16} fill="white" color="white" />
+                            <Play size={14} fill="white" color="white" />
                             <span>Jetzt üben (Timer starten)</span>
                           </button>
                         </div>
                       )}
 
-                      {/* SECTION 1: SONGS PLAYLIST (Multi-Column Grid) */}
+                      {/* SECTION 1: SONGS (Balanced Auto-Fit Grid) */}
                       {showSongsSection && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Music size={16} color={brandColor} /> Songs ({filteredSongs.length})
+                            <h3 style={{ fontSize: '1.05rem', fontWeight: 850, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Music size={15} color={brandColor} /> Songs ({filteredSongs.length})
                             </h3>
                           </div>
 
                           {filteredSongs.length === 0 ? (
-                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+                            <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                               Keine Songs in dieser Auswahl gefunden.
                             </div>
                           ) : (
                             <div style={{
                               display: 'grid',
-                              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                              gap: '14px',
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                              gap: '12px',
                               width: '100%'
                             }}>
                               {filteredSongs.map(song => {
@@ -11666,20 +11941,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                                 if (progressItem) {
                                   if (progressItem.is_current_homework) {
-                                    statusColor = '#06b6d4';
-                                    statusBg = '#ecfeff';
+                                    statusColor = '#0284c7';
+                                    statusBg = '#e0f2fe';
                                     statusText = 'Aktuelle Mission';
                                   } else if (progressItem.status === 'THEORY_DONE') {
-                                    statusColor = '#a855f7';
+                                    statusColor = '#7c3aed';
                                     statusBg = '#f3e8ff';
                                     statusText = 'Theorie gelesen';
                                   } else if (progressItem.status === 'MASTERED') {
-                                    statusColor = '#34a853';
-                                    statusBg = '#e6f4ea';
+                                    statusColor = '#15803d';
+                                    statusBg = '#dcfce7';
                                     statusText = 'Meisterwerk!';
                                   } else {
-                                    statusColor = '#34a853';
-                                    statusBg = '#e6f4ea';
+                                    statusColor = '#15803d';
+                                    statusBg = '#dcfce7';
                                     statusText = 'In Arbeit';
                                   }
                                 }
@@ -11688,19 +11963,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   <div 
                                     key={song.id} 
                                     onClick={() => setSelectedSongForDetail(song)}
-                                    className="glass-panel hover-scale"
+                                    className="hover-scale-subtle"
                                     style={{ 
-                                      padding: '14px 18px', 
+                                      padding: '12px 16px', 
                                       display: 'flex', 
                                       gap: '12px',
                                       alignItems: 'center', 
-                                      background: 'white', 
-                                      borderRadius: '24px', 
-                                      border: '1px solid #e2e8f0', 
-                                      borderLeft: `5px solid ${lwColor.from}`,
-                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)', 
-                                      transition: 'all 0.2s ease',
-                                      minHeight: '92px',
+                                      background: '#ffffff', 
+                                      borderRadius: '16px', 
+                                      border: '1px solid #f1f5f9', 
+                                      boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)', 
+                                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                      minHeight: '80px',
                                       boxSizing: 'border-box',
                                       cursor: 'pointer'
                                     }}
@@ -11709,23 +11983,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     {renderSongVinylCover(lwColor, 'sm')}
 
                                     {/* Title and Artist */}
-                                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                      <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.05rem', letterSpacing: '-0.02em', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
-                                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {song.artist}</div>
+                                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                      <div style={{ fontWeight: 850, color: '#0f172a', fontSize: '0.98rem', letterSpacing: '-0.01em', lineHeight: '1.25', wordBreak: 'break-word' }}>{song.title}</div>
+                                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', lineHeight: '1.2', wordBreak: 'break-word' }}>von {song.artist}</div>
                                     </div>
 
                                     {statusText && (
                                       <span style={{
                                         background: statusBg,
                                         color: statusColor,
-                                        padding: '4px 8px',
-                                        borderRadius: '8px',
-                                        fontSize: '0.65rem',
-                                        fontWeight: 900,
+                                        padding: '3px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 850,
                                         textTransform: 'uppercase',
                                         whiteSpace: 'nowrap',
                                         alignSelf: 'center',
-                                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                                        flexShrink: 0
                                       }}>
                                         {statusText}
                                       </span>
@@ -11738,24 +12012,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>
                       )}
 
-                      {/* SECTION 2: LEHRWERKE PLAYLIST (Multi-Column Grid) */}
+                      {/* SECTION 2: LEHRWERKE (Balanced Auto-Fit Grid) */}
                       {showLehrwerkeSection && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', marginTop: showSongsSection ? '12px' : '0' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: showSongsSection ? '8px' : '0' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Library size={16} color={brandColor} /> Lehrwerke ({filteredLehrwerke.length})
+                            <h3 style={{ fontSize: '1.05rem', fontWeight: 850, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Library size={15} color={brandColor} /> Lehrwerke ({filteredLehrwerke.length})
                             </h3>
                           </div>
 
                           {filteredLehrwerke.length === 0 ? (
-                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+                            <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                               Keine Lehrwerke in dieser Auswahl gefunden.
                             </div>
                           ) : (
                             <div style={{
                               display: 'grid',
-                              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                              gap: '14px',
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                              gap: '12px',
                               width: '100%'
                             }}>
                               {filteredLehrwerke.map(item => {
@@ -11773,29 +12047,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   <div 
                                     key={item.id} 
                                     onClick={() => setSelectedLehrwerkForDetail(item)}
-                                    className="glass-panel hover-scale" 
+                                    className="hover-scale-subtle" 
                                     style={{ 
-                                      padding: '14px 18px', 
-                                      background: 'white', 
+                                      padding: '12px 16px', 
+                                      background: '#ffffff', 
                                       display: 'flex', 
                                       gap: '12px', 
                                       alignItems: 'center', 
-                                      borderRadius: '24px', 
-                                      border: '1px solid #e2e8f0', 
-                                      borderLeft: `5px solid ${gradient.from}`,
-                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+                                      borderRadius: '16px', 
+                                      border: '1px solid #f1f5f9', 
+                                      boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
                                       position: 'relative',
-                                      transition: 'all 0.2s ease',
-                                      minHeight: '92px',
+                                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                      minHeight: '80px',
                                       boxSizing: 'border-box',
                                       cursor: 'pointer'
                                     }}
                                   >
                                     <div style={{ 
-                                      width: '44px', 
-                                      height: '58px', 
+                                      width: '40px', 
+                                      height: '52px', 
                                       background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                                      borderRadius: '6px', 
+                                      borderRadius: '7px', 
                                       display: 'flex', 
                                       alignItems: 'center', 
                                       justifyContent: 'center', 
@@ -11803,21 +12076,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
                                       flexShrink: 0
                                     }}>
-                                      <BookOpen size={18} color={gradient.text} />
+                                      <BookOpen size={17} color={gradient.text} />
                                     </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
-                                      {item.author && <p style={{ margin: '0 0 2px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {item.author}</p>}
-                                      <p style={{ margin: 0, fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
+                                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.92rem', fontWeight: 850, color: '#1e293b', lineHeight: '1.25', wordBreak: 'break-word' }}>{item.title}</h4>
+                                      {item.author && <p style={{ margin: '0 0 2px 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 600, lineHeight: '1.2', wordBreak: 'break-word' }}>von {item.author}</p>}
+                                      <p style={{ margin: 0, fontSize: '0.70rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
                                       
                                       {masteredCount > 0 && (
-                                        <div style={{ marginTop: '8px' }}>
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#64748b', fontWeight: 700, marginBottom: '4px' }}>
+                                        <div style={{ marginTop: '6px' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: '#64748b', fontWeight: 700, marginBottom: '3px' }}>
                                             <span>{masteredCount} / {item.totalPages} Seiten</span>
                                             <span>{Math.round(pct * 100)}%</span>
                                           </div>
-                                          <div style={{ width: '100%', height: '5px', borderRadius: '3px', background: '#e2e8f0', overflow: 'hidden' }}>
-                                            <div style={{ width: `${Math.min(100, pct * 100)}%`, height: '100%', background: gradient.from, borderRadius: '3px' }} />
+                                          <div style={{ width: '100%', height: '4px', borderRadius: '2px', background: '#e2e8f0', overflow: 'hidden' }}>
+                                            <div style={{ width: `${Math.min(100, pct * 100)}%`, height: '100%', background: gradient.from, borderRadius: '2px' }} />
                                           </div>
                                         </div>
                                       )}
@@ -11836,34 +12109,32 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
               {/* RIGHT COLUMN: MEINE ERFOLGE WIDGET */}
               <div style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.45) 100%)',
-                backdropFilter: 'blur(24px) saturate(1.8)',
-                WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                border: '1px solid rgba(255, 255, 255, 0.5)',
-                borderRadius: '24px',
-                padding: '24px',
-                boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                background: '#ffffff',
+                border: '1px solid #f1f5f9',
+                borderRadius: '20px',
+                padding: '20px',
+                boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '20px'
+                gap: '16px'
               }}>
                 <div>
-                  <h4 style={{ fontSize: '1.05rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 900 }}>
-                    <div style={{ background: '#fef3c7', padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
-                      <Trophy size={16} color="#d97706" fill="#d97706" />
+                  <h4 style={{ fontSize: '1.02rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 850 }}>
+                    <div style={{ background: '#fef3c7', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                      <Trophy size={15} color="#d97706" fill="#d97706" />
                     </div>
                     <span>Meine Erfolge</span>
                   </h4>
-                  <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+                  <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '3px 0 0 0', fontWeight: 600 }}>
                     Deine gesammelten Meilensteine
                   </p>
                 </div>
 
                 {/* List of Mastered Songs & Lehrwerke */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   {/* Mastered Songs Section */}
                   <div>
-                    <h5 style={{ fontSize: '0.72rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h5 style={{ fontSize: '0.70rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
                       🏆 Gemeisterte Songs
                     </h5>
                     {(() => {
@@ -11935,49 +12206,49 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                       if (masteredSongsList.length === 0) {
                         return (
-                          <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                          <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
                             Noch keine Meisterwerke.
                           </div>
                         );
                       }
 
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           {masteredSongsList.map(song => {
                             const lwColor = getSongColor(song.title);
                             return (
                               <div 
                                 key={song.id || song.title} 
                                 onClick={() => setSelectedSongForDetail(song)}
-                                className="hover-scale"
+                                className="hover-scale-subtle"
                                 style={{ 
                                   display: 'flex', 
                                   alignItems: 'center', 
                                   gap: '10px', 
                                   background: '#ffffff', 
-                                  padding: '8px 12px', 
-                                  borderRadius: '14px', 
-                                  border: '1px solid #dcfce7', 
-                                  boxShadow: '0 2px 6px rgba(34, 197, 94, 0.06)',
+                                  padding: '8px 10px', 
+                                  borderRadius: '12px', 
+                                  border: '1px solid #f1f5f9', 
+                                  boxShadow: '0 1px 4px rgba(0, 0, 0, 0.02)', 
                                   cursor: 'pointer'
                                 }}
                               >
                                 {renderSongVinylCover(lwColor, 'sm')}
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <div style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a', lineHeight: '1.25', wordBreak: 'break-word' }}>
                                     {song.title}
                                   </div>
-                                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', lineHeight: '1.2', wordBreak: 'break-word', marginTop: '1px' }}>
                                     von {song.artist}
                                   </div>
                                 </div>
                                 <div style={{
                                   background: '#dcfce7',
                                   color: '#15803d',
-                                  padding: '3px 8px',
-                                  borderRadius: '6px',
-                                  fontSize: '0.65rem',
-                                  fontWeight: 900,
+                                  padding: '2px 6px',
+                                  borderRadius: '5px',
+                                  fontSize: '0.62rem',
+                                  fontWeight: 850,
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '3px',
@@ -11996,7 +12267,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                   {/* Mastered / Completed Lehrwerke Section */}
                   <div>
-                    <h5 style={{ fontSize: '0.72rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h5 style={{ fontSize: '0.70rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
                       📚 Gemeisterte Lehrwerke
                     </h5>
                     {(() => {
@@ -12016,36 +12287,36 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                       if (completedBooks.length === 0) {
                         return (
-                          <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                          <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
                             Noch keine Lehrwerke gemeistert.
                           </div>
                         );
                       }
 
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           {completedBooks.map(({ book }) => {
                             const gradient = getLehrwerkColor(book.title, lehrwerke);
-                            const cardBg = '#f5f3ff';
-                            const cardBorder = '1px solid #ddd6fe';
+                            const cardBg = '#ffffff';
+                            const cardBorder = '1px solid #f1f5f9';
 
                             return (
-                              <div key={book.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: cardBorder }}>
+                              <div key={book.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '8px 10px', borderRadius: '12px', border: cardBorder, boxShadow: '0 1px 4px rgba(0,0,0,0.02)' }}>
                                 <div style={{
-                                  width: '32px',
-                                  height: '32px',
+                                  width: '28px',
+                                  height: '34px',
                                   background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
-                                  borderRadius: '8px',
+                                  borderRadius: '6px',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   color: gradient.text,
                                   flexShrink: 0,
-                                  border: '1px solid rgba(0,0,0,0.05)'
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
                                 }}>
-                                  <BookOpen size={14} />
+                                  <BookOpen size={13} />
                                 </div>
-                                <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: '#5b21b6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 850, color: '#1e293b', lineHeight: '1.25', wordBreak: 'break-word' }}>
                                   {book.title}
                                 </div>
                               </div>
@@ -12055,7 +12326,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       );
                     })()}
                   </div>
-
 
                 </div>
               </div>
@@ -12086,7 +12356,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   : 0;
 
                 // MoM performance percentage
-                const now = new Date();
+                const now = getSimulatedNow();
                 const currentMonth = now.getMonth();
                 const currentYear = now.getFullYear();
                 const startOfCurrentMonth = new Date(currentYear, currentMonth, 1, 0, 0, 0, 0);
@@ -12096,32 +12366,34 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 const daysElapsed = now.getDate();
                 const limitOfPreviousMonth = new Date(prevYear, prevMonth, daysElapsed, now.getHours(), now.getMinutes(), now.getSeconds());
 
+                const classmateAndSelfIds = Array.from(new Set([...(classmateIds || []), studentId]));
+
                 const currentMonthMins = classFocusLogs.filter(log => {
                   if (!log.created_at) return false;
                   const d = new Date(log.created_at);
-                  const isClassmateOrSelf = classmateIds.includes(log.user_id) || log.user_id === studentId;
+                  const isClassmateOrSelf = classmateAndSelfIds.includes(log.user_id);
                   return isClassmateOrSelf && d >= startOfCurrentMonth && d <= now;
-                }).reduce((sum, log) => sum + (log.duration_minutes || 0), 0) + activeSessionMins;
+                }).reduce((sum, log) => sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0)), 0) + activeSessionMins;
 
                 const previousMonthMins = classFocusLogs.filter(log => {
                   if (!log.created_at) return false;
                   const d = new Date(log.created_at);
-                  const isClassmateOrSelf = classmateIds.includes(log.user_id) || log.user_id === studentId;
+                  const isClassmateOrSelf = classmateAndSelfIds.includes(log.user_id);
                   return isClassmateOrSelf && d >= startOfPreviousMonth && d <= limitOfPreviousMonth;
-                }).reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+                }).reduce((sum, log) => sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0)), 0);
 
                 const momPercent = previousMonthMins > 0
                   ? Math.round(((currentMonthMins - previousMonthMins) / previousMonthMins) * 100)
                   : (currentMonthMins > 0 ? 100 : 0);
 
                 // Weekly activity rate
-                const startOfWeek = new Date();
+                const startOfWeek = new Date(now);
                 const day = startOfWeek.getDay();
                 const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
                 startOfWeek.setDate(diff);
                 startOfWeek.setHours(0, 0, 0, 0);
 
-                const activeThisWeekCount = (classmateIds || []).filter(id => {
+                const activeThisWeekCount = classmateAndSelfIds.filter(id => {
                   return classFocusLogs.some(log => {
                     if (!log.created_at) return false;
                     const d = new Date(log.created_at);
@@ -12129,8 +12401,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   });
                 }).length;
 
-                const activityRate = classCount > 0
-                  ? Math.round((activeThisWeekCount / classCount) * 100)
+                const effectiveClassCount = Math.max(classCount, classmateAndSelfIds.length);
+                const activityRate = effectiveClassCount > 0
+                  ? Math.round((activeThisWeekCount / effectiveClassCount) * 100)
                   : 0;
 
                 const pieData = liveClassMins === 0 && otherClassMins === 0 
@@ -12477,7 +12750,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </div>
 
                   {(() => {
-                    const now = new Date();
+                    const now = getSimulatedNow();
                     const currentMonth = now.getMonth();
                     const startYear = currentMonth >= 8 ? now.getFullYear() : now.getFullYear() - 1;
                     const monthsList = [
@@ -12495,6 +12768,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       { month: 7, label: 'Aug', year: startYear + 1 }
                     ];
 
+                    const classmateAndSelfIds = Array.from(new Set([...(classmateIds || []), studentId]));
+
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
@@ -12502,7 +12777,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             const logsForMonth = classFocusLogs.filter(log => {
                               if (!log.created_at) return false;
                               const logDate = new Date(log.created_at);
-                              const isClassmateOrSelf = (classmateIds || []).includes(log.user_id) || log.user_id === studentId;
+                              const isClassmateOrSelf = classmateAndSelfIds.includes(log.user_id);
                               return isClassmateOrSelf && logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
                             });
                             let totalSecs = logsForMonth.reduce((sum, log) => {
@@ -12651,6 +12926,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             initialStreak={avatar?.streak_flame || 0}
             initialPracticeMinutes={totalFocusMinutes || 0}
             initialMasteredSongsCount={songStats?.masteredCount || 0}
+            hasTresorStorage={checkIsAudioTresorActive(studentUser)}
           />
         )}
       </div>
@@ -12970,13 +13246,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   {/* ========================================================================= */}
                   {(() => {
                     let nextStickerTitle = 'Fleiß-Pionier';
-                    let nextStickerDesc = `Noch ${Math.max(1, 50 - totalFocusMinutes)} Min. Üben für deinen 1. Meilenstein! 🐝✨`;
+                    let nextStickerDesc = `Noch ${Math.max(1, 20 - totalFocusMinutes)} Min. Üben für deinen 1. Meilenstein! 🐝✨`;
                     let nextStickerEmoji = '🐝';
                     let nextStickerId = 'fleiss-pionier';
 
-                    if (totalFocusMinutes < 50) {
+                    if (totalFocusMinutes < 20) {
                       nextStickerTitle = 'Fleiß-Pionier';
-                      nextStickerDesc = `Noch ${Math.max(1, 50 - totalFocusMinutes)} Min. Üben für deinen 1. Meilenstein! 🐝`;
+                      nextStickerDesc = `Noch ${Math.max(1, 20 - totalFocusMinutes)} Min. Üben für deinen 1. Meilenstein! 🐝`;
                       nextStickerEmoji = '🐝';
                       nextStickerId = 'fleiss-pionier';
                     } else if ((avatar?.streak_flame || 0) < 3) {
@@ -12984,9 +13260,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       nextStickerDesc = `Noch ${3 - (avatar?.streak_flame || 0)} Tage Streak bis zum Disziplin-Sticker! 🔥`;
                       nextStickerEmoji = '🔥';
                       nextStickerId = 'dranbleiber';
-                    } else if (totalFocusMinutes < 250) {
+                    } else if (totalFocusMinutes < 100) {
                       nextStickerTitle = 'Übe-Meister';
-                      nextStickerDesc = `Noch ${Math.max(1, 250 - totalFocusMinutes)} Min. bis zum seltenen Sticker! 🦉`;
+                      nextStickerDesc = `Noch ${Math.max(1, 100 - totalFocusMinutes)} Min. bis zum seltenen Sticker! 🦉`;
                       nextStickerEmoji = '🦉';
                       nextStickerId = 'uebe-meister';
                     } else if ((avatar?.streak_flame || 0) < 7) {
@@ -12994,9 +13270,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       nextStickerDesc = `Noch ${7 - (avatar?.streak_flame || 0)} Tage Streak bis zum Wochen-Held! 📆`;
                       nextStickerEmoji = '📆';
                       nextStickerId = 'wochen-held';
-                    } else if (totalFocusMinutes < 1000) {
+                    } else if (totalFocusMinutes < 500) {
                       nextStickerTitle = 'Übe-Legende';
-                      nextStickerDesc = `Noch ${Math.max(1, 1000 - totalFocusMinutes)} Min. bis zum epischen Meilenstein! 👑`;
+                      nextStickerDesc = `Noch ${Math.max(1, 500 - totalFocusMinutes)} Min. bis zum epischen Meilenstein! 👑`;
                       nextStickerEmoji = '👑';
                       nextStickerId = 'uebe-legende';
                     } else {
@@ -16698,18 +16974,45 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                          <span style={{ 
-                            fontSize: '1.6rem', 
-                            fontWeight: 950, 
-                            fontFamily: "'Plus Jakarta Sans', sans-serif", 
-                            letterSpacing: '-0.02em',
-                            color: 'white'
-                          }}>
-                            {totalPracticeMinutes || 0}
-                          </span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
-                            Minuten
-                          </span>
+                          {(() => {
+                            const dbSecs = (fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                            const liveSecs = sessionActive ? secondsElapsed : 0;
+                            const totalSecs = Math.max(dbSecs + liveSecs, (totalPracticeMinutes || 0) * 60);
+                            if (totalSecs > 0 && totalSecs < 60) {
+                              return (
+                                <>
+                                  <span style={{ 
+                                    fontSize: '1.6rem', 
+                                    fontWeight: 950, 
+                                    fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                                    letterSpacing: '-0.02em',
+                                    color: 'white'
+                                  }}>
+                                    {Math.round(totalSecs)}
+                                  </span>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+                                    Sek.
+                                  </span>
+                                </>
+                              );
+                            }
+                            return (
+                              <>
+                                <span style={{ 
+                                  fontSize: '1.6rem', 
+                                  fontWeight: 950, 
+                                  fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                                  letterSpacing: '-0.02em',
+                                  color: 'white'
+                                }}>
+                                  {Math.floor(totalSecs / 60)}
+                                </span>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+                                  Min.
+                                </span>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     )}
@@ -19752,6 +20055,151 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             <QRCodeModal user={studentUser} activePlatform="campus" onClose={() => setShowOwnQr(false)} />
           )}
 
+          {/* 📦 Student Audio-Tresor Termination Backup Notice & 1-Click ZIP Exporter */}
+          {(() => {
+            const schoolObj = studentUser?.schools || (studentUser as any)?.school;
+            let overridesData: any = {};
+            try {
+              const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+              const allOverrides = JSON.parse(overridesStr);
+              const sId = studentUser?.school_id || schoolObj?.id;
+              if (sId && allOverrides[sId]) overridesData = allOverrides[sId];
+            } catch (e) {}
+
+            const termStatus = overridesData.storage_termination_status ?? schoolObj?.storage_termination_status;
+            const termDeadline = overridesData.storage_termination_deadline ?? schoolObj?.storage_termination_deadline;
+            const isBackupDownloaded = localStorage.getItem(`campus_storage_backup_downloaded_${studentId}`) === 'true';
+            const isDismissedForSession = sessionStorage.getItem(`campus_storage_backup_dismissed_${studentId}`) === 'true';
+
+            if (termStatus !== 'active_grace_period' || isBackupDownloaded || isDismissedForSession) {
+              return null;
+            }
+
+            const deadlineFormatted = termDeadline ? new Date(termDeadline).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : 'demnächst';
+
+            return (
+              <div style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(15, 23, 42, 0.65)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px'
+              }}>
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '28px',
+                  width: '100%',
+                  maxWidth: '520px',
+                  padding: '32px',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
+                  border: '1.5px solid #e2e8f0',
+                  textAlign: 'center',
+                  boxSizing: 'border-box'
+                }}>
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '20px',
+                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px auto',
+                    boxShadow: '0 8px 20px rgba(245, 158, 11, 0.2)'
+                  }}>
+                    <span style={{ fontSize: '2rem' }}>📦</span>
+                  </div>
+
+                  <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0' }}>
+                    Audio-Tresor Umstellung
+                  </h3>
+
+                  <p style={{ fontSize: '0.86rem', color: '#475569', lineHeight: 1.5, margin: '0 0 20px 0' }}>
+                    Deine Musikschule stellt den Cloud-Audio-Tresor zum <strong style={{ color: '#0f172a' }}>{deadlineFormatted}</strong> um.
+                    Sichere dir jetzt alle deine persönlichen Songs, Loops und Meisterwerke mit einem Klick als geordnetes ZIP-Archiv auf dein Gerät!
+                  </p>
+
+                  {/* Folder Preview Box */}
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '14px 18px',
+                    textAlign: 'left',
+                    marginBottom: '24px',
+                    fontSize: '0.78rem',
+                    color: '#334155'
+                  }}>
+                    <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>📁 Enthaltene Ordner in deiner ZIP-Datei:</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: '#64748b' }}>
+                      <span>⭐ <strong>/Meisterwerke</strong> (Konzerte &amp; Audio-Biografie)</span>
+                      <span>🎛️ <strong>/Loopstation</strong> (Deine eigenen Beats &amp; Jam-Tracks)</span>
+                      <span>🎙️ <strong>/Hausaufgaben</strong> (Unterrichts- &amp; Übungs-Aufnahmen)</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await downloadStudentAudioBackup({
+                            studentId: studentId || (studentUser as any)?.id,
+                            studentName: `${studentUser?.first_name || ''} ${studentUser?.last_name || ''}`.trim()
+                          });
+                          alert(`✅ Dein Audio-Archiv wurde erfolgreich heruntergeladen (${res.count} Aufnahmen gesichert)!`);
+                        } catch (e: any) {
+                          alert('Fehler beim Download: ' + e.message);
+                        }
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '16px',
+                        padding: '14px 20px',
+                        fontWeight: 850,
+                        fontSize: '0.92rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 8px 20px rgba(5, 150, 105, 0.25)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <span>💾 Alle meine Aufnahmen herunterladen (ZIP)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sessionStorage.setItem(`campus_storage_backup_dismissed_${studentId}`, 'true');
+                        window.dispatchEvent(new Event('storage_backup_dismissed'));
+                      }}
+                      style={{
+                        background: 'transparent',
+                        color: '#64748b',
+                        border: 'none',
+                        padding: '10px',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Später erinnern • Weiter zum Dashboard
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Profile Edit Overlay Modal */}
           {showEditProfile && editingProfile && (
             <div style={{
@@ -20878,9 +21326,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           .map(([numStr, details]) => ({ num: parseInt(numStr, 10), ...details }))
           .sort((a, b) => a.num - b.num);
 
+        const activeCount = sortedPages.length;
         const masteredCount = sortedPages.filter(p => p.status === 'MASTERED').length;
         const totalPages = book.totalPages || 50;
-        const pct = totalPages > 0 ? (masteredCount / totalPages) : 0;
+        const pctActive = activeCount > 0 ? (masteredCount / activeCount) : 0;
 
         return (
           <div style={{
@@ -20897,23 +21346,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           }}>
             <div style={{
               background: '#ffffff',
-              borderRadius: '32px',
+              borderRadius: '28px',
               width: '100%',
-              maxWidth: '920px',
+              maxWidth: '880px',
               maxHeight: '90vh',
-              boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
+              boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.20)',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              border: '1px solid rgba(226, 232, 240, 0.8)',
+              border: '1px solid #f1f5f9',
               position: 'relative'
             }} className="animation-slide-up">
               
-              {/* Header - Clean White Apple Header */}
+              {/* Header - Clean Apple Style */}
               <div style={{
-                padding: '20px 28px',
+                padding: '18px 24px',
                 background: '#ffffff',
-                borderBottom: '1px solid #e2e8f0',
+                borderBottom: '1px solid #f1f5f9',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -20924,7 +21373,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     width: '36px',
                     height: '36px',
                     borderRadius: '10px',
-                    background: `${gradient.from}20`,
+                    background: `${gradient.from}18`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -20933,127 +21382,128 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     <BookOpen size={18} />
                   </div>
                   <div>
-                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
                       {book.title}
                     </h2>
-                    {book.author && (
-                      <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 650 }}>
-                        von {book.author}
-                      </p>
-                    )}
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                      {book.author ? `von ${book.author} · ` : ''}📖 {totalPages} Seiten Gesamtumfang
+                    </p>
                   </div>
                 </div>
 
                 <button
                   onClick={() => setSelectedLehrwerkForDetail(null)}
                   style={{
-                    background: '#f1f5f9',
-                    border: 'none',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '50%',
-                    width: '34px',
-                    height: '34px',
+                    width: '32px',
+                    height: '32px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
                     color: '#64748b',
-                    transition: 'all 0.18s ease'
+                    transition: 'all 0.15s ease'
                   }}
-                  className="hover-scale"
+                  className="hover-scale-subtle"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
 
-              {/* Inside Content: Left Hero Card + Right Pages Flow */}
+              {/* Inside Content: Left Stage + Right Pages Flow */}
               <div style={{
                 display: 'flex',
                 flex: 1,
                 overflowY: 'auto',
-                padding: '24px 28px',
+                padding: '24px',
                 gap: '24px',
                 flexDirection: isMobile ? 'column' : 'row'
               }}>
                 
-                {/* Left Column (3D Book Artwork & Progress Stage) */}
+                {/* Left Column (Stage & Progress Card) */}
                 <div style={{
-                  flex: isMobile ? 'none' : '0 0 320px',
+                  flex: isMobile ? 'none' : '0 0 280px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '18px'
+                  gap: '16px'
                 }}>
                   <div style={{
                     background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '24px',
-                    padding: '24px',
+                    border: '1px solid #f1f5f9',
+                    borderRadius: '20px',
+                    padding: '20px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     textAlign: 'center',
                     gap: '14px'
                   }}>
-                    {/* 3D Bookcover Artwork */}
+                    {/* 3D Book Artwork */}
                     <div style={{ 
-                      width: '100px', 
-                      height: '135px', 
+                      width: '90px', 
+                      height: '120px', 
                       background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
                       borderRadius: '10px', 
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center', 
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                      borderLeft: '4px solid rgba(255,255,255,0.4)'
+                      boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
+                      borderLeft: '4px solid rgba(255,255,255,0.4)',
+                      flexShrink: 0
                     }}>
-                      <BookOpen size={42} color={gradient.text} />
+                      <BookOpen size={36} color={gradient.text} />
                     </div>
 
                     <div>
-                      <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                      <h3 style={{ margin: '0 0 3px 0', fontSize: '1.10rem', fontWeight: 850, color: '#0f172a', wordBreak: 'break-word' }}>
                         {book.title}
                       </h3>
-                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 750 }}>
-                        📖 {book.totalPages || 50} Seiten Gesamtumfang
-                      </span>
+                      {book.author && (
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                          von {book.author}
+                        </p>
+                      )}
                     </div>
 
                     {/* Progress Card */}
                     <div style={{
                       width: '100%',
                       background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '16px',
-                      padding: '16px',
+                      border: '1px solid #f1f5f9',
+                      borderRadius: '14px',
+                      padding: '14px',
                       boxSizing: 'border-box',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '10px'
+                      gap: '8px'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>Fortschritt</span>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>Unterrichts-Fortschritt</span>
                         <span style={{
                           background: '#dcfce7',
                           color: '#15803d',
-                          padding: '2px 8px',
+                          padding: '2px 7px',
                           borderRadius: '6px',
-                          fontSize: '0.72rem',
-                          fontWeight: 900
+                          fontSize: '0.68rem',
+                          fontWeight: 850
                         }}>
-                          {Math.round(pct * 100)}%
+                          {Math.round(pctActive * 100)}%
                         </span>
                       </div>
 
-                      <div style={{ width: '100%', height: '8px', borderRadius: '4px', background: '#e2e8f0', overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.min(100, pct * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)', borderRadius: '4px', transition: 'width 0.3s ease' }} />
+                      <div style={{ width: '100%', height: '6px', borderRadius: '3px', background: '#f1f5f9', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(100, pctActive * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)', borderRadius: '3px', transition: 'width 0.3s ease' }} />
                       </div>
 
-                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
-                        {masteredCount} von {book.totalPages || 50} Seiten gemeistert
+                      <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 650 }}>
+                        {masteredCount} von {activeCount} aktiven Seiten gemeistert
                       </span>
                     </div>
                   </div>
 
-                  {/* Action CTA Button */}
+                  {/* Primary CTA Button */}
                   <button
                     onClick={() => {
                       setSelectedTopic(book.title);
@@ -21065,116 +21515,149 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                       color: '#ffffff',
                       border: 'none',
-                      padding: '16px 20px',
-                      borderRadius: '18px',
-                      fontWeight: 950,
-                      fontSize: '0.92rem',
+                      padding: '13px 18px',
+                      borderRadius: '14px',
+                      fontWeight: 850,
+                      fontSize: '0.86rem',
                       cursor: 'pointer',
-                      boxShadow: '0 8px 22px rgba(34, 197, 94, 0.28)',
+                      boxShadow: '0 4px 14px rgba(34, 197, 94, 0.28)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.15s ease'
                     }}
-                    className="hover-scale"
+                    className="hover-scale-subtle"
                   >
-                    <Play size={17} fill="white" color="white" />
-                    <span>An diesem Lehrwerk üben (Timer starten)</span>
+                    <Play size={15} fill="white" color="white" />
+                    <span>Gesamtes Lehrwerk üben</span>
                   </button>
                 </div>
 
-                {/* Right Column: Hausaufgabenheft Editorial Flow */}
+                {/* Right Column: Editorial Page Cards with 1-Click Practice */}
                 <div style={{
                   flex: 1,
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '24px',
-                  padding: '24px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '14px',
+                  gap: '12px',
                   overflowY: 'auto'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CheckCircle size={16} color="#34a853" /> Aufgaben & Buchseiten
-                    </h3>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 750 }}>
-                      {sortedPages.length} {sortedPages.length === 1 ? 'Eintrag' : 'Einträge'}
-                    </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '0.96rem', fontWeight: 850, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CheckCircle size={15} color="#34a853" /> Aktive Buchseiten ({sortedPages.length})
+                      </h3>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                        Tippe auf eine Seite, um gezielt dafür zu üben.
+                      </p>
+                    </div>
                   </div>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {sortedPages.map((page) => {
-                      let badgeBg = '#e6f4ea';
-                      let badgeColor = '#15803d';
+                      let badgeBg = '#f8fafc';
+                      let badgeColor = '#64748b';
                       let badgeText = 'In Arbeit';
 
                       if (page.status === 'THEORY_DONE') {
                         badgeBg = '#f3e8ff';
-                        badgeColor = '#6b21a8';
+                        badgeColor = '#7c3aed';
                         badgeText = 'Theorie gelesen';
                       } else if (page.status === 'MASTERED') {
                         badgeBg = '#dcfce7';
                         badgeColor = '#15803d';
-                        badgeText = '✓ Geschafft!';
+                        badgeText = '✓ Gemeistert';
                       }
 
                       return (
                         <div key={page.num} style={{
                           background: '#ffffff',
-                          border: '1px solid #e2e8f0',
-                          padding: '14px 18px',
-                          borderRadius: '18px',
+                          border: '1px solid #f1f5f9',
+                          padding: '14px 16px',
+                          borderRadius: '16px',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '8px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                          boxShadow: '0 2px 6px -1px rgba(0,0,0,0.03)'
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                               <span style={{
                                 background: '#dcfce7',
                                 color: '#15803d',
-                                padding: '3px 10px',
+                                padding: '3px 9px',
                                 borderRadius: '100px',
-                                fontSize: '0.78rem',
-                                fontWeight: 900
+                                fontSize: '0.75rem',
+                                fontWeight: 850,
+                                flexShrink: 0
                               }}>
                                 S. {page.num}
                               </span>
-                              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
-                                Buchseite {page.num}
+                              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', wordBreak: 'break-word' }}>
+                                Seite {page.num}
                               </span>
                             </div>
 
-                            <span style={{
-                              background: badgeBg,
-                              color: badgeColor,
-                              padding: '3px 10px',
-                              borderRadius: '8px',
-                              fontSize: '0.68rem',
-                              fontWeight: 900,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.02em'
-                            }}>
-                              {badgeText}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                              <span style={{
+                                background: badgeBg,
+                                color: badgeColor,
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.66rem',
+                                fontWeight: 850,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.02em'
+                              }}>
+                                {badgeText}
+                              </span>
+
+                              {/* 1-Click Action Button for this specific page */}
+                              <button
+                                onClick={() => {
+                                  setSelectedTopic(`${book.title} - Seite ${page.num}`);
+                                  setSelectedLehrwerkForDetail(null);
+                                  handleTabChangeLocal('practice');
+                                }}
+                                style={{
+                                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  padding: '5px 12px',
+                                  borderRadius: '100px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 850,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  boxShadow: '0 2px 6px rgba(34, 197, 94, 0.25)',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                className="hover-scale-subtle"
+                              >
+                                <Play size={11} fill="white" color="white" />
+                                <span>Üben</span>
+                              </button>
+                            </div>
                           </div>
 
                           {page.notes && (
                             <div style={{
                               background: '#f0fdf4',
-                              border: '1px solid #bbf7d0',
+                              border: '1px solid #dcfce7',
                               padding: '8px 12px',
                               borderRadius: '10px',
-                              fontSize: '0.78rem',
+                              fontSize: '0.76rem',
                               color: '#166534',
                               fontWeight: 650,
-                              lineHeight: 1.4
+                              lineHeight: 1.4,
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '6px'
                             }}>
-                              💡 <strong>Tipp der Lehrkraft:</strong> {page.notes}
+                              <span>💡</span>
+                              <span><strong>Tipp der Lehrkraft:</strong> {page.notes}</span>
                             </div>
                           )}
                         </div>
@@ -21186,11 +21669,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         padding: '32px 20px',
                         textAlign: 'center',
                         color: '#94a3b8',
-                        fontSize: '0.85rem',
+                        fontSize: '0.82rem',
                         fontStyle: 'italic',
-                        background: '#ffffff',
-                        borderRadius: '18px',
-                        border: '1px dashed #cbd5e1'
+                        background: '#f8fafc',
+                        borderRadius: '16px',
+                        border: '1px solid #f1f5f9'
                       }}>
                         Hier sind aktuell noch keine einzelnen Seiten eingetragen.
                       </div>
@@ -22712,6 +23195,381 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           </div>
         );
       })()}
+      {/* Live Match Celebration Modal Portal */}
+      {matchCelebrationData && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10006,
+            background: 'rgba(9, 9, 11, 0.82)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            color: '#ffffff',
+            fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
+            animation: 'fadeIn 0.25s ease'
+          }}
+        >
+          <Confetti width={typeof window !== 'undefined' ? window.innerWidth : 400} height={typeof window !== 'undefined' ? window.innerHeight : 800} recycle={false} numberOfPieces={280} gravity={0.22} />
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '420px',
+              background: 'linear-gradient(180deg, #18181b 0%, #09090b 100%)',
+              border: '2px solid rgba(52, 168, 83, 0.45)',
+              borderRadius: '28px',
+              padding: '32px 24px',
+              textAlign: 'center',
+              boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.8), 0 0 50px rgba(52, 168, 83, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '18px',
+              position: 'relative'
+            }}
+          >
+            <div style={{
+              fontSize: '0.72rem',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: '#86efac',
+              background: 'rgba(34, 197, 94, 0.15)',
+              padding: '4px 14px',
+              borderRadius: '99px',
+              border: '1px solid rgba(34, 197, 94, 0.3)'
+            }}>
+              ✨ Live aus deinem Unterricht
+            </div>
+
+            <div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 950, color: '#ffffff', letterSpacing: '-0.02em' }}>
+                Song-Match geprüft! 🎯
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: '#a1a1aa', lineHeight: 1.4 }}>
+                Deine Lehrkraft hat dein Können für <strong style={{ color: '#ffffff' }}>{matchCelebrationData.songTitle}</strong> gematcht!
+              </p>
+            </div>
+
+            {/* Holographic 3-Tier Sticker Card */}
+            <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <MeisterOhrSticker
+                matchedAt={matchCelebrationData.matchedAt}
+                teacherPercent={matchCelebrationData.teacherPercent}
+                studentPercent={matchCelebrationData.studentPercent}
+                xpAmount={matchCelebrationData.xpAmount}
+                isCompact={false}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setMatchCelebrationData(null)}
+              style={{
+                width: '100%',
+                border: 'none',
+                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                color: '#ffffff',
+                padding: '14px',
+                borderRadius: '16px',
+                fontSize: '0.94rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(22, 163, 74, 0.45)',
+                transition: 'all 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+              className="hover-scale"
+            >
+              <Sparkles size={18} />
+              <span>🚀 Weiter rocken!</span>
+            </button>
+          </div>
+        </div>
+      , document.body)}
+
+      {/* Celebration / Success Logbook Overlay */}
+      {showCelebration && celebrationDetails && createPortal(
+        (() => {
+          const exactSecs = celebrationDetails.exactSeconds ?? ((celebrationDetails.sessionMinutes ?? 0) * 60);
+          const targetMins = celebrationDetails.dailyGoal || 3;
+          const targetSecs = targetMins * 60;
+          const isGoalReached = Boolean(celebrationDetails.sessionCompletedTarget);
+          const remainingSecs = Math.max(0, targetSecs - exactSecs);
+          const isFlow = exactSecs >= targetSecs + 90;
+
+          const formatSecs = (s: number) => {
+            if (s < 60) return `${s} Sek.`;
+            const m = Math.floor(s / 60);
+            const rem = s % 60;
+            return rem > 0 ? `${m}:${String(rem).padStart(2, '0')} Min.` : `${m} Min.`;
+          };
+
+          let celebrationTitle = "Der erste Schritt sitzt!";
+          let celebrationSubtitle = `Dein Gehirn und deine Finger lernen ab der 1. Sekunde. Noch ${formatSecs(remainingSecs)} bis zur Tages-Flamme! 🔥`;
+
+          if (isFlow) {
+            celebrationTitle = "Voller Flow & Spielfreude! 🚀";
+            celebrationSubtitle = `Du warst voll im Sound – ${formatSecs(exactSecs)} pure Hingabe! ✨`;
+          } else if (isGoalReached) {
+            celebrationTitle = "Tages-Flamme entfacht! 🔥";
+            celebrationSubtitle = `${targetMins} Minuten voller Fokus. Genau dieses tägliche Dranbleiben macht dich meisterhaft! 🏆`;
+          }
+
+          return (
+            <div 
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 10003, // Topmost layer
+                background: 'rgba(15, 23, 42, 0.45)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+                color: '#1e293b',
+                userSelect: 'none',
+                fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif'
+              }}
+            >
+              <div style={{
+                width: '100%',
+                maxWidth: '380px',
+                background: '#ffffff',
+                border: '1px solid rgba(226, 232, 240, 0.9)',
+                borderRadius: '32px',
+                padding: '34px 24px',
+                textAlign: 'center',
+                boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1), 0 0 40px rgba(52, 168, 83, 0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '22px',
+                position: 'relative'
+              }}>
+                {/* Animated Progress Ring Container */}
+                <div style={{ position: 'relative', width: '136px', height: '136px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+                  {/* Canvas for Particle Explosion */}
+                  <canvas
+                    ref={celebrationCanvasRef}
+                    width={320}
+                    height={320}
+                    style={{
+                      position: 'absolute',
+                      top: '-92px',
+                      left: '-92px',
+                      width: '320px',
+                      height: '320px',
+                      pointerEvents: 'none',
+                      zIndex: 10
+                    }}
+                  />
+
+                  {/* SVG circular progress bar */}
+                  <svg width="136" height="136" viewBox="0 0 160 160" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r="70"
+                      fill="transparent"
+                      stroke="#f1f5f9"
+                      strokeWidth="8"
+                    />
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r="70"
+                      fill="transparent"
+                      stroke="url(#celebrationProgressGrad)"
+                      strokeWidth="8"
+                      strokeDasharray="439.82"
+                      strokeDashoffset={439.82 - 439.82 * celebrationRingProgress}
+                      strokeLinecap="round"
+                      style={{
+                        transition: 'stroke-dashoffset 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        filter: 'drop-shadow(0 2px 6px rgba(52, 168, 83, 0.35))'
+                      }}
+                    />
+                    <defs>
+                      <linearGradient id="celebrationProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#34a853" />
+                        <stop offset="100%" stopColor="#22c55e" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+
+                  {/* Flame Icon & Streak Count in Center */}
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 5
+                  }}>
+                    <Flame
+                      size={34}
+                      color="#ea580c"
+                      fill="#ea580c"
+                      style={{
+                        filter: 'drop-shadow(0 2px 8px rgba(234, 88, 12, 0.45))',
+                        transform: 'scale(1)',
+                        animation: 'pulse 2s infinite ease-in-out'
+                      }}
+                    />
+                    <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#1e293b', marginTop: '1px', lineHeight: 1 }}>
+                      {celebrationDetails.streakFlame && celebrationDetails.streakFlame > 0 ? celebrationDetails.streakFlame : '1.'}
+                    </span>
+                    <span style={{ fontSize: '0.54rem', fontWeight: 900, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '2px' }}>
+                      {celebrationDetails.streakFlame && celebrationDetails.streakFlame > 0 ? 'Tage Streak' : 'Tag im Anflug'}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 style={{ fontSize: '1.58rem', fontWeight: 900, color: '#166534', margin: '0 0 6px 0', letterSpacing: '-0.03em' }}>
+                    {celebrationTitle}
+                  </h3>
+                  <p style={{ fontSize: '0.86rem', color: '#64748b', fontWeight: 600, lineHeight: 1.48, margin: 0, maxWidth: '320px' }}>
+                    {celebrationSubtitle}
+                  </p>
+                </div>
+
+                {/* Modern 3-Pill Grid (Light Mode) */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '8px',
+                  width: '100%'
+                }}>
+                  {/* Pill 1: Fokus-Zeit */}
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '20px',
+                    padding: '13px 6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
+                  }}>
+                    <Timer size={18} color="#34a853" />
+                    <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1 }}>
+                      {formatSecs(exactSecs)}
+                    </span>
+                    <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Fokus-Zeit
+                    </span>
+                  </div>
+
+                  {/* Pill 2: XP / Erfahrung */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                    border: '1px solid #bae6fd',
+                    borderRadius: '20px',
+                    padding: '13px 6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.06)'
+                  }}>
+                    <Zap size={18} color="#0284c7" />
+                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0284c7', lineHeight: 1.1 }}>
+                      {exactSecs < 60 ? '1. XP ab 1m' : `+${celebrationDetails.xpGained} XP`}
+                    </span>
+                    <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {exactSecs < 60 ? `Noch ${60 - exactSecs}s 🚀` : 'Erfahrung ✨'}
+                    </span>
+                  </div>
+
+                  {/* Pill 3: Ziel & Ø-Schnitt */}
+                  <div style={{
+                    background: isGoalReached ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+                    border: isGoalReached ? '1px solid #86efac' : '1px solid #fde047',
+                    borderRadius: '20px',
+                    padding: '13px 6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
+                  }}>
+                    <Target size={18} color={isGoalReached ? "#15803d" : "#ca8a04"} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 900, color: isGoalReached ? '#15803d' : '#854d0e', lineHeight: 1.1 }}>
+                      {isGoalReached ? 'Ziel erreicht!' : `Noch ${formatSecs(remainingSecs)}`}
+                    </span>
+                    <span style={{ fontSize: '0.52rem', fontWeight: 800, color: isGoalReached ? '#166534' : '#a16207', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                      Ø {personalAverageMinutes}m • {targetMins}m Ziel
+                    </span>
+                  </div>
+                </div>
+
+                {celebrationDetails.usedJokerThisSession && (
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#c2410c',
+                    fontWeight: 700,
+                    background: '#fff7ed',
+                    border: '1px solid #fed7aa',
+                    padding: '8px 12px',
+                    borderRadius: '14px',
+                    width: '100%'
+                  }}>
+                    🎯 Joker eingesetzt – dein Streak von {celebrationDetails.streak} Tagen gerettet!
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setShowCelebration(false);
+                    setLastSelectedMood(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #34a853 0%, #22c55e 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '16px 20px',
+                    borderRadius: '20px',
+                    fontWeight: 900,
+                    fontSize: '0.98rem',
+                    letterSpacing: '-0.01em',
+                    cursor: 'pointer',
+                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 25px -4px rgba(52, 168, 83, 0.4)',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                  className="hover-scale"
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  <Sparkles size={18} />
+                  <span>Super, weiter geht's!</span>
+                </button>
+              </div>
+            </div>
+          );
+        })()
+      , document.body)}
+
       <TourComponent />
     </div>
   );

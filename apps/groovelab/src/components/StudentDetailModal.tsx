@@ -8,7 +8,7 @@ import {
 } from 'recharts';
 
 import { renderInstrumentIcon } from '../utils/instruments';
-import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 import { IDBadgeCard } from './IDBadgeCard';
 import { StudentPinResetModal } from './StudentPinResetModal';
@@ -5114,16 +5114,20 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       {showTageskompassModal && (
         <MeisterwerkDocumentationModal
           student={{
+            ...student,
             id: student.id,
             first_name: student.first_name,
             last_name: student.last_name,
             photo_url: student.photo_url || '/avatar_ghost.jpg',
-            is_campus_active: student.is_campus_active
+            is_campus_active: student.is_campus_active,
+            school_id: student.school_id,
+            schools: student.schools
           }}
           onClose={() => setShowTageskompassModal(false)}
           teacherId={currentTeacherId}
           initialViewMode="document"
           isTeacherTools={false}
+          hasTresorStorage={checkIsAudioTresorActive(student)}
         />
       )}
       {confirmDurationModal?.open && (

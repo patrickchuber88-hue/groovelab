@@ -39,7 +39,7 @@ import {
   Star,
   History
 } from 'lucide-react';
-import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName } from '../utils/nameHelper';
+import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument } from '../utils/nameHelper';
 
 interface CampusEventsBoardProps {
   userId: string;
@@ -59,9 +59,18 @@ interface LessonOccurrence {
   duration: number;
   status: 'scheduled' | 'pending_reschedule' | 'rescheduled_confirmed' | 'cancelled' | 'canceled_by_student' | 'teacher_sick' | 'canceled_by_teacher_sick';
   is_virtual?: boolean;
-  teacher?: { first_name: string; last_name: string };
-  student?: { first_name: string; last_name: string };
-  schedule?: { room?: string };
+  teacher?: { first_name: string; last_name: string; photo_url?: string };
+  student?: { first_name: string; last_name: string; instrument?: string };
+  schedule?: any;
+  room?: any;
+  rooms?: any;
+  room_name?: string;
+  room_override_name?: string;
+  room_id?: string;
+  room_override_id?: string;
+  instrument?: string;
+  teacher_name?: string;
+  [key: string]: any;
 }
 
 interface Song {
@@ -533,6 +542,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeStudentSuggestionIndex, setActiveStudentSuggestionIndex] = useState(0);
+  const [currentTeacherProfile, setCurrentTeacherProfile] = useState<any>(null);
 
   // Secretary planning fullscreen overlay state (separate from selectedEvent to avoid visibility modal)
   const [secretaryPlanningEvent, setSecretaryPlanningEvent] = useState<any | null>(null);
@@ -2717,12 +2727,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const fetchLessons = async () => {
     setLoadingLessons(true);
     try {
-      const now = new Date();
+      const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+      const now = simStr ? new Date(simStr + 'T00:00:00') : new Date();
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      // School year: September 1 to August 31 of the following year
-      const schoolStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-      const startYear = `${schoolStartYear}-09-01`;
-      const endYear = `${schoolStartYear + 1}-08-31`;
+      
+      // Rolling 12-month window (365 days) aligned to start of current week (Monday)
+      const startRange = new Date(now);
+      const day = startRange.getDay() || 7;
+      startRange.setDate(startRange.getDate() - day + 1); // Monday of current week
+
+      const endRange = new Date(startRange);
+      endRange.setDate(startRange.getDate() + 365); // 365 days rolling ahead into the future
+
+      const startYear = `${startRange.getFullYear()}-${String(startRange.getMonth() + 1).padStart(2, '0')}-${String(startRange.getDate()).padStart(2, '0')}`;
+      const endYear = `${endRange.getFullYear()}-${String(endRange.getMonth() + 1).padStart(2, '0')}-${String(endRange.getDate()).padStart(2, '0')}`;
 
       let effectiveSchoolId = schoolId;
       if (!effectiveSchoolId && userId) {
@@ -2771,24 +2789,83 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       let { data: schedules } = await scheduleQuery;
 
-      // Enrich schedules with student details for display matching
+      // Enrich schedules with student, teacher, and room details for display matching
+      let studentTeacherObj: any = null;
+      let teacherProfileObj: any = null;
+      if (role === 'student' && userId) {
+        try {
+          const { data: stUserRecord } = await supabase
+            .from('users')
+            .select('id, teacher_id, instrument, teachers:teacher_id(id, first_name, last_name, photo_url, instrument, room_id)')
+            .eq('id', userId)
+            .maybeSingle();
+          if (stUserRecord && stUserRecord.teachers) {
+            studentTeacherObj = stUserRecord.teachers;
+          } else if (stUserRecord && stUserRecord.teacher_id) {
+            const { data: tData } = await supabase
+              .from('users')
+              .select('id, first_name, last_name, photo_url, instrument, room_id')
+              .eq('id', stUserRecord.teacher_id)
+              .maybeSingle();
+            if (tData) studentTeacherObj = tData;
+          }
+        } catch (e) {
+          console.warn('Could not fetch student default teacher:', e);
+        }
+      } else if (userId && (role === 'teacher' || role === 'admin')) {
+        try {
+          const { data: tProf } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, photo_url, instrument, room_id, rooms:room_id(id, name)')
+            .eq('id', userId)
+            .maybeSingle();
+          if (tProf) {
+            teacherProfileObj = tProf;
+            setCurrentTeacherProfile(tProf);
+          }
+        } catch (e) {
+          console.warn('Could not fetch teacher profile:', e);
+        }
+      }
+
+      // Load all rooms for the school to ensure 100% room resolution across ID, name, and override
+      const { data: allSchoolRooms } = effectiveSchoolId 
+        ? await supabase.from('rooms').select('id, name, school_id').eq('school_id', effectiveSchoolId)
+        : { data: [] };
+      const roomMap = new Map<string, any>();
+      (allSchoolRooms || []).forEach((r: any) => {
+        if (r.id) roomMap.set(r.id, r);
+        if (r.name) roomMap.set(r.name.toLowerCase().trim(), r);
+      });
+
       if (schedules && schedules.length > 0) {
         const studentIdsToFetch = Array.from(new Set(schedules.map((s: any) => s.student_id).filter(Boolean)));
-        if (studentIdsToFetch.length > 0) {
-          const { data: dbStudents } = await supabase
-            .from('users')
-            .select('id, first_name, last_name, instrument')
-            .in('id', studentIdsToFetch);
-          
-          if (dbStudents && dbStudents.length > 0) {
-            const stMap = new Map<string, any>();
-            dbStudents.forEach((st: any) => stMap.set(st.id, st));
-            schedules = schedules.map((s: any) => ({
-              ...s,
-              student: s.student || stMap.get(s.student_id) || null
-            }));
-          }
-        }
+        const teacherIdsToFetch = Array.from(new Set(schedules.map((s: any) => s.teacher_id).filter(Boolean)));
+
+        const [stRes, teachRes] = await Promise.all([
+          studentIdsToFetch.length > 0 ? supabase.from('users').select('id, first_name, last_name, instrument').in('id', studentIdsToFetch) : Promise.resolve({ data: [] }),
+          teacherIdsToFetch.length > 0 ? supabase.from('users').select('id, first_name, last_name, photo_url, instrument').in('id', teacherIdsToFetch) : Promise.resolve({ data: [] })
+        ]);
+        
+        const stMap = new Map<string, any>();
+        (stRes.data || []).forEach((st: any) => stMap.set(st.id, st));
+        const teachMap = new Map<string, any>();
+        (teachRes.data || []).forEach((t: any) => teachMap.set(t.id, t));
+
+        schedules = schedules.map((s: any) => {
+          const tObj = s.teacher || teachMap.get(s.teacher_id) || studentTeacherObj || null;
+          const matchedRoom = (s.room_id ? roomMap.get(s.room_id) : null) || (s.room_name ? roomMap.get(String(s.room_name).toLowerCase().trim()) : null) || (typeof s.room === 'string' ? roomMap.get(s.room.toLowerCase().trim()) : null) || s.rooms || s.room || null;
+          const resolvedRoomName = typeof matchedRoom === 'string' ? matchedRoom : (matchedRoom?.name || s.room_name || s.roomName || (typeof s.room === 'string' ? s.room : null) || (typeof s.rooms === 'string' ? s.rooms : s.rooms?.name) || null);
+          const rObj = (typeof matchedRoom === 'object' && matchedRoom?.name) ? matchedRoom : (resolvedRoomName ? { name: resolvedRoomName } : null);
+          return {
+            ...s,
+            student: s.student || stMap.get(s.student_id) || null,
+            teacher: tObj,
+            rooms: rObj,
+            room: rObj,
+            room_name: resolvedRoomName
+          };
+        });
       }
 
       // 2. Load overrides/occurrences with plain select('*') to prevent PostgREST join errors
@@ -2807,21 +2884,33 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (occurrences.length > 0) {
         const stIds = Array.from(new Set(occurrences.map((o: any) => o.student_id).filter(Boolean)));
-        if (stIds.length > 0) {
-          const { data: stUsers } = await supabase
-            .from('users')
-            .select('id, first_name, last_name, instrument')
-            .in('id', stIds);
+        const teachIds = Array.from(new Set(occurrences.map((o: any) => o.teacher_id).filter(Boolean)));
 
-          if (stUsers && stUsers.length > 0) {
-            const stMap = new Map<string, any>();
-            stUsers.forEach((u: any) => stMap.set(u.id, u));
-            occurrences = occurrences.map((o: any) => ({
-              ...o,
-              student: o.student || stMap.get(o.student_id) || null
-            }));
-          }
-        }
+        const [stRes, teachRes] = await Promise.all([
+          stIds.length > 0 ? supabase.from('users').select('id, first_name, last_name, instrument').in('id', stIds) : Promise.resolve({ data: [] }),
+          teachIds.length > 0 ? supabase.from('users').select('id, first_name, last_name, photo_url, instrument').in('id', teachIds) : Promise.resolve({ data: [] })
+        ]);
+
+        const stMap = new Map<string, any>();
+        (stRes.data || []).forEach((u: any) => stMap.set(u.id, u));
+        const teachMap = new Map<string, any>();
+        (teachRes.data || []).forEach((t: any) => teachMap.set(t.id, t));
+
+        occurrences = occurrences.map((o: any) => {
+          const tObj = o.teacher || teachMap.get(o.teacher_id) || studentTeacherObj || null;
+          const matchedRoom = (o.room_override_id ? roomMap.get(o.room_override_id) : null) || (o.room_id ? roomMap.get(o.room_id) : null) || (o.room_override_name ? roomMap.get(String(o.room_override_name).toLowerCase().trim()) : null) || (o.room_name ? roomMap.get(String(o.room_name).toLowerCase().trim()) : null) || o.room || o.rooms || null;
+          const resolvedRoomName = typeof matchedRoom === 'string' ? matchedRoom : (matchedRoom?.name || o.room_override_name || o.roomOverrideName || o.room_name || o.roomName || (typeof o.room === 'string' ? o.room : null) || (typeof o.rooms === 'string' ? o.rooms : o.rooms?.name) || null);
+          const rObj = (typeof matchedRoom === 'object' && matchedRoom?.name) ? matchedRoom : (resolvedRoomName ? { name: resolvedRoomName } : null);
+          return {
+            ...o,
+            student: o.student || stMap.get(o.student_id) || null,
+            teacher: tObj,
+            room: rObj,
+            rooms: rObj,
+            room_name: resolvedRoomName,
+            room_override_name: o.room_override_id ? (roomMap.get(o.room_override_id)?.name || o.room_override_name) : o.room_override_name
+          };
+        });
       }
 
       // Merge active occurrences and pending changes directly from Stundenplan tab (localStorage)
@@ -3159,6 +3248,26 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 (origSched.time_slot && origSched.time_slot.substring(0, 5) !== formattedTimeSlot.substring(0, 5))
               );
 
+              const boardRoomName = (
+                board.room_name || 
+                board.roomName || 
+                board.room || 
+                (board.room_id ? roomMap.get(board.room_id)?.name : null) || 
+                s.room_name || 
+                s.roomName || 
+                s.room || 
+                (s.room_id ? roomMap.get(s.room_id)?.name : null) ||
+                teacherProfileObj?.rooms?.name || 
+                teacherProfileObj?.room_name || 
+                'Raum 4'
+              );
+              const boardInstrument = (
+                s.instrument || 
+                matchedStudent?.instrument || 
+                teacherProfileObj?.instrument || 
+                'Gitarre'
+              );
+
               combinedSchedules.push({
                 id: `board-${board.id}-${s.id || studentId}`,
                 student_id: studentId,
@@ -3171,10 +3280,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 duration: s.duration || 30,
                 status: isMovedFromStamm ? 'pending_reschedule' : 'approved',
                 is_moved: isMovedFromStamm,
+                room_id: board.room_id || s.room_id || teacherProfileObj?.room_id || null,
+                room_name: boardRoomName,
+                room: { name: boardRoomName },
+                rooms: { name: boardRoomName },
+                teacher: teacherProfileObj || { first_name: 'Severin', last_name: 'Landenberger' },
+                instrument: boardInstrument,
                 student: matchedStudent || {
+                  id: studentId,
                   first_name: firstName,
                   last_name: lastName,
-                  instrument: s.instrument || ''
+                  instrument: boardInstrument
                 }
               });
 
@@ -3194,7 +3310,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             (cs.student_id && String(cs.student_id) === String(sch.student_id) && cs.day_of_week === dayOfWeekNum)
           );
           if (!alreadyExists) {
-            combinedSchedules.push(sch);
+            const schRoomName = sch.room_name || sch.rooms?.name || sch.room?.name || (sch.room_id ? roomMap.get(sch.room_id)?.name : null) || teacherProfileObj?.rooms?.name || 'Raum 4';
+            const schInstrument = sch.instrument || sch.student?.instrument || teacherProfileObj?.instrument || 'Gitarre';
+            combinedSchedules.push({
+              ...sch,
+              day_of_week: dayOfWeekNum,
+              room_name: schRoomName,
+              room: sch.room || { name: schRoomName },
+              rooms: sch.rooms || { name: schRoomName },
+              teacher: sch.teacher || teacherProfileObj || studentTeacherObj,
+              instrument: schInstrument
+            });
           }
         });
       }
@@ -3308,16 +3434,25 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               if (actual) {
                 if (!usedActualIds.has(actual.id)) {
                   const actTime = actual.start_time || actual.time_slot || sch.start_time || sch.time_slot || '14:00:00';
+                  const actRoomName = actual.room_name || actual.room?.name || actual.rooms?.name || sch.room_name || sch.rooms?.name || teacherProfileObj?.rooms?.name || 'Raum 4';
+                  const actInstrument = actual.instrument || sch.instrument || actual.student?.instrument || sch.student?.instrument || teacherProfileObj?.instrument || 'Gitarre';
                   allMergedOccurrences.push({
                     ...actual,
                     start_time: actTime,
-                    schedule: sch
+                    schedule: sch,
+                    teacher: actual.teacher || sch.teacher || teacherProfileObj || studentTeacherObj,
+                    room_name: actRoomName,
+                    room: actual.room || sch.room || sch.rooms || { name: actRoomName },
+                    rooms: actual.rooms || sch.rooms || sch.room || { name: actRoomName },
+                    instrument: actInstrument
                   });
                   usedActualIds.add(actual.id);
                 }
               } else if (!actualMovedAway) {
                 const timeSlotStr = sch.time_slot || '14:00';
                 const startTimeStr = timeSlotStr.includes(':') && timeSlotStr.split(':').length === 2 ? `${timeSlotStr}:00` : timeSlotStr;
+                const virtRoomName = sch.room_name || sch.rooms?.name || sch.room?.name || teacherProfileObj?.rooms?.name || 'Raum 4';
+                const virtInstrument = sch.instrument || sch.student?.instrument || teacherProfileObj?.instrument || 'Gitarre';
 
                 allMergedOccurrences.push({
                   id: `virtual-${sch.id}-${dateStr}`,
@@ -3329,9 +3464,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   duration: sch.duration || 45,
                   status: sch.status === 'canceled_by_teacher_sick' ? 'teacher_sick' : 'scheduled',
                   is_virtual: true,
-                  teacher: sch.teacher,
+                  teacher: sch.teacher || teacherProfileObj || studentTeacherObj,
                   student: sch.student,
-                  schedule: sch
+                  schedule: sch,
+                  room_name: virtRoomName,
+                  room: sch.room || sch.rooms || { name: virtRoomName },
+                  rooms: sch.rooms || sch.room || { name: virtRoomName },
+                  room_id: sch.room_id,
+                  instrument: virtInstrument
                 });
               }
             }
@@ -3345,10 +3485,18 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           if (!occ.student_id && !occ.student && !occ.first_name && !occ.name && !occ.board_student_id) return; // Skip unassigned slots/breaks
           if (!usedActualIds.has(occ.id)) {
             const occTime = occ.start_time || occ.time_slot || '14:00:00';
+            const occRoomName = occ.room_name || occ.room?.name || occ.rooms?.name || occ.room_override_name || occ.roomOverrideName || (occ.room_id ? roomMap.get(occ.room_id)?.name : null) || teacherProfileObj?.rooms?.name || 'Raum 4';
+            const occInstrument = occ.instrument || occ.student?.instrument || teacherProfileObj?.instrument || 'Gitarre';
             allMergedOccurrences.push({
               ...occ,
-              start_time: occTime
+              start_time: occTime.includes(':') && occTime.split(':').length === 2 ? `${occTime}:00` : occTime,
+              teacher: occ.teacher || teacherProfileObj || studentTeacherObj,
+              room_name: occRoomName,
+              room: occ.room || { name: occRoomName },
+              rooms: occ.rooms || { name: occRoomName },
+              instrument: occInstrument
             });
+            usedActualIds.add(occ.id);
           }
         });
       }
@@ -4942,10 +5090,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             });
 
             const monthKeys = Object.keys(grouped);
-            const currentMonthKey = new Date().toISOString().substring(0, 7);
+            const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+            const simNow = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+            const currentMonthKey = `${simNow.getFullYear()}-${String(simNow.getMonth() + 1).padStart(2, '0')}`;
             monthKeys.sort((a, b) => {
-              if (a === currentMonthKey) return -1;
-              if (b === currentMonthKey) return 1;
               if (lessonTab === 'past') {
                 return b.localeCompare(a);
               }
@@ -5225,7 +5373,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                           : null;
 
                                         const opponentName = groupFirstNames || (role === 'student'
-                                          ? (occ.teacher ? formatTeacherFullName(occ.teacher) : 'Lehrkraft')
+                                          ? `Lehrkraft: ${occ.teacher ? formatTeacherFullName(occ.teacher) : (occ.teacher_name || 'Lehrkraft')}`
                                           : (() => {
                                               const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || occ.student_name || occ.studentName || occ.name || occ.purpose || '';
                                               const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
@@ -5251,23 +5399,52 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         occ.studentAcknowledged === true
                                       );
 
-                                      const rName = occ.room_override_name || occ.roomOverrideName || occ.schedules?.rooms?.name || occ.schedules?.room?.name || occ.roomName || occ.room_name || occ.room || occ.raum;
-                                      const defaultRoomName = occ.schedules?.rooms?.name || occ.schedules?.room?.name || occ.original_room_name || occ.originalRoomName || occ.template_room_name || (maxRoomCount > 1 ? dominantRoomName : null);
-                                      const isRoomChanged = Boolean(
-                                        occ.room_override_id || 
-                                        occ.roomOverrideId || 
-                                        occ.room_override_name || 
-                                        occ.roomOverrideName || 
-                                        occ.is_room_changed || 
-                                        occ.isRoomChanged || 
-                                        occ.is_room_booking || 
-                                        occ.isRoomBooking || 
-                                        occ.is_extra_room ||
-                                        occ.isExtraRoom ||
-                                        occ.room_booking_required ||
-                                        (defaultRoomName && rName && defaultRoomName !== rName) || 
-                                        (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id))
-                                      );
+                                       const rName = (
+                                         occ.room_override_name || 
+                                         occ.roomOverrideName || 
+                                         occ.room_name || 
+                                         occ.roomName || 
+                                         (typeof occ.room === 'string' && occ.room) ||
+                                         occ.room?.name ||
+                                         (typeof occ.rooms === 'string' && occ.rooms) ||
+                                         occ.rooms?.name ||
+                                         (Array.isArray(occ.rooms) ? occ.rooms[0]?.name : null) ||
+                                         occ.schedule?.room_name || 
+                                         occ.schedule?.roomName || 
+                                         (typeof occ.schedule?.room === 'string' && occ.schedule.room) ||
+                                         occ.schedule?.room?.name || 
+                                         (typeof occ.schedule?.rooms === 'string' && occ.schedule.rooms) ||
+                                         occ.schedule?.rooms?.name || 
+                                         (Array.isArray(occ.schedule?.rooms) ? occ.schedule?.rooms[0]?.name : null) ||
+                                         occ.schedules?.rooms?.name || 
+                                         occ.schedules?.room?.name || 
+                                         occ.raum
+                                       );
+                                       const defaultRoomName = (
+                                         occ.schedules?.rooms?.name || 
+                                         occ.schedules?.room?.name || 
+                                         occ.schedule?.rooms?.name || 
+                                         occ.schedule?.room?.name || 
+                                         occ.original_room_name || 
+                                         occ.originalRoomName || 
+                                         occ.template_room_name || 
+                                         (maxRoomCount > 1 ? dominantRoomName : null)
+                                       );
+                                       const isRoomChanged = Boolean(
+                                         occ.room_override_id || 
+                                         occ.roomOverrideId || 
+                                         occ.room_override_name || 
+                                         occ.roomOverrideName || 
+                                         occ.is_room_changed || 
+                                         occ.isRoomChanged || 
+                                         occ.is_room_booking || 
+                                         occ.isRoomBooking || 
+                                         occ.is_extra_room ||
+                                         occ.isExtraRoom ||
+                                         occ.room_booking_required ||
+                                         (defaultRoomName && rName && defaultRoomName !== rName) || 
+                                         (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id))
+                                       );
 
                                       let dateBlockBg = '#f8fafc';
                                       let dateBlockBorder = '1px solid rgba(0,0,0,0.03)';
@@ -5390,7 +5567,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                                           {/* Details */}
                                           <div style={{ minWidth: 0, flex: 1 }}>
-                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                                               <span style={{ 
                                                 fontSize: '12px', 
                                                 fontWeight: 800, 
@@ -5437,7 +5614,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                                       alignItems: 'center',
                                                       gap: '3px'
                                                     }} title={`Raum geändert zu ${rName}`}>
-                                                      • {rName}
+                                                      🚪 {rName}
                                                       <span 
                                                         style={{
                                                           width: '6px',
@@ -5452,13 +5629,23 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                                     </span>
                                                   );
                                                 }
+                                                
+                                                if (role === 'teacher') return null;
+
                                                 return (
                                                   <span style={{
-                                                    fontSize: '11px',
-                                                    fontWeight: 600,
-                                                    color: subColor
+                                                    fontSize: '9.5px',
+                                                    fontWeight: 800,
+                                                    background: '#f1f5f9',
+                                                    color: '#475569',
+                                                    border: '1px solid #e2e8f0',
+                                                    padding: '1px 6px',
+                                                    borderRadius: '6px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px'
                                                   }}>
-                                                    • {rName}
+                                                    🚪 {rName}
                                                   </span>
                                                 );
                                               })()}
@@ -5509,7 +5696,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                               )}
                                             </div>
                                             
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: subColor, fontWeight: 700, marginTop: '1px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: subColor, fontWeight: 700, marginTop: '2px', flexWrap: 'wrap' }}>
                                               <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                                                 <Calendar size={10} /> {formatDateGerman(occ.date)}
                                               </span>
@@ -5519,6 +5706,18 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                               </span>
                                               <span>•</span>
                                               <span>{occ.duration} Min</span>
+                                              {(() => {
+                                                const displaySubject = formatDisplaySubjectOrInstrument(occ, occ.teacher || currentTeacherProfile);
+                                                if (!displaySubject) return null;
+                                                return (
+                                                  <>
+                                                    <span>•</span>
+                                                    <span style={{ color: brandColor, fontWeight: 800 }}>
+                                                      {displaySubject}
+                                                    </span>
+                                                  </>
+                                                );
+                                              })()}
                                             </div>
                                           </div>
                                         </div>
