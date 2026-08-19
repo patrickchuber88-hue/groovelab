@@ -2260,6 +2260,33 @@ function App() {
     };
     document.addEventListener('click', handleAnchorClick);
 
+    // Clear native PWA app badge when app is launched or becomes active
+    if ('clearAppBadge' in navigator) {
+      (navigator as any).clearAppBadge().catch(() => {});
+    }
+
+    // iOS Web AudioContext auto-unlock on first user interaction
+    const unlockAudioContext = () => {
+      try {
+        const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtxClass) {
+          const dummyCtx = new AudioCtxClass();
+          if (dummyCtx.state === 'suspended') {
+            dummyCtx.resume().catch(() => {});
+          }
+          const osc = dummyCtx.createOscillator();
+          const gain = dummyCtx.createGain();
+          gain.gain.value = 0.00001;
+          osc.connect(gain);
+          gain.connect(dummyCtx.destination);
+          osc.start(0);
+          osc.stop(0.001);
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('pointerdown', unlockAudioContext, { passive: true, once: true });
+    window.addEventListener('keydown', unlockAudioContext, { passive: true, once: true });
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -2280,6 +2307,8 @@ function App() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       document.removeEventListener('click', handleAnchorClick);
+      window.removeEventListener('pointerdown', unlockAudioContext);
+      window.removeEventListener('keydown', unlockAudioContext);
     };
   }, []);
 

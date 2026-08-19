@@ -28,6 +28,8 @@ import { AudioTrackCarousel, AudioTrackItem } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 import { processPureRawBlob } from '../utils/audioMasteringEngine';
 import { downloadStudentAudioBackup } from '../utils/audioBackupHelper';
+import { computeGroundTruthMetrics, broadcastPracticeUpdate } from '../utils/studentProgressEngine';
+import { PushNotificationSoftPromptModal } from './ui/PushNotificationSoftPromptModal';
 
 const showMissionsFeature = false;
 
@@ -2672,6 +2674,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   });
   const [showLevelModal, setShowLevelModal] = useState<boolean>(false);
 
+  // Collapsible Right Sidebar State for Student Briefing Dashboard (Default: Collapsed)
+  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('campus_student_briefing_sidebar_collapsed');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const handleToggleRightSidebar = (collapsed: boolean) => {
+    setIsRightSidebarCollapsed(collapsed);
+    localStorage.setItem('campus_student_briefing_sidebar_collapsed', String(collapsed));
+  };
+
   useEffect(() => {
     const handleGlobalLevelChange = (e: any) => {
       if (e?.detail) setStudentUiLevel(e.detail);
@@ -2832,6 +2846,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [pushNotifScheduleChanges, setPushNotifScheduleChanges] = useState(true);
   const [pushNotifHomework, setPushNotifHomework] = useState(false);
   const [pushNotifAllFeatures, setPushNotifAllFeatures] = useState(false);
+  const [showPushSoftPrompt, setShowPushSoftPrompt] = useState(false);
 
   const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
   const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
@@ -6155,7 +6170,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   }, [lehrwerke, progressItems, studentId]);
 
   useEffect(() => {
-    if (!studentUser?.school_id) return;
+    if (!studentId) return;
 
     const channel = supabase
       .channel(`realtime_student_focus_${studentId}`)
@@ -6165,12 +6180,47 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
         if (payload.new && (payload.new as any).user_id === studentId) {
           fetchFokusLogs();
+          fetchStudentAndAvatar(true);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'student_stats' }, (payload) => {
+        if (payload.new && (payload.new as any).student_id === studentId) {
+          fetchStudentAndAvatar(true);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'avatars' }, (payload) => {
+        if (payload.new && (payload.new as any).user_id === studentId) {
+          fetchStudentAndAvatar(true);
         }
       })
       .subscribe();
 
+    const handlePracticeUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (!customEvent.detail?.studentId || customEvent.detail?.studentId === studentId) {
+        fetchFokusLogs();
+        fetchStudentAndAvatar(true);
+      }
+    };
+    window.addEventListener('cg_practice_updated', handlePracticeUpdated);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel(`cg_practice_sync_${studentId}`);
+        bc.onmessage = () => {
+          fetchFokusLogs();
+          fetchStudentAndAvatar(true);
+        };
+      }
+    } catch (e) {}
+
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('cg_practice_updated', handlePracticeUpdated);
+      if (bc) {
+        try { bc.close(); } catch (e) {}
+      }
     };
   }, [studentUser?.school_id, studentUser?.teacher_id, studentId]);
 
@@ -7014,7 +7064,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setIsExtraTime(false);
       setShowCheckpoint(false);
       currentLogIdRef.current = null;
-      currentExtraLogIdRef.current = null;
+      broadcastPracticeUpdate(studentId, { xp: currentXp, streak_flame: streakFlame });
       fetchStudentAndAvatar(true);
       fetchStudentProgress(true);
       setSidebarTab('logbook');
@@ -7077,6 +7127,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           updated_at: new Date().toISOString()
         }, { onConflict: 'student_id' });
 
+      broadcastPracticeUpdate(studentId, { xp: newXp, streak_flame: newStreak });
       fetchStudentAndAvatar(true);
       fetchStudentProgress(true);
       fetchFokusLogs();
@@ -8038,142 +8089,38 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
 
       const statsData = statsRes.data;
-      const allLoadedLogs = logsRes.data || [];
-      const computedTotalMinutesFromLogs = Math.round(allLoadedLogs.reduce((sum: number, l: any) => sum + (l.duration_seconds || ((l.duration_minutes || 0) * 60)), 0) / 60);
-
-      let effectiveTotalFocus = Math.max(statsData?.total_focus_minutes || 0, computedTotalMinutesFromLogs);
-      let effectiveMonthlyFocus = Math.max(statsData?.monthly_focus_minutes || 0, computedTotalMinutesFromLogs);
+      const metrics = computeGroundTruthMetrics({
+        fokusLogs: logsRes.data || [],
+        songSkills: skillsRes.data || [],
+        progressMatrix: matrixRes.data || [],
+        user: user,
+        avatar: avatarRecord,
+        stats: statsData,
+        simulatedDate: getSimulatedNow(),
+        targetMinutes: getTargetMinutes(activeStreak)
+      });
 
       let effectiveAvatar = avatarRecord ? { ...avatarRecord } : {
         avatar_style: 'standard',
         instrument_type: user.instrument || 'Guitar',
         evolution_level: 1,
-        xp: statsData?.current_xp || 0,
+        xp: metrics.totalXp,
         asset_path: getInstrumentAvatarUrl(user.instrument),
-        streak_flame: statsData?.streak_flame || 0,
+        streak_flame: metrics.streakFlame,
         id: `local-avatar-${studentId}`,
         user_id: studentId
       } as any;
 
-      if (statsData?.current_xp) {
-        effectiveAvatar.xp = Math.max(effectiveAvatar.xp || 0, statsData.current_xp);
-      }
-      if (statsData?.streak_flame) {
-        effectiveAvatar.streak_flame = Math.max(effectiveAvatar.streak_flame || 0, statsData.streak_flame);
-      }
-
-      // Compute XP directly from all practice logs, mastered songs (+50 XP), and mastered pages (+10 XP)
-      const computedXpFromLogs = allLoadedLogs.reduce((sum: number, log: any) => {
-        if (log.xp_earned) return sum + log.xp_earned;
-        const isMastered = !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3);
-        const extraMins = log.is_extra ? Math.floor((log.duration_seconds || ((log.duration_minutes || 0) * 60)) / 60) : 0;
-        return sum + (isMastered ? 3 : 0) + extraMins;
-      }, 0);
-
-      // Mastered Songs (+50 XP each)
-      const masteredSongsSet = new Set<string>();
-      (skillsRes.data || []).forEach((skill: any) => {
-        if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
-          const title = skill.songs?.title || skill.title || skill.song_title;
-          if (title) masteredSongsSet.add(title.toLowerCase().trim());
-        }
-      });
-      (matrixRes.data || []).forEach((item: any) => {
-        const rawTopic = (item.topic_name || item.title || '').trim();
-        if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase().startsWith('test')) return;
-        if (item.status === 'MASTERED' || (item.progress_percent || 0) === 100) {
-          const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
-          if (cleanT) masteredSongsSet.add(cleanT.toLowerCase());
-        }
-      });
-
-      // Mastered Lehrwerk Pages (+10 XP each)
-      const masteredPagesSet = new Set<string>();
-      (matrixRes.data || []).forEach((item: any) => {
-        const rawTopic = (item.topic_name || item.title || '').trim();
-        if (rawTopic.includes(' - Seite ') && (item.status === 'MASTERED' || (item.progress_percent || 0) === 100)) {
-          masteredPagesSet.add(rawTopic.toLowerCase());
-        }
-      });
-
-      const songsXp = masteredSongsSet.size * 50;
-      const lehrwerkPagesXp = masteredPagesSet.size * 10;
-      const groundTruthTotalXp = computedXpFromLogs + songsXp + lehrwerkPagesXp;
-
-      effectiveAvatar.xp = Math.max(effectiveAvatar.xp || 0, statsData?.current_xp || 0, groundTruthTotalXp);
-
-      const masteredDates = new Set<string>();
-      allLoadedLogs.forEach((log: any) => {
-        if (!log.created_at) return;
-        const dStr = toLocalYYYYMMDD(new Date(log.created_at));
-        const isMastered = !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3);
-        if (isMastered) masteredDates.add(dStr);
-      });
-
-      const nowSim = getSimulatedNow();
-      let checkDate = new Date(nowSim);
-      let checkDateStr = toLocalYYYYMMDD(checkDate);
-      let computedStreakFromLogs = 0;
-      if (masteredDates.has(checkDateStr)) {
-        computedStreakFromLogs = 1;
-        while (true) {
-          checkDate.setDate(checkDate.getDate() - 1);
-          const prevStr = toLocalYYYYMMDD(checkDate);
-          if (masteredDates.has(prevStr)) {
-            computedStreakFromLogs += 1;
-          } else {
-            break;
-          }
-        }
-      } else {
-        checkDate.setDate(checkDate.getDate() - 1);
-        const yestStr = toLocalYYYYMMDD(checkDate);
-        if (masteredDates.has(yestStr)) {
-          computedStreakFromLogs = 1;
-          while (true) {
-            checkDate.setDate(checkDate.getDate() - 1);
-            const prevStr = toLocalYYYYMMDD(checkDate);
-            if (masteredDates.has(prevStr)) {
-              computedStreakFromLogs += 1;
-            } else {
-              break;
-            }
-          }
-        }
-      }
-      effectiveAvatar.streak_flame = Math.max(effectiveAvatar.streak_flame || 0, computedStreakFromLogs);
-
-      try {
-        const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || 'null');
-        if (localStats) {
-          effectiveTotalFocus = Math.max(effectiveTotalFocus, localStats.total_focus_minutes || 0);
-          effectiveMonthlyFocus = Math.max(effectiveMonthlyFocus, localStats.monthly_focus_minutes || 0);
-          if (localStats.current_xp !== undefined && localStats.current_xp !== null) {
-            effectiveAvatar.xp = Math.max(effectiveAvatar.xp || 0, localStats.current_xp);
-          }
-          if (localStats.streak_flame !== undefined && localStats.streak_flame !== null) {
-            effectiveAvatar.streak_flame = Math.max(effectiveAvatar.streak_flame || 0, localStats.streak_flame);
-          }
-        }
-      } catch (e) {}
-
-      try {
-        const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || 'null');
-        if (localPractice) {
-          if (localPractice.xp !== undefined && localPractice.xp !== null) effectiveAvatar.xp = Math.max(effectiveAvatar.xp || 0, localPractice.xp);
-          if (localPractice.streak_flame !== undefined && localPractice.streak_flame !== null) effectiveAvatar.streak_flame = Math.max(effectiveAvatar.streak_flame || 0, localPractice.streak_flame);
-          if (localPractice.total_focus_minutes) effectiveTotalFocus = Math.max(effectiveTotalFocus, localPractice.total_focus_minutes);
-          if (localPractice.monthly_focus_minutes) effectiveMonthlyFocus = Math.max(effectiveMonthlyFocus, localPractice.monthly_focus_minutes);
-        }
-      } catch (e) {}
+      effectiveAvatar.xp = metrics.totalXp;
+      effectiveAvatar.streak_flame = metrics.streakFlame;
 
       if (!avatarRecord && user.is_app_user) {
         setShowSelector(true);
       }
       setAvatar(effectiveAvatar);
 
-      setMonthlyFocusMinutes(effectiveMonthlyFocus);
-      setTotalFocusMinutes(effectiveTotalFocus);
+      setMonthlyFocusMinutes(metrics.totalFocusMinutes);
+      setTotalFocusMinutes(metrics.totalFocusMinutes);
 
       const localAnchor = (typeof window !== 'undefined' && studentId)
         ? (localStorage.getItem(`cg_practice_anchor_${studentId}`) || localStorage.getItem(`practice_anchor_${studentId}`) || null)
@@ -12969,11 +12916,124 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             studentUiLevel={studentUiLevel || 'pro'}
             schoolFokusLevels={schoolFokusLevels}
           />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        ) : (() => {
+          const sidebarAppointmentChanges = (scheduleOccurrences || []).filter(occ => 
+            !occ.student_acknowledged && (
+              occ.status === 'pending_reschedule' || 
+              occ.status === 'cancelled' || 
+              (occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date)
+            )
+          );
+          const hasSidebarAppointmentAlerts = sidebarAppointmentChanges.length > 0;
+          const hasSidebarFeedAlerts = (unreadClassFeedCount > 0) || ((occurrencesWithMessages || []).length > 0);
+          const sidebarTotalAlertsCount = sidebarAppointmentChanges.length + (unreadClassFeedCount || 0) + ((occurrencesWithMessages || []).length > 0 ? occurrencesWithMessages.length : 0);
+
+          return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative' }}>
           
-          {/* MAIN LAYOUT (Full-width for Junior Level 1, 2-column for Teen/Pro) */}
-          <div style={{ display: 'grid', gridTemplateColumns: (isMobile || studentUiLevel === 'junior') ? '1fr' : '1fr 320px', gap: '32px', alignItems: 'start' }}>
+          {/* Floating Right-Edge Toggle Button when Collapsed (Desktop only, for Teen / Pro) */}
+          {isRightSidebarCollapsed && studentUiLevel !== 'junior' && !isMobile && (
+            <button
+              onClick={() => handleToggleRightSidebar(false)}
+              style={{
+                position: 'fixed',
+                right: '0px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 99,
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                border: '1.5px solid #bbf7d0',
+                borderRight: 'none',
+                borderRadius: '16px 0 0 16px',
+                padding: '14px 10px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px',
+                cursor: 'pointer',
+                boxShadow: '-4px 0 20px rgba(52, 168, 83, 0.2)',
+                color: '#15803d',
+                fontWeight: 900,
+                fontSize: '0.7rem',
+                transition: 'all 0.2s ease-in-out'
+              }}
+              className="hover-scale"
+              title="Termine & Mitteilungen ausklappen"
+            >
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ChevronLeft size={18} color="#15803d" />
+                {(hasSidebarAppointmentAlerts || hasSidebarFeedAlerts) && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-6px',
+                    right: '-6px',
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: hasSidebarAppointmentAlerts ? '#f59e0b' : '#34a853',
+                    border: '2px solid #ffffff',
+                    boxShadow: `0 0 8px ${hasSidebarAppointmentAlerts ? '#f59e0b' : '#34a853'}`,
+                    animation: 'pulse 1.5s infinite'
+                  }} />
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '8px',
+                  background: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                }}>
+                  <Calendar size={15} color="#15803d" />
+                </div>
+                
+                {sidebarTotalAlertsCount > 0 && (
+                  <span style={{
+                    background: hasSidebarAppointmentAlerts ? '#f59e0b' : '#34a853',
+                    color: '#ffffff',
+                    fontSize: '0.65rem',
+                    fontWeight: 950,
+                    padding: '2px 6px',
+                    borderRadius: '100px',
+                    minWidth: '16px',
+                    textAlign: 'center',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                  }}>
+                    {sidebarTotalAlertsCount}
+                  </span>
+                )}
+              </div>
+
+              <span style={{ 
+                writingMode: 'vertical-rl', 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.08em', 
+                fontSize: '0.68rem',
+                fontWeight: 900,
+                color: '#166534',
+                marginTop: '2px'
+              }}>
+                Termine & Mitteilungen
+              </span>
+            </button>
+          )}
+
+          {/* MAIN LAYOUT (Full-width for Junior Level 1 or when Right Sidebar is Collapsed, 2-column when Open) */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: (isMobile || studentUiLevel === 'junior' || isRightSidebarCollapsed) ? '1fr' : '1fr 340px', 
+            gap: isRightSidebarCollapsed ? '0px' : '32px', 
+            paddingRight: (isRightSidebarCollapsed && studentUiLevel !== 'junior' && !isMobile) ? '56px' : '0px',
+            alignItems: 'start',
+            boxSizing: 'border-box',
+            width: '100%',
+            transition: 'grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}>
             
             {/* MAIN COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -18168,10 +18228,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     {/* Spalte 2: Tägliche Übezeit */}
                     {flamesActive && (() => {
                       const streak = avatar?.streak_flame || 0;
-                      const schoolConfig = schoolFokusLevels?.level3 || { kleine: 10, mittlere: 15, helden: 20 };
-                      const kleineMins = schoolConfig.kleine || 10;
-                      const mittlereMins = schoolConfig.mittlere || 15;
-                      const heldenMins = schoolConfig.helden || 20;
+                      const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
+                      const schoolConfig = (schoolFokusLevels && schoolFokusLevels[levelKey]) || DEFAULT_FOKUS_LEVELS[levelKey];
+                      const kleineMins = schoolConfig.kleine || DEFAULT_FOKUS_LEVELS[levelKey].kleine;
+                      const mittlereMins = schoolConfig.mittlere || DEFAULT_FOKUS_LEVELS[levelKey].mittlere;
+                      const heldenMins = schoolConfig.helden || DEFAULT_FOKUS_LEVELS[levelKey].helden;
                       const requiredMins = streak >= 9 ? heldenMins : streak >= 4 ? mittlereMins : kleineMins;
 
                       return (
@@ -18228,9 +18289,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 justifyContent: 'center', 
                                 alignItems: 'center', 
                                 gap: '8px', 
-                                boxShadow: '0 8px 20px rgba(79, 70, 229, 0.25)',
-                                transition: 'all 0.2s',
-                                width: '100%'
+                                boxShadow: '0 8px 20px rgba(79, 70, 229, 0.25)', 
+                                transition: 'all 0.2s', 
+                                width: '100%' 
                               }}
                               className="hover-scale"
                             >
@@ -18245,10 +18306,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     {/* Spalte 3: Flammen-Pfad */}
                     {flamesActive && (() => {
                       const streak = avatar?.streak_flame || 0;
-                      const schoolConfig = schoolFokusLevels?.level3 || { kleine: 10, mittlere: 15, helden: 20 };
-                      const kleineMins = schoolConfig.kleine || 10;
-                      const mittlereMins = schoolConfig.mittlere || 15;
-                      const heldenMins = schoolConfig.helden || 20;
+                      const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
+                      const schoolConfig = (schoolFokusLevels && schoolFokusLevels[levelKey]) || DEFAULT_FOKUS_LEVELS[levelKey];
+                      const kleineMins = schoolConfig.kleine || DEFAULT_FOKUS_LEVELS[levelKey].kleine;
+                      const mittlereMins = schoolConfig.mittlere || DEFAULT_FOKUS_LEVELS[levelKey].mittlere;
+                      const heldenMins = schoolConfig.helden || DEFAULT_FOKUS_LEVELS[levelKey].helden;
 
                       const isTier1Unlocked = streak >= 1;
                       const isTier2Unlocked = streak >= 4;
@@ -18364,8 +18426,81 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
             {/* RIGHT COLUMN (Only for Teen Level 2 and Pro Level 3 - Junior Level 1 gets full width) */}
             {studentUiLevel !== 'junior' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '24px',
+              width: isRightSidebarCollapsed ? '0px' : '340px',
+              minWidth: isRightSidebarCollapsed ? '0px' : '340px',
+              maxWidth: isRightSidebarCollapsed ? '0px' : '340px',
+              opacity: isRightSidebarCollapsed ? 0 : 1,
+              transform: isRightSidebarCollapsed ? 'translateX(20px)' : 'translateX(0)',
+              pointerEvents: isRightSidebarCollapsed ? 'none' : 'auto',
+              overflowY: isRightSidebarCollapsed ? 'hidden' : 'visible',
+              overflowX: 'hidden',
+              boxSizing: 'border-box',
+              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}>
+              {/* Sidebar Header with Collapse Button */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '4px 2px 4px 2px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '8px',
+                    background: '#e6f4ea',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Calendar size={15} color="#34a853" />
+                  </div>
+                  <span style={{ fontWeight: 950, fontSize: '0.88rem', color: '#1e293b', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
+                    Termine &amp; Mitteilungen
+                  </span>
+                  {sidebarTotalAlertsCount > 0 && (
+                    <span style={{
+                      background: hasSidebarAppointmentAlerts ? '#f59e0b' : '#34a853',
+                      color: '#ffffff',
+                      fontSize: '0.65rem',
+                      fontWeight: 900,
+                      padding: '2px 7px',
+                      borderRadius: '100px'
+                    }}>
+                      {sidebarTotalAlertsCount}
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => handleToggleRightSidebar(true)}
+                  style={{
+                    background: '#f8fafc',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '6px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                  title="Sidebar einklappen"
+                >
+                  <span>Einklappen</span>
+                  <ChevronRight size={14} color="#64748b" />
+                </button>
+              </div>
+
               {/* Nächste Termine */}
               <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -19279,7 +19414,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
           </div>
         </div>
-        )
+        );
+      })()
       )}
       </div>
       
@@ -20602,34 +20738,47 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>
                         
                         {isPremiumUser ? (
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const nextVal = !pushEnabled;
-                              setPushEnabled(nextVal);
-                              if (nextVal) {
-                                const success = await subscribeUserToPush(studentId);
-                                if (!success) {
-                                  setPushEnabled(false);
-                                  alert('Fehler beim Aktivieren der Push-Benachrichtigungen. Bitte überprüfe die Berechtigungen deines Browsers.');
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {pushEnabled && (
+                              <button
+                                type="button"
+                                onClick={() => setShowPushSoftPrompt(true)}
+                                style={{
+                                  background: '#f1f5f9',
+                                  color: '#0f172a',
+                                  border: 'none',
+                                  borderRadius: '100px',
+                                  padding: '6px 14px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  transition: 'background 0.2s'
+                                }}
+                              >
+                                Anpassen
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!pushEnabled) {
+                                  // Open soft-prompt modal with granular choices
+                                  setShowPushSoftPrompt(true);
                                 } else {
-                                  alert('Push-Benachrichtigungen erfolgreich aktiviert! 🔔');
+                                  const success = await unsubscribeUserFromPush(studentId);
+                                  if (!success) {
+                                    alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
+                                  } else {
+                                    setPushEnabled(false);
+                                  }
                                 }
-                              } else {
-                                const success = await unsubscribeUserFromPush(studentId);
-                                if (!success) {
-                                  setPushEnabled(true);
-                                  alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
-                                } else {
-                                  alert('Push-Benachrichtigungen deaktiviert.');
-                                }
-                              }
-                            }}
-                            className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
-                            style={{ backgroundColor: pushEnabled ? '#34a853' : undefined }}
-                          >
-                            <div className="app-binary-switch-knob" />
-                          </button>
+                              }}
+                              className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
+                              style={{ backgroundColor: pushEnabled ? '#34a853' : undefined }}
+                            >
+                              <div className="app-binary-switch-knob" />
+                            </button>
+                          </div>
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
                             <span>🔒 Nur für aktive Schüler</span>
@@ -23569,6 +23718,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           );
         })()
       , document.body)}
+
+      <PushNotificationSoftPromptModal
+        isOpen={showPushSoftPrompt}
+        onClose={() => setShowPushSoftPrompt(false)}
+        userId={studentId}
+        initialScheduleChanges={pushNotifScheduleChanges}
+        initialHomework={pushNotifHomework}
+        initialStreakAndNews={pushNotifAllFeatures}
+        onSuccess={() => {
+          setPushEnabled(true);
+          fetchStudentAndAvatar();
+        }}
+      />
 
       <TourComponent />
     </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
 import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
+import { PushNotificationSoftPromptModal } from './ui/PushNotificationSoftPromptModal';
 import { 
   Clock, 
   Calendar, 
@@ -130,6 +131,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   // Loading States
   const [loading, setLoading] = useState(true);
   const [pushEnabled, setPushEnabled] = useState<boolean>(false);
+  const [showPushSoftPrompt, setShowPushSoftPrompt] = useState<boolean>(false);
 
   // Holidays state
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
@@ -2799,35 +2801,38 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                     <span className="text-lg">🔔</span>
                     <span className="text-xs font-bold text-slate-300">Push-Benachrichtigungen aktivieren</span>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={pushEnabled}
-                      onChange={async (e) => {
-                        const checked = e.target.checked;
-                        setPushEnabled(checked);
-                        if (checked) {
-                          const success = await subscribeUserToPush(userId);
-                          if (!success) {
-                            setPushEnabled(false);
-                            alert('Fehler beim Aktivieren der Push-Benachrichtigungen. Bitte überprüfe die Berechtigungen deines Browsers.');
+                  <div className="flex items-center gap-2">
+                    {pushEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPushSoftPrompt(true)}
+                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition"
+                      >
+                        Anpassen
+                      </button>
+                    )}
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={pushEnabled}
+                        onChange={async (e) => {
+                          const checked = e.target.checked;
+                          if (checked) {
+                            setShowPushSoftPrompt(true);
                           } else {
-                            alert('Push-Benachrichtigungen erfolgreich aktiviert! 🔔');
+                            const success = await unsubscribeUserFromPush(userId);
+                            if (!success) {
+                              alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
+                            } else {
+                              setPushEnabled(false);
+                            }
                           }
-                        } else {
-                          const success = await unsubscribeUserFromPush(userId);
-                          if (!success) {
-                            setPushEnabled(true);
-                            alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
-                          } else {
-                            alert('Push-Benachrichtigungen deaktiviert.');
-                          }
-                        }
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950"></div>
-                  </label>
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950"></div>
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -3622,6 +3627,13 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
           </div>
         </div>
       )}
+
+      <PushNotificationSoftPromptModal
+        isOpen={showPushSoftPrompt}
+        onClose={() => setShowPushSoftPrompt(false)}
+        userId={userId}
+        onSuccess={() => setPushEnabled(true)}
+      />
     </div>
   );
 }

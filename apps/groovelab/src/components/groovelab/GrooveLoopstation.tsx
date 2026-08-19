@@ -3,6 +3,7 @@ import {
   Play,
   Square,
   Mic,
+  Volume1,
   Volume2,
   VolumeX,
   Trash2,
@@ -298,7 +299,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [loopstationMetronomeVolume, setLoopstationMetronomeVolume] = useState<number>(100);
   const [timeSignature, setTimeSignature] = useState<'4/4' | '3/4'>('4/4');
   const [barLength, setBarLength] = useState<1 | 2 | 4 | 8>(4);
-  const [metronomeSound, setMetronomeSound] = useState<'wood' | 'cowbell' | 'rimshot' | 'synth'>('rimshot');
+  const [metronomeSound, setMetronomeSound] = useState<'wood' | 'cowbell' | 'rimshot' | 'synth' | 'rock_beat' | 'hiphop_beat' | 'shuffle_beat' | 'funk_beat'>('rock_beat');
   const timeSignatureRef = useRef(timeSignature);
   const barLengthRef = useRef(barLength);
   const metronomeSoundRef = useRef(metronomeSound);
@@ -321,6 +322,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [autoLatencyResult, setAutoLatencyResult] = useState<number | null>(null);
   const [bounceBackupState, setBounceBackupState] = useState<{ tracks: Track[]; buffers: { [key: number]: AudioBuffer } } | null>(null);
   const [isBouncing, setIsBouncing] = useState(false);
+  const [isPreviewingSound, setIsPreviewingSound] = useState(false);
+  const previewTimeoutRef = useRef<any>(null);
+  const metronomeBeatStepRef = useRef<number>(0);
 
   const audioBufferToWav = (buffer: AudioBuffer): Blob => {
     const numChannels = buffer.numberOfChannels;
@@ -1272,7 +1276,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     }
   };
 
-  const playClickSound = (isHigh = false, time?: number, overrideSound?: string) => {
+  const playClickSound = (isHigh = false, time?: number, overrideSound?: string, beatIndex?: number) => {
     try {
       initAudio();
       const ctx = audioContextRef.current;
@@ -1288,11 +1292,173 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
       if (targetMetronomeGain === 0) return;
 
-      if (soundType === 'synth') {
+      // Determine exact 4/4 beat index (0 = 1st beat, 1 = 2nd beat, 2 = 3rd beat, 3 = 4th beat)
+      let beatNum = 0;
+      if (beatIndex !== undefined) {
+        beatNum = Math.abs(beatIndex) % 4;
+      } else if (isHigh) {
+        beatNum = 0;
+        metronomeBeatStepRef.current = 1;
+      } else {
+        beatNum = metronomeBeatStepRef.current % 4;
+        metronomeBeatStepRef.current = (metronomeBeatStepRef.current + 1) % 4;
+      }
+
+      const beatSecs = 60.0 / bpm;
+
+      // 🥁 Premium Studio Drum Synthesizer DSP
+      const playKick = (t: number, gainVal: number, subFreq = 45, punch = 1.0) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(155 * punch, t);
+        osc.frequency.exponentialRampToValueAtTime(subFreq, t + 0.06);
+        gain.gain.setValueAtTime(gainVal * 1.15, t);
+        gain.gain.exponentialRampToValueAtTime(0.00001, t + 0.16);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.17);
+
+        // Click transient for punch
+        const clickOsc = ctx.createOscillator();
+        const clickGain = ctx.createGain();
+        clickOsc.type = 'triangle';
+        clickOsc.frequency.setValueAtTime(320, t);
+        clickOsc.frequency.exponentialRampToValueAtTime(60, t + 0.012);
+        clickGain.gain.setValueAtTime(gainVal * 0.35, t);
+        clickGain.gain.exponentialRampToValueAtTime(0.00001, t + 0.015);
+        clickOsc.connect(clickGain);
+        clickGain.connect(ctx.destination);
+        clickOsc.start(t);
+        clickOsc.stop(t + 0.018);
+      };
+
+      const playSnare = (t: number, gainVal: number, isClap = false) => {
+        const osc = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(195, t);
+        osc.frequency.exponentialRampToValueAtTime(80, t + 0.045);
+        oscGain.gain.setValueAtTime(gainVal * 0.7, t);
+        oscGain.gain.exponentialRampToValueAtTime(0.00001, t + 0.075);
+        osc.connect(oscGain);
+        oscGain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.08);
+
+        const dur = isClap ? 0.13 : 0.095;
+        const bufferSize = Math.floor(ctx.sampleRate * dur);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(isClap ? 1800 : 2500, t);
+        bp.Q.setValueAtTime(2.8, t);
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(gainVal * 0.85, t);
+        noiseGain.gain.exponentialRampToValueAtTime(0.00001, t + dur - 0.01);
+        noise.connect(bp);
+        bp.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noise.start(t);
+        noise.stop(t + dur);
+      };
+
+      const playHiHat = (t: number, gainVal: number, isOpen = false) => {
+        const dur = isOpen ? 0.16 : 0.038;
+        const bufferSize = Math.floor(ctx.sampleRate * dur);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.setValueAtTime(7000, t);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(gainVal * 0.5, t);
+        gain.gain.exponentialRampToValueAtTime(0.00001, t + dur);
+        noise.connect(hp);
+        hp.connect(gain);
+        gain.connect(ctx.destination);
+        noise.start(t);
+        noise.stop(t + dur);
+      };
+
+      if (soundType === 'rock_beat') {
+        // Standard Rock / Pop: Kick on 1 & 3, Snare on 2 & 4, straight 8th-note Hi-Hats
+        if (beatNum === 0) {
+          playKick(playTime, targetMetronomeGain * 1.05, 44);
+          playHiHat(playTime, targetMetronomeGain * 0.6);
+          playHiHat(playTime + beatSecs * 0.5, targetMetronomeGain * 0.42);
+        } else if (beatNum === 1) {
+          playSnare(playTime, targetMetronomeGain * 1.0);
+          playHiHat(playTime, targetMetronomeGain * 0.52);
+          playHiHat(playTime + beatSecs * 0.5, targetMetronomeGain * 0.42);
+        } else if (beatNum === 2) {
+          playKick(playTime, targetMetronomeGain * 0.95, 46);
+          playHiHat(playTime, targetMetronomeGain * 0.58);
+          playHiHat(playTime + beatSecs * 0.5, targetMetronomeGain * 0.42);
+        } else {
+          playSnare(playTime, targetMetronomeGain * 1.0);
+          playHiHat(playTime, targetMetronomeGain * 0.52);
+          playHiHat(playTime + beatSecs * 0.5, targetMetronomeGain * 0.42);
+        }
+      } else if (soundType === 'hiphop_beat') {
+        // Standard Boom-Bap / Urban Beat: Kick on 1 & 3-and, Snare on 2 & 4, Open Hat on 4-and
+        if (beatNum === 0) {
+          playKick(playTime, targetMetronomeGain * 1.2, 35);
+          playHiHat(playTime, targetMetronomeGain * 0.65);
+        } else if (beatNum === 1) {
+          playSnare(playTime, targetMetronomeGain * 1.05, true);
+          playHiHat(playTime, targetMetronomeGain * 0.5);
+          playHiHat(playTime + beatSecs * 0.5, targetMetronomeGain * 0.38);
+        } else if (beatNum === 2) {
+          playHiHat(playTime, targetMetronomeGain * 0.55);
+          playKick(playTime + beatSecs * 0.5, targetMetronomeGain * 0.95, 38);
+        } else {
+          playSnare(playTime, targetMetronomeGain * 1.05, true);
+          playHiHat(playTime, targetMetronomeGain * 0.45);
+          playHiHat(playTime + beatSecs * 0.5, targetMetronomeGain * 0.48, true);
+        }
+      } else if (soundType === 'shuffle_beat') {
+        // Standard Blues / Swing Shuffle (8th-note Triplet Swing at 2/3)
+        const swingOffset = beatSecs * (2.0 / 3.0);
+        if (beatNum === 0) {
+          playKick(playTime, targetMetronomeGain * 0.95, 48);
+          playHiHat(playTime, targetMetronomeGain * 0.65);
+          playHiHat(playTime + swingOffset, targetMetronomeGain * 0.45);
+        } else if (beatNum === 1) {
+          playSnare(playTime, targetMetronomeGain * 0.9);
+          playHiHat(playTime, targetMetronomeGain * 0.55);
+          playHiHat(playTime + swingOffset, targetMetronomeGain * 0.45);
+        } else if (beatNum === 2) {
+          playKick(playTime, targetMetronomeGain * 0.9, 48);
+          playKick(playTime + swingOffset, targetMetronomeGain * 0.7, 52);
+          playHiHat(playTime, targetMetronomeGain * 0.6);
+          playHiHat(playTime + swingOffset, targetMetronomeGain * 0.45);
+        } else {
+          playSnare(playTime, targetMetronomeGain * 0.9);
+          playHiHat(playTime, targetMetronomeGain * 0.55);
+          playHiHat(playTime + swingOffset, targetMetronomeGain * 0.45);
+        }
+      } else if (soundType === 'funk_beat') {
+        // Standard Funk / Disco (Four-on-the-Floor Kick, Snare on 2 & 4, Offbeat Open Hat)
+        playKick(playTime, targetMetronomeGain * 0.95, 48);
+        playHiHat(playTime, targetMetronomeGain * 0.45);
+        playHiHat(playTime + beatSecs * 0.5, targetMetronomeGain * 0.65, true);
+        if (beatNum === 1 || beatNum === 3) {
+          playSnare(playTime, targetMetronomeGain * 1.0);
+        }
+      } else if (soundType === 'synth') {
         const osc = ctx.createOscillator();
         const gainNode = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(isHigh ? 1000 : 800, playTime);
+        osc.frequency.setValueAtTime(beatNum === 0 ? 1000 : 800, playTime);
 
         const volume = targetMetronomeGain * 0.65;
         gainNode.gain.setValueAtTime(0, playTime);
@@ -1307,13 +1473,13 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         const bodyOsc = ctx.createOscillator();
         const bodyGain = ctx.createGain();
         bodyOsc.type = 'sine';
-        bodyOsc.frequency.setValueAtTime(isHigh ? 380 : 310, playTime);
+        bodyOsc.frequency.setValueAtTime(beatNum === 0 ? 380 : 310, playTime);
 
         const stickOsc = ctx.createOscillator();
         const stickGain = ctx.createGain();
         stickOsc.type = 'sine';
-        stickOsc.frequency.setValueAtTime(isHigh ? 1500 : 1200, playTime);
-        stickOsc.frequency.exponentialRampToValueAtTime(isHigh ? 500 : 400, playTime + 0.004);
+        stickOsc.frequency.setValueAtTime(beatNum === 0 ? 1500 : 1200, playTime);
+        stickOsc.frequency.exponentialRampToValueAtTime(beatNum === 0 ? 500 : 400, playTime + 0.004);
 
         bodyGain.gain.setValueAtTime(targetMetronomeGain * 0.35, playTime);
         bodyGain.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.015);
@@ -1331,7 +1497,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         stickOsc.start(playTime);
         stickOsc.stop(playTime + 0.015);
 
-        const bufferSize = ctx.sampleRate * 0.008;
+        const bufferSize = Math.floor(ctx.sampleRate * 0.008);
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
@@ -1357,7 +1523,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         const gainNode = ctx.createGain();
         osc1.type = 'square';
         osc2.type = 'square';
-        const f = isHigh ? 840 : 540;
+        const f = beatNum === 0 ? 840 : 540;
         osc1.frequency.setValueAtTime(f, playTime);
         osc2.frequency.setValueAtTime(f * 1.48, playTime);
 
@@ -1383,8 +1549,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         const gainNode = ctx.createGain();
         osc.type = 'sine';
 
-        const startFreq = isHigh ? 1600 : 1200;
-        const endFreq = isHigh ? 900 : 700;
+        const startFreq = beatNum === 0 ? 1600 : 1200;
+        const endFreq = beatNum === 0 ? 900 : 700;
         osc.frequency.setValueAtTime(startFreq, playTime);
         osc.frequency.exponentialRampToValueAtTime(endFreq, playTime + 0.003);
 
@@ -1401,6 +1567,59 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     }
   };
 
+  const previewIntervalRef = useRef<any>(null);
+
+  const stopPreviewLoop = () => {
+    if (previewIntervalRef.current) {
+      clearInterval(previewIntervalRef.current);
+      previewIntervalRef.current = null;
+    }
+    setIsPreviewingSound(false);
+  };
+
+  const togglePreviewMetronomeSound = (soundToTest?: string) => {
+    const snd = soundToTest || metronomeSound;
+
+    if (soundToTest && isPreviewingSound) {
+      // Sound changed in dropdown, next tick will automatically play new sound via metronomeSoundRef
+      return;
+    }
+
+    if (isPreviewingSound && !soundToTest) {
+      stopPreviewLoop();
+      return;
+    }
+
+    setIsPreviewingSound(true);
+    if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
+
+    initAudio();
+    let beatIdx = 0;
+    const beatMs = (60.0 / bpm) * 1000;
+
+    // Play immediately beat 1 (index 0)
+    playClickSound(true, undefined, snd, 0);
+    beatIdx = 1;
+
+    previewIntervalRef.current = setInterval(() => {
+      const currentBeat = beatIdx % 4;
+      playClickSound(currentBeat === 0, undefined, metronomeSoundRef.current, currentBeat);
+      beatIdx++;
+    }, beatMs);
+  };
+
+  useEffect(() => {
+    if (isPlaying || isAutoSequenceActive) {
+      stopPreviewLoop();
+    }
+  }, [isPlaying, isAutoSequenceActive]);
+
+  useEffect(() => {
+    return () => {
+      stopPreviewLoop();
+    };
+  }, []);
+
   useEffect(() => {
     if (clickIntervalRef.current) clearInterval(clickIntervalRef.current);
 
@@ -1408,7 +1627,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       const intervalMs = (60 / bpm) * 1000;
       let beatCount = 0;
       clickIntervalRef.current = setInterval(() => {
-        playClickSound(beatCount % 4 === 0);
+        playClickSound(beatCount % 4 === 0, undefined, undefined, beatCount % 4);
         beatCount++;
       }, intervalMs);
     }
@@ -1821,7 +2040,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       audioEventsQueueRef.current = [];
 
       const scheduleNote = (tickIndex: number, time: number) => {
-        playClickSound(tickIndex % 4 === 0, time);
+        playClickSound(tickIndex % 4 === 0, time, undefined, tickIndex % 4);
         uiEventsQueueRef.current.push({ time, type: 'TICK', data: { tickIndex } });
         audioEventsQueueRef.current.push({ time, type: 'TICK', data: { tickIndex } });
       };
@@ -3138,47 +3357,62 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           background: transparent;
           outline: none;
           cursor: pointer;
+          margin: 0;
+          padding: 0;
         }
         .groovelab-fader::-webkit-slider-runnable-track {
           width: 100%;
           height: 6px;
-          background: linear-gradient(to bottom, #a0aec0 0%, #1a202c 35%, #1a202c 65%, #a0aec0 100%);
-          border-radius: 3px;
-          box-shadow: inset 0 1.5px 3px rgba(0,0,0,0.4);
+          background: #e2e8f0;
+          border-radius: 999px;
+          box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+          border: none;
         }
         .groovelab-fader::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 18px;
-          height: 26px;
-          border-radius: 3px;
-          background: linear-gradient(to bottom, #f1f5f9 0%, #ffffff 42%, #0f172a 43%, #0f172a 57%, #ffffff 58%, #cbd5e1 100%);
-          border: 1px solid #64748b;
-          box-shadow: 0 3px 6px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.3);
-          margin-top: -10px;
-          transition: transform 0.1s ease;
+          width: 16px;
+          height: 22px;
+          border-radius: 6px;
+          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 60%, #e2e8f0 100%);
+          border: 1px solid rgba(15, 23, 42, 0.16);
+          box-shadow: 0 3px 6px -1px rgba(15, 23, 42, 0.18), 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 #ffffff;
+          margin-top: -8px;
+          cursor: grab;
+          transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .groovelab-fader::-webkit-slider-thumb:hover {
-          transform: scale(1.05);
+          transform: scale(1.08);
+          border-color: #34a853;
+          box-shadow: 0 4px 10px -1px rgba(52, 168, 83, 0.25), 0 1px 3px rgba(0, 0, 0, 0.08), inset 0 1px 0 #ffffff;
+        }
+        .groovelab-fader::-webkit-slider-thumb:active {
+          cursor: grabbing;
+          transform: scale(1.04);
+          background: #f1f5f9;
+          border-color: #16a34a;
         }
         .groovelab-fader::-moz-range-track {
           width: 100%;
           height: 6px;
-          background: linear-gradient(to bottom, #a0aec0 0%, #1a202c 35%, #1a202c 65%, #a0aec0 100%);
-          border-radius: 3px;
-          box-shadow: inset 0 1.5px 3px rgba(0,0,0,0.4);
+          background: #e2e8f0;
+          border-radius: 999px;
+          box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+          border: none;
         }
         .groovelab-fader::-moz-range-thumb {
-          width: 18px;
-          height: 26px;
-          border-radius: 3px;
-          background: linear-gradient(to bottom, #f1f5f9 0%, #ffffff 42%, #0f172a 43%, #0f172a 57%, #ffffff 58%, #cbd5e1 100%);
-          border: 1px solid #64748b;
-          box-shadow: 0 3px 6px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.3);
-          transition: transform 0.1s ease;
+          width: 16px;
+          height: 22px;
+          border-radius: 6px;
+          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 60%, #e2e8f0 100%);
+          border: 1px solid rgba(15, 23, 42, 0.16);
+          box-shadow: 0 3px 6px -1px rgba(15, 23, 42, 0.18), 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 #ffffff;
+          cursor: grab;
+          transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .groovelab-fader::-moz-range-thumb:hover {
-          transform: scale(1.05);
+          transform: scale(1.08);
+          border-color: #34a853;
         }
         .daw-console-strip {
           transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -4861,72 +5095,144 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     </select>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 90px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 140px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                      <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.04em' }}>METRONOM-SOUND</span>
+                      <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.04em' }}>BEAT &amp; METRONOM-SOUND</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <select
+                        value={metronomeSound}
+                        onChange={(e) => {
+                          const newSound = e.target.value as any;
+                          setMetronomeSound(newSound);
+                          togglePreviewMetronomeSound(newSound);
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid rgba(0, 0, 0, 0.08)',
+                          borderRadius: '8px',
+                          height: '32px',
+                          padding: '0 6px',
+                          fontSize: '0.62rem',
+                          fontWeight: 700,
+                          outline: 'none',
+                          cursor: 'pointer',
+                          flex: 1
+                        }}
+                      >
+                        <optgroup label="🥁 Drum Grooves">
+                          <option value="rock_beat">🥁 Rock / Pop Beat</option>
+                          <option value="hiphop_beat">🎛️ Hip-Hop Beat</option>
+                          <option value="shuffle_beat">🎸 Shuffle / Blues</option>
+                          <option value="funk_beat">🪩 Funk / Disco (4-on-Floor)</option>
+                        </optgroup>
+                        <optgroup label="🔔 Metronom Klicks">
+                          <option value="wood">Holz-Klick</option>
+                          <option value="cowbell">Cowbell</option>
+                          <option value="rimshot">Rimshot</option>
+                          <option value="synth">Synth-Beep</option>
+                        </optgroup>
+                      </select>
                       <button
                         type="button"
-                        onClick={() => playClickSound(true)}
+                        onClick={() => togglePreviewMetronomeSound()}
                         style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '0 2px',
+                          background: isPreviewingSound ? 'linear-gradient(135deg, #fef08a 0%, #fde047 100%)' : '#f1f5f9',
+                          border: isPreviewingSound ? '1.5px solid #eab308' : '1.5px solid #cbd5e1',
+                          color: isPreviewingSound ? '#854d0e' : '#334155',
+                          borderRadius: '8px',
+                          height: '32px',
+                          padding: '0 10px',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#86868b'
+                          gap: '5px',
+                          boxShadow: isPreviewingSound ? '0 2px 10px rgba(234, 179, 8, 0.35)' : 'none',
+                          transition: 'all 0.15s ease',
+                          whiteSpace: 'nowrap'
                         }}
+                        title={isPreviewingSound ? 'Loop-Vorhören stoppen' : 'Loop-Vorhören starten'}
                       >
-                        <Volume2 size={10} />
+                        {isPreviewingSound ? (
+                          <>
+                            <Square size={10} fill="#854d0e" color="#854d0e" />
+                            <span>Stoppen (Loop)</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play size={10} fill="#334155" color="#334155" />
+                            <span>Vorhören (Loop)</span>
+                          </>
+                        )}
                       </button>
                     </div>
-                    <select
-                      value={metronomeSound}
-                      onChange={(e) => {
-                        const newSound = e.target.value as any;
-                        setMetronomeSound(newSound);
-                        setTimeout(() => playClickSound(true, undefined, newSound), 50);
-                      }}
-                      style={{
-                        background: '#ffffff',
-                        border: '1.5px solid rgba(0, 0, 0, 0.08)',
-                        borderRadius: '8px',
-                        height: '32px',
-                        padding: '0 4px',
-                        fontSize: '0.62rem',
-                        fontWeight: 700,
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="wood">Holz-Klick</option>
-                      <option value="cowbell">Cowbell</option>
-                      <option value="synth">Synth-Beep</option>
-                      <option value="rimshot">Rimshot</option>
-                    </select>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.04em' }}>CLICK LAUTSTÄRKE</span>
-                    <span style={{ fontSize: '0.58rem', color: '#eab308', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{loopstationMetronomeVolume}%</span>
+                    <span style={{ fontSize: '0.58rem', color: '#334155', fontWeight: 800, fontFamily: 'SF Mono, monospace', background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>{loopstationMetronomeVolume}%</span>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={loopstationMetronomeVolume}
-                    onChange={(e) => setLoopstationMetronomeVolume(parseInt(e.target.value))}
-                    className="apple-slider"
-                    style={{
-                      width: '100%',
-                      height: '4px',
-                      cursor: 'pointer',
-                      background: `linear-gradient(to right, #86868b 0%, #86868b ${loopstationMetronomeVolume}%, rgba(0,0,0,0.06) ${loopstationMetronomeVolume}%, rgba(0,0,0,0.06) 100%)`
-                    }}
-                  />
+                  <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '20px',
+                    borderRadius: '999px',
+                    background: '#e2e8f0',
+                    overflow: 'hidden',
+                    boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.08)',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: `${loopstationMetronomeVolume}%`,
+                      background: 'linear-gradient(90deg, #eab308 0%, #ca8a04 100%)',
+                      borderRadius: '999px',
+                      transition: 'width 0.05s ease-out'
+                    }} />
+                    <div style={{
+                      position: 'absolute',
+                      left: `calc(${Math.min(95, Math.max(5, loopstationMetronomeVolume))}% - 9px)`,
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.22)',
+                      border: '0.5px solid rgba(0,0,0,0.08)',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '1px'
+                    }}>
+                      <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
+                      <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={loopstationMetronomeVolume}
+                      onChange={(e) => setLoopstationMetronomeVolume(parseInt(e.target.value))}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        opacity: 0,
+                        cursor: 'pointer',
+                        margin: 0,
+                        zIndex: 10
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -4980,31 +5286,74 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                         {isDeviceCalibrated ? '🎯 Kalibriert (Neu einmessen)' : '⚡ Auto-Einmessen'}
                       </span>
                     </div>
-                    <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</span>
+                    <span style={{ fontSize: '0.58rem', color: '#334155', fontWeight: 800, fontFamily: 'SF Mono, monospace', background: '#ffffff', padding: '1px 5px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</span>
                   </div>
-                  <input
-                    type="range"
-                    min="-150"
-                    max="350"
-                    value={syncOffsetMs}
-                    onChange={(e) => {
-                      setSyncOffsetMs(parseInt(e.target.value));
-                      isManualLatencyAdjustmentRef.current = true;
-                    }}
-                    onMouseUp={(e) => {
-                      updateLatencyInDb(parseInt((e.target as HTMLInputElement).value));
-                    }}
-                    onTouchEnd={(e) => {
-                      updateLatencyInDb(parseInt((e.target as HTMLInputElement).value));
-                    }}
-                    className="apple-slider"
-                    style={{
-                      width: '100%',
-                      height: '4px',
-                      cursor: 'pointer',
-                      background: `linear-gradient(to right, #86868b 0%, #86868b ${((syncOffsetMs + 150) / 500) * 100}%, rgba(0,0,0,0.06) ${((syncOffsetMs + 150) / 500) * 100}%, rgba(0,0,0,0.06) 100%)`
-                    }}
-                  />
+                  <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '20px',
+                    borderRadius: '999px',
+                    background: '#e2e8f0',
+                    overflow: 'hidden',
+                    boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.08)',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: `${((syncOffsetMs + 150) / 500) * 100}%`,
+                      background: 'linear-gradient(90deg, #64748b 0%, #475569 100%)',
+                      borderRadius: '999px',
+                      transition: 'width 0.05s ease-out'
+                    }} />
+                    <div style={{
+                      position: 'absolute',
+                      left: `calc(${Math.min(95, Math.max(5, ((syncOffsetMs + 150) / 500) * 100))}% - 9px)`,
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.22)',
+                      border: '0.5px solid rgba(0,0,0,0.08)',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '1px'
+                    }}>
+                      <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
+                      <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
+                    </div>
+                    <input
+                      type="range"
+                      min="-150"
+                      max="350"
+                      value={syncOffsetMs}
+                      onChange={(e) => {
+                        setSyncOffsetMs(parseInt(e.target.value));
+                        isManualLatencyAdjustmentRef.current = true;
+                      }}
+                      onMouseUp={(e) => {
+                        updateLatencyInDb(parseInt((e.target as HTMLInputElement).value));
+                      }}
+                      onTouchEnd={(e) => {
+                        updateLatencyInDb(parseInt((e.target as HTMLInputElement).value));
+                      }}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        opacity: 0,
+                        cursor: 'pointer',
+                        margin: 0,
+                        zIndex: 10
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -5127,17 +5476,108 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '200px', marginLeft: '8px' }}>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={track.volume}
-                      onChange={(e) => handleVolumeChange(track.id, parseInt(e.target.value))}
-                      className="groovelab-fader"
-                    />
-                    <span style={{ fontSize: '0.50rem', fontWeight: 700, color: '#86868b', minWidth: '22px', textAlign: 'right' }}>
-                      {Math.round((track.volume / 100) * 6 - 6)}dB
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '210px', marginLeft: '8px' }}>
+                    <div style={{
+                      position: 'relative',
+                      width: '100%',
+                      height: '22px',
+                      borderRadius: '999px',
+                      background: '#e2e8f0',
+                      overflow: 'hidden',
+                      boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.08)',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}>
+                      {/* Active Green Fill */}
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: `${track.volume}%`,
+                        background: track.isMuted 
+                          ? '#94a3b8' 
+                          : 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)',
+                        borderRadius: '999px',
+                        transition: 'width 0.05s ease-out'
+                      }} />
+
+                      {/* Miniature Speaker Icon Inside Capsule */}
+                      <div style={{
+                        position: 'absolute',
+                        left: '7px',
+                        zIndex: 2,
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        color: track.volume > 22 ? '#ffffff' : '#64748b',
+                        transition: 'color 0.1s ease'
+                      }}>
+                        {track.isMuted || track.volume === 0 ? (
+                          <VolumeX size={11} />
+                        ) : track.volume < 50 ? (
+                          <Volume1 size={11} />
+                        ) : (
+                          <Volume2 size={11} />
+                        )}
+                      </div>
+
+                      {/* Tactile Floating Glass/Aluminum Knob */}
+                      <div style={{
+                        position: 'absolute',
+                        left: `calc(${Math.min(94, Math.max(6, track.volume))}% - 9px)`,
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: '#ffffff',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.22)',
+                        border: '0.5px solid rgba(0,0,0,0.08)',
+                        pointerEvents: 'none',
+                        zIndex: 3,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '1px'
+                      }}>
+                        <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
+                        <div style={{ width: '1px', height: '6px', background: '#cbd5e1' }} />
+                      </div>
+
+                      {/* Native Invisible Accessible Range Input */}
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={track.volume}
+                        onChange={(e) => handleVolumeChange(track.id, parseInt(e.target.value))}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          width: '100%',
+                          height: '100%',
+                          opacity: 0,
+                          cursor: 'pointer',
+                          margin: 0,
+                          zIndex: 10
+                        }}
+                      />
+                    </div>
+
+                    {/* Apple SF Mono dB Badge */}
+                    <span style={{
+                      fontSize: '0.56rem',
+                      fontWeight: 800,
+                      color: track.isMuted ? '#94a3b8' : (track.volume > 0 ? '#15803d' : '#64748b'),
+                      minWidth: '34px',
+                      textAlign: 'center',
+                      fontFamily: 'SF Mono, Menlo, monospace',
+                      background: '#f8fafc',
+                      padding: '2px 5px',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                    }}>
+                      {track.isMuted ? 'MUTE' : `${Math.round((track.volume / 100) * 6 - 6)}dB`}
                     </span>
                   </div>
 

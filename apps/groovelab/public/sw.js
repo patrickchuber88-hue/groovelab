@@ -1,4 +1,4 @@
-const CACHE_NAME = 'groovelab-static-v98';
+const CACHE_NAME = 'groovelab-static-v103';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -36,6 +36,13 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('push', function(event) {
+  // Set native app badge counter on PWA icon
+  if ('setAppBadge' in self.navigator) {
+    self.navigator.setAppBadge().catch(function(err) {
+      console.warn('Could not set app badge:', err);
+    });
+  }
+
   if (event.data) {
     try {
       const payload = event.data.json();
@@ -72,6 +79,14 @@ self.addEventListener('push', function(event) {
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
+
+  // Clear native app badge on interaction
+  if ('clearAppBadge' in self.navigator) {
+    self.navigator.clearAppBadge().catch(function(err) {
+      console.warn('Could not clear app badge:', err);
+    });
+  }
+
   const notificationId = event.notification.data?.notificationId;
   const supabaseUrl = event.notification.data?.supabaseUrl;
   const supabaseKey = event.notification.data?.supabaseKey;

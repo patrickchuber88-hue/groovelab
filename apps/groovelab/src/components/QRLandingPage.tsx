@@ -8,6 +8,7 @@ import { validateNewPin } from '../utils/pinValidation';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 
 import { useMasterPricing } from '../context/MasterPricingContext';
+import { computeGroundTruthMetrics, broadcastPracticeUpdate } from '../utils/studentProgressEngine';
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
@@ -470,6 +471,51 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       matchStandalone.removeEventListener?.('change', handleStandaloneChange);
     };
   }, []);
+
+  // Screen WakeLock for uninterrupted mobile practice
+  const wakeLockRef = useRef<any>(null);
+  useEffect(() => {
+    const acquireWakeLock = async () => {
+      if (!('wakeLock' in navigator)) return;
+      try {
+        if (wakeLockRef.current) return;
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        console.log('[PWA] Screen WakeLock acquired for practice session');
+      } catch (err) {
+        console.warn('[PWA] WakeLock request failed:', err);
+      }
+    };
+
+    const releaseWakeLock = async () => {
+      if (wakeLockRef.current) {
+        try {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+          console.log('[PWA] Screen WakeLock released');
+        } catch (err) {
+          console.warn('[PWA] Error releasing WakeLock:', err);
+        }
+      }
+    };
+
+    if (timerRunning) {
+      acquireWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && timerRunning) {
+        acquireWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseWakeLock();
+    };
+  }, [timerRunning]);
 
   const handleInstallClick = async () => {
     if (deferredInstallPrompt) {
@@ -1607,6 +1653,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         roomsRes,
         teachersRes,
         lehrwerkeRes,
+        fokusLogsRes,
         songSkillsRes
       ] = await Promise.all([
         supabase
@@ -1665,6 +1712,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           .from('lehrwerke')
           .select('*')
           .eq('school_id', profile.school_id),
+        supabase
+          .from('fokus_logs')
+          .select('*')
+          .in('user_id', studentIdList)
+          .order('created_at', { ascending: false }),
         supabase
           .from('user_song_skills')
           .select('*, songs(*)')
@@ -1853,10 +1905,39 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         return (a.start_time || '').localeCompare(b.start_time || '');
       });
 
+      const fokusLogsData = fokusLogsRes?.data || [];
+
+      const metrics = computeGroundTruthMetrics({
+        fokusLogs: fokusLogsData,
+        songSkills: songSkillsData,
+        progressMatrix: deduplicatedMatrixItems,
+        user: profile,
+        avatar: avatarData,
+        stats: statsData,
+        simulatedDate: todayDate,
+        targetMinutes: dailyGoal || 3
+      });
+
+      const updatedStats = {
+        ...(statsData || {}),
+        student_id: profile.id,
+        current_xp: metrics.totalXp,
+        streak_flame: metrics.streakFlame,
+        total_focus_minutes: metrics.totalFocusMinutes
+      };
+
+      const updatedAvatar = {
+        ...(avatarData || {}),
+        user_id: profile.id,
+        xp: metrics.totalXp,
+        streak_flame: metrics.streakFlame,
+        last_focus_date: metrics.hasCompletedTargetToday ? todayStr : (avatarData?.last_focus_date || statsData?.last_practice_date)
+      };
+
       setSchedules(schData || []);
       setOccurrences(allMergedOccurrences);
-      setStats(statsData || null);
-      setAvatar(avatarData || null);
+      setStats(updatedStats);
+      setAvatar(updatedAvatar);
       setProgressItems(deduplicatedMatrixItems);
       setActiveSongSkills(songSkillsData || []);
       const normalizedTeachers = (teachersRes?.data || []).map((t: any) => {
@@ -1880,19 +1961,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         if (combined.length > 0) setLocalProgress(combined);
       } catch {}
 
-      if (statsData && statsData.last_practice_date === todayStr) {
-        setPracticeLoggedToday(true);
-        // Get total logged minutes for today across all sessions
-        const { data: todayLogs } = await supabase
-          .from('fokus_logs')
-          .select('duration_minutes')
-          .eq('user_id', profile.id)
-          .gte('created_at', todayStr + 'T00:00:00');
-        if (todayLogs && todayLogs.length > 0) {
-          const totalMins = todayLogs.reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
-          setLoggedMinutesToday(totalMins);
-        }
-      }
+      setPracticeLoggedToday(metrics.hasCompletedTargetToday);
+      setLoggedMinutesToday(metrics.todayTotalMinutes);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -1972,6 +2042,61 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           fetchDashboardData();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          schema: 'public',
+          event: '*',
+          table: 'fokus_logs'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          schema: 'public',
+          event: '*',
+          table: 'student_stats'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          schema: 'public',
+          event: '*',
+          table: 'avatars'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          schema: 'public',
+          event: '*',
+          table: 'progress_matrix'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          schema: 'public',
+          event: '*',
+          table: 'user_song_skills'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
       .subscribe();
 
     const handleHomeworkUpdate = (e: Event) => {
@@ -1982,9 +2107,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     };
     window.addEventListener('homework-updated', handleHomeworkUpdate);
 
+    const handlePracticeUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (!customEvent.detail?.studentId || customEvent.detail?.studentId === profile.id) {
+        fetchDashboardData();
+      }
+    };
+    window.addEventListener('cg_practice_updated', handlePracticeUpdate);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel(`cg_practice_sync_${profile.id}`);
+        bc.onmessage = () => {
+          fetchDashboardData();
+        };
+      }
+    } catch (e) {}
+
     return () => {
       supabase.removeChannel(channel);
       window.removeEventListener('homework-updated', handleHomeworkUpdate);
+      window.removeEventListener('cg_practice_updated', handlePracticeUpdate);
+      if (bc) {
+        try { bc.close(); } catch (e) {}
+      }
     };
   }, [pageState, profile?.id, fetchDashboardData]);
 
@@ -2494,18 +2641,36 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         }
       }
 
-      // 2. Statistiken aktualisieren (student_stats)
+      // 2. Fetch all latest logs to calculate Ground-Truth Metrics
+      const { data: allLogs } = await supabase
+        .from('fokus_logs')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      const metrics = computeGroundTruthMetrics({
+        fokusLogs: allLogs || [],
+        songSkills: activeSongSkills,
+        progressMatrix: progressItems,
+        user: profile,
+        avatar: avatar,
+        stats: currentStats,
+        simulatedDate: getSimulatedNow(),
+        targetMinutes: dailyGoal || 3
+      });
+
+      // 3. Statistiken aktualisieren (student_stats)
       await supabase.from('student_stats').upsert({
         student_id: profile.id,
-        total_focus_minutes: totalMins,
-        monthly_focus_minutes: monthlyMins,
-        streak_flame: newStreak,
+        total_focus_minutes: metrics.totalFocusMinutes,
+        monthly_focus_minutes: (currentStats?.monthly_focus_minutes || 0) + minutes,
+        streak_flame: metrics.streakFlame,
         last_practice_date: todayStr,
-        current_xp: newXp,
+        current_xp: metrics.totalXp,
         updated_at: new Date().toISOString()
       }, { onConflict: 'student_id' });
 
-      // 3. Avatar-Tabelle updaten
+      // 4. Avatar-Tabelle updaten
       const { data: avatarRecord } = await supabase
         .from('avatars')
         .select('*')
@@ -2514,8 +2679,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       if (avatarRecord) {
         await supabase.from('avatars').update({
-          xp: newXp,
-          streak_flame: newStreak,
+          xp: metrics.totalXp,
+          streak_flame: metrics.streakFlame,
           last_focus_date: todayStr
         }).eq('id', avatarRecord.id);
       }
@@ -2527,25 +2692,27 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         profile.joker_used_at = new Date().toISOString();
       }
 
+      broadcastPracticeUpdate(profile.id, { metrics });
+
       playSuccessChime();
 
       setStats({
         student_id: profile.id,
-        total_focus_minutes: totalMins,
-        monthly_focus_minutes: monthlyMins,
-        streak_flame: newStreak,
+        total_focus_minutes: metrics.totalFocusMinutes,
+        monthly_focus_minutes: (currentStats?.monthly_focus_minutes || 0) + minutes,
+        streak_flame: metrics.streakFlame,
         last_practice_date: todayStr,
-        current_xp: newXp
+        current_xp: metrics.totalXp
       });
       if (avatarRecord) {
         setAvatar({
           ...avatarRecord,
-          xp: newXp,
-          streak_flame: newStreak,
+          xp: metrics.totalXp,
+          streak_flame: metrics.streakFlame,
           last_focus_date: todayStr
         });
       }
-      setLoggedMinutesToday(prev => prev + minutes); // accumulate minutes logged today in state
+      setLoggedMinutesToday(metrics.todayTotalMinutes);
       setHasExploded(false);
       setPracticeLoggedToday(true);
 
