@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
 import * as lamejs from '@breezystack/lamejs';
 import { GrooveLoopstation } from './groovelab/GrooveLoopstation';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
+import { CampusTuner } from './campus/CampusTuner';
 import { AudioBiographyView, CustomPlaylist, CustomPlaylistTrack } from './campus/AudioBiographyView';
 import { processPureRawBlob, processStudioMastering } from '../utils/audioMasteringEngine';
 import { storeBlob, getBlob } from '../utils/blobStorage';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
+import { AudioEditorModal } from './campus/AudioEditorModal';
 
 
 const getSimulatedNow = (): Date => {
@@ -542,6 +544,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   initialMasteredSongsCount,
   hasTresorStorage: propHasTresor
 }) => {
+  const isTeacherMode = !readOnly || isTeacherTools;
+  const studentFirstName = (student?.first_name || (student as any)?.name?.split(' ')[0] || 'Schüler').trim();
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showProtokollOnboarding, setShowProtokollOnboarding] = useState<boolean>(() => {
@@ -580,6 +584,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const isInsideSim = isInsideSimMobile || isInsideSimTabletLandscape;
   const isMobileView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
   const [mobileProtokollTab, setMobileProtokollTab] = useState<'repertoire' | 'homework'>('repertoire');
+  const [hubTab, setHubTab] = useState<'modules' | 'protocol'>('modules');
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const modalContainerRef = useRef<HTMLDivElement>(null);
@@ -777,10 +782,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [newCustomTagInput, setNewCustomTagInput] = useState<string>('');
-  const [expandedAudioWeeks, setExpandedAudioWeeks] = useState<Record<string, boolean>>({});
+  const [expandedTeacherAudioWeeks, setExpandedTeacherAudioWeeks] = useState<Record<string, boolean>>({});
+  const [expandedStudentAudioWeeks, setExpandedStudentAudioWeeks] = useState<Record<string, boolean>>({});
 
-  const toggleAudioWeek = (weekKey: string, defaultOpen: boolean = true) => {
-    setExpandedAudioWeeks(prev => {
+  const toggleTeacherAudioWeek = (weekKey: string, defaultOpen: boolean = true) => {
+    setExpandedTeacherAudioWeeks(prev => {
+      const current = prev[weekKey] !== undefined ? prev[weekKey] : defaultOpen;
+      return { ...prev, [weekKey]: !current };
+    });
+  };
+
+  const toggleStudentAudioWeek = (weekKey: string, defaultOpen: boolean = true) => {
+    setExpandedStudentAudioWeeks(prev => {
       const current = prev[weekKey] !== undefined ? prev[weekKey] : defaultOpen;
       return { ...prev, [weekKey]: !current };
     });
@@ -1366,7 +1379,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const [stickerCategoryFilter, setStickerCategoryFilter] = useState<'all' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial'>('all');
   const [isXpLegendOpen, setIsXpLegendOpen] = useState<boolean>(false);
-  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice'>(initialViewMode || (isTeacherTools ? 'loopstation' : 'document'));
+  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice' | 'tuner'>(initialViewMode || (isTeacherTools ? 'loopstation' : 'document'));
 
   // Speech Recognition & Audio play-along state
   const [isListening, setIsListening] = useState(false);
@@ -1376,11 +1389,122 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioDuration, setAudioDuration] = useState(0);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [localJuniorRecordingsTrigger, setLocalJuniorRecordingsTrigger] = useState(0);
   const [mediaRecorderInstance, setMediaRecorderInstance] = useState<MediaRecorder | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const useNotebookLayout = false;
   const recordingTimerRef = React.useRef<any>(null);
   const accumulatedTranscriptRef = React.useRef<string>('');
+
+  // ⏱️ Mechanical Metronome Icon Component
+  const MechanicalMetronomeIcon = ({ size = 18, color = "currentColor", strokeWidth = 2 }: { size?: number; color?: string; strokeWidth?: number }) => (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 21h12" />
+      <path d="M7.5 21L11 3.5h2l3.5 17.5" />
+      <path d="M12 4v17" />
+      <path d="M9 13.5l5.5-3" />
+      <circle cx="14.5" cy="10.5" r="1.8" fill={color} />
+    </svg>
+  );
+
+  // 🔍 Unified Omnisearch, Favorites & Month Album States
+  const [recordingSearchQuery, setRecordingSearchQuery] = useState<string>("");
+  const [selectedTeacherMonth, setSelectedTeacherMonth] = useState<{ key: string; label: string } | null>(null);
+  const [selectedStudentMonth, setSelectedStudentMonth] = useState<{ key: string; label: string } | null>(null);
+  const [showTeacherFavoritesOnly, setShowTeacherFavoritesOnly] = useState<boolean>(false);
+  const [showStudentFavoritesOnly, setShowStudentFavoritesOnly] = useState<boolean>(false);
+  const [favoriteAudioUrls, setFavoriteAudioUrls] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(`campus_audio_favorites_${student?.id || "default"}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const toggleFavoriteAudio = (audioUrl: string) => {
+    setFavoriteAudioUrls(prev => {
+      const updated = prev.includes(audioUrl) ? prev.filter(u => u !== audioUrl) : [...prev, audioUrl];
+      try {
+        localStorage.setItem(`campus_audio_favorites_${student?.id || "default"}`, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+
+
+  // 🏷️ Smart Contextual Auto-Naming Generator
+  const generateSmartAudioTitle = (isTeacher: boolean, customLabel?: string): string => {
+    if (customLabel && customLabel.trim()) return customLabel.trim();
+
+    const now = getSimulatedNow();
+    const weekdayShort = now.toLocaleDateString("de-DE", { weekday: "short" });
+    const dateShort = now.toLocaleDateString("de-DE", { day: "2-digit", month: "short" });
+    const timeShort = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+
+    // 1. Check if active piece / topic name exists
+    const activePiece = (topicName || "").trim();
+    if (activePiece && !activePiece.toLowerCase().startsWith("hausaufgabe") && !activePiece.toLowerCase().startsWith("allgemein")) {
+      return `${activePiece} • ${weekdayShort}, ${timeShort}`;
+    }
+
+    // 2. Role-based smart naming
+    if (isTeacher) {
+      return `Unterrichts-Audio • ${weekdayShort}, ${dateShort}`;
+    } else {
+      return `Übe-Take • ${weekdayShort}, ${dateShort} (${timeShort})`;
+    }
+  };
+
+  // ⏱️ Recording Metronome / Click State
+  const [isRecordingMetronomeActive, setIsRecordingMetronomeActive] = useState<boolean>(false);
+  const [recordingBpm, setRecordingBpm] = useState<number>(100);
+  const [showRecordingMetronomePopup, setShowRecordingMetronomePopup] = useState<boolean>(false);
+  const recordingMetronomeIntervalRef = useRef<any>(null);
+
+  const playMetronomeTick = (isAccent: boolean) => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(isAccent ? 1200 : 800, ctx.currentTime);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.045);
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (isRecordingAudio && isRecordingMetronomeActive) {
+      const intervalMs = (60 / recordingBpm) * 1000;
+      let beat = 0;
+      playMetronomeTick(true);
+      recordingMetronomeIntervalRef.current = setInterval(() => {
+        beat = (beat + 1) % 4;
+        playMetronomeTick(beat === 0);
+      }, intervalMs);
+    } else {
+      if (recordingMetronomeIntervalRef.current) {
+        clearInterval(recordingMetronomeIntervalRef.current);
+        recordingMetronomeIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (recordingMetronomeIntervalRef.current) {
+        clearInterval(recordingMetronomeIntervalRef.current);
+        recordingMetronomeIntervalRef.current = null;
+      }
+    };
+  }, [isRecordingAudio, isRecordingMetronomeActive, recordingBpm]);
+
   const [hasTresorStorage, setHasTresorStorage] = useState<boolean>(() => {
     if (propHasTresor === true) return true;
     return checkIsAudioTresorActive(student);
@@ -1607,9 +1731,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
-          autoGainControl: false
-        }
+          autoGainControl: false,
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false,
+          googTypingNoiseDetection: false,
+          channelCount: 1,
+          sampleRate: 48000
+        } as any
       });
+
+      // 🌟 WebAudio Dual-Channel Center Bridge:
+      // Takes raw microphone input and routes it 1:1 identically to Left and Right channels (100% centered stereo, 0 left-bias!)
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const recordAudioCtx = new AudioCtx();
+      const sourceNode = recordAudioCtx.createMediaStreamSource(stream);
+      const mergerNode = recordAudioCtx.createChannelMerger(2);
+      sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
+      sourceNode.connect(mergerNode, 0, 1); // Duplicate to Right
+      const destNode = recordAudioCtx.createMediaStreamDestination();
+      mergerNode.connect(destNode);
+      const recordStream = destNode.stream;
+
       // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
       let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
       let effectiveTresor = hasTresorStorage;
@@ -1627,8 +1771,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         } catch (e) {}
       }
 
-      // 256 kbps Crystal-Clear Studio Audio when Audio-Tresor is booked, else 64 kbps Space-Saving Compression
-      const targetBitrate = hasTresorStorage ? 256000 : 64000;
+      // 256 kbps Crystal-Clear Studio Audio when Audio-Tresor is booked, else 128 kbps High-Quality Audio
+      const targetBitrate = hasTresorStorage ? 256000 : 128000;
       let mimeType = 'audio/webm;codecs=opus';
       if (typeof MediaRecorder !== 'undefined') {
         if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -1642,10 +1786,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       let recorder: MediaRecorder;
       try {
         recorder = mimeType 
-          ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: targetBitrate }) 
-          : new MediaRecorder(stream, { audioBitsPerSecond: targetBitrate });
+          ? new MediaRecorder(recordStream, { mimeType, audioBitsPerSecond: targetBitrate }) 
+          : new MediaRecorder(recordStream, { audioBitsPerSecond: targetBitrate });
       } catch (recErr) {
-        recorder = new MediaRecorder(stream);
+        recorder = new MediaRecorder(recordStream);
       }
       const chunks: BlobPart[] = [];
       
@@ -1656,22 +1800,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       recorder.onstop = async () => {
         try {
           stream.getTracks().forEach(track => track.stop());
+          recordStream.getTracks().forEach(track => track.stop());
+          if (recordAudioCtx && recordAudioCtx.state !== 'closed') {
+            recordAudioCtx.close().catch(() => {});
+          }
         } catch (e) {}
 
         const rawBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-        let blob = rawBlob;
-        let url = URL.createObjectURL(rawBlob);
-
-        // 🎛️ PURE RAW DSP: If Audio-Tresor is active, render Lossless 24-Bit / 48 kHz Broadcast WAV
-        if (hasTresorStorage) {
-          try {
-            const pureRawResult = await processPureRawBlob(rawBlob, { targetLufs: -13.0, targetPeakDb: -1.0 });
-            blob = pureRawResult.processedBlob;
-            url = pureRawResult.processedUrl;
-          } catch (dspErr) {
-            console.warn('[Meisterwerk] Pure RAW DSP fallback to original blob:', dspErr);
-          }
-        }
+        // 🎙️ 100% PURE RAW: Pristine, uncolored, natural sound straight from the microphone
+        const blob = rawBlob;
+        const url = URL.createObjectURL(rawBlob);
 
         setAudioBlob(blob);
         setAudioUrl(url);
@@ -1682,19 +1820,51 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           try {
             const userRoleInSession = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
             const isStudentSession = userRoleInSession === 'student' || readOnly || (!isTeacherTools && student.id !== 'teacher-self');
-            const creatorRole = isStudentSession ? 'student' : 'teacher';
-            const initialVisibility = isStudentSession ? 'private' : 'shared_with_teacher';
-            const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}|${audioLabel.trim() || 'Aufnahme'}|${creatorRole}|${initialVisibility}`;
             
             if (blob) {
               await storeBlob(audioUrlString, blob).catch(() => {});
             }
 
-            setHomeworkNotesList(prev => {
-              const updated = [...prev, audioMetaStr];
-              syncHomeworkNotes(updated).catch(err => console.warn('[saveAudioMetadata] syncHomeworkNotes note:', err));
-              return updated;
-            });
+            if (isStudentSession) {
+              // 🎓 STUDENT RECORDING -> Stored on the RIGHT side in `campus_junior_recordings_${student.id}`
+              const juniorKey = `campus_junior_recordings_${student.id}`;
+              let existing: any[] = [];
+              try {
+                const stored = localStorage.getItem(juniorKey);
+                if (stored) {
+                  const parsed = JSON.parse(stored);
+                  if (Array.isArray(parsed)) existing = parsed;
+                }
+              } catch {}
+
+              const recDuration = durationInSeconds || Math.round(audioDuration) || 1;
+              const smartTitle = generateSmartAudioTitle(false, audioLabel);
+              const newRec = {
+                id: `stud-${Date.now()}`,
+                url: audioUrlString,
+                duration: recDuration,
+                date: new Date().toISOString(),
+                title: smartTitle,
+                label: smartTitle,
+                visibility: 'private'
+              };
+
+              const updated = [newRec, ...existing];
+              localStorage.setItem(juniorKey, JSON.stringify(updated));
+              setLocalJuniorRecordingsTrigger(prev => prev + 1);
+            } else {
+              // 👨‍🏫 TEACHER NOTE -> Stored on the LEFT side in `homeworkNotesList`
+              const creatorRole = 'teacher';
+              const initialVisibility = 'shared_with_teacher';
+              const smartTitle = generateSmartAudioTitle(true, audioLabel);
+              const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}`;
+              
+              setHomeworkNotesList(prev => {
+                const updated = [...prev, audioMetaStr];
+                syncHomeworkNotes(updated).catch(err => console.warn('[saveAudioMetadata] syncHomeworkNotes note:', err));
+                return updated;
+              });
+            }
             
             await fetchProgress().catch(() => {});
             notifyHomeworkChange();
@@ -6137,6 +6307,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             from { transform: translateY(20px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
           }
+          @keyframes ambientGoldBreathing {
+            0%, 100% {
+              box-shadow: 0 4px 18px -2px rgba(245, 158, 11, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.50);
+              border-color: rgba(253, 224, 71, 0.70);
+            }
+            50% {
+              box-shadow: 0 4px 28px 3px rgba(251, 191, 36, 0.65), inset 0 1px 3px rgba(255, 255, 255, 0.85);
+              border-color: rgba(253, 224, 71, 0.95);
+            }
+          }
           .modal-content-container {
             display: flex !important;
             flex-direction: row !important;
@@ -6280,7 +6460,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }} className="modal-header-container">
           
           {/* Top Row / Desktop Row */}
-          <div className="header-top-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: 0 }}>
+          <div className="header-top-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: 0, position: 'relative' }}>
             {/* Left: Avatar + Student Info */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }} className="header-left-info">
               <div 
@@ -6373,189 +6553,107 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               </div>
             </div>
 
-            {/* Desktop Tabs */}
-            <div style={{ display: isMobileOrSim ? 'none' : 'flex', gap: '8px', marginLeft: '12px' }} className="header-tabs-desktop-container">
-              {isTeacherTools ? (
-                <>
-                  {/* Teacher tools order: Loopstation -> Übe-Begleiter -> Aufnahmen */}
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('loopstation'); setActiveSubView('hub'); }}
-                    style={{
-                      background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 14px',
-                      borderRadius: '20px',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.2s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Sliders size={14} />
-                    <span>Loopstation</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('practice'); setActiveSubView('hub'); }}
-                    style={{
-                      background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 14px',
-                      borderRadius: '20px',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.2s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Music size={14} />
-                    <span>Übe-Begleiter</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('recordings'); setActiveSubView('hub'); }}
-                    style={{
-                      background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 14px',
-                      borderRadius: '20px',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.2s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Mic size={14} />
-                    <span>Aufnahmen</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Student order: Age-appropriate based on uiLevel */}
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('document'); setActiveSubView('hub'); }}
-                    style={{
-                      background: (activeModalTab === 'document' && activeViewMode === 'document' && activeSubView !== 'history') ? '#34a853' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: uiLevel === 'junior' ? '8px 16px' : '6px 14px',
-                      borderRadius: '20px',
-                      fontSize: uiLevel === 'junior' ? '0.85rem' : '0.75rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.2s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <BookOpen size={uiLevel === 'junior' ? 16 : 14} />
-                    <span>{uiLevel === 'junior' ? 'Aufgaben' : 'Protokoll'}</span>
-                  </button>
+            {/* Desktop Navigation Action: Centered Monochrome Back to Modules Button + Apple Spotlight Search & Segmented Switch */}
+            {(activeViewMode !== 'document' || activeModalTab !== 'document' || activeSubView !== 'hub' || hubTab === 'protocol') && (
+              <div style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                display: isMobileOrSim ? 'none' : 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                zIndex: 10
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveModalTab('document');
+                    setActiveViewMode('document');
+                    setActiveSubView('hub');
+                    setHubTab('modules');
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.16)',
+                    backdropFilter: 'blur(24px)',
+                    WebkitBackdropFilter: 'blur(24px)',
+                    border: '1px solid rgba(255, 255, 255, 0.32)',
+                    color: '#ffffff',
+                    padding: '7px 18px',
+                    borderRadius: '100px',
+                    fontSize: '0.80rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.35)',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                    letterSpacing: '-0.01em',
+                    userSelect: 'none'
+                  }}
+                  className="hover-scale"
+                >
+                  <ArrowLeft size={15} color="#ffffff" strokeWidth={2.6} />
+                  <span>Zurück zu den Modulen</span>
+                </button>
 
-                  {/* Loopstation only in Level 3 (Pro) */}
-                  {uiLevel === 'pro' && (
-                    <button
-                      type="button"
-                      onClick={() => { setActiveModalTab('document'); setActiveViewMode('loopstation'); setActiveSubView('hub'); }}
+                {/* 🔍 In Recordings View: Clean High-Contrast Spotlight Search Bar */}
+                {activeViewMode === 'recordings' && (
+                  <div style={{ position: 'relative', width: '260px' }}>
+                    <Search size={14} color="#64748b" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      placeholder="Aufnahmen durchsuchen..."
+                      value={recordingSearchQuery}
+                      onChange={(e) => setRecordingSearchQuery(e.target.value)}
                       style={{
-                        background: (activeModalTab === 'document' && activeViewMode === 'loopstation') ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
+                        width: '100%',
+                        padding: '6px 28px 6px 34px',
+                        borderRadius: '100px',
+                        border: '1.5px solid #e2e8f0',
+                        background: '#ffffff',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        color: '#0f172a',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
                       }}
-                      className="hover-scale"
-                    >
-                      <Sliders size={14} />
-                      <span>Loopstation</span>
-                    </button>
-                  )}
-
-                  {/* Übe-Begleiter for Teen and Pro */}
-                  {uiLevel !== 'junior' && (
-                    <button
-                      type="button"
-                      onClick={() => { setActiveModalTab('document'); setActiveViewMode('practice'); setActiveSubView('hub'); }}
-                      style={{
-                        background: (activeModalTab === 'document' && activeViewMode === 'practice') ? '#eab308' : 'rgba(255,255,255,0.15)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Music size={14} />
-                      <span>Übe-Begleiter</span>
-                    </button>
-                  )}
-
-                  {/* Aufnahmen in all levels */}
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('recordings'); setActiveSubView('hub'); }}
-                    style={{
-                      background: (activeModalTab === 'document' && activeViewMode === 'recordings') ? '#4f46e5' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: uiLevel === 'junior' ? '8px 16px' : '6px 14px',
-                      borderRadius: '20px',
-                      fontSize: uiLevel === 'junior' ? '0.85rem' : '0.75rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.2s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Mic size={uiLevel === 'junior' ? 16 : 14} />
-                    <span>Aufnahmen</span>
-                  </button>
-                </>
-              )}
-            </div>
+                    />
+                    {recordingSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setRecordingSearchQuery('')}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: '#e2e8f0',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '16px',
+                          height: '16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          padding: 0
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Actions (Always visible on all screen sizes, including Fullscreen + Close) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="header-right-actions">
-              <div className="header-desktop-archiv" style={{ display: isMobileOrSim ? 'none' : 'flex', alignItems: 'center', gap: '4px' }}>
-                {renderSkillRadarButton()}
-                {renderArchivButton()}
-              </div>
               {renderFullscreenButton()}
               {renderCloseButton()}
             </div>
@@ -6565,10 +6663,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           {/* Bottom Row (mobile/tablet only) - Apple Native Dropdown Selection Menu + Left/Right Quick-Click Buttons */}
           {(() => {
             const tabOptions = [
-              { value: 'document', label: isTeacherTools ? 'Aufgabenheft' : 'Schüler-Protokoll' },
+              { value: 'modules', label: 'Module (Studio)' },
+              { value: 'protocol', label: isTeacherTools ? 'Aufgabenheft' : 'Schüler-Protokoll' },
               { value: 'loopstation', label: 'Audio-Loopstation' },
               { value: 'practice', label: 'Übe-Begleiter' },
               { value: 'recordings', label: 'Audio-Aufnahmen' },
+              { value: 'tuner', label: 'Stimmgerät (Tuner)' },
               { value: 'radar', label: 'Skill-Radar' },
               { value: 'history', label: 'Archiv & Historie' }
             ];
@@ -6579,10 +6679,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               activeModalTab === 'audiobiography' ? 'audiobiography' :
               activeModalTab === 'logbook' ? 'meisterwerke' :
               (activeModalTab === 'document' && activeSubView === 'history') ? 'history' :
+              (activeModalTab === 'document' && activeViewMode === 'document' && activeSubView === 'hub') ? (hubTab === 'modules' ? 'modules' : 'protocol') :
               activeViewMode;
 
             const handleTabSelect = (val: string) => {
-              if (val === 'radar') {
+              if (val === 'modules') {
+                setActiveModalTab('document');
+                setActiveViewMode('document');
+                setActiveSubView('hub');
+                setHubTab('modules');
+              } else if (val === 'protocol') {
+                setActiveModalTab('document');
+                setActiveViewMode('document');
+                setActiveSubView('hub');
+                setHubTab('protocol');
+              } else if (val === 'radar') {
                 setActiveModalTab('skillradar');
               } else if (val === 'stickers') {
                 setActiveModalTab('stickeralbum');
@@ -6741,7 +6852,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           style={{
             display: 'flex',
             flex: 1,
-            overflowY: isMobileOrSim ? 'auto' : 'hidden',
+            overflowY: (isMobileOrSim || activeViewMode !== 'document' || activeModalTab !== 'document') ? 'auto' : 'hidden',
             overflowX: 'hidden',
             WebkitOverflowScrolling: 'touch',
             minHeight: 0,
@@ -6805,13 +6916,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 }}
               />
             </div>
+          ) : activeViewMode === 'tuner' ? (
+            <div style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px 24px 80px 24px'
+            }}>
+              <CampusTuner
+                uiLevel={uiLevel}
+              />
+            </div>
           ) : activeViewMode === 'recordings' ? (
-            <>
+            <div style={{ display: 'flex', width: '100%', height: '100%', minHeight: 0, overflow: 'hidden' }}>
               {/* ========================================================================= */}
               {/* LEFT PAGE: 🎙️ AUFNAHMEN VOM LEHRER (Play-Alongs & Unterrichts-Audios)     */}
               {/* ========================================================================= */}
               <div style={{
-                flex: isTeacherTools ? '1 1 100%' : '1 1 0%',
+                  flex: isTeacherTools ? '1 1 100%' : '1 1 0%',
                 overflowY: 'auto',
                 display: 'flex',
                 flexDirection: 'column',
@@ -6865,13 +6986,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       Vom Unterricht
                     </span>
                     <h3 style={{ margin: '1px 0 0 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                      Aufnahmen von deiner Lehrkraft
+                      {isTeacherMode ? `Unterrichts-Aufnahmen & Play-Alongs für ${studentFirstName}` : 'Aufnahmen von deiner Lehrkraft'}
                     </h3>
                   </div>
                 </div>
 
                 {/* Teacher Record Tool (when teacher is viewing) */}
-                {isTeacherTools && (
+                {isTeacherMode && (
                   <div style={{
                     margin: '0 0 16px 0',
                     padding: '12px 14px',
@@ -6891,29 +7012,166 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         </span>
                       </span>
                       {!isRecordingAudio ? (
-                        <button
-                          type="button"
-                          onClick={startRecordingAudio}
-                          disabled={isUploadingAudio}
-                          style={{
-                            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                            color: '#fff',
-                            border: 'none',
-                            padding: '6px 14px',
-                            borderRadius: '10px',
-                            fontSize: '0.74rem',
-                            fontWeight: 850,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            boxShadow: '0 2px 8px rgba(34, 197, 94, 0.25)'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
-                          <span>Aufnahme starten</span>
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
+                          {/* ⏱️ Metronom / Klick Button */}
+                          <button
+                            type="button"
+                            onClick={() => setShowRecordingMetronomePopup(prev => !prev)}
+                            style={{
+                              background: isRecordingMetronomeActive ? '#dcfce7' : '#f8fafc',
+                              border: isRecordingMetronomeActive ? '1.5px solid #16a34a' : '1.5px solid #cbd5e1',
+                              color: isRecordingMetronomeActive ? '#15803d' : '#64748b',
+                              borderRadius: '10px',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                              boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(22, 163, 74, 0.25)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="hover-scale-mini"
+                            title={isRecordingMetronomeActive ? `Klick aktiv (${recordingBpm} BPM)` : 'Klick / Metronom einstellen'}
+                          >
+                            <MechanicalMetronomeIcon size={16} color={isRecordingMetronomeActive ? '#15803d' : '#64748b'} strokeWidth={isRecordingMetronomeActive ? 2.4 : 2} />
+                          </button>
+
+                          {/* Metronome Flyout Popup */}
+                          {showRecordingMetronomePopup && (
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '100%',
+                              right: 0,
+                              marginBottom: '10px',
+                              background: '#ffffff',
+                              borderRadius: '16px',
+                              border: '1.5px solid #e2e8f0',
+                              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0,0,0,0.05)',
+                              padding: '12px 14px',
+                              width: '240px',
+                              zIndex: 100,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '10px'
+                            }}>
+                              {/* Header */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <MechanicalMetronomeIcon size={16} color="#16a34a" strokeWidth={2.2} />
+                                  <span>Klick / Metronom</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowRecordingMetronomePopup(false)}
+                                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+
+                              {/* Toggle Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = !isRecordingMetronomeActive;
+                                  setIsRecordingMetronomeActive(next);
+                                  if (next) playMetronomeTick(true);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  background: isRecordingMetronomeActive ? '#16a34a' : '#f1f5f9',
+                                  color: isRecordingMetronomeActive ? '#ffffff' : '#475569',
+                                  border: 'none',
+                                  borderRadius: '10px',
+                                  padding: '7px 10px',
+                                  fontSize: '0.76rem',
+                                  fontWeight: 850,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(22, 163, 74, 0.25)' : 'none'
+                                }}
+                                className="hover-scale-mini"
+                              >
+                                <span>{isRecordingMetronomeActive ? '✓ Klick ist AN' : 'Klick einschalten'}</span>
+                              </button>
+
+                              {/* BPM Slider & Stepper */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', fontWeight: 800, color: '#475569' }}>
+                                  <span>Tempo</span>
+                                  <span style={{ color: '#16a34a', fontWeight: 900 }}>{recordingBpm} BPM</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRecordingBpm(b => Math.max(40, b - 5))}
+                                    style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
+                                  >-</button>
+                                  <input
+                                    type="range"
+                                    min="40"
+                                    max="240"
+                                    value={recordingBpm}
+                                    onChange={(e) => setRecordingBpm(parseInt(e.target.value, 10))}
+                                    style={{ flex: 1, accentColor: '#16a34a', cursor: 'pointer' }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setRecordingBpm(b => Math.min(240, b + 5))}
+                                    style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
+                                  >+</button>
+                                </div>
+                              </div>
+
+                              {/* Test Click Button */}
+                              <button
+                                type="button"
+                                onClick={() => playMetronomeTick(true)}
+                                style={{
+                                  background: '#f8fafc',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '8px',
+                                  padding: '5px 8px',
+                                  fontSize: '0.70rem',
+                                  fontWeight: 750,
+                                  color: '#64748b',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                🔊 Klick kurz testen
+                              </button>
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={startRecordingAudio}
+                            disabled={isUploadingAudio}
+                            style={{
+                              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '6px 14px',
+                              borderRadius: '10px',
+                              fontSize: '0.74rem',
+                              fontWeight: 850,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              boxShadow: '0 2px 8px rgba(34, 197, 94, 0.25)'
+                            }}
+                            className="hover-scale"
+                          >
+                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
+                            <span>Aufnahme starten</span>
+                          </button>
+                        </div>
                       ) : (
                         <button
                           type="button"
@@ -7060,107 +7318,399 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     );
                   }
 
-                  // Group by Calendar Week
                   const now = getSimulatedNow();
                   const currentWeekStr = getISOWeek(now);
-                  const prevDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                  const prevWeekStr = getISOWeek(prevDate);
+                  const currentWeekNum = currentWeekStr.split("-W")[1] || "";
 
-                  const groups: { [key: string]: { key: string; label: string; isCurrent: boolean; items: any[] } } = {};
-                  teacherAudios.forEach(aud => {
+                  // Filter by Search Query if active
+                  const isSearching = recordingSearchQuery.trim() !== "";
+                  const searchResults = isSearching ? teacherAudios.filter(aud => {
+                    const q = recordingSearchQuery.toLowerCase().trim();
+                    return (aud.label || "").toLowerCase().includes(q) || (aud.date || "").toLowerCase().includes(q);
+                  }) : [];
+
+                  // Current Week Audios
+                  const currentWeekAudios = teacherAudios.filter(aud => {
                     const d = aud.date ? new Date(aud.date) : now;
-                    const weekKey = getISOWeek(isNaN(d.getTime()) ? now : d);
-                    const weekNum = weekKey.split('-W')[1] || '';
-                    if (!groups[weekKey]) {
-                      const isCurrent = weekKey === currentWeekStr;
-                      const isPrev = weekKey === prevWeekStr;
-                      let label = `KW ${weekNum}`;
-                      if (isCurrent) label = `Diese Woche (KW ${weekNum})`;
-                      else if (isPrev) label = `Letzte Woche (KW ${weekNum})`;
-                      else {
-                        const mName = d.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' });
-                        label = `KW ${weekNum} • ${mName}`;
-                      }
-                      groups[weekKey] = { key: weekKey, label, isCurrent, items: [] };
-                    }
-                    groups[weekKey].items.push(aud);
+                    return getISOWeek(isNaN(d.getTime()) ? now : d) === currentWeekStr;
                   });
 
-                  const groupList = Object.values(groups);
+                  // Favorite Audios
+                  const favoriteTeacherAudios = teacherAudios.filter(aud => favoriteAudioUrls.includes(aud.url));
 
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {groupList.map(group => {
-                        const isExpanded = expandedAudioWeeks[group.key] !== undefined ? expandedAudioWeeks[group.key] : true;
-                        return (
-                          <div key={`teacher-week-${group.key}`} style={{ display: 'flex', flexDirection: 'column' }}>
-                            {groupList.length > 1 && (
+                  // Group Past Audios into Month Albums
+                  const pastAudios = teacherAudios.filter(aud => {
+                    const d = aud.date ? new Date(aud.date) : now;
+                    return getISOWeek(isNaN(d.getTime()) ? now : d) !== currentWeekStr;
+                  });
+
+                  const monthGroups: { [monthKey: string]: { monthKey: string; monthLabel: string; weeks: { [weekKey: string]: any[] }; totalTakes: number } } = {};
+                  pastAudios.forEach(aud => {
+                    const d = aud.date ? new Date(aud.date) : now;
+                    const dateObj = isNaN(d.getTime()) ? now : d;
+                    const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`;
+                    const monthLabel = dateObj.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+                    const weekKey = getISOWeek(dateObj);
+
+                    if (!monthGroups[monthKey]) {
+                      monthGroups[monthKey] = { monthKey, monthLabel, weeks: {}, totalTakes: 0 };
+                    }
+                    if (!monthGroups[monthKey].weeks[weekKey]) {
+                      monthGroups[monthKey].weeks[weekKey] = [];
+                    }
+                    monthGroups[monthKey].weeks[weekKey].push(aud);
+                    monthGroups[monthKey].totalTakes += 1;
+                  });
+
+                  const sortedMonths = Object.values(monthGroups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+
+                  // 🔍 SEARCH RESULTS VIEW
+                  if (isSearching) {
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ fontSize: "0.76rem", fontWeight: 850, color: "#15803d", marginBottom: "4px" }}>
+                          🔍 {searchResults.length} {searchResults.length === 1 ? "Treffer" : "Treffer"} zur Suche „{recordingSearchQuery}“
+                        </div>
+                        {searchResults.map((aud, idx) => (
+                          <InlineAudioPlayer 
+                            key={`teacher-search-${idx}`}
+                            url={aud.url} 
+                            label={aud.label} 
+                            duration={aud.duration}
+                            date={aud.date}
+                            isFavorite={favoriteAudioUrls.includes(aud.url)}
+                            onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
+                            themeColor="#15803d"
+                            themeBg="#e6f4ea"
+                            badge="👨‍🏫 Lehrkraft"
+                            badgeBg="#dcfce7"
+                            badgeColor="#15803d"
+                            onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                          />
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  // ⭐ FAVORITES DRILLDOWN VIEW
+                  if (showTeacherFavoritesOnly) {
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowTeacherFavoritesOnly(false)}
+                            style={{
+                              background: "#ffffff",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "100px",
+                              padding: "4px 12px",
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                              color: "#475569",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                            className="hover-scale"
+                          >
+                            <ArrowLeft size={12} /> Zurück zur Übersicht
+                          </button>
+                          <span style={{ fontSize: "0.76rem", fontWeight: 900, color: "#ca8a04" }}>
+                            ⭐ {favoriteTeacherAudios.length} Favoriten
+                          </span>
+                        </div>
+
+                        {favoriteTeacherAudios.length === 0 ? (
+                          <div style={{ textAlign: "center", padding: "30px 16px", color: "#94a3b8", fontSize: "0.80rem", fontWeight: 700 }}>
+                            Noch keine Favoriten markiert. Klicke bei einer Aufnahme auf das Stern-Symbol ⭐!
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {favoriteTeacherAudios.map((aud, idx) => (
+                              <InlineAudioPlayer 
+                                key={`teacher-fav-${idx}`}
+                                url={aud.url} 
+                                label={aud.label} 
+                                duration={aud.duration}
+                                date={aud.date}
+                                isFavorite={true}
+                                onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
+                                themeColor="#15803d"
+                                themeBg="#e6f4ea"
+                                badge="👨‍🏫 Lehrkraft"
+                                badgeBg="#dcfce7"
+                                badgeColor="#15803d"
+                                onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // 📁 SELECTED MONTH DRILLDOWN VIEW
+                  if (selectedTeacherMonth) {
+                    const monthData = monthGroups[selectedTeacherMonth.key];
+                    const weekKeys = monthData ? Object.keys(monthData.weeks).sort((a, b) => b.localeCompare(a)) : [];
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTeacherMonth(null)}
+                            style={{
+                              background: "#ffffff",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "100px",
+                              padding: "4px 12px",
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                              color: "#475569",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                            className="hover-scale"
+                          >
+                            <ArrowLeft size={12} /> Zurück zur Übersicht
+                          </button>
+                          <span style={{ fontSize: "0.78rem", fontWeight: 900, color: "#15803d" }}>
+                            📁 {selectedTeacherMonth.label}
+                          </span>
+                        </div>
+
+                        {weekKeys.map(wkKey => {
+                          const wkAudios = monthData.weeks[wkKey] || [];
+                          const isExpanded = expandedTeacherAudioWeeks[wkKey] !== undefined ? expandedTeacherAudioWeeks[wkKey] : true;
+                          const wkNum = wkKey.split("-W")[1] || "";
+
+                          return (
+                            <div key={`teacher-month-week-${wkKey}`} style={{ display: "flex", flexDirection: "column" }}>
                               <div
-                                onClick={() => toggleAudioWeek(group.key, true)}
+                                onClick={() => toggleTeacherAudioWeek(wkKey, true)}
                                 style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '8px 12px',
-                                  background: group.isCurrent ? '#f0fdf4' : '#ffffff',
-                                  borderRadius: '12px',
-                                  border: group.isCurrent ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                                  cursor: 'pointer',
-                                  marginBottom: '8px',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                                  userSelect: 'none'
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  padding: "8px 12px",
+                                  background: "#ffffff",
+                                  borderRadius: "12px",
+                                  border: "1px solid #e2e8f0",
+                                  cursor: "pointer",
+                                  marginBottom: "8px",
+                                  boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+                                  userSelect: "none"
                                 }}
                                 className="hover-scale"
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{
-                                    fontSize: '0.74rem',
-                                    color: group.isCurrent ? '#16a34a' : '#64748b',
-                                    display: 'inline-flex',
-                                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                                    transition: 'transform 0.15s ease'
-                                  }}>
-                                    ▶
-                                  </span>
-                                  <span style={{ fontSize: '0.78rem', fontWeight: 850, color: group.isCurrent ? '#15803d' : '#334155' }}>
-                                    {group.label}
-                                  </span>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  <span style={{ fontSize: "0.74rem", color: "#64748b", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s ease" }}>▶</span>
+                                  <span style={{ fontSize: "0.78rem", fontWeight: 850, color: "#334155" }}>KW {wkNum}</span>
                                 </div>
-                                <span style={{
-                                  fontSize: '0.66rem',
-                                  fontWeight: 800,
-                                  background: group.isCurrent ? '#dcfce7' : '#f1f5f9',
-                                  color: group.isCurrent ? '#15803d' : '#64748b',
-                                  padding: '2px 8px',
-                                  borderRadius: '100px'
-                                }}>
-                                  {group.items.length} {group.items.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
+                                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "#f1f5f9", color: "#64748b", padding: "2px 8px", borderRadius: "100px" }}>
+                                  {wkAudios.length} {wkAudios.length === 1 ? "Aufnahme" : "Aufnahmen"}
                                 </span>
                               </div>
-                            )}
 
-                            {isExpanded && (
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '8px', marginBottom: '8px' }}>
-                                {group.items.map((aud, idx) => (
-                                  <InlineAudioPlayer 
-                                    key={`teacher-aud-${group.key}-${idx}`}
-                                    url={aud.url} 
-                                    label={aud.label} 
-                                    duration={aud.duration}
-                                    date={aud.date}
-                                    themeColor="#15803d"
-                                    themeBg="#e6f4ea"
-                                    badge="👨‍🏫 Lehrkraft"
-                                    badgeBg="#dcfce7"
-                                    badgeColor="#15803d"
-                                    onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
-                                  />
-                                ))}
-                              </div>
-                            )}
+                              {isExpanded && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "8px" }}>
+                                  {wkAudios.map((aud, idx) => (
+                                    <InlineAudioPlayer 
+                                      key={`teacher-month-aud-${wkKey}-${idx}`}
+                                      url={aud.url} 
+                                      label={aud.label} 
+                                      duration={aud.duration}
+                                      date={aud.date}
+                                      isFavorite={favoriteAudioUrls.includes(aud.url)}
+                                      onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
+                                      themeColor="#15803d"
+                                      themeBg="#e6f4ea"
+                                      badge="👨‍🏫 Lehrkraft"
+                                      badgeBg="#dcfce7"
+                                      badgeColor="#15803d"
+                                      onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+
+                  // 🏠 DEFAULT VIEW: Top Hero (Diese Woche) + Square Album Grid (Monate & Favoriten)
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                      {/* 1. TOP HERO: Diese Woche (KW x) */}
+                      <div style={{
+                        background: "#ffffff",
+                        borderRadius: "18px",
+                        border: "1.5px solid #bbf7d0",
+                        padding: "12px 14px",
+                        boxShadow: "0 4px 14px rgba(34, 197, 94, 0.08)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "8px"
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+                            <span style={{ fontSize: "0.82rem", fontWeight: 900, color: "#15803d" }}>Diese Woche (KW {currentWeekNum})</span>
                           </div>
-                        );
-                      })}
+                          <span style={{ fontSize: "0.68rem", fontWeight: 800, background: "#dcfce7", color: "#15803d", padding: "2px 8px", borderRadius: "100px" }}>
+                            {currentWeekAudios.length} {currentWeekAudios.length === 1 ? "Aufnahme" : "Aufnahmen"}
+                          </span>
+                        </div>
+
+                        {currentWeekAudios.length === 0 ? (
+                          <div style={{ padding: "14px", textAlign: "center", color: "#94a3b8", fontSize: "0.76rem", fontWeight: 700, background: "#f8fafc", borderRadius: "12px" }}>
+                            Noch keine Aufnahmen in dieser Woche vorhanden
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {currentWeekAudios.map((aud, idx) => (
+                              <InlineAudioPlayer 
+                                key={`teacher-curr-aud-${idx}`}
+                                url={aud.url} 
+                                label={aud.label} 
+                                duration={aud.duration}
+                                date={aud.date}
+                                isFavorite={favoriteAudioUrls.includes(aud.url)}
+                                onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
+                                themeColor="#15803d"
+                                themeBg="#e6f4ea"
+                                badge="👨‍🏫 Lehrkraft"
+                                badgeBg="#dcfce7"
+                                badgeColor="#15803d"
+                                onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. VISUAL SQUARE ALBUM COVERS (6er-Reihe: Favoriten + Monate) */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: "0.70rem", fontWeight: 900, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Monats-Alben & Archiv
+                          </span>
+                          <span style={{ fontSize: "0.66rem", color: "#94a3b8", fontWeight: 700 }}>
+                            {sortedMonths.length} {sortedMonths.length === 1 ? "Monat" : "Monate"}
+                          </span>
+                        </div>
+
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(6, 1fr)",
+                          gap: "8px"
+                        }}>
+                          {/* ⭐ Radiant Apple Liquid Gold Favoriten Cover Card */}
+                          <div
+                            onClick={() => setShowTeacherFavoritesOnly(true)}
+                            style={{
+                              aspectRatio: "1 / 1",
+                              background: "linear-gradient(145deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%)",
+                              borderRadius: "14px",
+                              border: "1.5px solid #fbbf24",
+                              padding: "6px 4px",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              cursor: "pointer",
+                              boxShadow: "0 4px 16px rgba(245, 158, 11, 0.20), 0 1px 3px rgba(0,0,0,0.04)",
+                              position: "relative",
+                              overflow: "hidden",
+                              transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                              textAlign: "center"
+                            }}
+                            className="hover-scale"
+                          >
+                            <div style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "11px",
+                              background: "linear-gradient(135deg, #fef08a 0%, #eab308 100%)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 3px 10px rgba(234, 179, 8, 0.42), inset 0 1px 1.5px #ffffff",
+                              border: "1px solid rgba(255, 255, 255, 0.7)",
+                              marginTop: "2px"
+                            }}>
+                              <Star size={20} fill="#78350f" color="#78350f" strokeWidth={1} />
+                            </div>
+                            <div style={{ width: "100%" }}>
+                              <div style={{ fontSize: "0.66rem", fontWeight: 900, color: "#78350f", letterSpacing: "-0.01em", lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                Favoriten
+                              </div>
+                              <div style={{ fontSize: "0.56rem", fontWeight: 800, color: "#92400e", marginTop: "1px" }}>
+                                {favoriteTeacherAudios.length} {favoriteTeacherAudios.length === 1 ? "Take" : "Takes"}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 📅 Monthly Album Cover Cards (Kompakte Apple-Mini-Covers) */}
+                          {sortedMonths.map(m => {
+                            const dParts = m.monthKey.split("-");
+                            const dObj = new Date(parseInt(dParts[0], 10), parseInt(dParts[1], 10) - 1, 1);
+                            const shortLabel = dObj.toLocaleDateString("de-DE", { month: "short" }) + " " + String(dObj.getFullYear()).slice(2);
+                            return (
+                              <div
+                                key={`teacher-month-card-${m.monthKey}`}
+                                onClick={() => setSelectedTeacherMonth({ key: m.monthKey, label: m.monthLabel })}
+                                style={{
+                                  aspectRatio: "1 / 1",
+                                  background: "linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)",
+                                  borderRadius: "14px",
+                                  border: "1.5px solid #e2e8f0",
+                                  padding: "8px 4px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  cursor: "pointer",
+                                  boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                                  transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                                  textAlign: "center"
+                                }}
+                                className="hover-scale"
+                              >
+                                <div style={{
+                                  width: "28px",
+                                  height: "28px",
+                                  borderRadius: "9px",
+                                  background: "#f0fdf4",
+                                  color: "#16a34a",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  border: "1px solid #dcfce7",
+                                  marginTop: "2px"
+                                }}>
+                                  <Calendar size={13} strokeWidth={2.4} />
+                                </div>
+                                <div style={{ width: "100%" }}>
+                                  <div style={{ fontSize: "0.64rem", fontWeight: 900, color: "#1e293b", letterSpacing: "-0.01em", lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {shortLabel}
+                                  </div>
+                                  <div style={{ fontSize: "0.56rem", fontWeight: 750, color: "#64748b", marginTop: "1px" }}>
+                                    {m.totalTakes} {m.totalTakes === 1 ? "Take" : "Takes"}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}
@@ -7217,56 +7767,57 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 )}
 
                 {/* Header: Student Own Recordings */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <div style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
-                    color: '#6d28d9',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 3px 8px rgba(109, 40, 217, 0.15)',
-                    flexShrink: 0
-                  }}>
-                    <Star size={18} strokeWidth={2.4} fill="#6d28d9" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '11px',
+                      background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
+                      color: '#6d28d9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 6px rgba(109, 40, 217, 0.12)',
+                      flexShrink: 0
+                    }}>
+                      <Star size={16} strokeWidth={2.4} fill="#6d28d9" />
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        {isTeacherMode ? 'Schüler-Studio' : 'Dein Übe-Studio'}
+                      </span>
+                      <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                        {isTeacherMode ? `Freigegebene Aufnahmen von ${studentFirstName}` : 'Deine eigenen Aufnahmen'}
+                      </h3>
+                    </div>
                   </div>
-                  <div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      Dein Übe-Studio
+
+                  {/* Compact Apple Privacy Badge directly inline beside the title */}
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '4px 10px',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '100px',
+                    fontSize: '0.68rem',
+                    color: '#64748b',
+                    fontWeight: 650,
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                  }}>
+                    <Lock size={12} color="#6366f1" style={{ flexShrink: 0 }} />
+                    <span>
+                      {isTeacherMode
+                        ? `Nur für Lehrkraft freigegeben`
+                        : <>Standardmäßig privat & nur für dich sichtbar</>}
                     </span>
-                    <h3 style={{ margin: '1px 0 0 0', fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                      {isTeacherTools ? 'Freigegebene Schüler-Aufnahmen' : 'Deine eigenen Aufnahmen'}
-                    </h3>
                   </div>
                 </div>
 
-                {/* Privacy Badge for Students */}
-                {!isTeacherTools && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    borderRadius: '12px',
-                    fontSize: '0.74rem',
-                    color: '#475569',
-                    fontWeight: 650,
-                    marginBottom: '14px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-                  }}>
-                    <Lock size={14} color="#6366f1" style={{ flexShrink: 0 }} />
-                    <span>
-                      Deine Aufnahmen sind <strong style={{ color: '#4338ca' }}>standardmäßig privat</strong> und nur für dich sichtbar.
-                    </span>
-                  </div>
-                )}
-
                 {/* Kid-Friendly Studio Recording Tool (for students) */}
-                {!isTeacherTools && (
+                {!isTeacherMode && (
                   <div style={{
                     margin: '0 0 16px 0',
                     padding: '14px 16px',
@@ -7348,32 +7899,175 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             )}
 
                             {!isRecordingAudio ? (
-                              <button
-                                type="button"
-                                onClick={startRecordingAudio}
-                                disabled={isUploadingAudio || isLimitReached}
-                                style={{
-                                  background: isLimitReached ? '#cbd5e1' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                                  color: '#fff',
-                                  border: 'none',
-                                  padding: '8px 16px',
-                                  borderRadius: '12px',
-                                  fontSize: '0.80rem',
-                                  fontWeight: 900,
-                                  cursor: isLimitReached ? 'not-allowed' : 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '6px',
-                                  boxShadow: isLimitReached ? 'none' : '0 3px 10px rgba(99, 102, 241, 0.25)',
-                                  whiteSpace: 'nowrap',
-                                  flexShrink: 0
-                                }}
-                                className={isLimitReached ? '' : 'hover-scale'}
-                              >
-                                <Mic size={15} strokeWidth={2.4} />
-                                <span>Aufnahme starten</span>
-                              </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, position: 'relative' }}>
+                                {/* ⏱️ Metronom / Klick Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowRecordingMetronomePopup(prev => !prev)}
+                                  style={{
+                                    background: isRecordingMetronomeActive ? '#dcfce7' : '#f8fafc',
+                                    border: isRecordingMetronomeActive ? '1.5px solid #16a34a' : '1.5px solid #cbd5e1',
+                                    color: isRecordingMetronomeActive ? '#15803d' : '#64748b',
+                                    borderRadius: '12px',
+                                    width: '36px',
+                                    height: '36px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    flexShrink: 0,
+                                    boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(22, 163, 74, 0.25)' : 'none',
+                                    transition: 'all 0.15s ease',
+                                    position: 'relative'
+                                  }}
+                                  className="hover-scale-mini"
+                                  title={isRecordingMetronomeActive ? `Klick aktiv (${recordingBpm} BPM)` : 'Klick / Metronom einstellen'}
+                                >
+                                  <MechanicalMetronomeIcon size={18} color={isRecordingMetronomeActive ? "#15803d" : "#64748b"} strokeWidth={isRecordingMetronomeActive ? 2.4 : 2} />
+                                </button>
+
+                                {/* Metronome Flyout Popup */}
+                                {showRecordingMetronomePopup && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    bottom: '100%',
+                                    right: 0,
+                                    marginBottom: '10px',
+                                    background: '#ffffff',
+                                    borderRadius: '16px',
+                                    border: '1.5px solid #e2e8f0',
+                                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0,0,0,0.05)',
+                                    padding: '12px 14px',
+                                    width: '240px',
+                                    zIndex: 100,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '10px'
+                                  }}>
+                                    {/* Header */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <MechanicalMetronomeIcon size={16} color="#16a34a" strokeWidth={2.2} />
+                                        <span>Klick / Metronom</span>
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowRecordingMetronomePopup(false)}
+                                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    </div>
+
+                                    {/* Toggle Button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const next = !isRecordingMetronomeActive;
+                                        setIsRecordingMetronomeActive(next);
+                                        if (next) playMetronomeTick(true);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        background: isRecordingMetronomeActive ? '#16a34a' : '#f1f5f9',
+                                        color: isRecordingMetronomeActive ? '#ffffff' : '#475569',
+                                        border: 'none',
+                                        borderRadius: '10px',
+                                        padding: '7px 10px',
+                                        fontSize: '0.76rem',
+                                        fontWeight: 850,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '6px',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                    >
+                                      <Check size={14} style={{ opacity: isRecordingMetronomeActive ? 1 : 0 }} />
+                                      <span>{isRecordingMetronomeActive ? 'Klick bei Aufnahme aktiv' : 'Klick einschalten'}</span>
+                                    </button>
+
+                                    {/* BPM Stepper & Slider */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => setRecordingBpm(p => Math.max(40, p - 5))}
+                                          style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 8px', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                                        >
+                                          -5
+                                        </button>
+                                        <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a' }}>
+                                          {recordingBpm} <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>BPM</span>
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setRecordingBpm(p => Math.min(240, p + 5))}
+                                          style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 8px', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                                        >
+                                          +5
+                                        </button>
+                                      </div>
+
+                                      <input
+                                        type="range"
+                                        min="40"
+                                        max="240"
+                                        value={recordingBpm}
+                                        onChange={(e) => setRecordingBpm(Number(e.target.value))}
+                                        style={{ width: '100%', accentColor: '#16a34a', cursor: 'pointer' }}
+                                      />
+                                    </div>
+
+                                    {/* Test Click / Beep */}
+                                    <button
+                                      type="button"
+                                      onClick={() => playMetronomeTick(true)}
+                                      style={{
+                                        background: '#f8fafc',
+                                        border: '1px dashed #cbd5e1',
+                                        color: '#64748b',
+                                        borderRadius: '8px',
+                                        padding: '5px',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 750,
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      🔊 Klick kurz testen
+                                    </button>
+                                  </div>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={startRecordingAudio}
+                                  disabled={isUploadingAudio || isLimitReached}
+                                  style={{
+                                    background: isLimitReached ? '#cbd5e1' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.80rem',
+                                    fontWeight: 900,
+                                    cursor: isLimitReached ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    boxShadow: isLimitReached ? 'none' : '0 3px 10px rgba(99, 102, 241, 0.25)',
+                                    whiteSpace: 'nowrap',
+                                    height: '36px',
+                                    boxSizing: 'border-box'
+                                  }}
+                                  className={isLimitReached ? '' : 'hover-scale'}
+                                >
+                                  <Mic size={15} strokeWidth={2.4} />
+                                  <span>Aufnahme starten</span>
+                                </button>
+                              </div>
                             ) : (
                               <button
                                 type="button"
@@ -7448,7 +8142,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   } catch {}
 
                   // If teacher is viewing, only show student recordings that are shared
-                  if (isTeacherTools) {
+                  if (isTeacherMode) {
                     const sharedAudios = studentAudios.filter(aud => aud.visibility === 'shared_with_teacher');
 
                     if (sharedAudios.length === 0) {
@@ -7458,9 +8152,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             <Lock size={20} />
                           </div>
                           <div>
-                            <p style={{ fontWeight: 800, fontSize: '0.86rem', color: '#334155', margin: '0 0 4px' }}>Keine freigegebenen Aufnahmen</p>
+                            <p style={{ fontWeight: 800, fontSize: '0.86rem', color: '#334155', margin: '0 0 4px' }}>Keine freigegebenen Aufnahmen von ${studentFirstName}</p>
                             <p style={{ fontSize: '0.74rem', color: '#64748b', margin: 0, maxWidth: '280px', lineHeight: 1.45 }}>
-                              Der Schüler nutzt diesen Bereich zum ungestörten, privaten Ausprobieren. Sobald er eine Aufnahme freigibt, erscheint sie hier.
+                              ${studentFirstName} nutzt diesen Bereich zum ungestörten, privaten Ausprobieren. Sobald eine Übe-Aufnahme für dich freigegeben wird, erscheint sie hier.
                             </p>
                           </div>
                         </div>
@@ -7468,7 +8162,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     }
 
                     return (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {sharedAudios.map((aud, idx) => (
                           <InlineAudioPlayer 
                             key={`shared-aud-${idx}`}
@@ -7478,7 +8172,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             date={aud.date}
                             themeColor="#16a34a"
                             themeBg="#dcfce7"
-                            badge="🎓 Freigegeben"
+                            badge="🎓 Lehrer"
+                            badgeTitle="Vom Schüler für die Lehrkraft freigegeben"
                             badgeBg="#dcfce7"
                             badgeColor="#15803d"
                           />
@@ -7492,35 +8187,35 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     return (
                       <div style={{
                         flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#94a3b8',
-                        padding: '40px 20px',
-                        gap: '12px',
-                        textAlign: 'center',
-                        background: '#ffffff',
-                        borderRadius: '20px',
-                        border: '1.5px dashed #e2e8f0'
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#94a3b8",
+                        padding: "40px 20px",
+                        gap: "12px",
+                        textAlign: "center",
+                        background: "#ffffff",
+                        borderRadius: "20px",
+                        border: "1.5px dashed #e2e8f0"
                       }}>
                         <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '50%',
-                          background: '#f5f3ff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#6366f1'
+                          width: "48px",
+                          height: "48px",
+                          borderRadius: "50%",
+                          background: "#f5f3ff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#6366f1"
                         }}>
                           <Star size={22} />
                         </div>
                         <div>
-                          <h4 style={{ margin: '0 0 4px 0', fontSize: '0.92rem', fontWeight: 900, color: '#1e293b' }}>
+                          <h4 style={{ margin: "0 0 4px 0", fontSize: "0.92rem", fontWeight: 900, color: "#1e293b" }}>
                             Noch keine eigenen Aufnahmen
                           </h4>
-                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, maxWidth: '260px', lineHeight: 1.45 }}>
+                          <p style={{ margin: 0, fontSize: "0.78rem", color: "#64748b", fontWeight: 600, maxWidth: "260px", lineHeight: 1.45 }}>
                             Nimm dein Üben auf, höre dir selbst zu und sammle deine besten Takes in deinem Übe-Studio!
                           </p>
                         </div>
@@ -7528,121 +8223,417 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     );
                   }
 
-                  // Group student audios by Calendar Week
                   const now = getSimulatedNow();
                   const currentWeekStr = getISOWeek(now);
-                  const prevDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                  const prevWeekStr = getISOWeek(prevDate);
+                  const currentWeekNum = currentWeekStr.split("-W")[1] || "";
 
-                  const groups: { [key: string]: { key: string; label: string; isCurrent: boolean; items: any[] } } = {};
-                  studentAudios.forEach(aud => {
+                  // Filter by Search Query if active
+                  const isSearching = recordingSearchQuery.trim() !== "";
+                  const searchResults = isSearching ? studentAudios.filter(aud => {
+                    const q = recordingSearchQuery.toLowerCase().trim();
+                    return (aud.label || "").toLowerCase().includes(q) || (aud.date || "").toLowerCase().includes(q);
+                  }) : [];
+
+                  // Current Week Audios
+                  const currentWeekAudios = studentAudios.filter(aud => {
                     const d = aud.date ? new Date(aud.date) : now;
-                    const weekKey = getISOWeek(isNaN(d.getTime()) ? now : d);
-                    const weekNum = weekKey.split('-W')[1] || '';
-                    if (!groups[weekKey]) {
-                      const isCurrent = weekKey === currentWeekStr;
-                      const isPrev = weekKey === prevWeekStr;
-                      let label = `KW ${weekNum}`;
-                      if (isCurrent) label = `Diese Woche (KW ${weekNum})`;
-                      else if (isPrev) label = `Letzte Woche (KW ${weekNum})`;
-                      else {
-                        const mName = d.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' });
-                        label = `KW ${weekNum} • ${mName}`;
-                      }
-                      groups[weekKey] = { key: weekKey, label, isCurrent, items: [] };
-                    }
-                    groups[weekKey].items.push(aud);
+                    return getISOWeek(isNaN(d.getTime()) ? now : d) === currentWeekStr;
                   });
 
-                  const groupList = Object.values(groups);
+                  // Favorite Audios
+                  const favoriteStudentAudios = studentAudios.filter(aud => favoriteAudioUrls.includes(aud.url));
 
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {groupList.map(group => {
-                        const isExpanded = expandedAudioWeeks[group.key] !== undefined ? expandedAudioWeeks[group.key] : true;
-                        return (
-                          <div key={`stud-week-${group.key}`} style={{ display: 'flex', flexDirection: 'column' }}>
-                            {groupList.length > 1 && (
+                  // Group Past Audios into Month Albums
+                  const pastAudios = studentAudios.filter(aud => {
+                    const d = aud.date ? new Date(aud.date) : now;
+                    return getISOWeek(isNaN(d.getTime()) ? now : d) !== currentWeekStr;
+                  });
+
+                  const monthGroups: { [monthKey: string]: { monthKey: string; monthLabel: string; weeks: { [weekKey: string]: any[] }; totalTakes: number } } = {};
+                  pastAudios.forEach(aud => {
+                    const d = aud.date ? new Date(aud.date) : now;
+                    const dateObj = isNaN(d.getTime()) ? now : d;
+                    const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`;
+                    const monthLabel = dateObj.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+                    const weekKey = getISOWeek(dateObj);
+
+                    if (!monthGroups[monthKey]) {
+                      monthGroups[monthKey] = { monthKey, monthLabel, weeks: {}, totalTakes: 0 };
+                    }
+                    if (!monthGroups[monthKey].weeks[weekKey]) {
+                      monthGroups[monthKey].weeks[weekKey] = [];
+                    }
+                    monthGroups[monthKey].weeks[weekKey].push(aud);
+                    monthGroups[monthKey].totalTakes += 1;
+                  });
+
+                  const sortedMonths = Object.values(monthGroups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+
+                  const renderStudentPlayer = (aud: any, idxKey: string) => {
+                    const isShared = aud.visibility === "shared_with_teacher";
+                    return (
+                      <InlineAudioPlayer 
+                        key={idxKey}
+                        url={aud.url} 
+                        label={aud.label} 
+                        duration={aud.duration}
+                        date={aud.date}
+                        isFavorite={favoriteAudioUrls.includes(aud.url)}
+                        onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
+                        themeColor={isShared ? "#16a34a" : "#6366f1"}
+                        themeBg={isShared ? "#dcfce7" : "#ede9fe"}
+                        badge={isShared ? "🎓 Lehrer" : "🔒 Privat"}
+                        badgeTitle={isShared ? "Für Lehrkraft freigegeben (Klicken zum Umschalten)" : "Privat (Klicken zum Umschalten)"}
+                        badgeBg={isShared ? "#dcfce7" : "#ede9fe"}
+                        badgeColor={isShared ? "#15803d" : "#6d28d9"}
+                        onBadgeClick={!isTeacherMode ? () => {
+                          if (student?.id) {
+                            try {
+                              const juniorKey = `campus_junior_recordings_${student.id}`;
+                              const stored = localStorage.getItem(juniorKey);
+                              if (stored) {
+                                const recs = JSON.parse(stored).map((r: any) => {
+                                  if (r.url === aud.url || r.id === aud.id) {
+                                    return { ...r, visibility: isShared ? "private" : "shared_with_teacher" };
+                                  }
+                                  return r;
+                                });
+                                localStorage.setItem(juniorKey, JSON.stringify(recs));
+                                setLocalJuniorRecordingsTrigger(p => p + 1);
+                              }
+                            } catch {}
+                          }
+                        } : undefined}
+                        onDelete={!isTeacherMode ? () => {
+                          if (student?.id) {
+                            try {
+                              const juniorKey = `campus_junior_recordings_${student.id}`;
+                              const stored = localStorage.getItem(juniorKey);
+                              if (stored) {
+                                const recs = JSON.parse(stored).filter((r: any) => r.url !== aud.url && r.id !== aud.id);
+                                localStorage.setItem(juniorKey, JSON.stringify(recs));
+                                setLocalJuniorRecordingsTrigger(p => p + 1);
+                              }
+                            } catch {}
+                          }
+                        } : undefined}
+                        onSaveEdited={(res) => {
+                          if (student?.id) {
+                            try {
+                              const juniorKey = `campus_junior_recordings_${student.id}`;
+                              const stored = localStorage.getItem(juniorKey);
+                              let recs = stored ? JSON.parse(stored) : [];
+                              if (res.mode === "overwrite") {
+                                recs = recs.map((r: any) => {
+                                  if (r.url === aud.url || r.id === aud.id) {
+                                    return { ...r, url: res.url, duration: res.duration, label: res.label, title: res.label };
+                                  }
+                                  return r;
+                                });
+                              } else {
+                                const newRecord = {
+                                  id: `stud-${Date.now()}`,
+                                  url: res.url,
+                                  duration: res.duration,
+                                  date: new Date().toISOString(),
+                                  title: res.label,
+                                  label: res.label,
+                                  visibility: aud.visibility || "private"
+                                };
+                                recs = [newRecord, ...recs];
+                              }
+                              localStorage.setItem(juniorKey, JSON.stringify(recs));
+                              setLocalJuniorRecordingsTrigger(p => p + 1);
+                            } catch {}
+                          }
+                        }}
+                      />
+                    );
+                  };
+
+                  // 🔍 SEARCH RESULTS VIEW
+                  if (isSearching) {
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ fontSize: "0.76rem", fontWeight: 850, color: "#6d28d9", marginBottom: "4px" }}>
+                          🔍 {searchResults.length} {searchResults.length === 1 ? "Treffer" : "Treffer"} zur Suche „{recordingSearchQuery}“
+                        </div>
+                        {searchResults.map((aud, idx) => renderStudentPlayer(aud, `stud-search-${idx}`))}
+                      </div>
+                    );
+                  }
+
+                  // ⭐ FAVORITES DRILLDOWN VIEW
+                  if (showStudentFavoritesOnly) {
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowStudentFavoritesOnly(false)}
+                            style={{
+                              background: "#ffffff",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "100px",
+                              padding: "4px 12px",
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                              color: "#475569",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                            className="hover-scale"
+                          >
+                            <ArrowLeft size={12} /> Zurück zur Übersicht
+                          </button>
+                          <span style={{ fontSize: "0.76rem", fontWeight: 900, color: "#ca8a04" }}>
+                            ⭐ {favoriteStudentAudios.length} Favoriten
+                          </span>
+                        </div>
+
+                        {favoriteStudentAudios.length === 0 ? (
+                          <div style={{ textAlign: "center", padding: "30px 16px", color: "#94a3b8", fontSize: "0.80rem", fontWeight: 700 }}>
+                            Noch keine Favoriten markiert. Klicke bei einem deiner Takes auf das Stern-Symbol ⭐!
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {favoriteStudentAudios.map((aud, idx) => renderStudentPlayer(aud, `stud-fav-${idx}`))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // 📁 SELECTED MONTH DRILLDOWN VIEW
+                  if (selectedStudentMonth) {
+                    const monthData = monthGroups[selectedStudentMonth.key];
+                    const weekKeys = monthData ? Object.keys(monthData.weeks).sort((a, b) => b.localeCompare(a)) : [];
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStudentMonth(null)}
+                            style={{
+                              background: "#ffffff",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "100px",
+                              padding: "4px 12px",
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                              color: "#475569",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                            className="hover-scale"
+                          >
+                            <ArrowLeft size={12} /> Zurück zur Übersicht
+                          </button>
+                          <span style={{ fontSize: "0.78rem", fontWeight: 900, color: "#6d28d9" }}>
+                            📁 {selectedStudentMonth.label}
+                          </span>
+                        </div>
+
+                        {weekKeys.map(wkKey => {
+                          const wkAudios = monthData.weeks[wkKey] || [];
+                          const isExpanded = expandedStudentAudioWeeks[wkKey] !== undefined ? expandedStudentAudioWeeks[wkKey] : true;
+                          const wkNum = wkKey.split("-W")[1] || "";
+
+                          return (
+                            <div key={`stud-month-week-${wkKey}`} style={{ display: "flex", flexDirection: "column" }}>
                               <div
-                                onClick={() => toggleAudioWeek(group.key, true)}
+                                onClick={() => toggleStudentAudioWeek(wkKey, true)}
                                 style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '8px 12px',
-                                  background: group.isCurrent ? '#faf5ff' : '#ffffff',
-                                  borderRadius: '12px',
-                                  border: group.isCurrent ? '1px solid #e9d5ff' : '1px solid #e2e8f0',
-                                  cursor: 'pointer',
-                                  marginBottom: '8px',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                                  userSelect: 'none'
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  padding: "8px 12px",
+                                  background: "#ffffff",
+                                  borderRadius: "12px",
+                                  border: "1px solid #e2e8f0",
+                                  cursor: "pointer",
+                                  marginBottom: "8px",
+                                  boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+                                  userSelect: "none"
                                 }}
                                 className="hover-scale"
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{
-                                    fontSize: '0.74rem',
-                                    color: group.isCurrent ? '#9333ea' : '#64748b',
-                                    display: 'inline-flex',
-                                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                                    transition: 'transform 0.15s ease'
-                                  }}>
-                                    ▶
-                                  </span>
-                                  <span style={{ fontSize: '0.78rem', fontWeight: 850, color: group.isCurrent ? '#6d28d9' : '#334155' }}>
-                                    {group.label}
-                                  </span>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  <span style={{ fontSize: "0.74rem", color: "#64748b", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s ease" }}>▶</span>
+                                  <span style={{ fontSize: "0.78rem", fontWeight: 850, color: "#334155" }}>KW {wkNum}</span>
                                 </div>
-                                <span style={{
-                                  fontSize: '0.66rem',
-                                  fontWeight: 800,
-                                  background: group.isCurrent ? '#ede9fe' : '#f1f5f9',
-                                  color: group.isCurrent ? '#6d28d9' : '#64748b',
-                                  padding: '2px 8px',
-                                  borderRadius: '100px'
-                                }}>
-                                  {group.items.length} {group.items.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
+                                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "#f1f5f9", color: "#64748b", padding: "2px 8px", borderRadius: "100px" }}>
+                                  {wkAudios.length} {wkAudios.length === 1 ? "Aufnahme" : "Aufnahmen"}
                                 </span>
                               </div>
-                            )}
 
-                            {isExpanded && (
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '8px', marginBottom: '8px' }}>
-                                {group.items.map((aud, idx) => (
-                                  <InlineAudioPlayer 
-                                    key={`stud-rec-${group.key}-${idx}`}
-                                    url={aud.url} 
-                                    label={aud.label} 
-                                    duration={aud.duration}
-                                    date={aud.date}
-                                    themeColor="#6366f1"
-                                    themeBg="#ede9fe"
-                                    badge="🔒 Privat"
-                                    badgeBg="#ede9fe"
-                                    badgeColor="#6d28d9"
-                                    onDelete={() => {
-                                      if (aud.source === 'local_junior' && student?.id) {
-                                        try {
-                                          const juniorKey = `campus_junior_recordings_${student.id}`;
-                                          const stored = localStorage.getItem(juniorKey);
-                                          if (stored) {
-                                            const recs = JSON.parse(stored).filter((r: any) => r.url !== aud.url && r.id !== aud.id);
-                                            localStorage.setItem(juniorKey, JSON.stringify(recs));
-                                            setHomeworkNotesList([...homeworkNotesList]);
-                                          }
-                                        } catch {}
-                                      } else if (aud.originalIdx >= 0) {
-                                        handleDeleteNote(aud.originalIdx);
-                                      }
-                                    }}
-                                  />
-                                ))}
-                              </div>
-                            )}
+                              {isExpanded && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "8px" }}>
+                                  {wkAudios.map((aud, idx) => renderStudentPlayer(aud, `stud-month-aud-${wkKey}-${idx}`))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+
+                  // 🏠 DEFAULT VIEW: Top Hero (Diese Woche) + Square Album Grid (6er-Reihe)
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                      {/* 1. TOP HERO: Diese Woche (KW x) */}
+                      <div style={{
+                        background: "#ffffff",
+                        borderRadius: "18px",
+                        border: "1.5px solid #e9d5ff",
+                        padding: "12px 14px",
+                        boxShadow: "0 4px 14px rgba(109, 40, 217, 0.08)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "8px"
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#9333ea", display: "inline-block" }} />
+                            <span style={{ fontSize: "0.82rem", fontWeight: 900, color: "#6d28d9" }}>Diese Woche (KW {currentWeekNum})</span>
                           </div>
-                        );
-                      })}
+                          <span style={{ fontSize: "0.68rem", fontWeight: 800, background: "#ede9fe", color: "#6d28d9", padding: "2px 8px", borderRadius: "100px" }}>
+                            {currentWeekAudios.length} {currentWeekAudios.length === 1 ? "Aufnahme" : "Aufnahmen"}
+                          </span>
+                        </div>
+
+                        {currentWeekAudios.length === 0 ? (
+                          <div style={{ padding: "14px", textAlign: "center", color: "#94a3b8", fontSize: "0.76rem", fontWeight: 700, background: "#faf5ff", borderRadius: "12px" }}>
+                            Noch keine eigenen Aufnahmen in dieser Woche
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {currentWeekAudios.map((aud, idx) => renderStudentPlayer(aud, `stud-curr-aud-${idx}`))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. VISUAL SQUARE ALBUM COVERS (6er-Reihe: Favoriten + Monate) */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: "0.70rem", fontWeight: 900, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Monats-Alben & Archiv
+                          </span>
+                          <span style={{ fontSize: "0.66rem", color: "#94a3b8", fontWeight: 700 }}>
+                            {sortedMonths.length} {sortedMonths.length === 1 ? "Monat" : "Monate"}
+                          </span>
+                        </div>
+
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(6, 1fr)",
+                          gap: "8px"
+                        }}>
+                          {/* ⭐ Radiant Apple Liquid Gold Favoriten Cover Card */}
+                          <div
+                            onClick={() => setShowStudentFavoritesOnly(true)}
+                            style={{
+                              aspectRatio: "1 / 1",
+                              background: "linear-gradient(145deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%)",
+                              borderRadius: "14px",
+                              border: "1.5px solid #fbbf24",
+                              padding: "6px 4px",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              cursor: "pointer",
+                              boxShadow: "0 4px 16px rgba(245, 158, 11, 0.20), 0 1px 3px rgba(0,0,0,0.04)",
+                              position: "relative",
+                              overflow: "hidden",
+                              transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                              textAlign: "center"
+                            }}
+                            className="hover-scale"
+                          >
+                            <div style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "11px",
+                              background: "linear-gradient(135deg, #fef08a 0%, #eab308 100%)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 3px 10px rgba(234, 179, 8, 0.42), inset 0 1px 1.5px #ffffff",
+                              border: "1px solid rgba(255, 255, 255, 0.7)",
+                              marginTop: "2px"
+                            }}>
+                              <Star size={20} fill="#78350f" color="#78350f" strokeWidth={1} />
+                            </div>
+                            <div style={{ width: "100%" }}>
+                              <div style={{ fontSize: "0.66rem", fontWeight: 900, color: "#78350f", letterSpacing: "-0.01em", lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                Favoriten
+                              </div>
+                              <div style={{ fontSize: "0.56rem", fontWeight: 800, color: "#92400e", marginTop: "1px" }}>
+                                {favoriteStudentAudios.length} {favoriteStudentAudios.length === 1 ? "Take" : "Takes"}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 📅 Monthly Album Cover Cards (Kompakte Apple-Mini-Covers) */}
+                          {sortedMonths.map(m => {
+                            const dParts = m.monthKey.split("-");
+                            const dObj = new Date(parseInt(dParts[0], 10), parseInt(dParts[1], 10) - 1, 1);
+                            const shortLabel = dObj.toLocaleDateString("de-DE", { month: "short" }) + " " + String(dObj.getFullYear()).slice(2);
+                            return (
+                              <div
+                                key={`stud-month-card-${m.monthKey}`}
+                                onClick={() => setSelectedStudentMonth({ key: m.monthKey, label: m.monthLabel })}
+                                style={{
+                                  aspectRatio: "1 / 1",
+                                  background: "linear-gradient(145deg, #ffffff 0%, #faf5ff 100%)",
+                                  borderRadius: "14px",
+                                  border: "1.5px solid #e9d5ff",
+                                  padding: "8px 4px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  cursor: "pointer",
+                                  boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                                  transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                                  textAlign: "center"
+                                }}
+                                className="hover-scale"
+                              >
+                                <div style={{
+                                  width: "28px",
+                                  height: "28px",
+                                  borderRadius: "9px",
+                                  background: "#f5f3ff",
+                                  color: "#9333ea",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  border: "1px solid #ede9fe",
+                                  marginTop: "2px"
+                                }}>
+                                  <Calendar size={13} strokeWidth={2.4} />
+                                </div>
+                                <div style={{ width: "100%" }}>
+                                  <div style={{ fontSize: "0.64rem", fontWeight: 900, color: "#1e293b", letterSpacing: "-0.01em", lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {shortLabel}
+                                  </div>
+                                  <div style={{ fontSize: "0.56rem", fontWeight: 750, color: "#64748b", marginTop: "1px" }}>
+                                    {m.totalTakes} {m.totalTakes === 1 ? "Take" : "Takes"}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}
@@ -7929,7 +8920,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     </div>
                   </div>
                 )}
-              </>
+              </div>
           ) : activeModalTab === 'document' ? (
             <>
           
@@ -9752,7 +10743,364 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             ) : (
               <>
                 {/* Hub-view inner scrollable area */}
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', padding: '20px 24px', paddingBottom: '16px', overflowY: 'auto' }}>
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px 24px', paddingBottom: '16px', overflowY: 'auto' }}>
+                
+                {hubTab === 'modules' ? (
+                  /* ========================================================================= */
+                  /* TAB 1: 🎧 MODULE (Kompaktes Apple Music / Spotify 7er-Raster)             */
+                  /* ========================================================================= */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }} className="animation-fade-in">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Sliders size={15} style={{ color: '#34a853' }} />
+                          <span>Campus Studio Module</span>
+                        </span>
+                        <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 550 }}>
+                          Interaktive Werkzeuge für deinen Unterricht & deine Übe-Sessions
+                        </p>
+                      </div>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px' }}>
+                        7 Module aktiv
+                      </span>
+                    </div>
+
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: '14px 12px',
+                      padding: '2px 0 12px 0'
+                    }}>
+                      {/* 1. Protokoll (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
+                      <div
+                        onClick={() => {
+                          setHubTab('protocol');
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '14px 8px 12px 8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{
+                          width: '62px',
+                          height: '62px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255, 255, 255, 0.25)'
+                        }}>
+                          <BookOpen size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                        </div>
+                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                            Protokoll
+                          </div>
+                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                            Lehrwerke & Stücke
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. Loopstation (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
+                      <div
+                        onClick={() => {
+                          setActiveModalTab('document');
+                          setActiveViewMode('loopstation');
+                          setActiveSubView('hub');
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '14px 8px 12px 8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{
+                          width: '62px',
+                          height: '62px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(244, 63, 94, 0.40)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255, 255, 255, 0.25)'
+                        }}>
+                          <Sliders size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                        </div>
+                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                            Loopstation
+                          </div>
+                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                            Audio-Mehrspur
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3. Übe-Begleiter (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
+                      <div
+                        onClick={() => {
+                          setActiveModalTab('document');
+                          setActiveViewMode('practice');
+                          setActiveSubView('hub');
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '14px 8px 12px 8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{
+                          width: '62px',
+                          height: '62px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(245, 158, 11, 0.40)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255, 255, 255, 0.25)'
+                        }}>
+                          <Clock size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                        </div>
+                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                            Übe-Begleiter
+                          </div>
+                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                            Fokus & Metronom
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 4. Aufnahmen (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
+                      <div
+                        onClick={() => {
+                          setActiveModalTab('document');
+                          setActiveViewMode('recordings');
+                          setActiveSubView('hub');
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '14px 8px 12px 8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{
+                          width: '62px',
+                          height: '62px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(99, 102, 241, 0.40)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255, 255, 255, 0.25)'
+                        }}>
+                          <Mic size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                        </div>
+                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                            Aufnahmen
+                          </div>
+                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                            Unterrichts-Memos
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 5. Stimmgerät (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
+                      <div
+                        onClick={() => {
+                          setActiveModalTab('document');
+                          setActiveViewMode('tuner');
+                          setActiveSubView('hub');
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '14px 8px 12px 8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{
+                          width: '62px',
+                          height: '62px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(6, 182, 212, 0.40)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255, 255, 255, 0.25)'
+                        }}>
+                          <Radio size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                        </div>
+                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                            Stimmgerät
+                          </div>
+                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                            WebAudio Tuner
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 6. Skill-Radar (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
+                      <div
+                        onClick={() => {
+                          setActiveModalTab('skillradar');
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '14px 8px 12px 8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{
+                          width: '62px',
+                          height: '62px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255, 255, 255, 0.25)'
+                        }}>
+                          <Activity size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                        </div>
+                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                            Skill-Radar
+                          </div>
+                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                            Kompetenz-Profil
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 7. Archiv (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
+                      <div
+                        onClick={() => {
+                          setActiveModalTab('document');
+                          setActiveSubView('history');
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '14px 8px 12px 8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{
+                          width: '62px',
+                          height: '62px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #64748b 0%, #334155 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(100, 116, 139, 0.40)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255, 255, 255, 0.25)'
+                        }}>
+                          <History size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                        </div>
+                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                            Archiv
+                          </div>
+                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                            Historie & Jahre
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* ========================================================================= */
+                  /* TAB 2: 📋 PROTOKOLL (Ausschließlich Lehrwerke & Songs)                    */
+                  /* ========================================================================= */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }} className="animation-fade-in">
                 {/* 1. LEHRWERKE & ÜBUNGEN (Kompakt & minimalistisch, ca. 1/3) */}
                 <div>
                   {/* Clean Apple-style Header Row with Quick-Add Action */}
@@ -10856,6 +12204,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     </div>
                   </div>
                 )}
+                </div>
+                )}
                 </div>{/* close inner scrollable div */}
 
                 {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom (Trophy Dock) */}
@@ -10889,7 +12239,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       className="hover-scale"
                     >
                       <Star size={14} fill="#fff" />
-                      <span style={{ whiteSpace: 'nowrap' }}>Sticker-Album</span>
+                      <span style={{ whiteSpace: 'nowrap' }}>
+                        {uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine'}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -12128,10 +13480,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <div>
                     <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Edit3 size={16} style={{ color: '#0f172a' }} />
-                      <span>Eintrag & Hausaufgabe</span>
+                      <span>{readOnly ? 'Hausaufgaben & Wochenplan' : 'Eintrag & Hausaufgabe'}</span>
                     </span>
                     <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
-                      Dokumentiere den heutigen Unterricht für den Schüler.
+                      {readOnly 
+                        ? 'Deine aktuellen Aufgaben, Stücke und Übungsmemos für diese Woche.' 
+                        : 'Dokumentiere den heutigen Unterricht für den Schüler.'}
                     </p>
                   </div>
                 </div>
@@ -12184,7 +13538,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               <Calendar size={13} strokeWidth={2.5} />
                             </div>
                             <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                              Schülervorschau (KW {getISOWeek().split('-W')[1]})
+                              {readOnly ? 'Deine Hausaufgabe' : 'Schülervorschau'} (KW {getISOWeek().split('-W')[1]})
                             </span>
                           </div>
 
@@ -12212,6 +13566,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             </button>
                           )}
                         </div>
+
+
+
+                        {/* Silent Mode Banner */}
+                        {(() => {
+                          const currentHour = getSimulatedNow().getHours();
+                          const isSilentTime = currentHour >= 20 || currentHour < 7;
+                          if (!isSilentTime) return null;
+                          return (
+                            <div style={{
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '10px',
+                              padding: '6px 10px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              color: '#64748b'
+                            }}>
+                              <span>🌙</span>
+                              <span>
+                                {readOnly
+                                  ? 'Nachtruhe aktiv: Keine störenden Benachrichtigungen bis 07:00 Uhr.'
+                                  : 'Silent-Modus aktiv: Der Schüler erhält die Aufgabe morgen früh ab 07:00 Uhr ohne Nacht-Störung.'}
+                              </span>
+                            </div>
+                          );
+                        })()}
 
                         {/* Active Homework Items Section */}
                         {(() => {
@@ -15670,6 +17054,27 @@ const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlay
   );
 };
 
+// Lightweight WebAudio beep helper for 4-beat count-in
+const playCountInBeep = (isAccent: boolean) => {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(isAccent ? 960 : 640, ctx.currentTime);
+    gain.gain.setValueAtTime(0.28, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+  } catch {
+    // silent fallback
+  }
+};
+
 const InlineAudioPlayer: React.FC<{ 
   url: string; 
   label: string; 
@@ -15678,9 +17083,14 @@ const InlineAudioPlayer: React.FC<{
   themeColor?: string;
   themeBg?: string;
   badge?: string;
+  badgeTitle?: string;
   badgeBg?: string;
   badgeColor?: string;
+  onBadgeClick?: () => void;
   date?: string;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
+  onSaveEdited?: (result: { url: string; duration: number; label: string; mode: 'overwrite' | 'duplicate' }) => void;
 }> = ({ 
   url, 
   label, 
@@ -15689,16 +17099,51 @@ const InlineAudioPlayer: React.FC<{
   themeColor = '#34a853',
   themeBg = '#e6f4ea',
   badge,
+  badgeTitle,
   badgeBg = '#f1f5f9',
   badgeColor = '#475569',
-  date
+  onBadgeClick,
+  date,
+  isFavorite,
+  onToggleFavorite,
+  onSaveEdited
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [isLooping, setIsLooping] = useState(false);
+  const [countInActive, setCountInActive] = useState(false);
+  const [countInStep, setCountInStep] = useState<number | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string>(url);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const countInTimerRef = React.useRef<any>(null);
+  const playerIdRef = React.useRef<string>(`player_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
+
+  const notifyGlobalPlay = () => {
+    window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: playerIdRef.current } }));
+  };
+
+  // 🎧 Global Single-Audio Manager: Stop if any other player on the page starts
+  useEffect(() => {
+    const handleOtherPlay = (e: any) => {
+      if (e?.detail?.playerId && e.detail.playerId !== playerIdRef.current) {
+        if (countInTimerRef.current) {
+          clearTimeout(countInTimerRef.current);
+          countInTimerRef.current = null;
+          setCountInStep(null);
+        }
+        if (audioRef.current && !audioRef.current.paused) {
+          audioRef.current.pause();
+        }
+        setIsPlaying(false);
+      }
+    };
+
+    window.addEventListener('campus-global-audio-play', handleOtherPlay);
+    return () => window.removeEventListener('campus-global-audio-play', handleOtherPlay);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -15719,18 +17164,56 @@ const InlineAudioPlayer: React.FC<{
     return () => {
       active = false;
       if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
+      if (countInTimerRef.current) clearTimeout(countInTimerRef.current);
     };
   }, [url]);
 
+  // 🔁 Seamless Gapless Native Loop
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.loop = isLooping;
+    }
+  }, [isLooping]);
+
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (countInTimerRef.current) {
+      clearTimeout(countInTimerRef.current);
+      countInTimerRef.current = null;
+      setCountInStep(null);
+      return;
+    }
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play();
-      setIsPlaying(true);
+      notifyGlobalPlay();
+      if (countInActive) {
+        let step = 4;
+        setCountInStep(step);
+        playCountInBeep(true);
+
+        const runCount = () => {
+          step -= 1;
+          if (step > 0) {
+            setCountInStep(step);
+            playCountInBeep(false);
+            countInTimerRef.current = setTimeout(runCount, 550);
+          } else {
+            setCountInStep(null);
+            countInTimerRef.current = null;
+            if (audioRef.current) {
+              audioRef.current.loop = isLooping;
+              audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[InlineAudioPlayer] Play error:', err));
+            }
+          }
+        };
+        countInTimerRef.current = setTimeout(runCount, 550);
+      } else {
+        audioRef.current.loop = isLooping;
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[InlineAudioPlayer] Play error:', err));
+      }
     }
   };
 
@@ -15746,14 +17229,17 @@ const InlineAudioPlayer: React.FC<{
       setCurrentTime(audio.currentTime);
     };
     const handleEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
+      if (!isLooping) {
+        setIsPlaying(false);
+        setCurrentTime(0);
+      }
     };
 
     if (audio.duration && isFinite(audio.duration)) {
       setDuration(Math.round(audio.duration));
     }
 
+    audio.loop = isLooping;
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
@@ -15762,10 +17248,13 @@ const InlineAudioPlayer: React.FC<{
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [resolvedUrl]);
+  }, [resolvedUrl, isLooping]);
 
   useEffect(() => {
-    if (audioRef.current) audioRef.current.playbackRate = playbackRate;
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+      (audioRef.current as any).preservesPitch = true;
+    }
   }, [playbackRate]);
 
   const formatTime = (secs: number) => {
@@ -15794,183 +17283,438 @@ const InlineAudioPlayer: React.FC<{
 
   return (
     <div style={{
-      background: '#ffffff',
-      borderRadius: '16px',
+      background: isPlaying ? '#f0fdf4' : '#ffffff',
+      borderRadius: '14px',
       border: isPlaying ? `1.5px solid ${themeColor}` : '1.5px solid #e2e8f0',
-      padding: '10px 12px',
+      padding: '8px 14px',
       width: '100%',
-      boxShadow: isPlaying ? `0 4px 16px ${themeColor}22, 0 1px 3px rgba(0,0,0,0.04)` : '0 2px 6px rgba(0,0,0,0.02)',
+      boxShadow: isPlaying ? `0 4px 16px ${themeColor}20, 0 1px 3px rgba(0,0,0,0.03)` : '0 1px 4px rgba(0,0,0,0.02)',
       display: 'flex',
-      flexDirection: 'column',
+      alignItems: 'center',
       gap: '8px',
       boxSizing: 'border-box',
       position: 'relative',
-      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+      minHeight: '50px'
     }}>
       <audio ref={audioRef} src={resolvedUrl} />
 
-      {/* Main Row: Play button + 100% Legible Title & Details + Controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
-        {/* Play / Pause Circular Button */}
-        <button
-          type="button"
-          onClick={(e) => togglePlay(e)}
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            background: isPlaying ? themeColor : `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}ee 100%)`,
-            color: '#ffffff',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            boxShadow: isPlaying ? `0 0 12px ${themeColor}66` : `0 2px 6px ${themeColor}40`,
-            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}
-          className="hover-scale"
-          title={isPlaying ? 'Pause' : 'Abspielen'}
-        >
-          {isPlaying ? (
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-              <rect x="6" y="5" width="4" height="14" rx="1.5" />
-              <rect x="14" y="5" width="4" height="14" rx="1.5" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ marginLeft: '2px' }}>
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          )}
-        </button>
+      {/* Left: Play / Pause Circular Button (34px) */}
+      <button
+        type="button"
+        onClick={(e) => togglePlay(e)}
+        style={{
+          width: '34px',
+          height: '34px',
+          borderRadius: '50%',
+          background: countInStep !== null 
+            ? '#f59e0b'
+            : (isPlaying ? themeColor : `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}ee 100%)`),
+          color: '#ffffff',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          boxShadow: isPlaying ? `0 0 10px ${themeColor}55` : `0 2px 6px ${themeColor}33`,
+          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          fontSize: countInStep !== null ? '0.86rem' : undefined,
+          fontWeight: 900
+        }}
+        className="hover-scale"
+        title={countInStep !== null ? `Einzähler: ${countInStep}` : (isPlaying ? 'Pause' : 'Abspielen')}
+      >
+        {countInStep !== null ? (
+          <span>{countInStep}</span>
+        ) : isPlaying ? (
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+            <rect x="6" y="5" width="4" height="14" rx="1.5" />
+            <rect x="14" y="5" width="4" height="14" rx="1.5" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style={{ marginLeft: '2px' }}>
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
+      </button>
 
-        {/* Title & Metadata (100% Readable, Never Truncated) */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span style={{
-            fontSize: '0.84rem',
-            fontWeight: 850,
-            color: '#0f172a',
-            lineHeight: 1.25,
-            wordBreak: 'break-word',
-            display: 'block'
-          }}>
-            {cleanTitle}
+      {/* Middle: Title & Metadata */}
+      <div style={{ flex: '1 1 auto', minWidth: '60px', display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+        <span style={{
+          fontSize: '0.82rem',
+          fontWeight: 850,
+          color: '#0f172a',
+          lineHeight: 1.2,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          display: 'block'
+        }}>
+          {cleanTitle}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.66rem', color: '#64748b', fontWeight: 650, whiteSpace: 'nowrap' }}>
+          {formattedDate && <span>{formattedDate}</span>}
+          {formattedDate && <span>•</span>}
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+            {isActiveOrPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : `${formatTime(duration)} min`}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
-            {formattedDate && <span>{formattedDate}</span>}
-            {formattedDate && <span>•</span>}
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {isActiveOrPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : `${formatTime(duration)} min`}
-            </span>
-          </div>
-        </div>
-
-        {/* Right Controls: Speed + Badge + Delete */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
-          <button
-            type="button"
-            onClick={() => setPlaybackRate(prev => prev === 1 ? 0.8 : (prev === 0.8 ? 0.6 : 1))}
-            style={{
-              background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
-              border: playbackRate !== 1 ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
-              color: playbackRate !== 1 ? '#2563eb' : '#64748b',
-              borderRadius: '8px',
-              padding: '3px 6px',
-              fontSize: '0.66rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              flexShrink: 0
-            }}
-            title="Tempo anpassen"
-          >
-            {playbackRate}x
-          </button>
-
-          {badge && (
-            <span style={{
-              fontSize: '0.66rem',
-              fontWeight: 800,
-              background: badgeBg,
-              color: badgeColor,
-              padding: '3px 8px',
-              borderRadius: '100px',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              display: 'inline-flex',
-              alignItems: 'center'
-            }}>
-              {badge}
-            </span>
-          )}
-
-          {onDelete && (
-            <button
-              type="button"
-              onClick={onDelete}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                padding: '4px',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale"
-              title="Aufnahme löschen"
-            >
-              <Trash2 size={13} strokeWidth={2} />
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Audio Waveform Track: Displayed on Play / Active Playback */}
-      {isActiveOrPlaying && (
-        <div 
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
-            const newTime = newRatio * (duration || 0);
-            setCurrentTime(newTime);
-            if (audioRef.current) audioRef.current.currentTime = newTime;
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '2.5px',
-            height: '18px',
-            cursor: 'pointer',
-            padding: '2px 4px',
-            background: '#f8fafc',
-            borderRadius: '8px',
-            marginTop: '2px'
-          }}
-          title="Klicken zum Spulen"
-        >
-          {waveformHeights.map((h, i) => {
-            const barRatio = i / waveformHeights.length;
-            const isFilled = barRatio <= progressRatio;
-            return (
-              <div
-                key={i}
-                style={{
-                  flex: 1,
-                  height: `${h}%`,
-                  minHeight: '3px',
-                  borderRadius: '2px',
-                  background: isFilled ? themeColor : '#cbd5e1',
-                  transition: 'background 0.08s ease, height 0.15s ease'
+      {/* Right Area: Dynamic Morphing (Paused = 4 Action Buttons | Playing = Live Waveform + Quick Pills) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginLeft: 'auto' }}>
+        {isPlaying ? (
+          /* PLAYBACK MODE: Waveform + Quick Loop & Speed Pills */
+          <>
+            {/* Waveform Track with Touch Scrubbing */}
+            <div 
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
+                const newTime = newRatio * (duration || 0);
+                setCurrentTime(newTime);
+                if (audioRef.current) audioRef.current.currentTime = newTime;
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                height: '18px',
+                width: '90px',
+                cursor: 'pointer',
+                padding: '2px 4px',
+                background: '#f8fafc',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0'
+              }}
+              title="Klicken zum Spulen"
+            >
+              {waveformHeights.slice(0, 16).map((h, i) => {
+                const barRatio = i / 16;
+                const isFilled = barRatio <= progressRatio;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      flex: 1,
+                      height: `${h}%`,
+                      minHeight: '3px',
+                      borderRadius: '1.5px',
+                      background: isFilled ? themeColor : '#cbd5e1',
+                      transition: 'background 0.08s ease'
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Quick Loop Pill */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsLooping(!isLooping);
+              }}
+              style={{
+                background: isLooping ? '#dcfce7' : '#f8fafc',
+                border: isLooping ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
+                color: isLooping ? '#15803d' : '#64748b',
+                borderRadius: '6px',
+                padding: '4px 6px',
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '28px',
+                boxSizing: 'border-box'
+              }}
+              className="hover-scale-mini"
+              title={isLooping ? 'Loop aktiv' : 'Loop aktivieren'}
+            >
+              <Repeat size={11} strokeWidth={isLooping ? 2.6 : 2} />
+            </button>
+
+            {/* Quick Speed Pill */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const rates = [1, 0.85, 0.75, 0.5, 1.2];
+                const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+                setPlaybackRate(nextRate);
+              }}
+              style={{
+                background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
+                border: playbackRate !== 1 ? '1.2px solid #bfdbfe' : '1px solid #cbd5e1',
+                color: playbackRate !== 1 ? '#2563eb' : '#64748b',
+                borderRadius: '6px',
+                padding: '4px 6px',
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                height: '28px',
+                boxSizing: 'border-box'
+              }}
+              className="hover-scale-mini"
+              title="Tempo anpassen"
+            >
+              {playbackRate}×
+            </button>
+
+            {/* ⭐ Star / Favorite Button (Playing Mode) */}
+            {onToggleFavorite && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite();
                 }}
-              />
-            );
-          })}
-        </div>
+                style={{
+                  background: isFavorite ? '#fef3c7' : '#f8fafc',
+                  border: isFavorite ? '1.2px solid #f59e0b' : '1px solid #cbd5e1',
+                  color: isFavorite ? '#d97706' : '#94a3b8',
+                  borderRadius: '6px',
+                  padding: '4px 6px',
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '28px',
+                  boxSizing: 'border-box',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale-mini"
+                title={isFavorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen"}
+              >
+                <Star size={12} strokeWidth={isFavorite ? 2.6 : 2} fill={isFavorite ? "#f59e0b" : "none"} color={isFavorite ? "#d97706" : "#94a3b8"} />
+              </button>
+            )}
+          </>
+        ) : (
+          /* PAUSED / IDLE MODE: All 4 Action Buttons in 1 Sleek Row */
+          <>
+            {/* 🔁 Loop Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsLooping(!isLooping);
+              }}
+              style={{
+                background: isLooping ? '#dcfce7' : '#f8fafc',
+                border: isLooping ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
+                color: isLooping ? '#15803d' : '#64748b',
+                borderRadius: '6px',
+                padding: '4px 6px',
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '28px',
+                boxSizing: 'border-box'
+              }}
+              className="hover-scale-mini"
+              title={isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)'}
+            >
+              <Repeat size={11} strokeWidth={isLooping ? 2.6 : 2} />
+            </button>
+
+            {/* ⏱️ 4-Beat Count-In Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCountInActive(!countInActive);
+              }}
+              style={{
+                background: countInActive ? '#dcfce7' : '#f8fafc',
+                border: countInActive ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
+                color: countInActive ? '#15803d' : '#64748b',
+                borderRadius: '6px',
+                padding: '4px 6px',
+                fontSize: '0.62rem',
+                fontWeight: 850,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                height: '28px',
+                boxSizing: 'border-box'
+              }}
+              className="hover-scale-mini"
+              title={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler vor Abspielen aktivieren'}
+            >
+              <Timer size={11} strokeWidth={countInActive ? 2.4 : 2} />
+              <span>4</span>
+            </button>
+
+            {/* 🚀 Speed Rate Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const rates = [1, 0.85, 0.75, 0.5, 1.2];
+                const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+                setPlaybackRate(nextRate);
+              }}
+              style={{
+                background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
+                border: playbackRate !== 1 ? '1.2px solid #bfdbfe' : '1px solid #cbd5e1',
+                color: playbackRate !== 1 ? '#2563eb' : '#64748b',
+                borderRadius: '6px',
+                padding: '4px 6px',
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                height: '28px',
+                boxSizing: 'border-box'
+              }}
+              className="hover-scale-mini"
+              title="Tempo anpassen"
+            >
+              {playbackRate}×
+            </button>
+
+            {/* ✂️ Studio Editor Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditorOpen(true);
+              }}
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #cbd5e1',
+                color: '#6366f1',
+                borderRadius: '6px',
+                padding: '4px 6px',
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '28px',
+                boxSizing: 'border-box'
+              }}
+              className="hover-scale-mini"
+              title="Aufnahme zuschneiden & Pitch verändern"
+            >
+              <Scissors size={11} strokeWidth={2.2} />
+            </button>
+
+            {/* ⭐ Star / Favorite Button */}
+            {onToggleFavorite && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite();
+                }}
+                style={{
+                  background: isFavorite ? '#fef3c7' : '#f8fafc',
+                  border: isFavorite ? '1.2px solid #f59e0b' : '1px solid #cbd5e1',
+                  color: isFavorite ? '#d97706' : '#94a3b8',
+                  borderRadius: '6px',
+                  padding: '4px 6px',
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '28px',
+                  boxSizing: 'border-box',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale-mini"
+                title={isFavorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen"}
+              >
+                <Star size={12} strokeWidth={isFavorite ? 2.6 : 2} fill={isFavorite ? "#f59e0b" : "none"} color={isFavorite ? "#d97706" : "#94a3b8"} />
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Status Badge (1-Click Toggle) */}
+        {badge && (
+          <span 
+            onClick={onBadgeClick ? (e) => { e.stopPropagation(); onBadgeClick(); } : undefined}
+            style={{
+              fontSize: '0.64rem',
+              fontWeight: 800,
+              background: badgeBg,
+              color: badgeColor,
+              padding: '3px 7px',
+              borderRadius: '100px',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              cursor: onBadgeClick ? 'pointer' : 'default',
+              userSelect: 'none',
+              height: '26px',
+              boxSizing: 'border-box',
+              transition: 'all 0.15s ease'
+            }}
+            className={onBadgeClick ? 'hover-scale-mini' : ''}
+            title={badgeTitle || (onBadgeClick ? 'Klicken zum Umschalten (Privat / Für Lehrkraft freigeben)' : undefined)}
+          >
+            {badge}
+          </span>
+        )}
+
+        {/* Delete Button */}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              width: '26px',
+              height: '26px',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              marginLeft: '3px',
+              marginRight: '2px',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale"
+            title="Aufnahme löschen"
+          >
+            <Trash2 size={12} strokeWidth={2} />
+          </button>
+        )}
+      </div>
+
+      {/* Studio Waveform & Pitch Editor Modal */}
+      {isEditorOpen && (
+        <AudioEditorModal
+          isOpen={isEditorOpen}
+          onClose={() => setIsEditorOpen(false)}
+          audioUrl={resolvedUrl}
+          initialLabel={cleanTitle}
+          initialDuration={duration}
+          onSave={(res) => {
+            if (onSaveEdited) {
+              onSaveEdited(res);
+            }
+            setIsEditorOpen(false);
+          }}
+        />
       )}
     </div>
   );

@@ -34,7 +34,7 @@ import {
   BookOpen,
   Edit3
 } from 'lucide-react';
-import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
 import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
 interface ScheduleOccurrence {
@@ -7306,7 +7306,7 @@ return (
                                 fontWeight: 800,
                                 border: '1px solid #bbf7d0'
                               }}>
-                                {(occ.student?.instrument && occ.student.instrument !== 'Musiker') ? occ.student.instrument : (occ.instrument && occ.instrument !== 'Musiker' ? occ.instrument : 'Unterrichtsfach')}
+                                {formatDisplaySubjectOrInstrument(occ)}
                               </span>
                               <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
                                 • {editOccState.duration || 45} Min Lektion

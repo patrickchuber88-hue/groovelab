@@ -76,7 +76,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const [volMetronome, setVolMetronome] = useState(100);
 
   // 🎙️ Campus Rhythmus-Coach States & Realtime Audio Tracking
-  const [rhythmCoachActive, setRhythmCoachActive] = useState(!!activeSongContext);
+  const [rhythmCoachActive, setRhythmCoachActive] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [calibrationStep, setCalibrationStep] = useState<1 | 2>(1);
   const [step1Count, setStep1Count] = useState<number>(0);
@@ -1233,7 +1233,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             }}
           >
             <Clock size={15} />
-            <span>Metronom & Coach</span>
+            <span>Metronom</span>
           </button>
           <button
             type="button"
@@ -1261,8 +1261,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '28px', flex: 1, width: '100%' }} className="flex-col lg:flex-row">
-        {/* Left Column: Equalized Metronome Panel (Generous 50/50 Breathing Room) */}
+      <div style={{ display: 'flex', gap: '24px', flex: 1, width: '100%' }} className="flex-col lg:flex-row">
+        {/* Left Column: Equalized Metronome Panel */}
         <div style={{
           flex: '1 1 0%',
           minWidth: isMobileView ? '100%' : '320px',
@@ -1272,9 +1272,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           background: '#ffffff',
           borderRadius: '20px',
           border: '1px solid #e8e8ed',
-          padding: '24px 26px',
+          padding: '18px 22px',
           justifyContent: 'space-between',
-          gap: '20px',
+          gap: '12px',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)'
         }}>
           <div style={{ width: '100%', textAlign: 'center' }}>
@@ -1284,7 +1284,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           </div>
 
           {/* Mechanical Metronome Container */}
-          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '4px 0' }}>
+          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '2px 0' }}>
             <style>{`
               @keyframes swing-anim {
                 0% { transform: rotate(-12deg); }
@@ -1296,7 +1296,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               }
             `}</style>
 
-            <svg width="180" height="215" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
+            <svg width="155" height="185" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
               <defs>
                 {/* Walnut Wood Gradient */}
                 <linearGradient id="walnutWood" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1651,112 +1651,6 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             TAP TEMPO
           </button>
 
-          {/* 🎙️ Campus Rhythmus-Coach Controls (Campus Exclusive) */}
-          {isCampusModule && (
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
-                <button
-                  type="button"
-                  onClick={toggleRhythmCoach}
-                  className="tactile-btn"
-                  style={{
-                    flex: 1,
-                    background: rhythmCoachActive ? 'rgba(52, 168, 83, 0.12)' : '#f8fafc',
-                    color: rhythmCoachActive ? '#15803d' : '#64748b',
-                    border: rhythmCoachActive ? '1.5px solid #34a853' : '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '8px 10px',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <Mic size={13} style={{ color: rhythmCoachActive ? '#34a853' : '#64748b' }} />
-                  <span>{rhythmCoachActive ? 'Rhythmus-Coach AKTIV 🎙️' : 'Rhythmus-Coach An'}</span>
-                </button>
-
-                {rhythmCoachActive && (
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleStartCalibration(false)}
-                      className="tactile-btn"
-                      title="3 Instrumenten-Töne neu einpegeln"
-                      style={{
-                        background: '#f1f5f9',
-                        color: '#475569',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '10px',
-                        padding: '8px 10px',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <span>Einpegeln</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleStartCalibration(true)}
-                      className="tactile-btn"
-                      title="Latenz-Kalibrierung neu starten (Loopstation Modus)"
-                      style={{
-                        background: '#e0e7ff',
-                        color: '#4338ca',
-                        border: '1px solid #c7d2fe',
-                        borderRadius: '10px',
-                        padding: '8px 10px',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <Mic size={13} />
-                      <Settings size={12} />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Live Precision Badge */}
-              {rhythmCoachActive && (
-                <div style={{
-                  width: '100%',
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: '10px',
-                  padding: '8px 12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  animation: 'fadeIn 0.2s ease-out'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Activity size={14} style={{ color: '#34a853' }} />
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534' }}>
-                      Rhythmus-Präzision
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#15803d', fontFamily: 'SF Mono, monospace' }}>
-                    {rhythmScoreStats.totalBeats > 0 ? `${Math.round((rhythmScoreStats.inTime / rhythmScoreStats.totalBeats) * 100)}%` : '---'}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Active Song Context Banner */}
           {activeSongContext?.songTitle && (
             <div style={{
@@ -1782,144 +1676,48 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             </div>
           )}
 
-          {/* ⚡ Dynamic Groove-Ring Play/Pause Button */}
-          <div style={{ position: 'relative', width: '100%' }}>
-            {/* Dynamic Halo Glow Ring */}
-            {isPlaying && rhythmCoachActive && (
-              <div style={{
-                position: 'absolute',
-                inset: '-4px',
-                borderRadius: '16px',
-                pointerEvents: 'none',
-                background: grooveFeedback?.type === 'perfect' 
-                  ? 'rgba(52, 168, 83, 0.4)' 
-                  : (grooveFeedback?.type === 'rushing' 
-                      ? 'rgba(245, 158, 11, 0.4)' 
-                      : (grooveFeedback?.type === 'dragging' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(52, 168, 83, 0.15)')),
-                boxShadow: grooveFeedback?.type === 'perfect'
-                  ? '0 0 20px #34a853, 0 0 40px rgba(52, 168, 83, 0.6)'
-                  : (grooveFeedback?.type === 'rushing'
-                      ? '0 0 20px #f59e0b, 0 0 40px rgba(245, 158, 11, 0.6)'
-                      : (grooveFeedback?.type === 'dragging' ? '0 0 20px #3b82f6, 0 0 40px rgba(59, 130, 246, 0.6)' : 'none')),
-                transition: 'all 0.08s ease-out'
-              }} />
+          {/* Clean Play/Pause Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+                audioCtxRef.current.resume();
+              }
+              setIsPlaying(!isPlaying);
+            }}
+            className="tactile-btn"
+            style={{
+              width: '100%',
+              background: isPlaying ? '#ea4335' : '#34a853',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '14px',
+              padding: '14px',
+              fontSize: '0.86rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              boxShadow: isPlaying ? '0 4px 14px rgba(234, 67, 53, 0.3)' : '0 4px 14px rgba(52, 168, 83, 0.3)',
+              transition: 'all 0.2s ease-in-out'
+            }}
+          >
+            {isPlaying ? (
+              <>
+                <Square size={14} fill="currentColor" />
+                <span>Stoppen</span>
+              </>
+            ) : (
+              <>
+                <Play size={14} fill="currentColor" />
+                <span>Starten</span>
+              </>
             )}
-
-            <button
-              type="button"
-              onClick={() => {
-                if (isPlaying) {
-                  if (rhythmCoachActive && rhythmScoreStats.totalBeats >= 12) {
-                    const precisionPct = Math.round((rhythmScoreStats.inTime / rhythmScoreStats.totalBeats) * 100);
-                    const stars = precisionPct >= 85 ? 3 : (precisionPct >= 70 ? 2 : 1);
-                    const beatsPerBar = getBeatsPerBar(selectedStyle);
-                    const barsCount = Math.max(1, Math.floor(rhythmScoreStats.totalBeats / beatsPerBar));
-
-                    const totalBeats = rhythmScoreStats.totalBeats || 1;
-                    const quartersPct = Math.round((rhythmScoreStats.quarters / totalBeats) * 100);
-                    const eightsPct = Math.round((rhythmScoreStats.eights / totalBeats) * 100);
-                    const sixteenthsPct = Math.round((rhythmScoreStats.sixteenths / totalBeats) * 100);
-                    const dottedPct = Math.round((rhythmScoreStats.dotted / totalBeats) * 100);
-
-                    let advice = "";
-                    const rushing = rhythmScoreStats.rushing;
-                    const dragging = rhythmScoreStats.dragging;
-
-                    if (stars === 3) {
-                      advice = `🌟 Überragender Groove! Dein inneres Metronom läuft wie ein Schweizer Uhrwerk. Erkannte Struktur: ${quartersPct}% Viertel, ${eightsPct}% Achtel, ${sixteenthsPct}% 16tel!`;
-                    } else if (rushing > dragging + 1) {
-                      advice = `⚡ Tendenz zum Treiben (Zu früh): Du spielst sehr dynamisch! Achte bei ${eightsPct > 25 ? 'Achtel-Passagen' : 'deinen Anschlägen'} darauf, nicht dem Metronom vorauszulaufen.`;
-                    } else if (dragging > rushing + 1) {
-                      advice = `🐢 Tendenz zum Schleppen (Zu spät): Sehr gefühlvoller Anschlag! Du neigst bei ${sixteenthsPct > 20 ? 'Sechzehntel-Figuren' : 'den Noten'} dazu, leicht hinter dem Schlag zu hängen. Trau dich mutiger auf den Klick zu setzen.`;
-                    } else {
-                      advice = `🎯 Ausgewogener Puls: Du hältst das Tempo gut über verschiedene Notenwerte (${quartersPct}% Viertel / ${eightsPct}% Achtel). Wiederhole die Passage noch 1-2 Mal im gleichen Tempo!`;
-                    }
-
-                    setSummaryCardData({
-                      stars,
-                      precision: precisionPct,
-                      beatsCount: rhythmScoreStats.totalBeats,
-                      barsCount,
-                      bpm,
-                      songTitle: activeSongContext?.songTitle,
-                      advice,
-                      noteDistribution: { quartersPct, eightsPct, sixteenthsPct, dottedPct },
-                      microTimingDeltas: [...microTimingDeltasRef.current]
-                    });
-                  }
-                  setIsPlaying(false);
-                } else {
-                  setSummaryCardData(null);
-                  microTimingDeltasRef.current = [];
-                  setRhythmScoreStats({ totalBeats: 0, inTime: 0, rushing: 0, dragging: 0, quarters: 0, eights: 0, sixteenths: 0, dotted: 0 });
-                  if (isCampusModule) {
-                    setRhythmCoachActive(true);
-                  }
-                  setIsPlaying(true);
-                }
-              }}
-              className="tactile-btn"
-              style={{
-                position: 'relative',
-                width: '100%',
-                background: isPlaying ? '#ea4335' : '#34a853',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '12px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                zIndex: 2
-              }}
-            >
-              {isPlaying ? (
-                <>
-                  <Square size={12} fill="currentColor" />
-                  <span>Stoppen</span>
-                </>
-              ) : (
-                <>
-                  <Play size={12} fill="currentColor" />
-                  <span>Starten</span>
-                </>
-              )}
-            </button>
-
-            {/* Realtime Feedback Floating Pill */}
-            {isPlaying && rhythmCoachActive && grooveFeedback && (
-              <div style={{
-                position: 'absolute',
-                top: '-32px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: grooveFeedback.type === 'perfect' ? '#15803d' : (grooveFeedback.type === 'rushing' ? '#b45309' : '#1d4ed8'),
-                color: '#ffffff',
-                padding: '4px 12px',
-                borderRadius: '20px',
-                fontSize: '0.72rem',
-                fontWeight: 900,
-                letterSpacing: '0.04em',
-                boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                zIndex: 10,
-                whiteSpace: 'nowrap',
-                animation: 'bounceIn 0.15s ease-out'
-              }}>
-                {grooveFeedback.type === 'perfect' && <span>IN TIME! 🔥 ({grooveFeedback.noteLabel})</span>}
-                {grooveFeedback.type === 'rushing' && <span>ZU FRÜH ⚡ (Treiben)</span>}
-                {grooveFeedback.type === 'dragging' && <span>ZU SPÄT 🐢 (Schleppen)</span>}
-              </div>
-            )}
-          </div>
+          </button>
 
           {/* ⭐️ Non-XP 3-Star Summary Card Modal */}
           {summaryCardData && (
@@ -2210,14 +2008,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
                   audioCtxRef.current.resume();
                 }
-                if (isPlaying) {
-                  setIsPlaying(false);
-                } else {
-                  if (selectedStyle === 'metronome') {
-                    setRhythmCoachActive(true);
-                  }
-                  setIsPlaying(true);
-                }
+                setIsPlaying(!isPlaying);
               }}
               className="tactile-btn"
               style={{
@@ -2276,9 +2067,6 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   type="button"
                   onClick={() => {
                     setSelectedStyle(styleOpt.id as any);
-                    if (styleOpt.id !== 'metronome') {
-                      setRhythmCoachActive(false);
-                    }
                     if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
                       audioCtxRef.current.resume();
                     }

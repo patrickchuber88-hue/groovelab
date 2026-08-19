@@ -48,6 +48,7 @@ import { ProfileSelector } from './components/ProfileSelector';
 import { flushOfflineSyncQueue } from './services/offlineSyncService';
 import { DeviceSimulator } from './components/ui/DeviceSimulator';
 import { MobileTopHeader } from './components/ui/MobileTopHeader';
+import { formatTeacherFullName } from './utils/nameHelper';
 import { CampusLevelSwitcher, CampusUiLevel } from './components/campus/CampusLevelSwitcher';
 import { useMasterPricing } from './context/MasterPricingContext';
 import { MaintenanceLockoutOverlay } from './components/MaintenanceLockoutOverlay';
@@ -9514,12 +9515,8 @@ function App() {
                                   <User size={14} color="#3b82f6" />
                                   <span>
                                     {(() => {
-                                      const teacherName = teachers.find(t => t.id === user.teacher_id) 
-                                        ? `${teachers.find(t => t.id === user.teacher_id).first_name} ${teachers.find(t => t.id === user.teacher_id).last_name}` 
-                                        : (teachers.length > 0 
-                                          ? `${teachers[0].first_name} ${teachers[0].last_name}` 
-                                          : 'Patrick Huber');
-                                      return teacherName;
+                                      const matchedTeacher = teachers.find(t => t.id === user.teacher_id) || (teachers.length > 0 ? teachers[0] : null);
+                                      return formatTeacherFullName(matchedTeacher, matchedTeacher?.last_name);
                                     })()}
                                   </span>
                                 </span>

@@ -930,7 +930,7 @@ export function ensureCenteredStereoAudioBuffer(ctx: BaseAudioContext, inputBuff
     return stereoBuffer;
   }
 
-  // 2+ Channels: Check for asymmetric signal / dead channel (Links-Drall bug)
+  // 2+ Channels: Check for asymmetric signal / dead channel (Links-Drall bug on USB audio interfaces / mono mics)
   const inL = inputBuffer.getChannelData(0);
   const inR = inputBuffer.getChannelData(1);
 
@@ -942,19 +942,23 @@ export function ensureCenteredStereoAudioBuffer(ctx: BaseAudioContext, inputBuff
     rmsL += inL[i] * inL[i];
     rmsR += inR[i] * inR[i];
   }
-  rmsL = Math.sqrt(rmsL / (checkLen / 4));
-  rmsR = Math.sqrt(rmsR / (checkLen / 4));
+  rmsL = Math.sqrt(rmsL / Math.max(1, checkLen / 4));
+  rmsR = Math.sqrt(rmsR / Math.max(1, checkLen / 4));
 
-  const isRightDead = rmsR < 1e-4 && rmsL > 1e-3;
-  const isLeftDead = rmsL < 1e-4 && rmsR > 1e-3;
+  // If one channel is dead or significantly dominant (>2.0x RMS ratio / >6dB difference)
+  const isRightDeadOrFaint = (rmsR < 1e-4 && rmsL > 1e-3) || (rmsL > 1e-3 && rmsL > rmsR * 2.2);
+  const isLeftDeadOrFaint = (rmsL < 1e-4 && rmsR > 1e-3) || (rmsR > 1e-3 && rmsR > rmsL * 2.2);
 
-  if (isRightDead) {
+  if (isRightDeadOrFaint) {
+    // Mic is in Left channel only -> duplicate to both channels for centered sound
     outL.set(inL);
     outR.set(inL);
-  } else if (isLeftDead) {
+  } else if (isLeftDeadOrFaint) {
+    // Mic is in Right channel only -> duplicate to both channels for centered sound
     outL.set(inR);
     outR.set(inR);
   } else {
+    // Balanced stereo
     outL.set(inL);
     outR.set(inR);
   }

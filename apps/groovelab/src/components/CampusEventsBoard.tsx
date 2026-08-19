@@ -39,7 +39,7 @@ import {
   Star,
   History
 } from 'lucide-react';
-import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument } from '../utils/nameHelper';
+import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument } from '../utils/nameHelper';
 
 interface CampusEventsBoardProps {
   userId: string;
@@ -3262,9 +3262,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 'Raum 4'
               );
               const boardInstrument = (
-                s.instrument || 
-                matchedStudent?.instrument || 
-                teacherProfileObj?.instrument || 
+                (!isInvalidInstrument(s.instrument) ? s.instrument : null) || 
+                (!isInvalidInstrument(matchedStudent?.instrument) ? matchedStudent?.instrument : null) || 
+                (!isInvalidInstrument(teacherProfileObj?.instrument) ? teacherProfileObj?.instrument : null) || 
                 'Gitarre'
               );
 
@@ -3284,7 +3284,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 room_name: boardRoomName,
                 room: { name: boardRoomName },
                 rooms: { name: boardRoomName },
-                teacher: teacherProfileObj || { first_name: 'Severin', last_name: 'Landenberger' },
+                teacher: teacherProfileObj || { first_name: 'Severin', last_name: 'Landenberger', instrument: 'Gitarre' },
                 instrument: boardInstrument,
                 student: matchedStudent || {
                   id: studentId,
@@ -3311,14 +3311,19 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           );
           if (!alreadyExists) {
             const schRoomName = sch.room_name || sch.rooms?.name || sch.room?.name || (sch.room_id ? roomMap.get(sch.room_id)?.name : null) || teacherProfileObj?.rooms?.name || 'Raum 4';
-            const schInstrument = sch.instrument || sch.student?.instrument || teacherProfileObj?.instrument || 'Gitarre';
+            const schInstrument = (
+              (!isInvalidInstrument(sch.instrument) ? sch.instrument : null) || 
+              (!isInvalidInstrument(sch.student?.instrument) ? sch.student?.instrument : null) || 
+              (!isInvalidInstrument(teacherProfileObj?.instrument) ? teacherProfileObj?.instrument : null) || 
+              'Gitarre'
+            );
             combinedSchedules.push({
               ...sch,
               day_of_week: dayOfWeekNum,
               room_name: schRoomName,
               room: sch.room || { name: schRoomName },
               rooms: sch.rooms || { name: schRoomName },
-              teacher: sch.teacher || teacherProfileObj || studentTeacherObj,
+              teacher: sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Severin', last_name: 'Landenberger', instrument: 'Gitarre' },
               instrument: schInstrument
             });
           }
@@ -3435,12 +3440,19 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 if (!usedActualIds.has(actual.id)) {
                   const actTime = actual.start_time || actual.time_slot || sch.start_time || sch.time_slot || '14:00:00';
                   const actRoomName = actual.room_name || actual.room?.name || actual.rooms?.name || sch.room_name || sch.rooms?.name || teacherProfileObj?.rooms?.name || 'Raum 4';
-                  const actInstrument = actual.instrument || sch.instrument || actual.student?.instrument || sch.student?.instrument || teacherProfileObj?.instrument || 'Gitarre';
+                  const actInstrument = (
+                    (!isInvalidInstrument(actual.instrument) ? actual.instrument : null) || 
+                    (!isInvalidInstrument(sch.instrument) ? sch.instrument : null) || 
+                    (!isInvalidInstrument(actual.student?.instrument) ? actual.student?.instrument : null) || 
+                    (!isInvalidInstrument(sch.student?.instrument) ? sch.student?.instrument : null) || 
+                    (!isInvalidInstrument(teacherProfileObj?.instrument) ? teacherProfileObj?.instrument : null) || 
+                    'Gitarre'
+                  );
                   allMergedOccurrences.push({
                     ...actual,
                     start_time: actTime,
                     schedule: sch,
-                    teacher: actual.teacher || sch.teacher || teacherProfileObj || studentTeacherObj,
+                    teacher: actual.teacher || sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Severin', last_name: 'Landenberger', instrument: 'Gitarre' },
                     room_name: actRoomName,
                     room: actual.room || sch.room || sch.rooms || { name: actRoomName },
                     rooms: actual.rooms || sch.rooms || sch.room || { name: actRoomName },
@@ -3452,7 +3464,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 const timeSlotStr = sch.time_slot || '14:00';
                 const startTimeStr = timeSlotStr.includes(':') && timeSlotStr.split(':').length === 2 ? `${timeSlotStr}:00` : timeSlotStr;
                 const virtRoomName = sch.room_name || sch.rooms?.name || sch.room?.name || teacherProfileObj?.rooms?.name || 'Raum 4';
-                const virtInstrument = sch.instrument || sch.student?.instrument || teacherProfileObj?.instrument || 'Gitarre';
+                const virtInstrument = (
+                  (!isInvalidInstrument(sch.instrument) ? sch.instrument : null) || 
+                  (!isInvalidInstrument(sch.student?.instrument) ? sch.student?.instrument : null) || 
+                  (!isInvalidInstrument(teacherProfileObj?.instrument) ? teacherProfileObj?.instrument : null) || 
+                  'Gitarre'
+                );
 
                 allMergedOccurrences.push({
                   id: `virtual-${sch.id}-${dateStr}`,
@@ -3464,7 +3481,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   duration: sch.duration || 45,
                   status: sch.status === 'canceled_by_teacher_sick' ? 'teacher_sick' : 'scheduled',
                   is_virtual: true,
-                  teacher: sch.teacher || teacherProfileObj || studentTeacherObj,
+                  teacher: sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Severin', last_name: 'Landenberger', instrument: 'Gitarre' },
                   student: sch.student,
                   schedule: sch,
                   room_name: virtRoomName,
@@ -3486,11 +3503,16 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           if (!usedActualIds.has(occ.id)) {
             const occTime = occ.start_time || occ.time_slot || '14:00:00';
             const occRoomName = occ.room_name || occ.room?.name || occ.rooms?.name || occ.room_override_name || occ.roomOverrideName || (occ.room_id ? roomMap.get(occ.room_id)?.name : null) || teacherProfileObj?.rooms?.name || 'Raum 4';
-            const occInstrument = occ.instrument || occ.student?.instrument || teacherProfileObj?.instrument || 'Gitarre';
+            const occInstrument = (
+              (!isInvalidInstrument(occ.instrument) ? occ.instrument : null) || 
+              (!isInvalidInstrument(occ.student?.instrument) ? occ.student?.instrument : null) || 
+              (!isInvalidInstrument(teacherProfileObj?.instrument) ? teacherProfileObj?.instrument : null) || 
+              'Gitarre'
+            );
             allMergedOccurrences.push({
               ...occ,
               start_time: occTime.includes(':') && occTime.split(':').length === 2 ? `${occTime}:00` : occTime,
-              teacher: occ.teacher || teacherProfileObj || studentTeacherObj,
+              teacher: occ.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Severin', last_name: 'Landenberger', instrument: 'Gitarre' },
               room_name: occRoomName,
               room: occ.room || { name: occRoomName },
               rooms: occ.rooms || { name: occRoomName },

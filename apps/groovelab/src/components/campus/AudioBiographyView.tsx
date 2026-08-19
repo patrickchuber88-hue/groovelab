@@ -1734,10 +1734,28 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false,
+          googTypingNoiseDetection: false,
+          channelCount: 1,
           sampleRate: 48000
-        }
+        } as any
       });
       activeMicStreamRef.current = stream;
+
+      // 🌟 WebAudio Dual-Channel Center Bridge:
+      // Takes raw microphone input and routes it 1:1 to Left and Right channels (100% centered stereo)
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const bioRecordAudioCtx = new AudioCtx();
+      const sourceNode = bioRecordAudioCtx.createMediaStreamSource(stream);
+      const mergerNode = bioRecordAudioCtx.createChannelMerger(2);
+      sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
+      sourceNode.connect(mergerNode, 0, 1); // Duplicate to Right
+      const destNode = bioRecordAudioCtx.createMediaStreamDestination();
+      mergerNode.connect(destNode);
+      const recordStream = destNode.stream;
 
       // 2. Browser MIME-Type Ermittlung (Safari, Chrome, Firefox, iOS Kompatibilität)
       let mimeType = 'audio/webm;codecs=opus';
@@ -1755,7 +1773,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         }
       }
 
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const recorder = mimeType 
+        ? new MediaRecorder(recordStream, { mimeType, audioBitsPerSecond: 256000 }) 
+        : new MediaRecorder(recordStream, { audioBitsPerSecond: 256000 });
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
@@ -1773,6 +1793,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         if (activeMicStreamRef.current) {
           activeMicStreamRef.current.getTracks().forEach(track => track.stop());
           activeMicStreamRef.current = null;
+        }
+        recordStream.getTracks().forEach(track => track.stop());
+        if (bioRecordAudioCtx && bioRecordAudioCtx.state !== 'closed') {
+          bioRecordAudioCtx.close().catch(() => {});
         }
 
         if (audioBlob.size > 0) {

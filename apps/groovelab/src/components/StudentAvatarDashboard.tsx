@@ -1283,7 +1283,7 @@ function MobileBriefingView({
             <button 
               onClick={() => handleTabChangeLocal('practice_board')}
               style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: 'white', border: 'none', borderRadius: '12px', padding: '10px 14px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(79, 70, 229, 0.15)' }}>
-              <Play size={14} fill="currentColor" /> Üben starten
+              <Play size={14} fill="currentColor" /> Fokus-Timer starten (Übe-Pfad)
             </button>
           </div>
         )}
@@ -4458,19 +4458,37 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
-          channelCount: 1, // Force centered mono capture to avoid left-ear-only panning on audio interfaces / stereo mics
           echoCancellation: false,
           noiseSuppression: false,
-          autoGainControl: false
-        } 
+          autoGainControl: false,
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false,
+          googTypingNoiseDetection: false,
+          channelCount: 1,
+          sampleRate: 48000
+        } as any
       });
       juniorAudioStreamRef.current = stream;
       juniorAudioChunksRef.current = [];
 
+      // 🌟 WebAudio Dual-Channel Center Bridge:
+      // Takes raw microphone input and routes it 1:1 to Left and Right channels (100% centered stereo)
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const juniorRecordAudioCtx = new AudioCtx();
+      const sourceNode = juniorRecordAudioCtx.createMediaStreamSource(stream);
+      const mergerNode = juniorRecordAudioCtx.createChannelMerger(2);
+      sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
+      sourceNode.connect(mergerNode, 0, 1); // Duplicate to Right
+      const destNode = juniorRecordAudioCtx.createMediaStreamDestination();
+      mergerNode.connect(destNode);
+      const recordStream = destNode.stream;
+
       // Detect supported cross-browser MIME type (Safari/iOS vs Chrome/Firefox)
       let mimeType = '';
       if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
           mimeType = 'audio/webm;codecs=opus';
         } else if (MediaRecorder.isTypeSupported('audio/webm')) {
           mimeType = 'audio/webm';
@@ -4481,7 +4499,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
       }
 
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const recorder = mimeType 
+        ? new MediaRecorder(recordStream, { mimeType, audioBitsPerSecond: 256000 }) 
+        : new MediaRecorder(recordStream, { audioBitsPerSecond: 256000 });
       juniorMediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -4501,6 +4521,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         if (juniorAudioStreamRef.current) {
           juniorAudioStreamRef.current.getTracks().forEach(t => t.stop());
           juniorAudioStreamRef.current = null;
+        }
+        recordStream.getTracks().forEach(t => t.stop());
+        if (juniorRecordAudioCtx && juniorRecordAudioCtx.state !== 'closed') {
+          juniorRecordAudioCtx.close().catch(() => {});
         }
       };
 
@@ -13096,11 +13120,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       </div>
                     )}
 
-                    {/* KPI 2: Flammen-Serie */}
+                    {/* KPI 2: Flammen-Serie (Ruby Flame Red) */}
                     {flamesActive && (
                       <div style={{ 
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
                         color: 'white',
                         borderRadius: '28px',
                         boxShadow: '0 14px 30px -6px rgba(239, 68, 68, 0.35)',
@@ -13713,87 +13737,152 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>
 
                         {/* BOX 2: ÜBE-RAKETE */}
-                        <div 
-                          onClick={() => setShowJuniorTimerModal(true)}
-                          style={{
-                            background: '#ffffff',
-                            borderRadius: '32px',
-                            padding: '28px',
-                            boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
-                            border: '2px solid rgba(251, 191, 36, 0.4)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            gap: '24px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                          className="hover-scale"
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{
-                                background: '#fef3c7',
-                                color: '#d97706',
-                                width: '64px',
-                                height: '64px',
-                                borderRadius: '22px',
+                        {(() => {
+                          const streak = avatar?.streak_flame || 0;
+                          const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
+                          const schoolConfig = (schoolFokusLevels && schoolFokusLevels[levelKey]) || DEFAULT_FOKUS_LEVELS[levelKey];
+                          const requiredMins = streak >= 9 ? (schoolConfig.helden || 10) : streak >= 4 ? (schoolConfig.mittlere || 5) : (schoolConfig.kleine || 3);
+
+                          const todayStr = toLocalYYYYMMDD(new Date());
+                          const todayLogs = (fokusLogs || []).filter((log: any) => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === todayStr);
+                          const dbTodaySecs = todayLogs.reduce((sum: number, log: any) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                          const liveTodaySecs = sessionActive ? secondsElapsed : 0;
+                          const totalTodaySecs = dbTodaySecs + liveTodaySecs;
+                          const todayMins = Math.floor(totalTodaySecs / 60);
+                          const isGoalAchieved = totalTodaySecs >= (requiredMins * 60);
+                          const hasPracticedSome = totalTodaySecs > 0;
+                          const progressPercent = Math.min(100, Math.round((totalTodaySecs / (requiredMins * 60)) * 100));
+
+                          return (
+                            <div 
+                              onClick={() => setShowJuniorTimerModal(true)}
+                              style={{
+                                background: '#ffffff',
+                                borderRadius: '28px',
+                                padding: '24px',
+                                boxShadow: isGoalAchieved ? '0 12px 32px rgba(16, 185, 129, 0.08)' : '0 12px 30px rgba(15, 23, 42, 0.04)',
+                                border: isGoalAchieved ? '1.5px solid rgba(16, 185, 129, 0.35)' : '1.5px solid rgba(251, 191, 36, 0.35)',
                                 display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 6px 16px rgba(245, 158, 11, 0.15)'
-                              }}>
-                                <Flame size={34} fill="currentColor" />
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                gap: '20px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div style={{
+                                    background: isGoalAchieved ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : '#fef3c7',
+                                    color: isGoalAchieved ? '#15803d' : '#d97706',
+                                    width: '56px',
+                                    height: '56px',
+                                    borderRadius: '18px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: isGoalAchieved ? '0 6px 16px rgba(34, 197, 94, 0.22)' : '0 6px 16px rgba(245, 158, 11, 0.15)'
+                                  }}>
+                                    {isGoalAchieved ? (
+                                      <Star size={28} fill="currentColor" />
+                                    ) : (
+                                      <Flame size={28} fill="currentColor" />
+                                    )}
+                                  </div>
+
+                                  <span style={{
+                                    background: isGoalAchieved ? '#ecfdf5' : '#ffedd5',
+                                    color: isGoalAchieved ? '#047857' : '#ea580c',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 900,
+                                    padding: '5px 12px',
+                                    borderRadius: '100px',
+                                    border: isGoalAchieved ? '1px solid #a7f3d0' : '1px solid rgba(249, 115, 22, 0.2)',
+                                    whiteSpace: 'nowrap',
+                                    letterSpacing: '-0.01em'
+                                  }}>
+                                    {isGoalAchieved ? `🔥 ${streak} ${streak === 1 ? 'Tag' : 'Tage'} • Gesichert ✅` : `🔥 ${streak} ${streak === 1 ? 'Tag' : 'Tage'}`}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 900, color: isGoalAchieved ? '#059669' : '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                    Übe-Rakete
+                                  </div>
+                                  <h3 style={{ margin: '4px 0 0 0', fontSize: '1.35rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                                    {isGoalAchieved 
+                                      ? 'Tagesziel erreicht! 🌟' 
+                                      : hasPracticedSome 
+                                        ? `${todayMins} von ${requiredMins} Min. geschafft` 
+                                        : `Nur ${requiredMins} Minuten`}
+                                  </h3>
+                                  <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: isGoalAchieved ? '#047857' : '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
+                                    {isGoalAchieved 
+                                      ? `Heute ${todayMins} Min. geübt • Deine Flamme brennt sicher!` 
+                                      : hasPracticedSome 
+                                        ? `Noch ${Math.max(1, requiredMins - todayMins)} Min. bis zur Flamme! 🚀` 
+                                        : 'Runder Timer • Flamme holen!'}
+                                  </p>
+
+                                  {/* Sleek Progress bar */}
+                                  <div style={{ marginTop: '10px', width: '100%', height: '6px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                                    <div style={{
+                                      width: `${progressPercent}%`,
+                                      height: '100%',
+                                      background: isGoalAchieved 
+                                        ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)' 
+                                        : 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                                      borderRadius: '100px',
+                                      transition: 'width 0.4s ease'
+                                    }} />
+                                  </div>
+                                </div>
                               </div>
 
-                              <span style={{
-                                background: '#ffedd5',
-                                color: '#ea580c',
-                                fontSize: '0.85rem',
-                                fontWeight: 950,
-                                padding: '6px 14px',
-                                borderRadius: '100px'
-                              }}>
-                                🔥 {streak} {streak === 1 ? 'Tag' : 'Tage'}
-                              </span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setShowJuniorTimerModal(true); }}
+                                style={{
+                                  width: '100%',
+                                  padding: '14px 18px',
+                                  minHeight: '44px',
+                                  boxSizing: 'border-box',
+                                  borderRadius: '16px',
+                                  border: 'none',
+                                  background: isGoalAchieved 
+                                    ? 'linear-gradient(135deg, #10b981 0%, #047857 100%)' 
+                                    : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                  color: '#ffffff',
+                                  fontSize: '0.92rem',
+                                  fontWeight: 900,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px',
+                                  whiteSpace: 'nowrap',
+                                  boxShadow: isGoalAchieved 
+                                    ? '0 8px 20px rgba(5, 150, 105, 0.28)' 
+                                    : '0 8px 20px rgba(22, 163, 74, 0.28)',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                className="hover-scale"
+                              >
+                                {isGoalAchieved ? (
+                                  <>
+                                    <Sparkles size={18} fill="white" color="white" />
+                                    <span>Weiterüben (+Bonus XP)</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Play size={18} fill="white" color="white" />
+                                    <span>{hasPracticedSome ? 'Weiter üben' : 'Timer starten'}</span>
+                                  </>
+                                )}
+                              </button>
                             </div>
-
-                            <div>
-                              <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Übe-Rakete
-                              </div>
-                              <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                Nur {requiredMins} Minuten
-                              </h3>
-                              <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650 }}>
-                                Runder Timer • Flamme holen!
-                              </p>
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setShowJuniorTimerModal(true); }}
-                            style={{
-                              width: '100%',
-                              padding: '16px',
-                              borderRadius: '20px',
-                              border: 'none',
-                              background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
-                              color: '#ffffff',
-                              fontSize: '1.05rem',
-                              fontWeight: 950,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '10px',
-                              boxShadow: '0 8px 20px rgba(52, 168, 83, 0.35)'
-                            }}
-                          >
-                            <Play size={20} fill="currentColor" />
-                            <span>Timer starten</span>
-                          </button>
-                        </div>
+                          );
+                        })()}
 
                         {/* BOX 3: AUFNAHME STARTEN */}
                         <div 
@@ -16094,51 +16183,55 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     {/* KPI 2: Übezeit */}
                     <div style={{ 
                       background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                      color: 'white',
+                      color: '#0f172a',
                       borderRadius: '18px',
-                      boxShadow: '0 8px 20px -4px rgba(234, 179, 8, 0.3)',
+                      boxShadow: '0 8px 20px -4px rgba(234, 179, 8, 0.35)',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                       padding: '16px 20px',
                       minHeight: '82px',
-                      border: '1px solid rgba(255, 255, 255, 0.15)'
+                      border: '1px solid rgba(255, 255, 255, 0.3)'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.95 }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#78350f' }}>
                           Übezeit ⏱️
                         </span>
-                        <Clock size={15} color="white" />
+                        <div style={{ background: 'rgba(0, 0, 0, 0.12)', padding: '5px', borderRadius: '8px' }}>
+                          <Clock size={14} color="#451a03" />
+                        </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '4px' }}>
-                        <span style={{ fontSize: '1.9rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        <span style={{ fontSize: '1.9rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#0f172a' }}>
                           {totalPracticeMinutes || 0}
                         </span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, opacity: 0.9 }}>Minuten</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#78350f' }}>Minuten</span>
                       </div>
                     </div>
 
-                    {/* KPI 3: Streak / Tagesserie */}
+                    {/* KPI 3: Streak / Tagesserie (Ruby Flame Red) */}
                     {flamesActive && (
                       <div style={{ 
-                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
                         color: 'white',
                         borderRadius: '18px',
-                        boxShadow: '0 8px 20px -4px rgba(239, 68, 68, 0.3)',
+                        boxShadow: '0 8px 20px -4px rgba(239, 68, 68, 0.35)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         padding: '16px 20px',
                         minHeight: '82px',
-                        border: '1px solid rgba(255, 255, 255, 0.15)'
+                        border: '1px solid rgba(255, 255, 255, 0.2)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.95 }}>
                             Streak 🔥
                           </span>
-                          <Flame size={15} color="white" fill="white" />
+                          <div style={{ background: 'rgba(255, 255, 255, 0.25)', padding: '5px', borderRadius: '8px' }}>
+                            <Flame size={14} color="white" fill="white" />
+                          </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '4px' }}>
                           <span style={{ fontSize: '1.9rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                             {avatar?.streak_flame || 0}
                           </span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800, opacity: 0.9 }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, opacity: 0.95 }}>
                             {(avatar?.streak_flame || 0) === 1 ? 'Tag' : 'Tage'}
                           </span>
                         </div>
@@ -16893,7 +16986,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 <>
                   {/* TOP 4 KPIs ROW */}
                   <div style={{ display: 'flex', flexDirection: 'row', gap: '16px', width: '100%' }}>
-                    {/* KPI 1: XP */}
+                    {/* KPI 1: XP (Vibrant Indigo-Blue) */}
                     {xpActive && (
                       <div style={{ 
                         flex: '1 1 0px',
@@ -16946,7 +17039,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       </div>
                     )}
 
-                    {/* KPI 2: Songs */}
+                    {/* KPI 2: Songs (Vibrant Campus Green) */}
                     <div style={{ 
                       flex: '1 1 0px',
                       minWidth: 0,
@@ -16997,14 +17090,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       </div>
                     </div>
 
-                    {/* KPI 3: Übeminuten */}
+                    {/* KPI 3: Übeminuten (Vibrant Sun Yellow with High-Contrast Deep Slate Typography) */}
                     {flamesActive && (
                       <div style={{ 
                         flex: '1 1 0px',
                         minWidth: 0,
                         position: 'relative', overflow: 'hidden',
                         background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                        color: 'white',
+                        color: '#0f172a',
                         borderRadius: '20px',
                         boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
@@ -17012,25 +17105,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         padding: '16px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)'
+                        border: '1px solid rgba(255, 255, 255, 0.3)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                           <span style={{ 
                             fontSize: '0.68rem', 
                             fontWeight: 900, 
-                            opacity: 0.95, 
                             textTransform: 'uppercase', 
                             letterSpacing: '0.08em',
-                            color: 'white'
+                            color: '#78350f'
                           }}>
                             Übeminuten
                           </span>
                           <div style={{ 
-                            background: 'rgba(255, 255, 255, 0.2)', 
+                            background: 'rgba(0, 0, 0, 0.12)', 
                             padding: '6px', 
                             borderRadius: '10px' 
                           }}>
-                            <Clock size={14} color="white" />
+                            <Clock size={14} color="#451a03" />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
@@ -17046,11 +17138,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     fontWeight: 950, 
                                     fontFamily: "'Plus Jakarta Sans', sans-serif", 
                                     letterSpacing: '-0.02em',
-                                    color: 'white'
+                                    color: '#0f172a'
                                   }}>
                                     {Math.round(totalSecs)}
                                   </span>
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#78350f' }}>
                                     Sek.
                                   </span>
                                 </>
@@ -17063,11 +17155,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   fontWeight: 950, 
                                   fontFamily: "'Plus Jakarta Sans', sans-serif", 
                                   letterSpacing: '-0.02em',
-                                  color: 'white'
+                                  color: '#0f172a'
                                 }}>
                                   {Math.floor(totalSecs / 60)}
                                 </span>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#78350f' }}>
                                   Min.
                                 </span>
                               </>
@@ -17077,13 +17169,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       </div>
                     )}
 
-                    {/* KPI 4: Streak */}
+                    {/* KPI 4: Tagesserie / Streak (Vibrant Ruby-Flame Red) */}
                     {flamesActive && (
                       <div style={{ 
                         flex: '1 1 0px',
                         minWidth: 0,
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
                         color: 'white',
                         borderRadius: '20px',
                         boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.35)',
@@ -17092,7 +17184,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         padding: '16px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)'
+                        border: '1px solid rgba(255, 255, 255, 0.2)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                           <span style={{ 
@@ -17106,7 +17198,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             Tagesserie
                           </span>
                           <div style={{ 
-                            background: 'rgba(255, 255, 255, 0.2)', 
+                            background: 'rgba(255, 255, 255, 0.25)', 
                             padding: '6px', 
                             borderRadius: '10px' 
                           }}>
@@ -17123,7 +17215,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           }}>
                             {avatar?.streak_flame || 0}
                           </span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
                             {(avatar?.streak_flame || 0) === 1 ? 'Tag' : 'Tage'}
                           </span>
                         </div>
@@ -17215,6 +17307,42 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </span>
                         </div>
 
+                        {/* Offline- & Keller-Bereit Status Badge */}
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: typeof navigator !== 'undefined' && !navigator.onLine 
+                            ? '#fefce8' 
+                            : 'rgba(52, 168, 83, 0.08)',
+                          border: typeof navigator !== 'undefined' && !navigator.onLine 
+                            ? '1px solid #fef08a' 
+                            : '1px solid rgba(52, 168, 83, 0.2)',
+                          borderRadius: '100px',
+                          padding: '4px 12px',
+                          color: typeof navigator !== 'undefined' && !navigator.onLine 
+                            ? '#854d0e' 
+                            : '#15803d',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                        }}>
+                          <div style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: typeof navigator !== 'undefined' && !navigator.onLine ? '#eab308' : '#34a853'
+                          }} />
+                          <span style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 900,
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase'
+                          }}>
+                            {typeof navigator !== 'undefined' && !navigator.onLine 
+                              ? '☁️ Offline-Modus' 
+                              : '● Offline-bereit'}
+                          </span>
+                        </div>
+
                         <div style={{
                           background: 'rgba(99, 102, 241, 0.08)',
                           color: '#4f46e5',
@@ -17282,13 +17410,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               gap: '8px', 
                               background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
                               color: '#34a853', 
-                              padding: '6px 14px', 
+                              padding: '8px 16px', 
+                              minHeight: '38px',
+                              boxSizing: 'border-box',
                               borderRadius: '12px', 
-                              fontSize: '0.75rem', 
+                              fontSize: '0.78rem', 
                               fontWeight: 800,
-                              border: '1px solid rgba(52, 168, 83, 0.15)'
+                              border: '1px solid rgba(52, 168, 83, 0.18)'
                             }}>
-                              <Calendar size={13} color="#34a853" />
+                              <Calendar size={14} color="#34a853" />
                               <span>Nächster Unterricht: {lessonText}</span>
                             </div>
 
@@ -17308,21 +17438,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 style={{ 
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
-                                  gap: '6px', 
+                                  gap: '8px', 
                                   background: hasMessage ? '#34a853' : '#ffffff', 
-                                  color: hasMessage ? '#ffffff' : '#475569', 
-                                  padding: '6px 12px', 
+                                  color: hasMessage ? '#ffffff' : '#334155', 
+                                  padding: '8px 16px', 
+                                  minHeight: '38px',
+                                  boxSizing: 'border-box',
                                   borderRadius: '12px', 
-                                  fontSize: '0.75rem', 
-                                  fontWeight: 750, 
-                                  border: hasMessage ? 'none' : '1px solid #e2e8f0', 
+                                  fontSize: '0.78rem', 
+                                  fontWeight: 800, 
+                                  border: hasMessage ? 'none' : '1px solid #cbd5e1', 
                                   cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
                                   transition: 'all 0.2s'
                                 }}
                                 className="hover-scale"
                               >
-                                <MessageSquare size={13} color={hasMessage ? '#ffffff' : '#34a853'} />
+                                <MessageSquare size={14} color={hasMessage ? '#ffffff' : '#34a853'} />
                                 <span>{hasMessage ? 'Nachricht ansehen' : 'Nachricht an Lehrer'}</span>
                               </button>
                             )}
@@ -18119,20 +18251,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                               {item.title}
                                             </span>
                                           </div>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flexShrink: 0 }}>
                                             {item.pageNums.map((pNum: number, pIdx: number) => (
                                               <span key={`pro-p-${pIdx}`} style={{
-                                                fontSize: '0.72rem',
+                                                fontSize: '0.75rem',
                                                 fontWeight: 800,
                                                 color: '#15803d',
                                                 background: '#dcfce7',
-                                                padding: '2px 8px',
-                                                borderRadius: '6px'
+                                                padding: '4px 10px',
+                                                minHeight: '28px',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                borderRadius: '8px',
+                                                border: '1px solid rgba(21, 128, 61, 0.15)'
                                               }}>
                                                 S. {pNum}
                                               </span>
                                             ))}
-                                            {item.isDone && <Check size={14} color="#34a853" strokeWidth={3} />}
+                                            {item.isDone && <Check size={16} color="#34a853" strokeWidth={3} />}
                                           </div>
                                         </div>
                                       );
@@ -18148,8 +18285,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         borderRadius: '12px'
                                       }}>
                                         <div style={{
-                                          width: '22px',
-                                          height: '22px',
+                                          width: '24px',
+                                          height: '24px',
                                           borderRadius: '6px',
                                           background: '#e0e7ff',
                                           display: 'flex',
@@ -18157,7 +18294,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                           justifyContent: 'center',
                                           flexShrink: 0
                                         }}>
-                                          <Music size={12} color="#4338ca" />
+                                          <Music size={13} color="#4338ca" />
                                         </div>
                                         <span style={{ fontWeight: 850, fontSize: '0.90rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {cleanTitle(item.topic_name || item.title)}
@@ -18201,12 +18338,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               style={{
                                 marginTop: 'auto',
                                 width: '100%',
-                                padding: '9px 12px',
+                                minHeight: '44px',
+                                padding: '12px 16px',
                                 borderRadius: '14px',
                                 border: '1.5px solid #e2e8f0',
                                 background: '#f8fafc',
                                 color: '#0f172a',
-                                fontSize: '0.75rem',
+                                fontSize: '0.78rem',
                                 fontWeight: 900,
                                 cursor: 'pointer',
                                 display: 'flex',
@@ -18217,7 +18355,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               }}
                               className="hover-scale"
                             >
-                              <BookOpen size={14} color="#34a853" />
+                              <BookOpen size={15} color="#34a853" />
                               <span>Alle Aufgaben im Heft ansehen →</span>
                             </button>
                           </div>
@@ -18280,23 +18418,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
                                 color: 'white', 
                                 border: 'none', 
-                                borderRadius: '12px', 
-                                padding: '12px 20px', 
+                                borderRadius: '14px', 
+                                padding: '14px 20px', 
+                                minHeight: '44px',
+                                boxSizing: 'border-box',
                                 fontWeight: 950, 
-                                fontSize: '0.85rem', 
+                                fontSize: '0.88rem', 
                                 cursor: 'pointer', 
                                 display: 'flex', 
                                 justifyContent: 'center', 
                                 alignItems: 'center', 
                                 gap: '8px', 
-                                boxShadow: '0 8px 20px rgba(79, 70, 229, 0.25)', 
+                                boxShadow: '0 8px 20px rgba(79, 70, 229, 0.28)', 
                                 transition: 'all 0.2s', 
                                 width: '100%' 
                               }}
                               className="hover-scale"
                             >
-                              <Play size={15} fill="white" />
-                              <span>🚀 Üben starten</span>
+                              <Play size={16} fill="white" />
+                              <span>🚀 Fokus-Timer starten (Übe-Pfad)</span>
                             </button>
                           </div>
                         </div>
@@ -18316,6 +18456,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       const isTier2Unlocked = streak >= 4;
                       const isTier3Unlocked = streak >= 9;
 
+                      const currentWeek = getISOWeek(new Date());
+                      const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+                      const usedJokersThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
+                      const availableShields = Math.max(0, 3 - usedJokersThisWeek);
+
                       return (
                         <div style={{ 
                           background: '#ffffff', 
@@ -18325,7 +18470,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           border: '1px solid rgba(0, 0, 0, 0.04)',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '16px'
+                          gap: '14px'
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -18341,18 +18486,98 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               </button>
                             </div>
                             <span style={{ 
-                              background: streak === 0 ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
-                              color: streak === 0 ? '#ffffff' : '#ea580c', 
+                              background: streak === 0 ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
+                              color: streak === 0 ? '#991b1b' : '#ea580c', 
                               fontSize: '0.75rem', 
                               fontWeight: 950, 
-                              padding: '3px 10px', 
-                              borderRadius: '100px'
+                              padding: '4px 10px', 
+                              borderRadius: '100px',
+                              border: streak === 0 ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(249, 115, 22, 0.2)'
                             }}>
                               {streak} {streak === 1 ? 'Tag' : 'Tage'} 🔥
                             </span>
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative', flex: 1, justifyContent: 'center' }}>
+                          {/* FERIEN-FREEZE ODER 3 SCHUTZSCHILDE */}
+                          {isTodayHoliday ? (
+                            <div style={{
+                              background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                              border: '1.5px solid #a7f3d0',
+                              borderRadius: '14px',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <Palmtree size={15} color="#059669" />
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#065f46' }}>
+                                    Ferienpause aktiv
+                                  </span>
+                                </div>
+                                <span style={{
+                                  fontSize: '0.65rem',
+                                  fontWeight: 900,
+                                  background: '#059669',
+                                  color: '#ffffff',
+                                  padding: '2px 8px',
+                                  borderRadius: '100px'
+                                }}>
+                                  ✨ 2× XP-Booster
+                                </span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.70rem', color: '#047857', lineHeight: 1.35 }}>
+                                Streak ist sicher eingefroren (kein Übezwang). Freiwilliges Üben bringt heute <strong>2× XP</strong>!
+                              </p>
+                            </div>
+                          ) : (
+                            <div style={{
+                              background: '#f8fafc',
+                              borderRadius: '14px',
+                              padding: '10px 12px',
+                              border: '1px solid #e2e8f0',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.70rem', fontWeight: 850, color: '#475569', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <Shield size={12} color="#f97316" />
+                                  3 Schutzschilde (KW {currentWeek}):
+                                </span>
+                                <span style={{ fontSize: '0.70rem', fontWeight: 900, color: availableShields > 0 ? '#15803d' : '#b91c1c' }}>
+                                  {availableShields}/3 bereit
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                {[1, 2, 3].map((shieldNum) => {
+                                  const isShieldActive = shieldNum <= availableShields;
+                                  return (
+                                    <div key={`pro-shield-${shieldNum}`} style={{
+                                      flex: 1,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '4px',
+                                      padding: '4px 6px',
+                                      borderRadius: '6px',
+                                      background: isShieldActive ? 'rgba(52, 168, 83, 0.1)' : 'rgba(249, 115, 22, 0.1)',
+                                      border: isShieldActive ? '1px solid rgba(52, 168, 83, 0.25)' : '1px dashed rgba(249, 115, 22, 0.3)',
+                                      color: isShieldActive ? '#15803d' : '#c2410c',
+                                      fontSize: '0.65rem',
+                                      fontWeight: 800
+                                    }}>
+                                      <Shield size={10} fill={isShieldActive ? 'currentColor' : 'none'} />
+                                      <span>{isShieldActive ? `Schild ${shieldNum}` : 'Glut-Schutz'}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative', flex: 1, justifyContent: 'center' }}>
                             <div style={{ position: 'absolute', left: '17px', top: '20px', bottom: '20px', width: '2px', background: '#e2e8f0', zIndex: 1 }} />
                             <div style={{ position: 'absolute', left: '17px', top: '20px', height: streak >= 9 ? '100%' : streak >= 4 ? '50%' : '0%', width: '2px', background: 'linear-gradient(to bottom, #f97316 0%, #ef4444 100%)', zIndex: 1, transition: 'height 0.5s ease' }} />
 
@@ -22927,16 +23152,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </div>
                 </div>
               </div>
-            {/* Joker Info */}
-            <div style={{ background: '#e6f4ea', border: '1px solid #e6f4ea', borderRadius: '16px', padding: '16px', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34a853', fontWeight: 800, fontSize: '0.85rem', marginBottom: '6px' }}>
-                🎯 Der wöchentliche Joker & Fehltage
+            {/* 3 Schutzschilde & Ferien Info */}
+            <div style={{ background: '#e6f4ea', border: '1px solid #d1fae5', borderRadius: '16px', padding: '16px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#15803d', fontWeight: 850, fontSize: '0.85rem', marginBottom: '6px' }}>
+                🛡️ 3 wöchentliche Schutzschilde & Ferienpause
               </div>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: '#34a853', lineHeight: 1.45 }}>
-                Jede Woche (Montag bis Sonntag) erhältst du <strong>1 Joker</strong>. Wenn du das Üben an einem Tag verpasst, wird der Joker am Tagesende automatisch eingesetzt, um deinen Streak zu retten. Hast du keinen Joker mehr, wird <strong>jeder Fehltag als -1 auf deinen Streak</strong> gewertet (z. B. fällt ein 5-Tage-Streak nach einem Fehltag auf 4 Tage).
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#166534', lineHeight: 1.45 }}>
+                Jede Woche erhältst du <strong>3 Schutzschilde</strong>, die verpasste Übetage automatisch absichern. Deine Flamme erlischt nicht, sondern geht in den schützenden Glut-Modus über.
               </p>
-              <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#34a853', lineHeight: 1.45 }}>
-                <strong>Wichtig:</strong> Um die Kleine Flamme zum Brennen zu bringen, benötigst du mindestens <strong>1 Übe-Tag (Streak &gt;= 1)</strong>. Wenn der Streak durch Fehltage auf 0 fällt, leuchtet keine Flamme mehr.
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.45 }}>
+                <strong>Ferienzeit:</strong> In Schulferien und an Feiertagen wird dein Streak automatisch eingefroren (kein Übezwang). Wer in den Ferien freiwillig übt, erhält <strong>2× XP (Ferien-Booster)</strong>!
               </p>
             </div>
 
