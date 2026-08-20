@@ -5645,6 +5645,47 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [classMins, setClassMins] = useState(0);
   const [otherClassMins, setOtherClassMins] = useState(0);
 
+  const [privacyShowHighlights, setPrivacyShowHighlights] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(`campus_privacy_show_highlights_${studentId}`);
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const [kudosState, setKudosState] = useState<Record<string, { applause: number; fire: number; rock: number; userVoted: string[] }>>(() => {
+    try {
+      const saved = localStorage.getItem('campus_class_kudos');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const handleToggleKudo = (highlightKey: string, kudoType: 'applause' | 'fire' | 'rock') => {
+    setKudosState(prev => {
+      const current = prev[highlightKey] || { applause: 3, fire: 2, rock: 4, userVoted: [] };
+      const hasVoted = current.userVoted.includes(kudoType);
+      const newCount = hasVoted ? Math.max(0, current[kudoType] - 1) : current[kudoType] + 1;
+      const newVoted = hasVoted ? current.userVoted.filter(v => v !== kudoType) : [...current.userVoted, kudoType];
+      const updated = {
+        ...prev,
+        [highlightKey]: {
+          ...current,
+          [kudoType]: newCount,
+          userVoted: newVoted
+        }
+      };
+      try {
+        localStorage.setItem('campus_class_kudos', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not save kudos to localStorage', e);
+      }
+      return updated;
+    });
+  };
+
   const formatMins = (mins: number) => {
     if (mins < 60) return `${Math.round(mins)} Min.`;
     const hrs = Math.floor(mins / 60);
@@ -7842,12 +7883,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         });
         const monthlyStreak = monthlyWeeks.size;
 
+        // Privacy opt-out check
+        let isOptedOut = false;
+        try {
+          const savedOpt = localStorage.getItem(`campus_privacy_show_highlights_${student.id}`);
+          if (savedOpt !== null && JSON.parse(savedOpt) === false) {
+            isOptedOut = true;
+          }
+        } catch (e) {}
+
+        if (isOptedOut) return;
+
         const masteredThisMonth = studentSkills.filter((sk: any) => sk.progress_percent === 100 || sk.is_stage_ready);
 
         const formattedStudentName = `${student.first_name || ''} ${student.last_name ? student.last_name.trim().charAt(0) + '.' : ''}`.trim();
 
         if (monthlyStreak >= 2) {
           highlights.push({
+            id: `${student.id}_streak_${monthlyStreak}`,
             studentName: formattedStudentName,
             emoji: '🔥',
             title: 'Monats-Konstanz',
@@ -7856,6 +7909,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
         if (monthlyMins >= 120) {
           highlights.push({
+            id: `${student.id}_focus_${monthlyMins}`,
             studentName: formattedStudentName,
             emoji: '⚡',
             title: 'Monats-Fokus',
@@ -7864,6 +7918,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
         masteredThisMonth.forEach((sk: any) => {
           highlights.push({
+            id: `${student.id}_song_${sk.id || (sk.songs as any)?.title || 'song'}`,
             studentName: formattedStudentName,
             emoji: '🏆',
             title: 'Meilenstein',
@@ -13094,6 +13149,40 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   ? Math.round((activeThisWeekCount / effectiveClassCount) * 100)
                   : 0;
 
+                const classAnnualMins = classFocusLogs.filter(log => {
+                  if (!log.created_at) return false;
+                  const isClassmateOrSelf = classmateAndSelfIds.includes(log.user_id);
+                  return isClassmateOrSelf;
+                }).reduce((sum, log) => sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0)), 0) + activeSessionMins;
+
+                const levelThresholds = [
+                  { level: 1, mins: 0, title: 'Groove-Starter' },
+                  { level: 2, mins: 60, title: 'Rhythmus-Team' },
+                  { level: 3, mins: 180, title: 'Timing-Tigers' },
+                  { level: 4, mins: 360, title: 'Sound-Magier' },
+                  { level: 5, mins: 600, title: 'Bühnen-Helden' },
+                  { level: 6, mins: 1000, title: 'Meister-Ensemble' },
+                  { level: 7, mins: 1800, title: 'Campus-Legenden' }
+                ];
+
+                let currentLevelObj = levelThresholds[0];
+                let nextLevelObj = levelThresholds[1];
+
+                for (let i = levelThresholds.length - 1; i >= 0; i--) {
+                  if (classAnnualMins >= levelThresholds[i].mins) {
+                    currentLevelObj = levelThresholds[i];
+                    nextLevelObj = levelThresholds[i + 1] || { level: currentLevelObj.level + 1, mins: currentLevelObj.mins + 1000, title: 'Super-Stars' };
+                    break;
+                  }
+                }
+
+                const levelCurrentFloor = currentLevelObj.mins;
+                const levelTargetCeil = nextLevelObj.mins;
+                const levelRange = Math.max(1, levelTargetCeil - levelCurrentFloor);
+                const levelProgressMins = Math.max(0, classAnnualMins - levelCurrentFloor);
+                const levelPercent = Math.min(100, Math.round((levelProgressMins / levelRange) * 100));
+                const minsToNextLevel = Math.max(0, levelTargetCeil - classAnnualMins);
+
                 const pieData = liveClassMins === 0 && otherClassMins === 0 
                   ? [
                       { name: 'Unsere Klasse', value: 0.1, color: brandColor },
@@ -13106,41 +13195,73 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                 return (
                   <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
-                    {/* Top Left: Header and summary cards */}
+                    {/* Top Left: Header and 3 Hero Cards */}
                     <div className="glass-panel" style={{ padding: isMobile ? '16px' : '20px 24px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '18px' }}>
                         <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Award size={24} />
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <h2 style={{ fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word' }}>Performance & Highlights</h2>
-                          <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: isMobile ? '0.8rem' : '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
+                          <h2 style={{ fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word' }}>Klassen-Highlights &amp; Team-Power</h2>
+                          <p style={{ color: '#475569', margin: '3px 0 0 0', fontWeight: 600, fontSize: isMobile ? '0.8rem' : '0.9rem' }}>Entdecke die Erfolge deiner Mitschüler, sammelt gemeinsame Übe-Minuten und feiert eure Meilensteine!</p>
                         </div>
                       </div>
 
-                      <div className="stat-cards-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '10px', width: '100%', boxSizing: 'border-box' }}>
-                        {[
-                          { label: 'Deine Klasse', value: classCount, icon: Users, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                          { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                          { label: 'Klassen-Übezeit (Woche)', value: formatMins(liveClassWeeklyFocus), icon: TrendingUp, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                          { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                          { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#34a853' : '#ea4335', bg: momPercent >= 0 ? '#e6f4ea' : '#fce8e6', isNeutral: false },
-                          { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                          { label: 'Ø Zeit / Kopf (Woche)', value: formatMinsToMMSS(classCount > 0 ? (liveClassWeeklyFocus / classCount) : 0), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                          { label: 'Ø Zeit / Kopf (Monat)', value: formatMinsToMMSS(classCount > 0 ? (currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: '#f8fafc', isNeutral: true }
-                        ].map((stat, idx) => (
-                          <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}25`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px', width: '100%', boxSizing: 'border-box' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
-                              <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}15`, flexShrink: 0 }}>
-                                <stat.icon size={16} />
-                              </div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '4px' }}>{stat.value}</div>
+                      {/* 3 Focused Hero Cards (Pädagogisch glasklar & wertschätzend) */}
+                      <div className="stat-cards-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+                        {/* Card 1: Unsere Klasse */}
+                        <div style={{ padding: '14px 16px', background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '96px', width: '100%', boxSizing: 'border-box' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Unsere Klasse</span>
+                            <div style={{ padding: '6px', borderRadius: '10px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Users size={16} />
                             </div>
                           </div>
-                        ))}
+                          <div>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '4px' }}>
+                              {classCount} <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#475569' }}>Schüler</span>
+                            </div>
+                            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#166534', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              Gemeinsam im Team
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card 2: Diese Woche im Team */}
+                        <div style={{ padding: '14px 16px', background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '96px', width: '100%', boxSizing: 'border-box' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Diese Woche im Team</span>
+                            <div style={{ padding: '6px', borderRadius: '10px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Clock size={16} />
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '4px' }}>
+                              {formatMins(liveClassWeeklyFocus)}
+                            </div>
+                            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#166534', marginTop: '2px' }}>
+                              Jede Minute zählt fürs Team
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card 3: Schuljahr Gesamt */}
+                        <div style={{ padding: '14px 16px', background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '96px', width: '100%', boxSizing: 'border-box' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schuljahr Gesamt</span>
+                            <div style={{ padding: '6px', borderRadius: '10px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Award size={16} />
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '4px' }}>
+                              {formatMins(classAnnualMins)}
+                            </div>
+                            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#166534', marginTop: '2px' }}>
+                              Klassen-Pool (Sep – Aug)
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -13149,8 +13270,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', width: '100%', marginBottom: '4px', textAlign: 'left' }}>
                         Gemeinsamer Schul-Beitrag
                       </h3>
-                      <p style={{ fontSize: '0.75rem', color: '#64748b', width: '100%', margin: '0 0 12px 0', textAlign: 'left', fontWeight: 600 }}>
-                        Wie viel trägt deine Klasse bei?
+                      <p style={{ fontSize: '0.78rem', color: '#475569', width: '100%', margin: '0 0 12px 0', textAlign: 'left', fontWeight: 600 }}>
+                        Gemeinsam für unsere Musikschule
                       </p>
 
                       <div style={{ width: '100%', height: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
@@ -13175,26 +13296,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           <span style={{ fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>
                             {contributionPercent}%
                           </span>
-                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' }}>
                             Anteil
                           </span>
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', marginTop: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f8fafc', borderRadius: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: brandColor }} />
-                            <span style={{ fontSize: '0.72rem', fontWeight: 750, color: '#334155' }}>Unsere Klasse</span>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 750, color: '#334155' }}>Unsere Klasse</span>
                           </div>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>{formatMins(liveClassMins)}</span>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>{formatMins(liveClassMins)}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f8fafc', borderRadius: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#cbd5e1' }} />
-                            <span style={{ fontSize: '0.72rem', fontWeight: 750, color: '#64748b' }}>Restliche Schule</span>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 750, color: '#475569' }}>Restliche Schule</span>
                           </div>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>{formatMins(otherClassMins)}</span>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155' }}>{formatMins(otherClassMins)}</span>
                         </div>
                       </div>
                     </div>
@@ -13205,7 +13326,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               {/* Grid Section: Goals | Highlights | Annual Stats */}
               <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch', width: '100%', boxSizing: 'border-box' }}>
                 
-                {/* Column 1: Übe-Ziele der Klasse */}
+                {/* Column 1: Übe-Ziele der Klasse (Klassen-Quests) */}
                 <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
@@ -13215,6 +13336,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                   {(() => {
                     const brandColor = studentUser?.schools?.brand_color || '#34a853';
+                    const activeSessionMins = sessionActive ? Math.round(secondsElapsed / 60) : 0;
+                    const liveClassMins = classMins + activeSessionMins;
                     const targets = classGoals || [];
                     const totalGoals = targets.length;
                     const masteredGoals = targets.filter((target: any) => {
@@ -13228,17 +13351,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     return (
                       <>
                         {totalGoals > 0 && (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px', border: '1px solid #e2e8f0' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
                               <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
-                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#34a853', marginTop: '2px' }}>{masteredGoals}</span>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
+                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#166534', marginTop: '2px' }}>{masteredGoals}</span>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
                               <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
                             </div>
                           </div>
@@ -13246,9 +13369,72 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                           {totalGoals === 0 ? (
-                            <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
-                              Keine aktiven Ziele angelegt.
-                            </p>
+                            <div style={{
+                              position: 'relative',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              background: '#34a853',
+                              boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
+                              borderRadius: '16px',
+                              padding: '14px 16px',
+                              gap: '10px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                                  <span style={{
+                                    fontSize: '0.85rem',
+                                    fontWeight: 800,
+                                    color: '#ffffff',
+                                    letterSpacing: '-0.01em',
+                                    lineHeight: '1.25'
+                                  }}>
+                                    Klassen-Monats-Quest
+                                  </span>
+                                  <span style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 600,
+                                    color: 'rgba(255, 255, 255, 0.85)'
+                                  }}>
+                                    Gemeinsam als Team 100 Min. sammeln
+                                  </span>
+                                </div>
+                                <span style={{
+                                  fontSize: '1.15rem',
+                                  fontWeight: 900,
+                                  color: '#ffffff',
+                                  letterSpacing: '-0.02em',
+                                  fontFeatureSettings: '"tnum"'
+                                }}>
+                                  {Math.min(100, Math.round((liveClassMins / 100) * 100))}%
+                                </span>
+                              </div>
+
+                              {/* Progress bar container */}
+                              <div style={{ position: 'relative', height: '8px', background: 'rgba(255, 255, 255, 0.25)', borderRadius: '99px' }}>
+                                <div style={{
+                                  width: `${Math.min(100, (liveClassMins / 100) * 100)}%`,
+                                  height: '100%',
+                                  background: '#ffffff',
+                                  borderRadius: '99px',
+                                  transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                  boxShadow: '0 0 6px rgba(255, 255, 255, 0.3)'
+                                }} />
+                              </div>
+
+                              {/* Current / Target & Status label */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', gap: '10px' }}>
+                                <span style={{ color: 'rgba(255, 255, 255, 0.95)', fontFeatureSettings: '"tnum"', fontWeight: 600 }}>
+                                  <span style={{ fontWeight: 800, color: '#ffffff' }}>{liveClassMins}</span> / 100 Min.
+                                </span>
+                                <span style={{
+                                  fontWeight: 800,
+                                  color: liveClassMins >= 100 ? '#e6f4ea' : 'rgba(255, 255, 255, 0.9)',
+                                  textAlign: 'right'
+                                }}>
+                                  {liveClassMins >= 100 ? 'Stufe 1 erreicht 🎉' : `Noch ${Math.max(0, 100 - liveClassMins)} Min.`}
+                                </span>
+                              </div>
+                            </div>
                           ) : (
                             targets.map((target: any) => {
                               const targetPercent = Math.round((classWeeklyFocus / target.minutes) * 100);
@@ -13357,66 +13543,110 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   })()}
                 </div>
 
-                {/* Column 2: Helden-Momente */}
+                {/* Column 2: Helden-Momente mit Safe Kudos-Reaktionen */}
                 <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', minHeight: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                     <span>✨</span> Helden-Momente
                   </h3>
-                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0 20px 0', fontWeight: 600 }}>
+                  <p style={{ fontSize: '0.8rem', color: '#475569', margin: '4px 0 20px 0', fontWeight: 600 }}>
                     Besondere Highlights deiner Mitschüler aus diesem Monat.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {highlightsLoading ? (
-                      <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 700 }}>Highlights werden geladen...</div>
+                      <div style={{ padding: '40px', textAlign: 'center', color: '#475569', fontWeight: 700 }}>Highlights werden geladen...</div>
                     ) : classHighlights.length === 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '1px dashed #cbd5e1' }}>
-                        <span style={{ fontSize: '2.5rem', marginBottom: '16px' }}>🤫</span>
-                        <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#475569', margin: '0 0 6px 0' }}>Ruhe vor dem Sturm</h4>
-                        <p style={{ fontSize: '0.78rem', color: '#64748b', maxWidth: '300px', margin: 0, lineHeight: 1.4 }}>
-                          Sobald du oder deine Mitschüler diesen Monat fleißig üben oder Challenges meistern, erscheinen die Erfolge hier!
+                        <span style={{ fontSize: '2.5rem', marginBottom: '16px' }}>✨</span>
+                        <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#334155', margin: '0 0 6px 0' }}>Bereit für neue Meilensteine</h4>
+                        <p style={{ fontSize: '0.78rem', color: '#475569', maxWidth: '300px', margin: 0, lineHeight: 1.4 }}>
+                          Sobald du oder deine Mitschüler fleißig üben oder Songs meistern, erscheinen die Erfolge hier zum gemeinsamen Feiern!
                         </p>
                       </div>
                     ) : (
-                      classHighlights.map((hl: any, idx: number) => (
-                        <div 
-                          key={idx} 
-                          style={{ 
-                            padding: '14px 18px', 
-                            background: '#f8fafc', 
-                            borderRadius: '16px', 
-                            border: '1px solid #e2e8f0', 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            gap: '14px'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span style={{ fontSize: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {hl.emoji}
-                          </span>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
-                              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>
-                                {(() => {
-                                  const name = hl.studentName || '';
-                                  const parts = name.trim().split(/\s+/);
-                                  if (parts.length <= 1) return name;
-                                  const first = parts[0];
-                                  const last = parts[parts.length - 1];
-                                  return `${first} ${last.charAt(0)}.`;
-                                })()}
+                      classHighlights.map((hl: any, idx: number) => {
+                        const highlightKey = hl.id || `hl_${idx}_${hl.studentName}`;
+                        const kudos = kudosState[highlightKey] || { applause: 3, fire: 2, rock: 4, userVoted: [] };
+
+                        return (
+                          <div 
+                            key={idx} 
+                            style={{ 
+                              padding: '14px 18px', 
+                              background: '#f8fafc', 
+                              borderRadius: '18px', 
+                              border: '1px solid #e2e8f0', 
+                              display: 'flex', 
+                              flexDirection: 'column',
+                              gap: '10px'
+                            }}
+                            className="hover-scale"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <span style={{ fontSize: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {hl.emoji}
                               </span>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: studentUser?.schools?.brand_color || '#34a853', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                {hl.title}
-                              </span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
+                                    {(() => {
+                                      const name = hl.studentName || '';
+                                      const parts = name.trim().split(/\s+/);
+                                      if (parts.length <= 1) return name;
+                                      const first = parts[0];
+                                      const last = parts[parts.length - 1];
+                                      return `${first} ${last.charAt(0)}.`;
+                                    })()}
+                                  </span>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: studentUser?.schools?.brand_color || '#34a853', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                    {hl.title}
+                                  </span>
+                                </div>
+                                <p style={{ fontSize: '0.78rem', color: '#475569', margin: '2px 0 0 0', lineHeight: 1.3, fontWeight: 550 }}>
+                                  {hl.text}
+                                </p>
+                              </div>
                             </div>
-                            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '3px 0 0 0', lineHeight: 1.3, fontWeight: 555 }}>
-                              {hl.text}
-                            </p>
+
+                            {/* Kudos Reactions Bar */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
+                              {[
+                                { key: 'applause' as const, emoji: '👏', label: 'Applaus', count: kudos.applause },
+                                { key: 'fire' as const, emoji: '🔥', label: 'Stark', count: kudos.fire },
+                                { key: 'rock' as const, emoji: '🎸', label: 'Rockt', count: kudos.rock }
+                              ].map((reaction) => {
+                                const isVoted = kudos.userVoted.includes(reaction.key);
+                                return (
+                                  <button
+                                    key={reaction.key}
+                                    type="button"
+                                    onClick={() => handleToggleKudo(highlightKey, reaction.key)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      padding: '4px 10px',
+                                      borderRadius: '100px',
+                                      border: isVoted ? '1px solid #34a853' : '1px solid #e2e8f0',
+                                      background: isVoted ? '#e6f4ea' : '#ffffff',
+                                      color: isVoted ? '#166534' : '#475569',
+                                      fontSize: '0.72rem',
+                                      fontWeight: isVoted ? 800 : 600,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale"
+                                    title={`${reaction.label} senden`}
+                                  >
+                                    <span>{reaction.emoji}</span>
+                                    <span>{reaction.count}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -13431,7 +13661,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
                         Jahres-Statistik
                       </h3>
-                      <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>
+                      <p style={{ fontSize: '0.72rem', color: '#475569', margin: '2px 0 0 0', fontWeight: 600 }}>
                         Übeminuten (Sep - Aug)
                       </p>
                     </div>
@@ -13478,41 +13708,41 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                             const minutes = Math.round(totalSecs / 60);
 
-                            // Heatmap calculations
+                            // Heatmap calculations with WCAG AA compliant contrast
                             let bg = '#f8fafc';
                             let border = '1px solid #e2e8f0';
-                            let labelColor = '#94a3b8';
-                            let textColor = '#64748b';
-                            let numColor = '#1e293b';
+                            let labelColor = '#475569';
+                            let textColor = '#475569';
+                            let numColor = '#0f172a';
                             let shadow = 'none';
 
                             if (minutes > 0) {
                               if (minutes <= 15) {
                                 bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6fbf0 100%)';
                                 border = '1px solid #e6f4ea';
-                                labelColor = '#34a853';
-                                textColor = '#34a853';
-                                numColor = '#34a853';
+                                labelColor = '#166534';
+                                textColor = '#166534';
+                                numColor = '#166534';
                                 shadow = '0 2px 6px rgba(52, 168, 83, 0.04)';
                               } else if (minutes <= 60) {
                                 bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                                 border = '1px solid #e6f4ea';
-                                labelColor = '#34a853';
-                                textColor = '#34a853';
-                                numColor = '#34a853';
+                                labelColor = '#166534';
+                                textColor = '#166534';
+                                numColor = '#166534';
                                 shadow = '0 3px 8px rgba(52, 168, 83, 0.07)';
                               } else if (minutes <= 180) {
                                 bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                                 border = '1px solid #e6f4ea';
-                                labelColor = '#34a853';
-                                textColor = '#34a853';
-                                numColor = '#34a853';
+                                labelColor = '#166534';
+                                textColor = '#166534';
+                                numColor = '#166534';
                                 shadow = '0 4px 12px rgba(52, 168, 83, 0.12)';
                               } else {
                                 bg = 'linear-gradient(135deg, #34a853 0%, #34a853 100%)';
                                 border = '1px solid #34a853';
-                                labelColor = 'rgba(255, 255, 255, 0.8)';
-                                textColor = 'rgba(255, 255, 255, 0.9)';
+                                labelColor = 'rgba(255, 255, 255, 0.9)';
+                                textColor = 'rgba(255, 255, 255, 0.95)';
                                 numColor = '#ffffff';
                                 shadow = '0 6px 15px rgba(52, 168, 83, 0.25)';
                               }
@@ -13537,7 +13767,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                                 }}
                               >
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: labelColor }}>
+                                <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: labelColor }}>
                                   {item.label}
                                 </span>
                                 <span style={{ fontSize: '1.05rem', fontWeight: 950, color: numColor, fontFeatureSettings: '"tnum"', letterSpacing: '-0.02em' }}>
@@ -13550,7 +13780,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                         {/* Legend */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '8px 12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid #e2e8f0', marginTop: '6px' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Heatmap:</span>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Heatmap:</span>
                           {[
                             { color: '#f8fafc', label: '0m', border: '#e2e8f0' },
                             { color: '#e6f4ea', label: '<15m', border: '#e6f4ea' },
@@ -13560,7 +13790,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           ].map(pill => (
                             <div key={pill.label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: pill.color, border: `1px solid ${pill.border}` }} />
-                              <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>{pill.label}</span>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 750, color: '#475569' }}>{pill.label}</span>
                             </div>
                           ))}
                         </div>
@@ -22114,6 +22344,35 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         <li>Audiodaten und Memos dienen rein dem Unterricht und können jederzeit rückstandslos gelöscht werden.</li>
                         <li>Volle Betroffenenrechte nach Art. 15–21 DSGVO (Auskunft &amp; Löschung jederzeit über das Sekretariat).</li>
                       </ul>
+                    </div>
+
+                    {/* Privatsphäre in der Klasse & Helden-Momente */}
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                        <div>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            ✨ Meilensteine in Klassen-Highlights teilen
+                          </span>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#475569', lineHeight: 1.4, fontWeight: 550 }}>
+                            Erlaube Mitschülern deiner Klasse, gemeisterte Songs und Meilensteine (anonymisiert als Vorname + Initiale) im Feed zu sehen und dir Kudos zu senden.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !privacyShowHighlights;
+                            setPrivacyShowHighlights(next);
+                            try {
+                              localStorage.setItem(`campus_privacy_show_highlights_${studentId}`, JSON.stringify(next));
+                            } catch (e) {}
+                          }}
+                          className={`app-binary-switch ${privacyShowHighlights ? 'active' : ''}`}
+                          style={{ backgroundColor: privacyShowHighlights ? '#34a853' : undefined, flexShrink: 0 }}
+                          title="Sichtbarkeit in Klassen-Highlights anpassen"
+                        >
+                          <div className="app-binary-switch-knob" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Lizenz & Software-Nutzung */}
