@@ -39,7 +39,7 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
           </div>
           <div>
             <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
-              Transparente Lizenz- &amp; Preiskonditionen
+              Transparente Cloud- &amp; Hostingkonditionen
             </h4>
             <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b' }}>
               Campus-Groovelab Fair-Use Tarifübersicht für Musikschulen
@@ -54,7 +54,7 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
           padding: '4px 10px',
           borderRadius: '20px'
         }}>
-          100% Kostenlose Software-Lizenz
+          Software-Nutzung 100% kostenlos
         </span>
       </div>
 

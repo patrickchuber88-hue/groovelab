@@ -7,7 +7,7 @@ import {
   UserCheck, RefreshCw, Key, ChevronRight, UserX, LogOut,
   Copy, Check, Link as LinkIcon, Monitor, Sliders,
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
-  Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
+  Trash2, Shield, Calendar, CalendarX, CalendarCheck, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
   School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake,
   HardDrive, Cloud, Crown, Rocket, Cpu
@@ -2185,6 +2185,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   
   // Apple-style settings panel states
   const [settingsTab, setSettingsTab] = useState<'general' | 'sync' | 'security_privacy' | 'backup'>('general');
+  const [activeSecretarySettingsModal, setActiveSecretarySettingsModal] = useState<'general' | 'links' | 'sync' | 'security_privacy' | 'backup' | 'school_year' | 'danger_zone' | null>(null);
   const [initialSettings, setInitialSettings] = useState<any>(null);
   const [kioskPinLength, setKioskPinLength] = useState<number>(4);
   const [kioskAutoLogout, setKioskAutoLogout] = useState<number>(5);
@@ -15147,68 +15148,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 {/* LEFT COLUMN: MAIN CONTENT AREA */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   
-                  {/* Backup Warning Banner */}
-                  {showBackupAlert && (
-                    <div style={{
-                      background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                      border: '1px solid #fde68a',
-                      borderRadius: '16px',
-                      padding: '12px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '16px',
-                      boxShadow: '0 4px 12px -2px rgba(245, 158, 11, 0.08)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          background: '#fef3c7',
-                          borderRadius: '12px',
-                          padding: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '1px solid #fcd34d'
-                        }}>
-                          <ShieldAlert size={20} style={{ color: '#d97706' }} />
-                        </div>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.84rem', color: '#92400e', marginBottom: '2px' }}>
-                            Lokale Datensicherung empfohlen!
-                          </strong>
-                          <span style={{ fontSize: '0.76rem', color: '#78350f', lineHeight: '1.3' }}>
-                            {lastBackupDate 
-                              ? `Dein letztes lokales Daten-Backup ist bereits ${daysSinceLastBackup} Tage alt. Bitte erstelle eine aktuelle Sicherungsdatei, um deine rechtlichen Mitwirkungspflichten zu erfüllen.`
-                              : 'Es wurde noch kein lokales Daten-Backup heruntergeladen. Bitte erstelle eine Sicherungsdatei, um deine rechtlichen Mitwirkungspflichten zu erfüllen.'}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setSecretarySubTab('setup');
-                          setSettingsTab('backup');
-                        }}
-                        style={{
-                          background: '#d97706',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '10px',
-                          padding: '8px 14px',
-                          fontSize: '0.78rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap',
-                          boxShadow: '0 4px 12px rgba(217, 119, 6, 0.2)',
-                          transition: 'transform 0.15s, background-color 0.15s'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#b45309'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = '#d97706'}
-                      >
-                        Jetzt sichern
-                      </button>
-                    </div>
-                  )}
-
                   {/* ⏳ Active Audio-Tresor Termination & Grace Period Monitor */}
                   {(() => {
                     const termStatus = currentSchoolProfile?.storage_termination_status;
@@ -15676,30 +15615,30 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     {/* Card 3: Konflikte (Amber/Orange Gradient) */}
                     <div style={{
                       position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
+                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: '#0f172a',
                       borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
                       padding: '16px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                      border: '1px solid rgba(0, 0, 0, 0.08)'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Terminkonflikte</span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                          <ShieldAlert size={13} color="white" />
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Terminkonflikte</span>
+                        <div style={{ background: 'rgba(0, 0, 0, 0.08)', padding: '5px', borderRadius: '8px' }}>
+                          <ShieldAlert size={13} color="#0f172a" />
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: '#0f172a' }}>
                           {scheduleConflicts.length}
                         </span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1e293b' }}>
                           {scheduleConflicts.length === 0 ? 'System-Prüfung stabil' : 'Konflikte gefunden'}
                         </span>
                       </div>
                     </div>
 
-                    {/* Card 4: Krankmeldungen (Red Gradient) */}
+                    {/* Card 4: Ausfälle Heute (Red Gradient) */}
                     <div style={{
                       position: 'relative', overflow: 'hidden',
                       background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
@@ -15710,9 +15649,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       border: '1px solid rgba(255, 255, 255, 0.1)'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Krankmeldungen</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ausfälle Heute</span>
                         <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                          <UserX size={13} color="white" />
+                          <CalendarX size={13} color="white" />
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
@@ -15720,108 +15659,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           {activeSickTeachers.length}
                         </span>
                         <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
-                          {activeSickTeachers.length === 1 ? 'Lehrkraft krank' : 'Lehrkräfte krank'}
+                          {activeSickTeachers.length === 0 ? 'Kein Ausfallbedarf' : (activeSickTeachers.length === 1 ? 'Ausfall gemeldet' : 'Ausfälle gemeldet')}
                         </span>
                       </div>
                     </div>
 
-                  </div>
-                    
-                    {/* GLASS DASHBOARD GREETING HEADER */}
-                    <div id="tour-secretary-briefing" style={{
-                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
-                      backdropFilter: 'blur(24px) saturate(1.8)',
-                      WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                      border: '1px solid rgba(255, 255, 255, 0.5)',
-                      borderRadius: '24px',
-                      display: 'flex',
-                      alignItems: 'stretch',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                      width: '100%',
-                      minHeight: '200px',
-                      boxSizing: 'border-box',
-                      overflow: 'hidden'
-                    }}>
-                    <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                      {/* Full Height Graphic on the left */}
-                      <div style={{
-                        width: '190px',
-                        height: '100%',
-                        flexShrink: 0,
-                        position: 'relative',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden',
-                        borderRight: '1px solid rgba(0, 0, 0, 0.05)'
-                      }}>
-                        <img 
-                          src="/campus_login_hero.png" 
-                          alt="" 
-                          style={{ 
-                            width: '100%', 
-                            height: '100%', 
-                            objectFit: 'cover'
-                          }} 
-                        />
-                      </div>
-                      
-                      <div style={{ 
-                        padding: '24px 32px', 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        justifyContent: 'center',
-                        minWidth: 0,
-                        flex: 1 
-                      }}>
-                        {/* Live Clock Badge */}
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          background: '#ffffff',
-                          border: '1px solid rgba(0, 0, 0, 0.06)',
-                          borderRadius: '100px',
-                          padding: '4px 10px',
-                          alignSelf: 'flex-start',
-                          marginBottom: '6px',
-                          flexShrink: 0
-                        }}>
-                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', animation: 'pulse 2s infinite' }} />
-                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
-                            {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
-                          </span>
-                        </div>
-
-                        <h3 style={{ 
-                          margin: 0, 
-                          fontSize: '30px', 
-                          fontWeight: 950, 
-                          color: '#0f172a', 
-                          fontFamily: "'Plus Jakarta Sans', sans-serif", 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '8px',
-                          lineHeight: 1.15
-                        }}>
-                          Hallo, <span style={{ 
-                            color: '#ef4444', 
-                            fontWeight: 900,
-                            letterSpacing: '-0.01em',
-                            display: 'inline-flex',
-                            alignItems: 'center'
-                          }}>{currentUserProfile?.first_name || 'Zentrale'}</span>! 
-                          <span className="inline-block animate-bounce" style={{ marginLeft: '4px' }}>
-                            {currentUserProfile?.is_ghost_mode ? '🎧' : '👋'}
-                          </span>
-                        </h3>
-                        <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.25 }}>
-                          Heute ist {(simulatedToday ? new Date(simulatedToday + 'T12:00:00') : new Date()).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} &bull; Systemstatus stabil &bull; {pendingSchedules.length} ausstehende Stundenpläne.
-                        </p>
-                      </div>
-                    </div>
                   </div>
 
                   {/* WIDGET: Vorläufige Raumbuchungen */}
@@ -16295,7 +16137,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           padding: '16px',
                           textAlign: 'center'
                         }}>
-                          <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>👍</div>
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+                            <CheckCircle size={22} color="#34a853" />
+                          </div>
                           <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Alles freigegeben</strong>
                           <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>Es liegen aktuell keine ausstehenden Stundenplaneinreichungen vor.</span>
                         </div>
@@ -16407,7 +16251,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 {/* RIGHT COLUMN: SIDEBAR */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   
-                  {/* WIDGET: Heutige Krankmeldungen / Lehrer-Präsenz & Status */}
+                  {/* WIDGET: Unterrichtsausfälle heute (Ausfall- & Raumfreigabe-Monitor) */}
                   <div style={{
                     background: '#ffffff',
                     borderRadius: '24px',
@@ -16416,15 +16260,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     border: '1px solid rgba(0, 0, 0, 0.05)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                      <div style={{ background: '#fee2e2', color: '#b91c1c', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-                        <UserX size={16} color="#ef4444" />
+                      <div style={{ background: activeSickTeachers.length > 0 ? '#fee2e2' : '#e6f4ea', color: activeSickTeachers.length > 0 ? '#b91c1c' : '#34a853', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                        {activeSickTeachers.length > 0 ? <CalendarX size={16} color="#ef4444" /> : <CheckCircle size={16} color="#34a853" />}
                       </div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          Lehrer-Präsenz &amp; Status
+                          Unterrichtsausfälle heute
                         </h3>
                         <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                          Aktuelle Krankmeldungen
+                          Ausfall- &amp; Raumfreigabe-Monitor
                         </span>
                       </div>
                     </div>
@@ -16438,9 +16282,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         padding: '16px',
                         textAlign: 'center'
                       }}>
-                        <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>🎉</div>
-                        <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Volle Präsenz</strong>
-                        <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>Alle Lehrkräfte sind einsatzbereit. Es liegen keine Krankmeldungen vor.</span>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+                          <CheckCircle size={22} color="#34a853" />
+                        </div>
+                        <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Kein Ausfallbedarf</strong>
+                        <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>Alle geplanten Unterrichtsstunden finden regulär statt. Keine offenen Schüler-Benachrichtigungen.</span>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -16448,444 +16294,39 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           const sickUntilStr = teacher.sick_until ? new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : 'unbefristet';
                           return (
                             <div key={teacher.id} style={{
-                              padding: '8px',
+                              padding: '12px 14px',
                               borderRadius: '16px',
-                              border: '1px solid rgba(239, 68, 68, 0.1)',
+                              border: '1px solid rgba(239, 68, 68, 0.15)',
                               background: 'rgba(239, 68, 68, 0.04)',
                               display: 'flex',
-                              alignItems: 'center',
-                              gap: '10px'
+                              flexDirection: 'column',
+                              gap: '6px'
                             }}>
-                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1.5s infinite' }} />
-                              <div style={{ flex: 1 }}>
-                                <strong style={{ display: 'block', fontSize: '0.82rem', color: '#991b1b', fontWeight: 700 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <strong style={{ fontSize: '0.82rem', color: '#991b1b', fontWeight: 700 }}>
                                   {formatTeacherFullName(teacher)}
                                 </strong>
-                                <span style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: 600 }}>
-                                  Ausfall gemeldet: bis {sickUntilStr}
+                                <span style={{
+                                  background: '#fee2e2',
+                                  color: '#b91c1c',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.66rem',
+                                  fontWeight: 700
+                                }}>
+                                  bis {sickUntilStr}
                                 </span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.70rem', color: '#64748b' }}>
+                                <span style={{ color: '#16a34a', fontWeight: 700 }}>✓ Räume freigegeben</span>
+                                <span>&bull;</span>
+                                <span style={{ color: '#2563eb', fontWeight: 600 }}>Schüler informiert</span>
                               </div>
                             </div>
                           );
                         })}
                       </div>
                     )}
-                  </div>
-
-                  {/* WIDGET: Live Campus Feed */}
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '28px 24px',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                    border: '1px solid rgba(0, 0, 0, 0.05)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Sparkles size={20} color="#fbbf24" style={{ flexShrink: 0 }} />
-                        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1a253c', fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif", letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                          Live Campus Feed
-                        </h3>
-                      </div>
-                      <button 
-                        onClick={() => setShowAddEventModal(!showAddEventModal)}
-                        style={{
-                          background: '#f2f2f7',
-                          border: 'none',
-                          color: '#1c1c1e',
-                          padding: '6px 14px',
-                          borderRadius: '9999px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#e5e5ea'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = '#f2f2f7'}
-                      >
-                        {showAddEventModal ? 'Schließen' : '＋ Neu'}
-                      </button>
-                    </div>
-
-                    {showAddEventModal && (
-                      <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        if (!newEventTitle.trim() || !newEventDesc.trim()) return;
-                        try {
-                          const { error } = await supabase
-                            .from('campus_announcements')
-                            .insert({
-                              school_id: schoolId,
-                              user_id: userId,
-                              title: newEventTitle,
-                              message: newEventDesc,
-                              target_type: newEventTarget,
-                              category: newEventCategory,
-                              is_emergency: newEventIsEmergency,
-                              published_at: newEventPublishedAt ? new Date(newEventPublishedAt).toISOString() : new Date().toISOString(),
-                              expires_at: newEventExpiresAt ? new Date(newEventExpiresAt).toISOString() : null,
-                              attachment_url: newEventAttachmentUrl || null
-                            });
-                          if (!error) {
-                            setNewEventTitle('');
-                            setNewEventDesc('');
-                            setNewEventCategory('general');
-                            setNewEventIsEmergency(false);
-                            setNewEventPublishedAt('');
-                            setNewEventExpiresAt('');
-                            setNewEventAttachmentUrl('');
-                            setShowAddEventModal(false);
-                            fetchDashboardData();
-                          }
-                        } catch (err) {
-                          console.error(err);
-                        }
-                      }} style={{
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        padding: '18px',
-                        borderRadius: '16px',
-                        marginBottom: '20px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                      }}>
-                        <input 
-                          placeholder="Titel..." 
-                          value={newEventTitle} 
-                          onChange={(e) => setNewEventTitle(e.target.value)}
-                          required
-                          style={{
-                            padding: '10px 14px',
-                            borderRadius: '10px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '0.82rem',
-                            fontFamily: 'inherit',
-                            width: '100%',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                        <textarea 
-                          placeholder="Mitteilung schreiben..." 
-                          value={newEventDesc} 
-                          onChange={(e) => setNewEventDesc(e.target.value)}
-                          required
-                          style={{
-                            padding: '10px 14px',
-                            borderRadius: '10px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '0.82rem',
-                            minHeight: '80px',
-                            resize: 'vertical',
-                            fontFamily: 'inherit',
-                            width: '100%',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                        
-                        {/* Advanced Settings Row */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#475569', marginBottom: '4px', textTransform: 'uppercase' }}>Kategorie</label>
-                            <select 
-                              value={newEventCategory} 
-                              onChange={(e: any) => setNewEventCategory(e.target.value)}
-                              style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.74rem', width: '100%', background: '#ffffff', fontFamily: 'inherit' }}
-                            >
-                              <option value="general">Allgemeine Info</option>
-                              <option value="announcement">Wichtige Ankündigung</option>
-                              <option value="event">Konzert & Event</option>
-                              <option value="holidays">Ferien & Schließzeit</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#475569', marginBottom: '4px', textTransform: 'uppercase' }}>Zielgruppe</label>
-                            <select 
-                              value={newEventTarget} 
-                              onChange={(e: any) => setNewEventTarget(e.target.value)}
-                              style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.74rem', width: '100%', background: '#ffffff', fontFamily: 'inherit' }}
-                            >
-                              <option value="all">Sichtbar für alle</option>
-                              <option value="teachers">Nur Lehrkräfte</option>
-                              <option value="students">Nur Schüler</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#475569', marginBottom: '4px', textTransform: 'uppercase' }}>Veröffentlichen am</label>
-                            <input 
-                              type="datetime-local" 
-                              value={newEventPublishedAt} 
-                              onChange={(e) => setNewEventPublishedAt(e.target.value)}
-                              style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.74rem', width: '100%', fontFamily: 'inherit' }}
-                            />
-                          </div>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#475569', marginBottom: '4px', textTransform: 'uppercase' }}>Ablaufdatum (Optional)</label>
-                            <input 
-                              type="datetime-local" 
-                              value={newEventExpiresAt} 
-                              onChange={(e) => setNewEventExpiresAt(e.target.value)}
-                              style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.74rem', width: '100%', fontFamily: 'inherit' }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* File Upload / Attachments */}
-                        <div style={{ background: '#f1f5f9', padding: '10px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Anhang (PDF / Bild)</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <input 
-                              type="file" 
-                              accept="image/*,application/pdf"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                try {
-                                  setIsUploadingAttachment(true);
-                                  const fileExt = file.name.split('.').pop();
-                                  const fileName = `announcement_${Date.now()}.${fileExt}`;
-                                  const filePath = `feed-attachments/${fileName}`;
-                                  const { error: uploadErr } = await supabase.storage
-                                    .from('groovelab-assets')
-                                    .upload(filePath, file);
-                                  if (uploadErr) throw uploadErr;
-                                  
-                                  const { data: urlData } = supabase.storage
-                                    .from('groovelab-assets')
-                                    .getPublicUrl(filePath);
-                                  setNewEventAttachmentUrl(urlData.publicUrl);
-                                } catch (err: any) {
-                                  alert('Upload fehlgeschlagen: ' + err.message);
-                                } finally {
-                                  setIsUploadingAttachment(false);
-                                }
-                              }}
-                              style={{ fontSize: '0.72rem' }}
-                            />
-                            {isUploadingAttachment && <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Lädt hoch...</span>}
-                          </div>
-                          {newEventAttachmentUrl && (
-                            <span style={{ fontSize: '0.7rem', color: '#34a853', fontWeight: 600 }}>
-                              ✓ Datei verknüpft: {newEventAttachmentUrl.substring(newEventAttachmentUrl.lastIndexOf('/') + 1)}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Emergency Toggle */}
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 700, color: '#b91c1c' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={newEventIsEmergency} 
-                            onChange={(e) => setNewEventIsEmergency(e.target.checked)} 
-                            style={{ cursor: 'pointer' }}
-                          />
-                          Sehr wichtig (Rotes Banner oben auf dem Dashboard einblenden)
-                        </label>
-
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
-                          <button type="submit" style={{
-                            background: '#ea4335',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '9999px',
-                            padding: '8px 20px',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            transition: 'background 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#d93025'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = '#ea4335'}
-                          >
-                            Speichern
-                          </button>
-                        </div>
-                      </form>
-                    )}
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      {schoolEvents.length === 0 ? (
-                        <div style={{
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          color: '#64748b',
-                          borderRadius: '16px',
-                          padding: '24px 16px',
-                          textAlign: 'center'
-                        }}>
-                          <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700 }}>Keine Campus-Feeds vorhanden</strong>
-                          <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>
-                            Erstelle eine Campus-Mitteilung, um hier wichtige Infos anzuzeigen.
-                          </span>
-                        </div>
-                      ) : (
-                        schoolEvents.slice(0, 6).map((evt, idx) => {
-                          const dateObj = new Date(evt.created_at);
-                          const day = dateObj.getDate();
-                          const month = dateObj.getMonth() + 1;
-                          const year = dateObj.getFullYear();
-                          const formattedDate = `${day}.${month}.${year}`;
-
-                          // Target label styling matching Apple's minimal gray badges
-                          let targetLabel = 'ALLE';
-                          let targetBg = '#f1f5f9';
-                          let targetColor = '#475569';
-                          if (evt.target_type === 'teachers') {
-                            targetLabel = 'LEHRKRÄFTE';
-                            targetBg = '#fce8e6';
-                            targetColor = '#ea4335';
-                          } else if (evt.target_type === 'students') {
-                            targetLabel = 'SCHÜLER';
-                            targetBg = '#e8f0fe';
-                            targetColor = '#1a73e8';
-                          }
-
-                          let categoryLabel = 'Info';
-                          let categoryBg = '#fef3c7';
-                          let categoryColor = '#b45309';
-                          if (evt.category === 'announcement') {
-                            categoryLabel = 'Ankündigung';
-                            categoryBg = '#fce8e6';
-                            categoryColor = '#ea4335';
-                          } else if (evt.category === 'event') {
-                            categoryLabel = 'Event';
-                            categoryBg = '#e0f2fe';
-                            categoryColor = '#0369a1';
-                          } else if (evt.category === 'holidays') {
-                            categoryLabel = 'Ferien';
-                            categoryBg = '#e6f4ea';
-                            categoryColor = '#34a853';
-                          }
-
-                          return (
-                            <div 
-                              key={evt.id} 
-                              style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px',
-                                paddingBottom: '4px',
-                                borderTop: idx > 0 ? '1px solid #f1f5f9' : 'none',
-                                paddingTop: idx > 0 ? '18px' : '0px',
-                                position: 'relative'
-                              }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{
-                                    background: targetBg,
-                                    color: targetColor,
-                                    padding: '4px 10px',
-                                    borderRadius: '9999px',
-                                    fontSize: '0.62rem',
-                                    fontWeight: 800,
-                                    letterSpacing: '0.02em'
-                                  }}>
-                                    {targetLabel}
-                                  </span>
-                                  <span style={{
-                                    background: evt.is_emergency ? '#fce8e6' : categoryBg,
-                                    color: evt.is_emergency ? '#ea4335' : categoryColor,
-                                    padding: '4px 10px',
-                                    borderRadius: '9999px',
-                                    fontSize: '0.62rem',
-                                    fontWeight: 800
-                                  }}>
-                                    {categoryLabel} {evt.is_emergency && '⚠️ Wichtig'}
-                                  </span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontSize: '0.74rem', color: '#86868b', fontWeight: 600 }}>
-                                    {formattedDate}
-                                  </span>
-                                  <button
-                                    onClick={async () => {
-                                      if (!window.confirm('Diese Mitteilung wirklich löschen?')) return;
-                                      try {
-                                        const { error } = await supabase
-                                          .from('campus_announcements')
-                                          .delete()
-                                          .eq('id', evt.id);
-                                        if (!error) {
-                                          fetchDashboardData();
-                                        }
-                                      } catch (err) {
-                                        console.error(err);
-                                      }
-                                    }}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#ef4444',
-                                      cursor: 'pointer',
-                                      padding: '2px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      opacity: 0.3,
-                                      transition: 'opacity 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.3'}
-                                    title="Löschen"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <strong style={{
-                                  fontSize: '0.96rem',
-                                  color: '#1a253c',
-                                  fontWeight: 800,
-                                  fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif"
-                                }}>
-                                  {evt.title}
-                                </strong>
-                                <p style={{
-                                  margin: 0,
-                                  fontSize: '0.84rem',
-                                  color: '#475569',
-                                  lineHeight: 1.45,
-                                  fontWeight: 500
-                                }}>
-                                  {evt.message}
-                                </p>
-                                
-                                {evt.attachment_url && (
-                                  <div style={{ marginTop: '6px' }}>
-                                    {evt.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                                      <a href={evt.attachment_url} target="_blank" rel="noreferrer">
-                                        <img 
-                                          src={evt.attachment_url} 
-                                          alt="Anhang" 
-                                          style={{ maxWidth: '100%', maxHeight: '120px', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'zoom-in' }}
-                                        />
-                                      </a>
-                                    ) : (
-                                      <a 
-                                        href={evt.attachment_url} 
-                                        target="_blank" 
-                                        rel="noreferrer" 
-                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#ea4335', textDecoration: 'none', fontWeight: 650 }}
-                                      >
-                                        📄 Dokument öffnen
-                                      </a>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
                   </div>
 
                 </div>
@@ -25835,7 +25276,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                                   </div>
                                   <div style={{ fontSize: '0.66rem', color: '#d97706', lineHeight: '1.4', borderTop: '1px solid #fed7aa', paddingTop: '8px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <span>💚 <strong>Solidaritäts- &amp; Härtefall-Schutz (Das 20:1 Prinzip):</strong> Bei der Eltern-Direktabrechnung schaltet das System für <strong>je 20 aktivierte Schüler-Profile automatisch 1 kostenfreie Freilizenz für Härtefälle &amp; Geschwisterkinder</strong> frei (0,00 € für Eltern &amp; Schule). In deiner Schülerverwaltung kannst du begünstigte Schüler manuell als „Härtefall / Geschwisterrabatt“ freischalten.</span>
+                                    <span>💚 <strong>Solidaritäts- &amp; Härtefall-Schutz (Das 20:1 Prinzip):</strong> Bei der Eltern-Direktabrechnung schaltet das System für <strong>je 20 aktivierte Schüler-Profile automatisch 1 kostenfreie Freischaltung für Härtefälle &amp; Geschwisterkinder</strong> frei (0,00 € für Eltern &amp; Schule). In deiner Schülerverwaltung kannst du begünstigte Schüler manuell als „Härtefall / Geschwisterrabatt“ freischalten.</span>
                                     <span>💡 <strong>GrooveLab-Aktivierungen:</strong> Bitte beachte, dass Aktivierungen für das GrooveLab-Modul immer vollständig von der Musikschule getragen werden und nicht über die Direktabrechnung mit Eltern/Schülern abgewickelt werden können (die Direktabrechnung ist nur für das Campus-Modul möglich).</span>
                                   </div>
                                 </div>
@@ -26357,7 +25798,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.7rem', color: '#374151' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>Software-Lizenz (Grundgebühr):</span>
+                                        <span>Software-Bereitstellung (Grundgebühr):</span>
                                         <strong>Kostenlos</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -26688,7 +26129,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Campus-Groovelab Software-Nutzungslizenz:</span>
+                                <span>Campus-Groovelab Software-Nutzung:</span>
                                 <strong style={{ color: '#34a853' }}>100% kostenlos</strong>
                               </div>
 
@@ -27274,7 +26715,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>Campus-Groovelab Software-Nutzungslizenz:</span>
+                                              <span>Campus-Groovelab Software-Nutzung:</span>
                                               <strong style={{ color: '#34a853' }}>100% kostenlos</strong>
                                             </div>
 
@@ -30663,1004 +30104,1191 @@ status: status,
         })()}
 
         {/* TAB 1.8: SECRETARY - SETUP */}
-
         {activeTab === 'secretary' && secretarySubTab === 'setup' && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            background: '#ffffff',
-            borderRadius: '24px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)',
-            minHeight: '650px',
-            overflow: 'hidden',
-            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-          }}>
-            <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-              {/* LEFT SIDEBAR (Apple-style) */}
-              <div style={{
-                width: '260px',
-                background: '#f8fafc',
-                borderRight: '1px solid #e2e8f0',
-                padding: '24px 16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-                flexShrink: 0
-              }}>
-                <h3 style={{ margin: '0 0 16px 8px', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Einstellungen</h3>
-                {[
-                  { id: 'general', label: 'Allgemein' },
-                  { id: 'sync', label: 'Kalender & Synchronisation' },
-                  { id: 'security_privacy', label: 'Sicherheit & Datenschutz' },
-                  { id: 'backup', label: 'Lokale Datensicherung' }
-                ].map((item) => {
-                  const isSelected = settingsTab === item.id;
-                  const activeColor = isSelected ? '#ea4335' : '#64748b';
-                  
-                  const renderIcon = () => {
-                    switch (item.id) {
-                      case 'general': return <Settings size={14} color={activeColor} />;
-                      case 'sync': return <Zap size={14} color={activeColor} />;
-                      case 'security_privacy': return <Shield size={14} color={activeColor} />;
-                      case 'backup': return <Database size={14} color={activeColor} />;
-                      default: return null;
-                    }
-                  };
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
+                ⚙️ Einstellungen
+              </h2>
+              <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
+                Wähle ein Modul aus, um Stammdaten, Kalender-Sync, Sicherheit, Datensicherung und Betriebszeiten für deine Schule zu konfigurieren.
+              </p>
+            </div>
 
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setSettingsTab(item.id as any)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: isSelected ? '0 12px 12px 0' : '12px',
-                        border: 'none',
-                        borderLeft: isSelected ? '3px solid #ea4335' : '3px solid transparent',
-                        background: isSelected ? '#fce8e6' : 'transparent',
-                        color: isSelected ? '#ea4335' : '#475569',
-                        fontSize: '0.84rem',
-                        fontWeight: isSelected ? 700 : 500,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover-scale"
-                    >
+            {/* MODULAR COVER CARDS GRID */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: windowWidth < 640 ? 'repeat(2, 1fr)' : windowWidth < 1024 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: '18px',
+              width: '100%'
+            }}>
+              {[
+                {
+                  id: 'general',
+                  title: 'Schul-Stammdaten',
+                  subtitle: schoolName || 'Name, Adresse & Logo',
+                  badge: 'Stammdaten',
+                  gradient: 'linear-gradient(135deg, #ea4335 0%, #b91c1c 100%)',
+                  shadowColor: 'rgba(234, 67, 53, 0.40)',
+                  icon: School
+                },
+                {
+                  id: 'links',
+                  title: 'Anmelde- & Kiosk-Links',
+                  subtitle: 'Schul-URL & Tablet-Kopplung',
+                  badge: 'Integration',
+                  gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  shadowColor: 'rgba(2, 132, 199, 0.40)',
+                  icon: LinkIcon
+                },
+                {
+                  id: 'sync',
+                  title: 'Kalender & Sync',
+                  subtitle: `${calendarUrls.length} Kalender abonniert`,
+                  badge: syncInterval === 'realtime' ? 'Echtzeit' : syncInterval === 'hourly' ? 'Stündlich' : 'Täglich',
+                  gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                  shadowColor: 'rgba(6, 182, 212, 0.40)',
+                  icon: Zap
+                },
+                {
+                  id: 'security_privacy',
+                  title: 'Sicherheit & DSGVO',
+                  subtitle: 'PIN, DSB-Ausweis & AVV',
+                  badge: isAvvSigned ? 'AVV Gezeichnet' : 'AVV Ausstehend',
+                  gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  shadowColor: 'rgba(16, 185, 129, 0.40)',
+                  icon: ShieldCheck
+                },
+                {
+                  id: 'backup',
+                  title: 'Lokale Datensicherung',
+                  subtitle: lastBackupDate ? 'Sicherung vorhanden' : 'JSON-Backup Tresor',
+                  badge: 'Backup Tresor',
+                  gradient: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  shadowColor: 'rgba(99, 102, 241, 0.40)',
+                  icon: Database
+                },
+                {
+                  id: 'school_year',
+                  title: 'Schuljahr & Auto-Clean',
+                  subtitle: `Start: ${schoolYearStartDay}. ${['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'][(schoolYearStartMonth || 9) - 1] || 'September'}`,
+                  badge: autoDeleteExpiredUsers ? 'Auto-Clean An' : 'Manuell',
+                  gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  shadowColor: 'rgba(245, 158, 11, 0.40)',
+                  icon: Clock
+                },
+                {
+                  id: 'danger_zone',
+                  title: 'Werkseinstellungen',
+                  subtitle: 'Musikschule zurücksetzen',
+                  badge: 'Gefahr',
+                  gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                  shadowColor: 'rgba(239, 68, 68, 0.40)',
+                  icon: ShieldAlert
+                }
+              ].map((module) => {
+                const IconComp = module.icon;
+                return (
+                  <div
+                    key={module.id}
+                    onClick={() => {
+                      if (module.id === 'general' || module.id === 'sync' || module.id === 'security_privacy' || module.id === 'backup') {
+                        setSettingsTab(module.id as any);
+                      }
+                      setActiveSecretarySettingsModal(module.id as any);
+                    }}
+                    style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '20px',
+                      padding: '24px 16px 20px 16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                    className="hover-scale"
+                  >
+                    <div style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '16px',
+                      background: module.gradient,
+                      boxShadow: `0 8px 18px -3px ${module.shadowColor}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      border: '1px solid rgba(255, 255, 255, 0.25)'
+                    }}>
+                      <IconComp size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                    </div>
+                    <div style={{ marginTop: '14px', padding: '0 4px', width: '100%' }}>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                        {module.title}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', marginTop: '3px', lineHeight: '1.3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {module.subtitle}
+                      </div>
+                    </div>
+                    {module.badge && (
                       <span style={{
+                        marginTop: '10px',
+                        fontSize: '0.62rem',
+                        fontWeight: 800,
+                        color: module.id === 'danger_zone' ? '#dc2626' : (module.id === 'security_privacy' && !isAvvSigned ? '#d97706' : '#ea4335'),
+                        background: module.id === 'danger_zone' ? '#fee2e2' : (module.id === 'security_privacy' && !isAvvSigned ? '#fef3c7' : '#fce8e6'),
+                        padding: '2px 8px',
+                        borderRadius: '100px'
+                      }}>
+                        {module.badge}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* PERSISTENT BOTTOM SAVE BAR (IF DIRTY) */}
+            {isSettingsDirty && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 32px',
+                border: '1px solid #fecaca',
+                background: '#fef2f2',
+                borderRadius: '20px',
+                boxShadow: '0 4px 16px rgba(234, 67, 53, 0.1)',
+                boxSizing: 'border-box',
+                width: '100%'
+              }}>
+                <span style={{ fontSize: '0.82rem', color: '#ea4335', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚠️ Ungespeicherte Änderungen an den Schuleinstellungen vorhanden.
+                </span>
+                <button
+                  onClick={handleSaveAllSettings}
+                  disabled={isSavingSettings}
+                  style={{
+                    padding: '10px 24px',
+                    background: '#ea4335',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: 800,
+                    fontSize: '0.84rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+                    transition: 'all 0.2s',
+                    opacity: isSavingSettings ? 0.7 : 1
+                  }}
+                  className="hover-scale"
+                >
+                  {isSavingSettings ? 'Wird gespeichert...' : 'Einstellungen speichern'}
+                </button>
+              </div>
+            )}
+
+            {/* FOCUS MODAL FOR SELECTED SETTINGS CATEGORY */}
+            {activeSecretarySettingsModal && (
+              <div 
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(15, 23, 42, 0.55)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  zIndex: 10000,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '20px',
+                  boxSizing: 'border-box'
+                }}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setActiveSecretarySettingsModal(null);
+                }}
+              >
+                <div 
+                  style={{
+                    width: '100%',
+                    maxWidth: activeSecretarySettingsModal === 'general' ? '740px' : '680px',
+                    maxHeight: '90vh',
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(255, 255, 255, 0.8)',
+                    boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.35)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}
+                  className="animate-scale-in"
+                >
+                  {/* Modal Header */}
+                  <div style={{
+                    padding: '20px 24px',
+                    borderBottom: '1px solid #f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#f8fafc'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: activeSecretarySettingsModal === 'general'
+                          ? 'linear-gradient(135deg, #ea4335 0%, #b91c1c 100%)'
+                          : activeSecretarySettingsModal === 'links'
+                          ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                          : activeSecretarySettingsModal === 'sync'
+                          ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
+                          : activeSecretarySettingsModal === 'security_privacy'
+                          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                          : activeSecretarySettingsModal === 'backup'
+                          ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
+                          : activeSecretarySettingsModal === 'school_year'
+                          ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                          : 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '6px',
-                        background: isSelected ? '#ffffff' : '#f1f5f9',
-                        boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
-                      }}>{renderIcon()}</span>
-                      <span style={{ flex: 1 }}>{item.label}</span>
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
+                      }}>
+                        {activeSecretarySettingsModal === 'general' && <School size={22} color="#ffffff" />}
+                        {activeSecretarySettingsModal === 'links' && <LinkIcon size={22} color="#ffffff" />}
+                        {activeSecretarySettingsModal === 'sync' && <Zap size={22} color="#ffffff" />}
+                        {activeSecretarySettingsModal === 'security_privacy' && <ShieldCheck size={22} color="#ffffff" />}
+                        {activeSecretarySettingsModal === 'backup' && <Database size={22} color="#ffffff" />}
+                        {activeSecretarySettingsModal === 'school_year' && <Clock size={22} color="#ffffff" />}
+                        {activeSecretarySettingsModal === 'danger_zone' && <ShieldAlert size={22} color="#ffffff" />}
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                          {activeSecretarySettingsModal === 'general' && 'Schul-Stammdaten & Branding'}
+                          {activeSecretarySettingsModal === 'links' && 'Anmelde- & Kiosk-Links'}
+                          {activeSecretarySettingsModal === 'sync' && 'Kalender & Synchronisation'}
+                          {activeSecretarySettingsModal === 'security_privacy' && 'Sicherheit & Datenschutz (DSGVO)'}
+                          {activeSecretarySettingsModal === 'backup' && 'Lokale Datensicherung'}
+                          {activeSecretarySettingsModal === 'school_year' && 'Schuljahr & Auto-Bereinigung'}
+                          {activeSecretarySettingsModal === 'danger_zone' && 'Gefahrenzone: Werkseinstellungen'}
+                        </h3>
+                        <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
+                          {activeSecretarySettingsModal === 'general' && 'Stammdaten, Anschrift und Schullogo deines Campus.'}
+                          {activeSecretarySettingsModal === 'links' && 'Einheitliche Zugangslinks für Campus, GrooveLab und Kiosk-Stationen.'}
+                          {activeSecretarySettingsModal === 'sync' && 'Datenabgleich, Live-Sync und externe iCal-Abonnements.'}
+                          {activeSecretarySettingsModal === 'security_privacy' && 'Kiosk-PIN, DSB-Prüfausweis und AV-Vereinbarungen.'}
+                          {activeSecretarySettingsModal === 'backup' && 'JSON-Export und Wiederherstellung der Schuldatenbank.'}
+                          {activeSecretarySettingsModal === 'school_year' && 'Schuljahresbeginn und automatische DSGVO-Bereinigung.'}
+                          {activeSecretarySettingsModal === 'danger_zone' && 'Setzt die Schule unwiderruflich auf Werkseinstellungen zurück.'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveSecretarySettingsModal(null)}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        border: '1px solid #e2e8f0',
+                        background: '#ffffff',
+                        color: '#64748b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                      className="hover-scale"
+                    >
+                      <X size={16} />
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
 
-              {/* RIGHT PANEL (Details) */}
-              <div style={{ flex: 1, padding: '32px 40px', overflowY: 'auto', textAlign: 'left' }}>
-                {settingsTab === 'general' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                    <div>
-                      <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Allgemeine Einstellungen</h3>
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Stammdaten und Schullogo deines Campus.</p>
-                    </div>
+                  {/* Modal Body */}
+                  <div style={{ padding: '24px', overflowY: 'auto', maxHeight: 'calc(80vh - 140px)', textAlign: 'left' }}>
+                    {activeSecretarySettingsModal === 'general' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Stammdaten der Musikschule</strong>
+                          
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Name der Musikschule *</label>
+                              <input
+                                type="text"
+                                value={schoolName}
+                                onChange={(e) => setSchoolName(e.target.value)}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Wunsch-Subdomain *</label>
+                              <input
+                                type="text"
+                                value={schoolSubdomain}
+                                onChange={(e) => setSchoolSubdomain(e.target.value)}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                              />
+                            </div>
+                          </div>
 
-                    {/* Musikschul-Stammdaten */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Stammdaten der Musikschule</strong>
-                      
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Name der Musikschule *</label>
-                          <input
-                            type="text"
-                            value={schoolName}
-                            onChange={(e) => setSchoolName(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Wunsch-Subdomain *</label>
-                          <input
-                            type="text"
-                            value={schoolSubdomain}
-                            onChange={(e) => setSchoolSubdomain(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                          />
-                        </div>
-                      </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Straße *</label>
+                              <input
+                                type="text"
+                                value={schoolStreet}
+                                onChange={(e) => setSchoolStreet(e.target.value)}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Nr. *</label>
+                              <input
+                                type="text"
+                                value={schoolHouseNumber}
+                                onChange={(e) => setSchoolHouseNumber(e.target.value)}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                              />
+                            </div>
+                          </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Straße *</label>
-                          <input
-                            type="text"
-                            value={schoolStreet}
-                            onChange={(e) => setSchoolStreet(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Nr. *</label>
-                          <input
-                            type="text"
-                            value={schoolHouseNumber}
-                            onChange={(e) => setSchoolHouseNumber(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                          />
-                        </div>
-                      </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>PLZ *</label>
+                              <input
+                                type="text"
+                                value={schoolZipCode}
+                                onChange={(e) => setSchoolZipCode(e.target.value)}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Ort *</label>
+                              <input
+                                type="text"
+                                value={schoolCity}
+                                onChange={(e) => setSchoolCity(e.target.value)}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                              />
+                            </div>
+                          </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>PLZ *</label>
-                          <input
-                            type="text"
-                            value={schoolZipCode}
-                            onChange={(e) => setSchoolZipCode(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Ort *</label>
-                          <input
-                            type="text"
-                            value={schoolCity}
-                            onChange={(e) => setSchoolCity(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                          />
-                        </div>
-                      </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Telefonnummer *</label>
+                              <input
+                                type="text"
+                                value={schoolPhoneNumber}
+                                onChange={(e) => setSchoolPhoneNumber(e.target.value)}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>E-Mail-Adresse *</label>
+                              <input
+                                type="email"
+                                value={schoolEmail}
+                                onChange={(e) => setSchoolEmail(e.target.value)}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                              />
+                            </div>
+                          </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Telefonnummer *</label>
-                          <input
-                            type="text"
-                            value={schoolPhoneNumber}
-                            onChange={(e) => setSchoolPhoneNumber(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                          />
+                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '4px' }}>
+                            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Logo URL</label>
+                            <input
+                              type="text"
+                              placeholder="https://example.com/logo.png"
+                              value={logoUrl}
+                              onChange={(e) => setLogoUrl(e.target.value)}
+                              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>E-Mail-Adresse *</label>
-                          <input
-                            type="email"
-                            value={schoolEmail}
-                            onChange={(e) => setSchoolEmail(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                          />
-                        </div>
-                      </div>
 
-                      {/* Logo URL input included in General */}
-                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '4px' }}>
-                        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Logo URL</label>
-                        <input
-                          type="text"
-                          placeholder="https://example.com/logo.png"
-                          value={logoUrl}
-                          onChange={(e) => setLogoUrl(e.target.value)}
-                          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Integration Link */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
-                      <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '6px' }}>Schul-ID & Integration Link (Campus & Groovelab)</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '12px', lineHeight: '1.4' }}>
-                        Dies ist der einheitliche Anmeldelink für deine Musikschule. Er gilt sowohl für den Campus als auch für Groovelab.
-                      </span>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input 
-                          readOnly 
-                          value={schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`} 
-                          style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.82rem', fontFamily: 'monospace', background: '#ffffff', color: '#1e293b' }} 
-                        />
-                        <button 
-                          onClick={() => { 
-                            const link = schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`;
-                            navigator.clipboard.writeText(link); 
-                            setCopiedSchoolLink(true);
-                            setTimeout(() => setCopiedSchoolLink(false), 2000);
-                          }} 
-                          style={{ 
-                            padding: '10px 20px', 
-                            fontSize: '0.8rem', 
-                            fontWeight: 800,
-                            borderRadius: '10px',
-                            border: copiedSchoolLink ? '1.5px solid #ea4335' : 'none',
-                            background: copiedSchoolLink ? '#fce8e6' : '#ea4335',
-                            color: copiedSchoolLink ? '#ea4335' : '#ffffff',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
-                          }}
-                        >
-                          {copiedSchoolLink ? '✓ Kopiert!' : 'Link kopieren'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* QR Code Scanner Login Link (Kiosk Mode) */}
-                    {kioskToken && (
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', marginTop: '16px' }}>
-                        <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '6px' }}>QR-Code Scanner Login (Kiosk-Modus)</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '12px', lineHeight: '1.4' }}>
-                          Verwende diesen Link, um Tablets/Endgeräte in deiner Schule permanent als Scan-Stationen (Kiosk-Modus) einzurichten.
-                        </span>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <input 
-                            readOnly 
-                            value={schoolSubdomain 
-                              ? (window.location.hostname.includes('localhost') 
-                                ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
-                                : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
-                              : `${window.location.origin}/device-onboarding/${kioskToken}`
-                            } 
-                            style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.82rem', fontFamily: 'monospace', background: '#ffffff', color: '#1e293b' }} 
-                          />
-                          <button 
-                            onClick={() => { 
-                              const link = schoolSubdomain 
-                                ? (window.location.hostname.includes('localhost') 
-                                  ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
-                                  : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
-                                : `${window.location.origin}/device-onboarding/${kioskToken}`;
-                              navigator.clipboard.writeText(link); 
-                              setCopiedKioskLink(true);
-                              setTimeout(() => setCopiedKioskLink(false), 2000);
-                            }} 
-                            style={{ 
-                              padding: '10px 20px', 
-                              fontSize: '0.8rem', 
-                              fontWeight: 800,
-                              borderRadius: '10px',
-                              border: copiedKioskLink ? '1.5px solid #ea4335' : 'none',
-                              background: copiedKioskLink ? '#fce8e6' : '#ea4335',
-                              color: copiedKioskLink ? '#ea4335' : '#ffffff',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {copiedKioskLink ? '✓ Kopiert!' : 'Link kopieren'}
-                          </button>
+                        {/* Zahlungsart Card */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Aktive Zahlungsart</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.35' }}>
+                              Die Software-Nutzung für <strong>Campus-Groovelab</strong> ist zu 100% kostenlos. Es fallen lediglich optionale Hosting- und Bereitstellungsgebühren an. Die Abrechnung erfolgt per Rechnung (14 Tage Zahlungsziel).
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#ea4335', background: '#fce8e6', border: '1px solid #fca5a5', padding: '6px 14px', borderRadius: '100px', letterSpacing: '0.04em', whiteSpace: 'nowrap', marginLeft: '12px' }}>
+                            RECHNUNG (14 TAGE)
+                          </div>
                         </div>
                       </div>
                     )}
 
-                    {/* Zahlungsart Card */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Aktive Zahlungsart</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.35' }}>
-                          Die Software-Lizenz für **Campus-Groovelab** ist zu 100% kostenlos. Es fallen lediglich optionale Hosting- und Aktivierungsgebühren an. Die Abrechnung erfolgt standardmäßig per Rechnung mit einem Zahlungsziel von 14 Tagen. Der Versand erfolgt per E-Mail zum Monatsende.
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#ea4335', background: '#fce8e6', border: '1px solid #fca5a5', padding: '6px 14px', borderRadius: '100px', letterSpacing: '0.04em' }}>
-                        RECHNUNG (14 TAGE)
-                      </div>
-                    </div>
-
-                    {/* Schuljahr & DSGVO Datenschutz-Bereinigung */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Schuljahr & DSGVO Datenschutz-Bereinigung</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.35' }}>
-                          Konfiguriere den offiziellen Schuljahresbeginn für deine Verträge und lege fest, ob abgelaufene Konten vollkommen automatisch und datenschutzkonform (inkl. physischer Löschung verknüpfter Audio-Dateien im Supabase Storage) gelöscht werden sollen.
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Schuljahresbeginn (Tag) *</label>
-                          <select
-                            value={schoolYearStartDay}
-                            onChange={(e) => setSchoolYearStartDay(parseInt(e.target.value))}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
-                          >
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                              <option key={day} value={day}>{day}.</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Schuljahresbeginn (Monat) *</label>
-                          <select
-                            value={schoolYearStartMonth}
-                            onChange={(e) => setSchoolYearStartMonth(parseInt(e.target.value))}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
-                          >
-                            <option value={1}>Januar</option>
-                            <option value={2}>Februar</option>
-                            <option value={3}>März</option>
-                            <option value={4}>April</option>
-                            <option value={5}>Mai</option>
-                            <option value={6}>Juni</option>
-                            <option value={7}>Juli</option>
-                            <option value={8}>August</option>
-                            <option value={9}>September</option>
-                            <option value={10}>Oktober</option>
-                            <option value={11}>November</option>
-                            <option value={12}>Dezember</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={autoDeleteExpiredUsers}
-                            onChange={(e) => setAutoDeleteExpiredUsers(e.target.checked)}
-                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#ea4335' }}
-                          />
-                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>
-                            Abgelaufene Schüler-Zugänge automatisch löschen (Auto-Clean)
+                    {activeSecretarySettingsModal === 'links' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                        {/* Integration Link */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
+                          <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '6px' }}>Schul-ID &amp; Integration Link (Campus &amp; Groovelab)</strong>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '12px', lineHeight: '1.4' }}>
+                            Dies ist der einheitliche Anmeldelink für deine Musikschule. Er gilt sowohl für den Campus als auch für Groovelab.
                           </span>
-                        </label>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '24px', display: 'block', marginTop: '-6px' }}>
-                          Inaktiviert bzw. löscht abgelaufene Profile und zugeordnete Spuren/Bands/Songs vollautomatisch nach Ablauf des Buchungszeitraums.
-                        </span>
-                      </div>
-
-                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2', padding: '12px', borderRadius: '12px', border: '1px dashed #fca5a5' }}>
-                        <div style={{ textAlign: 'left' }}>
-                          <strong style={{ fontSize: '0.8rem', display: 'block', color: '#991b1b' }}>Manuelle DSGVO-Löschung</strong>
-                          <span style={{ fontSize: '0.7rem', color: '#7f1d1d', display: 'block', marginTop: '2px' }}>
-                            {students.filter((s: any) => s.contractEndsAt && new Date(s.contractEndsAt).getTime() < Date.now()).length} abgelaufene Konten gefunden.
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteExpiredStudents(false)}
-                          style={{
-                            padding: '8px 16px',
-                            fontSize: '0.78rem',
-                            fontWeight: 800,
-                            borderRadius: '10px',
-                            background: '#ea4335',
-                            color: '#ffffff',
-                            border: 'none',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            boxShadow: '0 2px 4px rgba(234, 67, 53, 0.15)'
-                          }}
-                        >
-                          Jetzt bereinigen
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {settingsTab === 'sync' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                    <div>
-                      <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Kalender &amp; Synchronisation</h3>
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Verwalte deinen Datenabgleich und externe Kalender-Abonnements.</p>
-                    </div>
-
-                    {/* Sync Settings section */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
-                      <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>⚡ Synchronisation (Campus &amp; GrooveLab)</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px' }}>
-                        Frequenz, mit der Stundenpläne und externe Kalenderfeeds abgeglichen werden.
-                      </span>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <span style={{ fontSize: '0.76rem', fontWeight: 600 }}>Sync-Frequenz:</span>
-                        <select 
-                          value={syncInterval} 
-                          onChange={(e) => setSyncInterval(e.target.value)} 
-                          style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.78rem', fontWeight: 700 }}
-                        >
-                          <option value="realtime">Echtzeit / Live</option>
-                          <option value="hourly">Jede Stunde</option>
-                          <option value="daily">Täglich um 02:00 Uhr</option>
-                        </select>
-                      </div>
-                      <button 
-                        onClick={() => alert('Die manuelle Synchronisation wurde erfolgreich durchgeführt!')}
-                        style={{ 
-                          width: '100%', padding: '10px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
-                          border: '1px solid #ea4335', background: '#fce8e6', color: '#ea4335', cursor: 'pointer', transition: 'all 0.15s' 
-                        }}
-                        className="hover-scale"
-                      >
-                        Datenbanken jetzt synchronisieren
-                      </button>
-                    </div>
-
-                    {/* Multiple iCal Feeds Section */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>📅 Abonnierte iCal Kalender-Links (ICS Feeds)</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.4' }}>
-                          Abonniere einen oder mehrere externe Kalenderfeeds (.ics Format), um Feiertage, Ferien oder Veranstaltungen automatisch im System (Campus-Events) anzuzeigen.
-                        </span>
-                      </div>
-
-                      {/* List of current calendars */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                        {calendarUrls.length === 0 ? (
-                          <div style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', padding: '10px 14px', background: '#ffffff', borderRadius: '10px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
-                            Keine externen Kalender abonniert.
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input 
+                              readOnly 
+                              value={schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`} 
+                              style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.82rem', fontFamily: 'monospace', background: '#ffffff', color: '#1e293b' }} 
+                            />
+                            <button 
+                              onClick={() => { 
+                                const link = schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`;
+                                navigator.clipboard.writeText(link); 
+                                setCopiedSchoolLink(true);
+                                setTimeout(() => setCopiedSchoolLink(false), 2000);
+                              }} 
+                              style={{ 
+                                padding: '10px 20px', 
+                                fontSize: '0.8rem', 
+                                fontWeight: 800,
+                                borderRadius: '10px',
+                                border: copiedSchoolLink ? '1.5px solid #ea4335' : 'none',
+                                background: copiedSchoolLink ? '#fce8e6' : '#ea4335',
+                                color: copiedSchoolLink ? '#ea4335' : '#ffffff',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {copiedSchoolLink ? '✓ Kopiert!' : 'Link kopieren'}
+                            </button>
                           </div>
-                        ) : (
-                          calendarUrls.map((urlItem, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '10px' }}>
-                              <span style={{ fontSize: '0.74rem', color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
-                                {urlItem}
-                              </span>
-                              <button
-                                onClick={() => handleRemoveCalendarUrl(idx)}
-                                style={{
-                                  border: 'none',
-                                  background: 'transparent',
-                                  color: '#ef4444',
-                                  fontSize: '0.75rem',
+                        </div>
+
+                        {/* QR Code Scanner Login Link (Kiosk Mode) */}
+                        {kioskToken && (
+                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
+                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '6px' }}>QR-Code Scanner Login (Kiosk-Modus)</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '12px', lineHeight: '1.4' }}>
+                              Verwende diesen Link, um Tablets/Endgeräte in deiner Schule permanent als Scan-Stationen (Kiosk-Modus) einzurichten.
+                            </span>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <input 
+                                readOnly 
+                                value={schoolSubdomain 
+                                  ? (window.location.hostname.includes('localhost') 
+                                    ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
+                                    : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
+                                  : `${window.location.origin}/device-onboarding/${kioskToken}`
+                                } 
+                                style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.82rem', fontFamily: 'monospace', background: '#ffffff', color: '#1e293b' }} 
+                              />
+                              <button 
+                                onClick={() => { 
+                                  const link = schoolSubdomain 
+                                    ? (window.location.hostname.includes('localhost') 
+                                      ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
+                                      : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
+                                    : `${window.location.origin}/device-onboarding/${kioskToken}`;
+                                  navigator.clipboard.writeText(link); 
+                                  setCopiedKioskLink(true);
+                                  setTimeout(() => setCopiedKioskLink(false), 2000);
+                                }} 
+                                style={{ 
+                                  padding: '10px 20px', 
+                                  fontSize: '0.8rem', 
                                   fontWeight: 800,
+                                  borderRadius: '10px',
+                                  border: copiedKioskLink ? '1.5px solid #ea4335' : 'none',
+                                  background: copiedKioskLink ? '#fce8e6' : '#ea4335',
+                                  color: copiedKioskLink ? '#ea4335' : '#ffffff',
                                   cursor: 'pointer',
-                                  padding: '4px 8px',
-                                  borderRadius: '6px',
-                                  transition: 'all 0.15s'
+                                  transition: 'all 0.2s ease',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                                  whiteSpace: 'nowrap'
                                 }}
-                                onMouseOver={(e) => e.currentTarget.style.background = '#fef2f2'}
-                                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
                               >
-                                Entfernen
+                                {copiedKioskLink ? '✓ Kopiert!' : 'Link kopieren'}
                               </button>
                             </div>
-                          ))
+                          </div>
                         )}
                       </div>
+                    )}
 
-                      {/* Add new calendar URL form */}
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                        <input
-                          type="url"
-                          placeholder="https://example.com/calendar.ics"
-                          value={newCalendarUrlInput}
-                          onChange={(e) => setNewCalendarUrlInput(e.target.value)}
-                          style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem' }}
-                        />
-                        <button
-                          onClick={handleAddCalendarUrl}
-                          style={{
-                            padding: '10px 18px',
-                            fontSize: '0.78rem',
-                            fontWeight: 800,
-                            borderRadius: '10px',
-                            border: 'none',
-                            background: '#ea4335',
-                            color: '#ffffff',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 6px rgba(234, 67, 53, 0.1)'
-                          }}
-                        >
-                          Hinzufügen
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {settingsTab === 'security_privacy' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                    <div>
-                      <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Sicherheit &amp; Datenschutz</h3>
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Kiosk-Optionen, PIN-Sicherheit und DSGVO-Einstellungen.</p>
-                    </div>
-
-                    {/* Kiosk-PIN settings */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Kiosk PIN-Länge</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px', lineHeight: '1.3' }}>
-                          Wählen Sie die erforderliche Länge des persönlichen Logins PINs für das Kiosk-System.
-                        </span>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          {[4, 6].map((num) => (
-                            <button
-                              key={num}
-                              type="button"
-                              onClick={() => setKioskPinLength(num)}
-                              style={{
-                                padding: '8px 16px',
-                                borderRadius: '8px',
-                                border: '1.5px solid',
-                                borderColor: kioskPinLength === num ? '#ea4335' : '#cbd5e1',
-                                background: kioskPinLength === num ? '#fce8e6' : '#ffffff',
-                                color: kioskPinLength === num ? '#ea4335' : '#475569',
-                                fontSize: '0.8rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s'
-                              }}
+                    {activeSecretarySettingsModal === 'sync' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* Sync Settings section */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
+                          <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>⚡ Synchronisation (Campus &amp; GrooveLab)</strong>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px' }}>
+                            Frequenz, mit der Stundenpläne und externe Kalenderfeeds abgeglichen werden.
+                          </span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <span style={{ fontSize: '0.76rem', fontWeight: 600 }}>Sync-Frequenz:</span>
+                            <select 
+                              value={syncInterval} 
+                              onChange={(e) => setSyncInterval(e.target.value)} 
+                              style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.78rem', fontWeight: 700 }}
                             >
-                              {num} Ziffern
-                            </button>
-                          ))}
+                              <option value="realtime">Echtzeit / Live</option>
+                              <option value="hourly">Jede Stunde</option>
+                              <option value="daily">Täglich um 02:00 Uhr</option>
+                            </select>
+                          </div>
+                          <button 
+                            onClick={() => alert('Die manuelle Synchronisation wurde erfolgreich durchgeführt!')}
+                            style={{ 
+                              width: '100%', padding: '10px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
+                              border: '1px solid #ea4335', background: '#fce8e6', color: '#ea4335', cursor: 'pointer', transition: 'all 0.15s' 
+                            }}
+                            className="hover-scale"
+                          >
+                            Datenbanken jetzt synchronisieren
+                          </button>
                         </div>
-                      </div>
 
-                      <div>
-                        <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Master Bypass-PIN</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px', lineHeight: '1.3' }}>
-                          Ein universeller PIN zum Freischalten von Kiosk-Stationen bei Offline-Betrieb.
-                        </span>
-                        <input
-                          type="password"
-                          value={bypassPin}
-                          onChange={(e) => setBypassPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.84rem', letterSpacing: '0.3em', width: '120px', textAlign: 'center' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Städtischer DSB-Prüfausweis & Audit-Portal (Art. 38 DSGVO) */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #ffffff 0%, #f4fbf7 100%)',
-                      border: '1.5px solid #a7f3d0',
-                      borderRadius: '20px',
-                      padding: '24px',
-                      color: '#0f172a',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '16px',
-                      boxShadow: '0 4px 20px rgba(52, 168, 83, 0.08)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '14px',
-                          background: '#34a853',
-                          border: '1.5px solid #34a853',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#ffffff',
-                          boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
-                        }}>
-                          <ShieldCheck size={28} />
-                        </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                              🪪 DSB-Prüfausweis (Art. 38 DSGVO)
-                            </h4>
-                            <span style={{ background: '#e6f4ea', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '100px', fontSize: '0.65rem', fontWeight: 800 }}>
-                              E-Mail-Frei
+                        {/* Multiple iCal Feeds Section */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          <div>
+                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>📅 Abonnierte iCal Kalender-Links (ICS Feeds)</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.4' }}>
+                              Abonniere einen oder mehrere externe Kalenderfeeds (.ics Format), um Feiertage, Ferien oder Veranstaltungen automatisch im System (Campus-Events) anzuzeigen.
                             </span>
                           </div>
-                          <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#475569', fontWeight: 500 }}>
-                            Offizieller QR-Prüfausweis für den städtischen Datenschutzbeauftragten (Read-Only WORM Audit-Logs).
-                          </p>
-                        </div>
-                      </div>
 
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button
-                          type="button"
-                          onClick={() => setShowDpoPortalModal(true)}
-                          style={{
-                            background: '#ffffff',
-                            border: '1.5px solid #cbd5e1',
-                            color: '#334155',
-                            padding: '10px 18px',
-                            borderRadius: '12px',
-                            fontWeight: 750,
-                            fontSize: '0.8rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)',
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#f8fafc';
-                            e.currentTarget.style.borderColor = '#94a3b8';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#ffffff';
-                            e.currentTarget.style.borderColor = '#cbd5e1';
-                          }}
-                        >
-                          <Eye size={16} /> Audit-Portal testen
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowDpoIdCardModal(true)}
-                          style={{
-                            background: '#34a853',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '10px 20px',
-                            borderRadius: '12px',
-                            fontWeight: 800,
-                            fontSize: '0.8rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)',
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                        >
-                          <Printer size={16} /> DSB-Ausweis erstellen
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* AV-Vertrag Statusbereich */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {/* Schule AVV */}
-                      {/* School AVV */}
-                      <div style={{ 
-                        background: isAvvSigned ? '#e6f4ea' : '#fef2f2', 
-                        border: isAvvSigned ? '1px solid #a7f3d0' : '1px solid #fca5a5', 
-                        borderRadius: '16px', 
-                        padding: '16px', 
-                        display: 'flex', 
-                        alignItems: 'flex-start', 
-                        gap: '12px',
-                        fontSize: '0.76rem',
-                        color: isAvvSigned ? '#34a853' : '#dc2626',
-                        lineHeight: '1.45'
-                      }}>
-                        <FileText size={20} style={{ color: isAvvSigned ? '#34a853' : '#dc2626', flexShrink: 0, marginTop: '2px' }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: isAvvSigned ? '#34a853' : '#991b1b' }}>AV-Vertrag mit Campus-Groovelab (Schul-Vereinbarung)</strong>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <span style={{ 
-                                fontSize: '0.62rem', 
-                                fontWeight: 900, 
-                                background: isAvvSigned ? '#d1fae5' : '#fee2e2', 
-                                border: isAvvSigned ? '1px solid #a7f3d0' : '1px solid #fecaca', 
-                                color: isAvvSigned ? '#065f46' : '#dc2626', 
-                                padding: '3px 8px', 
-                                borderRadius: '100px', 
-                                textTransform: 'uppercase' 
-                              }}>
-                                {isAvvSigned ? 'Gezeichnet' : 'Ausstehend'}
-                              </span>
-                              {!isAvvSigned && (
-                                <button
-                                  onClick={() => setShowPilotAgreementModalFromDashboard(true)}
-                                  style={{
-                                    fontSize: '0.62rem', 
-                                    fontWeight: 900, 
-                                    background: '#dc2626', 
-                                    border: 'none', 
-                                    color: '#ffffff', 
-                                    padding: '3.5px 10px', 
-                                    borderRadius: '100px', 
-                                    textTransform: 'uppercase',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 4px rgba(220, 38, 38, 0.15)'
-                                  }}
-                                >
-                                  Jetzt unterzeichnen
-                                </button>
-                              )}
-                            </div>
+                          {/* List of current calendars */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                            {calendarUrls.length === 0 ? (
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', padding: '10px 14px', background: '#ffffff', borderRadius: '10px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
+                                Keine externen Kalender abonniert.
+                              </div>
+                            ) : (
+                              calendarUrls.map((urlItem, idx) => (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ffffff', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '10px' }}>
+                                  <span style={{ fontSize: '0.74rem', color: '#0f172a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                                    {urlItem}
+                                  </span>
+                                  <button
+                                    onClick={() => handleRemoveCalendarUrl(idx)}
+                                    style={{
+                                      border: 'none',
+                                      background: 'transparent',
+                                      color: '#ef4444',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      padding: '4px 8px',
+                                      borderRadius: '6px',
+                                      transition: 'all 0.15s'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.background = '#fef2f2'}
+                                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    Entfernen
+                                  </button>
+                                </div>
+                              ))
+                            )}
                           </div>
-                          <span style={{ display: 'block', marginTop: '4px', color: isAvvSigned ? '#34a853' : '#7f1d1d' }}>
-                            {isAvvSigned 
-                              ? 'Der AVV nach Art. 28 DSGVO zwischen deiner Musikschule und Campus-Groovelab wurde rechtsgültig gezeichnet.' 
-                              : 'Der AVV nach Art. 28 DSGVO zwischen deiner Musikschule und Campus-Groovelab steht zur digitalen Signatur bereit.'}
-                          </span>
-                        </div>
-                      </div>
 
-                      {/* Hoster AVV */}
-                      <div style={{ 
-                        background: '#e6f4ea', 
-                        border: '1px solid #a7f3d0', 
-                        borderRadius: '16px', 
-                        padding: '16px', 
-                        display: 'flex', 
-                        alignItems: 'flex-start', 
-                        gap: '12px',
-                        fontSize: '0.76rem',
-                        color: '#34a853',
-                        lineHeight: '1.45'
-                      }}>
-                        <ShieldCheck size={20} style={{ color: '#34a853', flexShrink: 0, marginTop: '2px' }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#34a853' }}>AV-Vertrag mit Hoster (Hetzner Online GmbH)</strong>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#d1fae5', border: '1px solid #a7f3d0', color: '#065f46', padding: '3px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>Gezeichnet</span>
-                          </div>
-                          <span style={{ display: 'block', marginTop: '4px' }}>
-                            Der übergeordnete Infrastruktur-AVV für das Hosten personenbezogener Daten in deutschen Rechenzentren der Hetzner Online GmbH wurde am 15.07.2026 von Campus-Groovelab rechtsgültig gezeichnet.
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Eltern-Infoblatt Vorlage */}
-                      <div style={{ 
-                        background: '#fefce8', 
-                        border: '1px solid #fef08a', 
-                        borderRadius: '16px', 
-                        padding: '16px', 
-                        display: 'flex', 
-                        alignItems: 'flex-start', 
-                        gap: '12px',
-                        fontSize: '0.76rem',
-                        color: '#854d0e',
-                        lineHeight: '1.45'
-                      }}>
-                        <FileText size={20} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#854d0e' }}>Eltern-Information & Einwilligung (Vorlage)</strong>
-                            <button 
-                              onClick={() => {
-                                const isGrooveOnly = !hasCampusSub && hasGroovelabSub;
-                                const isCampusOnly = hasCampusSub && !hasGroovelabSub;
-                                
-                                let appName = 'Campus-Groovelab';
-                                let subjectPhrase = 'Instrumental- und Groovelab-Unterrichts';
-                                if (isGrooveOnly) {
-                                  appName = 'GrooveLab';
-                                  subjectPhrase = 'Groovelab-Unterrichts';
-                                } else if (isCampusOnly) {
-                                  appName = 'Campus';
-                                  subjectPhrase = 'Instrumentalunterrichts';
-                                }
-
-                                const filename = isGrooveOnly 
-                                  ? 'Eltern_Information_Einwilligung_Groovelab.txt' 
-                                  : isCampusOnly
-                                    ? 'Eltern_Information_Einwilligung_Campus.txt'
-                                    : 'Eltern_Information_Einwilligung_Campus_Groovelab.txt';
-
-                                const costPhrase = isGrooveOnly || studentBillingOption === 'school_covered' || !studentBillingOption
-                                  ? '- Die Nutzung der App ist für Sie und Ihr Kind vollständig kostenlos (die Gebühren trägt die Musikschule).'
-                                  : studentBillingOption === 'student_full'
-                                    ? '- Die Nutzung der App erfolgt als transparenter Jahresbeitrag von 5,88 € für das gesamte Schuljahr (entspricht 0,49 € / Monat; Einmalzahlung, keine automatische Verlängerung).'
-                                    : '- Die Musikschule bezuschusst das Profil; für Sie fällt ein reduzierter Jahresbeitrag von 4,80 € für das gesamte Schuljahr an (entspricht 0,40 € / Monat; Einmalzahlung, keine automatische Verlängerung).';
-
-                                const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR NUTZUNG DER APP ${appName.toUpperCase()}\n\nSehr geehrte Eltern, liebe Erziehungsberechtigte,\n\nim Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).\n\nDATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:\n${costPhrase}\n- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.\n- Zur Identifizierung wird lediglich ein Profil mit dem Vornamen sowie dem ersten Buchstaben des Nachnamens (z. B. „Jonas M.“) angelegt.\n- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH & Supabase EU) statt.\n- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.\n\nMit der Nutzung der App willigen Sie ein, dass wir ein anonymisiertes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.\n\nVielen Dank für Ihre Unterstützung!`;
-                                const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = filename;
-                                document.body.appendChild(a);
-                                a.click();
-                                document.body.removeChild(a);
-                              }}
-                              style={{ 
-                                fontSize: '0.62rem', 
-                                fontWeight: 900, 
-                                background: '#fef08a', 
-                                border: '1px solid #ca8a04', 
-                                color: '#854d0e', 
-                                padding: '3px 8px', 
-                                borderRadius: '100px', 
-                                textTransform: 'uppercase',
-                                cursor: 'pointer'
+                          {/* Add new calendar URL form */}
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                            <input
+                              type="url"
+                              placeholder="https://example.com/calendar.ics"
+                              value={newCalendarUrlInput}
+                              onChange={(e) => setNewCalendarUrlInput(e.target.value)}
+                              style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                            />
+                            <button
+                              onClick={handleAddCalendarUrl}
+                              style={{
+                                padding: '10px 18px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                borderRadius: '10px',
+                                border: 'none',
+                                background: '#ea4335',
+                                color: '#ffffff',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 6px rgba(234, 67, 53, 0.1)'
                               }}
                             >
-                              Herunterladen
+                              Hinzufügen
                             </button>
                           </div>
-                          <span style={{ display: 'block', marginTop: '4px' }}>
-                            Lade dir hier die rechtssichere Eltern-Informationsvorlage und Einverständniserklärung zur Verteilung an deine Schüler herunter.
-                          </span>
                         </div>
                       </div>
-                    </div>
+                    )}
 
-                    {/* Audit Log Retention */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.84rem', color: '#1e293b', display: 'block' }}>Vorhaltezeit des Änderungsprotokolls</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Verlaufsprotokolle (Audit Logs) nach X Tagen automatisch löschen.</span>
+                    {activeSecretarySettingsModal === 'security_privacy' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* Kiosk-PIN settings */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
+                          <div>
+                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Kiosk PIN-Länge</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px', lineHeight: '1.3' }}>
+                              Wählen Sie die erforderliche Länge des persönlichen Login-PINs für das Kiosk-System.
+                            </span>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {[4, 6].map((num) => (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={() => setKioskPinLength(num)}
+                                  style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '8px',
+                                    border: '1.5px solid',
+                                    borderColor: kioskPinLength === num ? '#ea4335' : '#cbd5e1',
+                                    background: kioskPinLength === num ? '#fce8e6' : '#ffffff',
+                                    color: kioskPinLength === num ? '#ea4335' : '#475569',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  {num} Ziffern
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Master Bypass-PIN</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px', lineHeight: '1.3' }}>
+                              Ein universeller PIN zum Freischalten von Kiosk-Stationen bei Offline-Betrieb.
+                            </span>
+                            <input
+                              type="password"
+                              value={bypassPin}
+                              onChange={(e) => setBypassPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.84rem', letterSpacing: '0.3em', width: '120px', textAlign: 'center', background: '#ffffff' }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Städtischer DSB-Prüfausweis & Audit-Portal (Art. 38 DSGVO) */}
+                        <div style={{
+                          background: 'linear-gradient(135deg, #ffffff 0%, #f4fbf7 100%)',
+                          border: '1.5px solid #a7f3d0',
+                          borderRadius: '20px',
+                          padding: '20px',
+                          color: '#0f172a',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '16px',
+                          boxShadow: '0 4px 20px rgba(52, 168, 83, 0.08)'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                            <div style={{
+                              width: '44px',
+                              height: '44px',
+                              borderRadius: '12px',
+                              background: '#34a853',
+                              border: '1.5px solid #34a853',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ffffff',
+                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                            }}>
+                              <ShieldCheck size={24} />
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
+                                  🪪 DSB-Prüfausweis (Art. 38 DSGVO)
+                                </h4>
+                                <span style={{ background: '#e6f4ea', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '100px', fontSize: '0.65rem', fontWeight: 800 }}>
+                                  E-Mail-Frei
+                                </span>
+                              </div>
+                              <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#475569', fontWeight: 500 }}>
+                                Offizieller QR-Prüfausweis für den städtischen Datenschutzbeauftragten.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button
+                              type="button"
+                              onClick={() => setShowDpoPortalModal(true)}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid #cbd5e1',
+                                color: '#334155',
+                                padding: '8px 14px',
+                                borderRadius: '10px',
+                                fontWeight: 750,
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                              className="hover-scale"
+                            >
+                              <Eye size={14} /> Audit-Portal
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowDpoIdCardModal(true)}
+                              style={{
+                                background: '#34a853',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '10px',
+                                fontWeight: 800,
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <Printer size={14} /> DSB-Ausweis drucken
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* AV-Vertrag Statusbereich */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div style={{ 
+                            background: isAvvSigned ? '#e6f4ea' : '#fef2f2', 
+                            border: isAvvSigned ? '1px solid #a7f3d0' : '1px solid #fca5a5', 
+                            borderRadius: '16px', 
+                            padding: '16px', 
+                            display: 'flex', 
+                            alignItems: 'flex-start', 
+                            gap: '12px',
+                            fontSize: '0.76rem',
+                            color: isAvvSigned ? '#34a853' : '#dc2626',
+                            lineHeight: '1.45'
+                          }}>
+                            <FileText size={20} style={{ color: isAvvSigned ? '#34a853' : '#dc2626', flexShrink: 0, marginTop: '2px' }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: isAvvSigned ? '#34a853' : '#991b1b' }}>AV-Vertrag mit Campus-Groovelab (Schul-Vereinbarung)</strong>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <span style={{ 
+                                    fontSize: '0.62rem', 
+                                    fontWeight: 900, 
+                                    background: isAvvSigned ? '#d1fae5' : '#fee2e2', 
+                                    border: isAvvSigned ? '1px solid #a7f3d0' : '1px solid #fecaca', 
+                                    color: isAvvSigned ? '#065f46' : '#dc2626', 
+                                    padding: '3px 8px', 
+                                    borderRadius: '100px', 
+                                    textTransform: 'uppercase' 
+                                  }}>
+                                    {isAvvSigned ? 'Gezeichnet' : 'Ausstehend'}
+                                  </span>
+                                  {!isAvvSigned && (
+                                    <button
+                                      onClick={() => setShowPilotAgreementModalFromDashboard(true)}
+                                      style={{
+                                        fontSize: '0.62rem', 
+                                        fontWeight: 900, 
+                                        background: '#dc2626', 
+                                        border: 'none', 
+                                        color: '#ffffff', 
+                                        padding: '3.5px 10px', 
+                                        borderRadius: '100px', 
+                                        textTransform: 'uppercase',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.15)'
+                                      }}
+                                    >
+                                      Jetzt unterzeichnen
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <span style={{ display: 'block', marginTop: '4px', color: isAvvSigned ? '#34a853' : '#7f1d1d' }}>
+                                {isAvvSigned 
+                                  ? 'Der AVV nach Art. 28 DSGVO zwischen deiner Musikschule und Campus-Groovelab wurde rechtsgültig gezeichnet.' 
+                                  : 'Der AVV nach Art. 28 DSGVO zwischen deiner Musikschule und Campus-Groovelab steht zur digitalen Signatur bereit.'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Eltern-Infoblatt Vorlage */}
+                          <div style={{ 
+                            background: '#fefce8', 
+                            border: '1px solid #fef08a', 
+                            borderRadius: '16px', 
+                            padding: '16px', 
+                            display: 'flex', 
+                            alignItems: 'flex-start', 
+                            gap: '12px',
+                            fontSize: '0.76rem',
+                            color: '#854d0e',
+                            lineHeight: '1.45'
+                          }}>
+                            <FileText size={20} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#854d0e' }}>Eltern-Information &amp; Einwilligung (Vorlage)</strong>
+                                <button 
+                                  onClick={() => {
+                                    const isGrooveOnly = !hasCampusSub && hasGroovelabSub;
+                                    const isCampusOnly = hasCampusSub && !hasGroovelabSub;
+                                    
+                                    let appName = 'Campus-Groovelab';
+                                    let subjectPhrase = 'Instrumental- und Groovelab-Unterrichts';
+                                    if (isGrooveOnly) {
+                                      appName = 'GrooveLab';
+                                      subjectPhrase = 'Groovelab-Unterrichts';
+                                    } else if (isCampusOnly) {
+                                      appName = 'Campus';
+                                      subjectPhrase = 'Instrumentalunterrichts';
+                                    }
+
+                                    const filename = isGrooveOnly 
+                                      ? 'Eltern_Information_Einwilligung_Groovelab.txt' 
+                                      : isCampusOnly
+                                        ? 'Eltern_Information_Einwilligung_Campus.txt'
+                                        : 'Eltern_Information_Einwilligung_Campus_Groovelab.txt';
+
+                                    const costPhrase = isGrooveOnly || studentBillingOption === 'school_covered' || !studentBillingOption
+                                      ? '- Die Nutzung der App ist für Sie und Ihr Kind vollständig kostenlos (die Gebühren trägt die Musikschule).'
+                                      : studentBillingOption === 'student_full'
+                                        ? '- Die Nutzung der App erfolgt als transparenter Jahresbeitrag von 5,88 € für das gesamte Schuljahr (entspricht 0,49 € / Monat; Einmalzahlung, keine automatische Verlängerung).'
+                                        : '- Die Musikschule bezuschusst das Profil; für Sie fällt ein reduzierter Jahresbeitrag von 4,80 € für das gesamte Schuljahr an (entspricht 0,40 € / Monat; Einmalzahlung, keine automatische Verlängerung).';
+
+                                    const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR NUTZUNG DER APP ${appName.toUpperCase()}\n\nSehr geehrte Eltern, liebe Erziehungsberechtigte,\n\nim Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).\n\nDATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:\n${costPhrase}\n- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.\n- Zur Identifizierung wird lediglich ein Profil mit dem Vornamen sowie dem ersten Buchstaben des Nachnamens (z. B. „Jonas M.“) angelegt.\n- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH & Supabase EU) statt.\n- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.\n\nMit der Nutzung der App willigen Sie ein, dass wir ein anonymisiertes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.\n\nVielen Dank für Ihre Unterstützung!`;
+                                    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = filename;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                  }}
+                                  style={{ 
+                                    fontSize: '0.62rem', 
+                                    fontWeight: 900, 
+                                    background: '#fef08a', 
+                                    border: '1px solid #ca8a04', 
+                                    color: '#854d0e', 
+                                    padding: '3px 8px', 
+                                    borderRadius: '100px', 
+                                    textTransform: 'uppercase',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Herunterladen
+                                </button>
+                              </div>
+                              <span style={{ display: 'block', marginTop: '4px' }}>
+                                Lade dir hier die rechtssichere Eltern-Informationsvorlage und Einverständniserklärung zur Verteilung an deine Schüler herunter.
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Audit Log Retention */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 20px' }}>
+                          <div>
+                            <strong style={{ fontSize: '0.84rem', color: '#1e293b', display: 'block' }}>Vorhaltezeit des Änderungsprotokolls</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Verlaufsprotokolle (Audit Logs) nach X Tagen automatisch löschen.</span>
+                          </div>
+                          <select 
+                            value={logRetention} 
+                            onChange={(e) => setLogRetention(e.target.value)} 
+                            style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.8rem', fontWeight: 700 }}
+                          >
+                            <option value="30">Nach 30 Tagen</option>
+                            <option value="90">Nach 90 Tagen</option>
+                            <option value="365">Nach 1 Jahr</option>
+                            <option value="never">Nie löschen (manuell)</option>
+                          </select>
+                        </div>
                       </div>
-                      <select 
-                        value={logRetention} 
-                        onChange={(e) => setLogRetention(e.target.value)} 
-                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.8rem', fontWeight: 700 }}
-                      >
-                        <option value="30">Nach 30 Tagen</option>
-                        <option value="90">Nach 90 Tagen</option>
-                        <option value="365">Nach 1 Jahr</option>
-                        <option value="never">Nie löschen (manuell)</option>
-                      </select>
-                    </div>
-                    {/* Gefahrenbereich (Danger Zone) */}
-                    <div style={{ 
-                      marginTop: '12px',
-                      background: '#fff5f5', 
-                      border: '1.5px solid #feb2b2', 
-                      borderRadius: '16px', 
-                      padding: '20px', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: '12px' 
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <ShieldAlert size={18} style={{ color: '#e53e3e' }} />
-                        <strong style={{ fontSize: '0.88rem', color: '#c53030', fontWeight: 800 }}>Gefahrenzone: Werkseinstellungen</strong>
+                    )}
+
+                    {activeSecretarySettingsModal === 'backup' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div>
+                            <strong style={{ fontSize: '0.84rem', color: '#1e293b', display: 'block' }}>Sicherungsdatei erstellen / einspielen</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.4' }}>
+                              Lade alle Stammdaten, Benutzer, Räume, Stundenpläne und Bands deiner Musikschule als strukturierte JSON-Sicherungsdatei herunter oder spiele ein bestehendes Backup wieder ein.
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#1e293b' }}>Letztes lokales Backup</span>
+                              <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                                {lastBackupDate ? `Gesichert am ${new Date(lastBackupDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(lastBackupDate).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr` : 'Bisher kein lokales Backup erstellt.'}
+                              </span>
+                            </div>
+                            <button 
+                              onClick={handleExportBackup}
+                              disabled={isExporting}
+                              style={{ 
+                                padding: '10px 18px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
+                                border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', cursor: 'pointer', transition: 'all 0.15s',
+                                display: 'flex', alignItems: 'center', gap: '6px'
+                              }}
+                              className="hover-scale"
+                            >
+                              <Download size={14} style={{ color: '#64748b' }} /> {isExporting ? 'Exportiert...' : 'Backup herunterladen'}
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#fef2f2', border: '1px dashed #fca5a5', borderRadius: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginRight: '16px' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#991b1b' }}>Daten aus Backup wiederherstellen</span>
+                              <span style={{ fontSize: '0.7rem', color: '#7f1d1d', marginTop: '2px', lineHeight: '1.3' }}>
+                                WICHTIG: Das Einspielen überschreibt alle aktuellen Daten dieser Schule unwiderruflich mit dem Stand des Backups.
+                              </span>
+                            </div>
+                            <div>
+                              <input
+                                type="file"
+                                id="restore-file-input"
+                                accept=".json"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    handleRestoreBackup(file);
+                                  }
+                                }}
+                                style={{ display: 'none' }}
+                              />
+                              <button 
+                                onClick={() => document.getElementById('restore-file-input')?.click()}
+                                disabled={isRestoring}
+                                style={{ 
+                                  padding: '10px 18px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
+                                  border: 'none', background: '#ea4335', color: '#ffffff', cursor: 'pointer', transition: 'all 0.15s',
+                                  display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 6px rgba(234, 67, 53, 0.15)'
+                                }}
+                                className="hover-scale"
+                              >
+                                <Upload size={14} style={{ color: '#ffffff' }} /> {isRestoring ? 'Wiederherstellung...' : 'Backup einspielen'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' }}>
-                        <span style={{ fontSize: '0.74rem', color: '#742a2a', lineHeight: '1.45', flex: 1 }}>
+                    )}
+
+                    {activeSecretarySettingsModal === 'school_year' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div>
+                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Schuljahr &amp; DSGVO Datenschutz-Bereinigung</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.35' }}>
+                              Konfiguriere den offiziellen Schuljahresbeginn für deine Verträge und lege fest, ob abgelaufene Konten vollkommen automatisch und datenschutzkonform (inkl. physischer Löschung verknüpfter Audio-Dateien im Supabase Storage) gelöscht werden sollen.
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Schuljahresbeginn (Tag) *</label>
+                              <select
+                                value={schoolYearStartDay}
+                                onChange={(e) => setSchoolYearStartDay(parseInt(e.target.value))}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                              >
+                                {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                  <option key={day} value={day}>{day}.</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Schuljahresbeginn (Monat) *</label>
+                              <select
+                                value={schoolYearStartMonth}
+                                onChange={(e) => setSchoolYearStartMonth(parseInt(e.target.value))}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                              >
+                                <option value={1}>Januar</option>
+                                <option value={2}>Februar</option>
+                                <option value={3}>März</option>
+                                <option value={4}>April</option>
+                                <option value={5}>Mai</option>
+                                <option value={6}>Juni</option>
+                                <option value={7}>Juli</option>
+                                <option value={8}>August</option>
+                                <option value={9}>September</option>
+                                <option value={10}>Oktober</option>
+                                <option value={11}>November</option>
+                                <option value={12}>Dezember</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={autoDeleteExpiredUsers}
+                                onChange={(e) => setAutoDeleteExpiredUsers(e.target.checked)}
+                                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#ea4335' }}
+                              />
+                              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>
+                                Abgelaufene Schüler-Zugänge automatisch löschen (Auto-Clean)
+                              </span>
+                            </label>
+                            <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '24px', display: 'block', marginTop: '-6px' }}>
+                              Inaktiviert bzw. löscht abgelaufene Profile und zugeordnete Spuren/Bands/Songs vollautomatisch nach Ablauf des Buchungszeitraums.
+                            </span>
+                          </div>
+
+                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2', padding: '12px 16px', borderRadius: '12px', border: '1px dashed #fca5a5' }}>
+                            <div style={{ textAlign: 'left' }}>
+                              <strong style={{ fontSize: '0.8rem', display: 'block', color: '#991b1b' }}>Manuelle DSGVO-Löschung</strong>
+                              <span style={{ fontSize: '0.7rem', color: '#7f1d1d', display: 'block', marginTop: '2px' }}>
+                                {students.filter((s: any) => s.contractEndsAt && new Date(s.contractEndsAt).getTime() < Date.now()).length} abgelaufene Konten gefunden.
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleDeleteExpiredStudents(false)}
+                              style={{
+                                padding: '8px 16px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                borderRadius: '10px',
+                                background: '#ea4335',
+                                color: '#ffffff',
+                                border: 'none',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 2px 4px rgba(234, 67, 53, 0.15)'
+                              }}
+                            >
+                              Jetzt bereinigen
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeSecretarySettingsModal === 'danger_zone' && (
+                      <div style={{ 
+                        background: '#fff5f5', 
+                        border: '1.5px solid #feb2b2', 
+                        borderRadius: '16px', 
+                        padding: '24px', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '16px' 
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <ShieldAlert size={22} style={{ color: '#e53e3e' }} />
+                          <strong style={{ fontSize: '0.96rem', color: '#c53030', fontWeight: 800 }}>Gefahrenzone: Werkseinstellungen</strong>
+                        </div>
+                        
+                        <span style={{ fontSize: '0.78rem', color: '#742a2a', lineHeight: '1.5' }}>
                           Setzt Ihre komplette Musikschule auf Werkseinstellungen zurück. 
                           Alle Schüler- und Lehrer-Profile, Avatare, Wochenstundenpläne, Unterrichtsstunden, gebildeten Bands und Chathistorien werden <strong>unwiderruflich gelöscht</strong>. 
                           Lediglich Ihr Administrator-Konto bleibt aktiv, sodass Sie die Schule sofort von null auf neu aufbauen können.
                         </span>
                         
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setResetConfirmText('');
-                            setShowResetModal(true);
-                          }}
-                          style={{
-                            padding: '10px 16px',
-                            background: '#e53e3e',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '10px',
-                            fontSize: '0.78rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: '0 2px 4px rgba(229, 62, 62, 0.2)'
-                          }}
-                          className="hover-scale"
-                        >
-                          Werkseinstellungen zurücksetzen
-                        </button>
-                      </div>
-                    </div>
-
-                  </div>
-                )}
-
-                {settingsTab === 'backup' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                    <div>
-                      <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Lokale Datensicherung</h3>
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Backup &amp; Wiederherstellung der Schuldaten als strukturierte JSON-Datei.</p>
-                    </div>
-
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.84rem', color: '#1e293b', display: 'block' }}>Sicherungsdatei erstellen / einspielen</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.4' }}>
-                          Lade alle Stammdaten, Benutzer, Räume, Stundenpläne und Bands deiner Musikschule als strukturierte JSON-Sicherungsdatei herunter oder spiele ein bestehendes Backup wieder ein.
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#1e293b' }}>Letztes lokales Backup</span>
-                          <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
-                            {lastBackupDate ? `Gesichert am ${new Date(lastBackupDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(lastBackupDate).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr` : 'Bisher kein lokales Backup erstellt.'}
-                          </span>
-                        </div>
-                        <button 
-                          onClick={handleExportBackup}
-                          disabled={isExporting}
-                          style={{ 
-                            padding: '10px 18px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
-                            border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', cursor: 'pointer', transition: 'all 0.15s',
-                            display: 'flex', alignItems: 'center', gap: '6px'
-                          }}
-                          className="google-btn-secondary hover-scale"
-                        >
-                          <Download size={14} style={{ color: '#64748b' }} /> {isExporting ? 'Exportiert...' : 'Backup herunterladen'}
-                        </button>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#fef2f2', border: '1px dashed #fca5a5', borderRadius: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginRight: '16px' }}>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#991b1b' }}>Daten aus Backup wiederherstellen</span>
-                          <span style={{ fontSize: '0.7rem', color: '#7f1d1d', marginTop: '2px', lineHeight: '1.3' }}>
-                            WICHTIG: Das Einspielen überschreibt alle aktuellen Daten dieser Schule unwiderruflich mit dem Stand des Backups.
-                          </span>
-                        </div>
-                        <div>
-                          <input
-                            type="file"
-                            id="restore-file-input"
-                            accept=".json"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                handleRestoreBackup(file);
-                              }
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveSecretarySettingsModal(null);
+                              setResetConfirmText('');
+                              setShowResetModal(true);
                             }}
-                            style={{ display: 'none' }}
-                          />
-                          <button 
-                            onClick={() => document.getElementById('restore-file-input')?.click()}
-                            disabled={isRestoring}
-                            style={{ 
-                              padding: '10px 18px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
-                              border: 'none', background: '#ea4335', color: '#ffffff', cursor: 'pointer', transition: 'all 0.15s',
-                              display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 6px rgba(234, 67, 53, 0.15)'
+                            style={{
+                              padding: '10px 20px',
+                              background: '#e53e3e',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '10px',
+                              fontSize: '0.82rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              boxShadow: '0 2px 6px rgba(229, 62, 62, 0.25)'
                             }}
                             className="hover-scale"
                           >
-                            <Upload size={14} style={{ color: '#ffffff' }} /> {isRestoring ? 'Wiederherstellung...' : 'Backup einspielen'}
+                            Werkseinstellungen zurücksetzen
                           </button>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
 
-            {/* PERSISTENT BOTTOM SAVE BAR */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '16px 40px',
-              borderTop: '1px solid #e2e8f0',
-              background: isSettingsDirty ? '#fef2f2' : '#f8fafc',
-              borderBottomLeftRadius: '24px',
-              borderBottomRightRadius: '24px',
-              transition: 'background-color 0.3s ease',
-              flexShrink: 0
-            }}>
-              {isSettingsDirty ? (
-                <span style={{ fontSize: '0.82rem', color: '#ea4335', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  ⚠️ Ungespeicherte Änderungen vorhanden.
-                </span>
-              ) : (
-                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  ✓ Alle Änderungen gespeichert.
-                </span>
-              )}
-              <button
-                onClick={handleSaveAllSettings}
-                disabled={!isSettingsDirty || isSavingSettings}
-                style={{
-                  padding: '10px 24px',
-                  background: isSettingsDirty ? '#ea4335' : '#cbd5e1',
-                  color: isSettingsDirty ? 'white' : '#94a3b8',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontWeight: 800,
-                  fontSize: '0.84rem',
-                  cursor: isSettingsDirty ? 'pointer' : 'default',
-                  boxShadow: isSettingsDirty ? '0 4px 12px rgba(234, 67, 53, 0.2)' : 'none',
-                  transition: 'all 0.2s',
-                  opacity: isSavingSettings ? 0.7 : 1
-                }}
-                className={isSettingsDirty ? "hover-scale" : ""}
-              >
-                {isSavingSettings ? 'Wird gespeichert...' : 'Einstellungen speichern'}
-              </button>
-            </div>
+                  {/* Modal Footer */}
+                  <div style={{
+                    padding: '16px 24px',
+                    borderTop: '1px solid #f1f5f9',
+                    background: '#f8fafc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: '10px'
+                  }}>
+                    <button
+                      onClick={() => setActiveSecretarySettingsModal(null)}
+                      style={{
+                        padding: '8px 18px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        color: '#475569',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                      className="hover-scale"
+                    >
+                      Schließen
+                    </button>
+
+                    {activeSecretarySettingsModal !== 'danger_zone' && (
+                      <button
+                        onClick={async () => {
+                          await handleSaveAllSettings();
+                          setActiveSecretarySettingsModal(null);
+                        }}
+                        disabled={!isSettingsDirty || isSavingSettings}
+                        style={{
+                          padding: '8px 20px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          background: isSettingsDirty ? '#ea4335' : '#cbd5e1',
+                          color: isSettingsDirty ? '#ffffff' : '#94a3b8',
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
+                          cursor: isSettingsDirty ? 'pointer' : 'default',
+                          boxShadow: isSettingsDirty ? '0 4px 12px rgba(234, 67, 53, 0.25)' : 'none'
+                        }}
+                        className={isSettingsDirty ? "hover-scale" : ""}
+                      >
+                        {isSavingSettings ? 'Speichern...' : 'Speichern'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {activeTab === 'secretary' && secretarySubTab === 'duties' && renderDutiesBoard()}
@@ -33926,12 +33554,12 @@ status: status,
                   <div>
                     <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
                     <p style={{ margin: 0 }}>Der Anbieter betreibt und vertreibt die mandantenfähige, cloudbasierte Software-as-a-Service (SaaS)-Plattform „Campus-Groovelab“ (bestehend aus den Modulen „Campus“ und „GrooveLab“, nachfolgend einheitlich „Software“). Die Software dient als integriertes, digitales Zusatz- und Kommunikationssystem (Add-On) für Musikschulen zur Optimierung des Lehrbetriebs.</p>
-                    <p style={{ margin: '4px 0 0 0' }}>Die Software-Lizenz selbst wird dem Kunden dauerhaft zu 100 % kostenlos und lizenzgebührenfrei zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, das Hosting sowie Service- und Supportleistungen (nachfolgend „Server- & Servicegebühren“) durch den Anbieter.</p>
+                    <p style={{ margin: '4px 0 0 0' }}>Die Software selbst wird dem Kunden dauerhaft zu 100 % kostenlos zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, das Hosting sowie Service- und Supportleistungen (nachfolgend „Server- &amp; Servicegebühren“) durch den Anbieter.</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>Souveränitäts-Versprechen:</strong> Die Bereitstellung erfolgt über zertifizierte, deutsche Server (Hetzner Online GmbH, Standort Falkenstein). Der Anbieter garantiert, dass keine außereuropäische Cloud-Infrastrukturen (wie AWS, Azure oder Google Cloud) zur Kern-Datenhaltung verwendet werden.</p>
                   </div>
 
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LEISTUNGSUMFANG & ÜBERGABEPUNKT</h4>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LEISTUNGSUMFANG &amp; ÜBERGABEPUNKT</h4>
                     <p style={{ margin: 0 }}><strong>1. Vertragsgegenstand:</strong> Gegenstand ist die Bereitstellung der Software zur Nutzung über das Internet im Wege des SaaS-Modells. Die Vergütung versteht sich als reines Infrastruktur- und Serviceentgelt. Das Verhältnis qualifiziert sich rechtlich als gemischter Miet- und Dienstleistungsvertrag (§§ 535 ff., 611 BGB).</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>2. Modulbezug:</strong> Der konkrete Leistungsumfang ist modulbezogen und beschränkt sich auf die vom Kunden jeweils separat gebuchten Systembestandteile (Modul „Campus“, Modul „GrooveLab“ oder Kombi-Paket).</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>3. Übergabepunkt:</strong> Der Übergabepunkt ist der Ausgang des Rechenzentrums. Für die Internetanbindung und Endgeräte ist der Kunde selbst verantwortlich.</p>
@@ -33939,7 +33567,7 @@ status: status,
                   </div>
 
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 2 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ & DEVICE-PAIRING</h4>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 2 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ &amp; DEVICE-PAIRING</h4>
                     <p style={{ margin: 0 }}><strong>1. QR-Code-Login:</strong> Der Zugang erfolgt passwortlos über eindeutige QR-Codes. Der Kunde verpflichtet sich, Mitarbeiter im sorgsamen Umgang mit den Codes zu schulen.</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>2. Anti-Theft Device-Pairing (PIN-Schranke):</strong> Um unbefugten Zugriff bei physischem QR-Verlust zu verhindern, fordert das System auf neuen Geräten einmalig ein schülerbezogenes Sicherheitsmerkmal (PIN) an, bevor das Endgerät registriert wird.</p>
                   </div>
@@ -33947,23 +33575,23 @@ status: status,
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
                     <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 3 DATENSCHUTZ UND GEHEIMHALTUNG (DSGVO)</h4>
                     <p style={{ margin: 0 }}><strong>1. Rollen:</strong> Der Kunde ist „Verantwortlicher“ (Art. 4 Nr. 7 DSGVO), der Anbieter ist „Auftragsverarbeiter“ (Art. 4 Nr. 8 DSGVO). Die Details regelt ein gesonderter AV-Vertrag (AVV) nach Art. 28 DSGVO.</p>
-                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Zero-Mail & Anti-CLOUD-Act:</strong> Administrative Benachrichtigungen erfolgen lokal via `mailto:` ohne externe E-Mail-Dienstleister. Da der Anbieter ein deutsches Unternehmen ohne US-Muttergesellschaft ist, besteht Schutz vor dem US-amerikanischen CLOUD Act.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Zero-Mail &amp; Anti-CLOUD-Act:</strong> Administrative Benachrichtigungen erfolgen lokal via `mailto:` ohne externe E-Mail-Dienstleister. Da der Anbieter ein deutsches Unternehmen ohne US-Muttergesellschaft ist, besteht Schutz vor dem US-amerikanischen CLOUD Act.</p>
                   </div>
 
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG & GEWÄHRLEISTUNG</h4>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG &amp; GEWÄHRLEISTUNG</h4>
                     <p style={{ margin: 0 }}><strong>1. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Vorsatz, grobe Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf vertragstypisch vorhersehbare Schäden.</p>
-                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwarelizenzierung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwareüberlassung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
                   </div>
 
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 5 SYSTEMVERFÜGBARKEIT & RATE-LIMITING</h4>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 5 SYSTEMVERFÜGBARKEIT &amp; RATE-LIMITING</h4>
                     <p style={{ margin: 0 }}><strong>1. Verfügbarkeit:</strong> Der Anbieter gewährleistet 99,0 % Systemverfügbarkeit im Jahresmittel am Übergabepunkt. Ausgenommen sind angekündigte Wartungsfenster und Ausfälle durch höhere Gewalt.</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>2. Rate-Limiting:</strong> Zum Schutz vor Cyberangriffen (DDoS, Bruteforce) blockiert das System auffällige IP-Adressen temporär. Diese Sperren dienen der Datensicherheit und stellen keinen Mangel dar.</p>
                   </div>
 
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 LIZENZGEBÜHRENFREIHEIT & NUTZUNGSRECHTE</h4>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 GEBÜHRENFREIHEIT DER SOFTWARE &amp; NUTZUNGSRECHTE</h4>
                     <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software.</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>2. Schutzrechte:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zurückzuentwickeln (Reverse Engineering) oder zu modifizieren.</p>
                   </div>
@@ -33971,7 +33599,7 @@ status: status,
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
                     <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 7 VERTRAGSLAUFZEIT, PREISE &amp; KÜNDIGUNG</h4>
                     <p style={{ margin: 0 }}><strong>1. Schuljahres-Kopplung &amp; Kündigung:</strong> Die Vertragslaufzeit für den Serverbetrieb orientiert sich am Schuljahr (Kündigungsfrist 1 Monat zum 31. August). Ohne Kündigung verlängert sich die Laufzeit automatisch um ein weiteres Schuljahr.</p>
-                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Software-Lizenz:</strong> Die Bereitstellung der Basis-Softwarelizenz von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Zusatzlizenzen und aktive Schüler-Freischaltungen.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Basis-Software:</strong> Die Bereitstellung der Basis-Software von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Bereitstellungen und aktive Schüler-Freischaltungen.</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ {masterRates.campus.toFixed(2).replace('.', ',')} € und für das Modul „GrooveLab“ {masterRates.groovelab.toFixed(2).replace('.', ',')} €. Werden beide Module gebucht, gilt der Kombi-Vorteil von {masterRates.kombi.toFixed(2).replace('.', ',')} € (Ersparnis von {(masterRates.campus + masterRates.groovelab - masterRates.kombi).toFixed(2).replace('.', ',')} €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit {masterRates.teacher.toFixed(2).replace('.', ',')} €/Monat berechnet.</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
                       <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit {masterRates.student.toFixed(2).replace('.', ',')} €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.

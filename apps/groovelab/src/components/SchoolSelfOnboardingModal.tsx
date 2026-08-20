@@ -177,7 +177,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 Campus-Groovelab Schul-Registrierung
               </h2>
               <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                Kostenfreie Basis-Software-Lizenz für Ihre Musikschule
+                Kostenfreie Basis-Software für Ihre Musikschule
               </span>
             </div>
           </div>
@@ -631,7 +631,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 }}>
                   <Shield size={18} color="#15803d" />
                   <span>
-                    <strong>100% Kostenfreie Basis-Software-Lizenz:</strong> Keine versteckten Einrichtungsgebühren. Die Freischaltung erfolgt sofort.
+                    <strong>100% Kostenfreie Software-Nutzung:</strong> Keine versteckten Einrichtungsgebühren. Die Freischaltung erfolgt sofort.
                   </span>
                 </div>
               </div>

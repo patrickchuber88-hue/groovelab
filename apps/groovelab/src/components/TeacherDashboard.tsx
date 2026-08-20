@@ -10,6 +10,7 @@ import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, getGroupTypeLabel, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
+import { LiveStageToolboxModal } from './LiveStageToolboxModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
 import { 
@@ -1283,6 +1284,7 @@ export function TeacherDashboard({
     platformTheme: activePlatform === 'campus' ? 'campus' : 'groovelab'
   });
   const [teacherSettingsTab, setTeacherSettingsTab] = useState<'fokus' | 'profile'>('fokus');
+  const [activeTeacherSettingsModal, setActiveTeacherSettingsModal] = useState<'fokus' | 'profile' | 'avatar' | 'security' | null>(null);
   const [initialSchoolData, setInitialSchoolData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [allBands, setAllBands] = useState<any[]>([]);
@@ -1765,7 +1767,7 @@ export function TeacherDashboard({
     const sourceSlot = briefingData.timeline.find((s: any) => s.scheduleId === draggedSchedId);
     if (!sourceSlot || !sourceSlot.student) return 'RED';
 
-    const studentInstrument = sourceSlot.instrument || 'Klavier';
+    const studentInstrument = sourceSlot.instrument || teacher?.instrument || 'Gitarre';
     const studentId = sourceSlot.student.id;
 
     // 1. Room Matrix Check
@@ -1789,7 +1791,7 @@ export function TeacherDashboard({
 
     if (targetConflictSlot) {
       // It's a 1:1 swap! Verify original room matrix for target student
-      const targetStudentInst = targetConflictSlot.instrument || 'Klavier';
+      const targetStudentInst = targetConflictSlot.instrument || teacher?.instrument || 'Gitarre';
       const originalRoomId = sourceSlot.roomId;
       const originalRoom = rooms.find(r => r.id === originalRoomId);
       if (originalRoom && originalRoom.allowed_instruments && originalRoom.allowed_instruments.length > 0) {
@@ -2929,7 +2931,10 @@ export function TeacherDashboard({
           if (item.scheduleId && String(t.scheduleId) === String(item.scheduleId)) return true;
           if (item.id && (String(t.id) === String(item.id) || String(t.scheduleId) === String(item.id))) return true;
           if (itemStudentId && t.student?.id && String(t.student.id) === String(itemStudentId)) return true;
-          if (itemStudentFirstName && itemStudentFirstName !== 'schüler' && itemStudentFirstName !== 'unterricht' && t.student?.name && t.student.name.toLowerCase().includes(itemStudentFirstName)) return true;
+          if (itemStudentFirstName && itemStudentFirstName !== 'schüler' && itemStudentFirstName !== 'unterricht') {
+            const tFn = (t.student?.first_name || t.student?.name?.split(' ')[0] || '').toLowerCase().trim();
+            if (tFn && tFn === itemStudentFirstName) return true;
+          }
           return false;
         });
       };
@@ -2948,7 +2953,8 @@ export function TeacherDashboard({
             ...updatedTimeline[existingIdx],
             timeSlot: formattedItemTime,
             status: item.status || 'scheduled',
-            room: item.roomName || item.room || updatedTimeline[existingIdx].room,
+            room: item.roomName || item.room || updatedTimeline[existingIdx].room || 'Raum 4',
+            instrument: item.instrument || updatedTimeline[existingIdx].instrument || teacher?.instrument || 'Gitarre',
             student_acknowledged: item.student_acknowledged ?? item.studentAcknowledged ?? false,
             is_room_booking: Boolean(item.is_room_booking || item.isRoomBooking || item.room_override_id || item.roomOverrideId || item.is_room_changed || item.isRoomChanged || isFromMyBookings),
             isRescheduledPending: isPendingResched
@@ -2961,8 +2967,8 @@ export function TeacherDashboard({
             timeSlot: formattedItemTime,
             duration: item.duration || 45,
             status: item.status || 'scheduled',
-            room: item.roomName || item.room || 'Hauptraum',
-            instrument: item.instrument || 'Klavier',
+            room: item.roomName || item.room || 'Raum 4',
+            instrument: item.instrument || teacher?.instrument || 'Gitarre',
             student_acknowledged: item.student_acknowledged ?? item.studentAcknowledged ?? false,
             is_room_booking: Boolean(item.is_room_booking || item.isRoomBooking || item.room_override_id || item.roomOverrideId || item.is_room_changed || item.isRoomChanged || isFromMyBookings),
             isRescheduledPending: isPendingResched,
@@ -3042,14 +3048,58 @@ export function TeacherDashboard({
     return today.getDate() === birthDay && today.getMonth() === birthMonth;
   };
 
-  const activeLessonsCount = briefingData?.timeline 
-    ? briefingData.timeline.filter((s: any) => s.student && s.status !== 'canceled_by_student' && s.status !== 'teacher_sick' && s.status !== 'cancelled' && s.status !== 'canceled_by_teacher_sick' && s.status !== 'rescheduled_away').length 
-    : 0;
+  const { activeLessonsCount, totalActiveStudentsToday } = useMemo(() => {
+    if (!briefingData?.timeline) return { activeLessonsCount: 0, totalActiveStudentsToday: 0 };
+    
+    // Group timeline items by timeSlot to get distinct teaching units (UE)
+    const uniqueSlotsMap = new Map<string, any[]>();
+    briefingData.timeline.forEach((s: any) => {
+      if (
+        (s.student || s.students) &&
+        !s.is_room_booking &&
+        !s.isRoomBooking &&
+        s.status !== 'canceled_by_student' &&
+        s.status !== 'teacher_sick' &&
+        s.status !== 'cancelled' &&
+        s.status !== 'canceled_by_teacher_sick' &&
+        s.status !== 'rescheduled_away'
+      ) {
+        const timeKey = s.timeSlot || s.id;
+        if (!uniqueSlotsMap.has(timeKey)) {
+          uniqueSlotsMap.set(timeKey, []);
+        }
+        uniqueSlotsMap.get(timeKey)!.push(s);
+      }
+    });
+
+    const ueCount = uniqueSlotsMap.size;
+    let studentsCount = 0;
+    uniqueSlotsMap.forEach((slots) => {
+      const studentIds = new Set<string>();
+      slots.forEach((slot: any) => {
+        if (slot.students && Array.isArray(slot.students)) {
+          slot.students.forEach((st: any) => {
+            if (st.id) studentIds.add(st.id);
+            else if (st.name) studentIds.add(st.name);
+          });
+        } else if (slot.student?.id) {
+          studentIds.add(slot.student.id);
+        } else if (slot.student?.name) {
+          studentIds.add(slot.student.name);
+        }
+      });
+      studentsCount += Math.max(1, studentIds.size);
+    });
+
+    return { activeLessonsCount: ueCount, totalActiveStudentsToday: studentsCount };
+  }, [briefingData?.timeline]);
 
   const avgStreak = useMemo(() => {
     if (!briefingData?.timeline) return '0.0';
     const activeTimelineStudents = briefingData.timeline.filter((s: any) => 
-      s.student && 
+      (s.student || s.students) && 
+      !s.is_room_booking &&
+      !s.isRoomBooking &&
       s.status !== 'canceled_by_student' && 
       s.status !== 'teacher_sick' && 
       s.status !== 'cancelled' && 
@@ -3061,20 +3111,49 @@ export function TeacherDashboard({
     return (totalStreak / activeTimelineStudents.length).toFixed(1);
   }, [briefingData?.timeline]);
 
-  const workloadMinutes = briefingData?.timeline
-    ? briefingData.timeline
-        .filter((s: any) => s.status !== 'rescheduled_away')
-        .reduce((acc: number, s: any) => acc + (s.duration || 30), 0)
-    : 0;
+  const workloadMinutes = useMemo(() => {
+    if (!briefingData?.timeline) return 0;
+    // Calculate total minutes of teaching for unique time slots (excluding room bookings and cancellations)
+    const countedTimeSlots = new Set<string>();
+    let totalMins = 0;
+    briefingData.timeline.forEach((s: any) => {
+      if (
+        (s.student || s.students) &&
+        !s.is_room_booking &&
+        !s.isRoomBooking &&
+        s.status !== 'canceled_by_student' &&
+        s.status !== 'teacher_sick' &&
+        s.status !== 'cancelled' &&
+        s.status !== 'canceled_by_teacher_sick' &&
+        s.status !== 'rescheduled_away'
+      ) {
+        const timeKey = s.timeSlot || s.id;
+        if (!countedTimeSlots.has(timeKey)) {
+          countedTimeSlots.add(timeKey);
+          totalMins += (s.duration || 30);
+        }
+      }
+    });
+    return totalMins;
+  }, [briefingData?.timeline]);
+
   const workloadHours = Math.floor(workloadMinutes / 60);
   const workloadRemainingMinutes = workloadMinutes % 60;
   const workloadHoursStr = workloadRemainingMinutes > 0 
     ? `${workloadHours}h ${workloadRemainingMinutes}m` 
     : `${workloadHours}h`;
 
-  const cancellationsCount = briefingData?.timeline 
-    ? briefingData.timeline.filter((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick').length 
-    : 0;
+  const cancellationsCount = useMemo(() => {
+    if (!briefingData?.timeline) return 0;
+    return briefingData.timeline.filter((s: any) => 
+      s.status === 'canceled_by_student' || 
+      s.status === 'teacher_sick' || 
+      s.status === 'cancelled' || 
+      s.status === 'canceled_by_teacher_sick' ||
+      s.status === 'rescheduled_away' ||
+      s.isRescheduledPending
+    ).length;
+  }, [briefingData?.timeline]);
 
 
   // New Right Sidebar Sickness & Administrative feedback states
@@ -3128,6 +3207,25 @@ export function TeacherDashboard({
   const [planningEvents, setPlanningEvents] = useState<any[]>([]);
   const [mySubmittedProgramPoints, setMySubmittedProgramPoints] = useState<any[]>([]);
   const [dismissedBanners, setDismissedBanners] = useState<Record<string, boolean>>({});
+
+  // Collapsible Right Sidebar State for Teacher Briefing Dashboard (Default: Collapsed)
+  const [isTeacherBriefingSidebarCollapsed, setIsTeacherBriefingSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('campus_teacher_briefing_sidebar_collapsed');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const handleToggleTeacherBriefingSidebar = async (collapsed: boolean) => {
+    setIsTeacherBriefingSidebarCollapsed(collapsed);
+    localStorage.setItem('campus_teacher_briefing_sidebar_collapsed', String(collapsed));
+    try {
+      if (userId) {
+        await supabase.from('users').update({ briefing_sidebar_collapsed: collapsed }).eq('id', userId);
+      }
+    } catch (e) {
+      console.warn('Could not persist briefing_sidebar_collapsed to users table:', e);
+    }
+  };
 
   const lastSickUntilRef = useRef<string | undefined>(undefined);
   const activeTimelineSlotRef = useRef<HTMLDivElement | null>(null);
@@ -3833,31 +3931,57 @@ export function TeacherDashboard({
     };
   }, [dailyBriefingStableChoices, currentTimeStr]);
 
-  const activeStudent = useMemo(() => {
+  // Stage Toolbox & Group selection states
+  const [showStageToolbox, setShowStageToolbox] = useState<'tuner' | 'metronome' | null>(null);
+  const [selectedGroupStudentId, setSelectedGroupStudentId] = useState<string | null>(null);
+
+  const activeTimelineSlot = useMemo(() => {
     if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
     
     // 1. Try to find slot that is currently active by time
-    const activeSlot = briefingData.timeline.find((slot: any, idx: number) => {
+    const activeSlot = briefingData.timeline.find((slot: any) => {
       const slotStart = slot.timeSlot;
       const slotEnd = (() => {
-        const [sh, sm] = slotStart.split(':').map(Number);
-        const totalMin = sh * 60 + sm + 30;
+        const [sh, sm] = (slotStart || '00:00').split(':').map(Number);
+        const totalMin = sh * 60 + sm + (slot.duration || 30);
         return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
       })();
-      return currentTimeStr >= slotStart && currentTimeStr < slotEnd && slot.student;
+      return currentTimeStr >= slotStart && currentTimeStr < slotEnd && (slot.student || (slot.students && slot.students.length > 0)) && !slot.is_room_booking && !slot.isRoomBooking;
     });
-    if (activeSlot?.student) return activeSlot.student;
+    if (activeSlot) return activeSlot;
 
     // 2. Fallback to first upcoming student
     const upcomingSlot = briefingData.timeline.find((slot: any) => {
-      return currentTimeStr < slot.timeSlot && slot.student;
+      return currentTimeStr < (slot.timeSlot || '') && (slot.student || (slot.students && slot.students.length > 0)) && !slot.is_room_booking && !slot.isRoomBooking;
     });
-    if (upcomingSlot?.student) return upcomingSlot.student;
+    if (upcomingSlot) return upcomingSlot;
 
     // 3. Fallback to first student of the day
-    const firstStudentSlot = briefingData.timeline.find((slot: any) => slot.student);
-    return firstStudentSlot?.student || null;
+    const firstStudentSlot = briefingData.timeline.find((slot: any) => (slot.student || (slot.students && slot.students.length > 0)) && !slot.is_room_booking && !slot.isRoomBooking);
+    return firstStudentSlot || null;
   }, [briefingData?.timeline, currentTimeStr]);
+
+  const activeGroupStudents = useMemo(() => {
+    if (!activeTimelineSlot) return [];
+    if (activeTimelineSlot.students && activeTimelineSlot.students.length > 0) {
+      return splitAndNormalizeStudents(activeTimelineSlot.students, allStudents);
+    }
+    if (activeTimelineSlot.student) {
+      return splitAndNormalizeStudents([activeTimelineSlot.student], allStudents);
+    }
+    return [];
+  }, [activeTimelineSlot, allStudents]);
+
+  const activeStudent = useMemo(() => {
+    if (activeGroupStudents.length > 0) {
+      if (selectedGroupStudentId && selectedGroupStudentId !== 'both') {
+        const found = activeGroupStudents.find((s: any) => s.id === selectedGroupStudentId);
+        if (found) return found;
+      }
+      return activeGroupStudents[0];
+    }
+    return activeTimelineSlot?.student || null;
+  }, [activeGroupStudents, selectedGroupStudentId, activeTimelineSlot]);
 
   const [dynamicPrepMirror, setDynamicPrepMirror] = useState<any>(null);
   const [loadingPrepMirror, setLoadingPrepMirror] = useState<boolean>(false);
@@ -3968,10 +4092,14 @@ export function TeacherDashboard({
 
         const prevWeekNotes = prevWeekNotesItem ? parseHomeworkNotes(prevWeekNotesItem.homework_notes) : [];
 
+        const rawStudentName = activeStudent.first_name 
+          ? `${activeStudent.first_name} ${maskLastName(activeStudent.last_name, showRealNames)}`.trim()
+          : (activeStudent.name || 'Schüler');
+
         setDynamicPrepMirror({
           studentId,
-          studentName: activeStudent.name,
-          timeSlot: briefingData.timeline.find((s: any) => s.student?.id === studentId)?.timeSlot || '',
+          studentName: rawStudentName,
+          timeSlot: activeTimelineSlot?.timeSlot || briefingData?.timeline?.find((s: any) => s.student?.id === studentId)?.timeSlot || '',
           streakCount: studentAvatar?.streak_flame || 0,
           evolutionLevel: studentAvatar?.evolution_level || 1,
           verifiedSongs,
@@ -3996,7 +4124,7 @@ export function TeacherDashboard({
     };
 
     loadPrepForStudent();
-  }, [activeStudent?.id, briefingData?.timeline]);
+  }, [activeStudent?.id, briefingData?.timeline, activeTimelineSlot?.timeSlot, showRealNames]);
 
   useEffect(() => {
     const loadBriefing = async () => {
@@ -4032,40 +4160,45 @@ export function TeacherDashboard({
            const dayNamesMap: Record<number, string> = { 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday' };
            const dayNameStr = dayNamesMap[todayWeekday] || 'Monday';
 
-           const { data: allTeacherSlots } = await supabase
-            .from('schedules')
-            .select(`
-              id,
-              time_slot,
-              duration,
-              status,
-              day_of_week,
-              instrument,
-              rooms (id, name),
-              student:users!schedules_student_id_fkey (
-                id,
-                first_name,
-                last_name,
-                is_app_user,
-                instrument,
-                birth_date,
-                avatars (avatar_style, evolution_level, xp, streak_flame)
-              )
-            `)
-            .eq('teacher_id', userId)
-            .eq('school_id', teacherProfile.school_id)
-            .in('status', ['opened', 'approved', 'published']);
+           const { data: dbRooms } = await supabase
+             .from('rooms')
+             .select('id, name')
+             .eq('school_id', teacherProfile.school_id);
+           const allRooms = dbRooms || rooms || [];
 
-           const slots = (allTeacherSlots || []).filter((s: any) => {
-             return s.day_of_week === todayWeekday || 
-                    s.day_of_week === dayNameStr || 
-                    String(s.day_of_week) === String(todayWeekday) ||
-                    String(s.day_of_week) === dayNameStr;
-           });
+           const slots: any[] = [];
+           const todayStr = simDateStr;
 
-           // Fallback to teacher planned_boards if DB schedules are empty
-           if (slots.length === 0) {
-             try {
+           // 1. Primary Master Blueprint: Load teacher planned_boards (matching ScheduleBoardDesktop.tsx)
+           try {
+             let loadedDrafts: any[] = [];
+             let loadedActiveDraftId = 'default';
+             let loadedSubmittedDraftId = '';
+
+             const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${userId}`) || localStorage.getItem(`groovelab_teacher_draft_state_campus_${userId}`);
+             const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${userId}`) || localStorage.getItem(`groovelab_teacher_boards_${userId}`);
+
+             if (storedDraftState) {
+               try {
+                 const parsed = JSON.parse(storedDraftState);
+                 if (parsed && parsed.drafts) {
+                   loadedDrafts = parsed.drafts;
+                   loadedActiveDraftId = parsed.activeDraftId || 'default';
+                   loadedSubmittedDraftId = parsed.submittedDraftId || '';
+                 }
+               } catch (e) {}
+             }
+
+             if (loadedDrafts.length === 0 && storedBoardsState) {
+               try {
+                 const parsed = JSON.parse(storedBoardsState);
+                 if (Array.isArray(parsed) && parsed.length > 0) {
+                   loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: parsed }];
+                 }
+               } catch (e) {}
+             }
+
+             if (loadedDrafts.length === 0) {
                const { data: tUser } = await supabase
                  .from('users')
                  .select('planned_boards')
@@ -4074,272 +4207,357 @@ export function TeacherDashboard({
 
                if (tUser && tUser.planned_boards) {
                  const pb = typeof tUser.planned_boards === 'string' ? JSON.parse(tUser.planned_boards) : tUser.planned_boards;
-                 let boards: any[] = [];
                  if (pb && typeof pb === 'object' && !Array.isArray(pb) && Array.isArray(pb.drafts)) {
-                   const targetDraftId = pb.submittedDraftId || pb.activeDraftId;
-                   const targetDraft = pb.drafts.find((d: any) => d.id === targetDraftId) || pb.drafts[0];
-                   if (targetDraft && Array.isArray(targetDraft.boards)) {
-                     boards = targetDraft.boards;
-                   }
+                   loadedDrafts = pb.drafts;
+                   loadedActiveDraftId = pb.activeDraftId || 'default';
+                   loadedSubmittedDraftId = pb.submittedDraftId || '';
                  } else if (Array.isArray(pb)) {
-                   boards = pb;
+                   loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: pb }];
                  } else if (pb && typeof pb === 'object') {
-                   boards = Object.values(pb);
-                 }
-
-                 const germanDaysMap: Record<number, string> = { 1: 'Montag', 2: 'Dienstag', 3: 'Mittwoch', 4: 'Donnerstag', 5: 'Freitag', 6: 'Samstag', 7: 'Sonntag' };
-                 const germanDayStr = germanDaysMap[todayWeekday] || 'Montag';
-
-                 const todayBoards = boards.filter((b: any) => {
-                   const dayVal = b.dayOfWeek ?? b.day_of_week ?? b.day;
-                   if (dayVal === undefined || dayVal === null) return false;
-                   const dStr = String(dayVal).trim().toLowerCase();
-                   return dStr === String(todayWeekday) ||
-                          dStr === String(todayWeekday - 1) ||
-                          dStr === dayNameStr.toLowerCase() ||
-                          dStr === germanDayStr.toLowerCase() ||
-                          dStr === germanDayStr.toLowerCase().substring(0, 2);
-                 });
-
-                 for (const todayBoard of todayBoards) {
-                   if (todayBoard && Array.isArray(todayBoard.students)) {
-                     const { data: schoolStudents } = await supabase
-                       .from('users')
-                       .select('id, first_name, last_name, instrument, is_app_user, birth_date, avatars(avatar_style, evolution_level, xp, streak_flame)')
-                       .eq('school_id', teacherProfile.school_id);
-
-                     const boardStartStr = todayBoard.startTime || '14:00';
-                     const [bSh, bSm] = boardStartStr.split(':').map(Number);
-                     let currentCumulativeMin = (bSh || 14) * 60 + (bSm || 0);
-
-                     todayBoard.students.forEach((s: any) => {
-                       if (s.isBreak || !s.first_name) {
-                         if (s.isBreak) {
-                           currentCumulativeMin += (s.duration || 15);
-                         }
-                         return;
-                       }
-                       const matchedStudent = (schoolStudents || []).find((st: any) => 
-                         st.id === s.id || 
-                         (st.first_name?.trim().toLowerCase() === s.first_name?.trim().toLowerCase() && 
-                          (st.last_name || '').trim().toLowerCase() === (s.last_name || '').trim().toLowerCase())
-                       );
-
-                       let studentTime = s.customStartTime || s.assignedTime || s.startTime;
-                       if (!studentTime) {
-                         const h = Math.floor(currentCumulativeMin / 60) % 24;
-                         const m = currentCumulativeMin % 60;
-                         studentTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                       }
-                       const studentDuration = s.duration || 45;
-                       currentCumulativeMin += studentDuration;
-
-                       slots.push({
-                         id: `board-${todayBoard.id}-${s.id}`,
-                         time_slot: studentTime,
-                         duration: studentDuration,
-                         status: 'approved',
-                         day_of_week: todayWeekday,
-                         instrument: resolveStudentInstrument(matchedStudent?.instrument, s.instrument, teacherProfile?.instrument),
-                         rooms: { id: todayBoard.roomId || null, name: todayBoard.roomName || 'Hauptraum' } as any,
-                         student: (matchedStudent ? {
-                           id: matchedStudent.id,
-                           first_name: matchedStudent.first_name,
-                           last_name: matchedStudent.last_name,
-                           is_app_user: matchedStudent.is_app_user,
-                           instrument: resolveStudentInstrument(matchedStudent.instrument, null, teacherProfile?.instrument),
-                           birth_date: matchedStudent.birth_date,
-                           avatars: matchedStudent.avatars
-                         } : {
-                           id: s.id || `temp-${s.first_name}`,
-                           first_name: s.first_name,
-                           last_name: s.last_name || '',
-                           is_app_user: false,
-                           instrument: resolveStudentInstrument(s.instrument, null, teacherProfile?.instrument),
-                           birth_date: null,
-                           avatars: []
-                         }) as any
-                       });
-                     });
-                   }
+                   loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: Object.values(pb) }];
                  }
                }
-             } catch (e) {
-               console.warn('Failed to parse planned_boards for briefing fallback:', e);
              }
+
+             const activeDraft = loadedDrafts.find((d: any) => d.id === loadedSubmittedDraftId) || 
+                                 loadedDrafts.find((d: any) => d.id === loadedActiveDraftId) || 
+                                 loadedDrafts[0];
+             const boards: any[] = activeDraft ? activeDraft.boards : [];
+
+             const todayBoards = boards.filter((b: any) => {
+               const dayVal = b.dayOfWeek ?? b.day_of_week ?? b.day;
+               if (dayVal === undefined || dayVal === null) return false;
+               const dStr = String(dayVal).trim();
+               return dStr === String(todayWeekday);
+             });
+
+             if (todayBoards.length > 0) {
+               const { data: schoolStudents } = await supabase
+                 .from('users')
+                 .select('id, first_name, last_name, instrument, is_app_user, birth_date, avatars(avatar_style, evolution_level, xp, streak_flame)')
+                 .eq('school_id', teacherProfile.school_id);
+
+               for (const todayBoard of todayBoards) {
+                 if (todayBoard && Array.isArray(todayBoard.students)) {
+                   const boardRoomName = allRooms.find((r: any) => String(r.id) === String(todayBoard.roomId))?.name || todayBoard.roomName || 'Raum 4';
+                   const boardStartStr = todayBoard.startTime || '14:00';
+                   const [bSh, bSm] = boardStartStr.split(':').map(Number);
+                   let currentCumulativeMin = (bSh || 14) * 60 + (bSm || 0);
+
+                   todayBoard.students.forEach((s: any) => {
+                     if (s.isBreak || (!s.first_name && !s.name)) {
+                       if (s.isBreak) {
+                         currentCumulativeMin += (s.duration || 15);
+                       }
+                       return;
+                     }
+
+                     const sFn = (s.first_name || s.name?.split(' ')[0] || '').trim().toLowerCase();
+                     const sLn = (s.last_name || s.name?.split(' ').slice(1).join(' ') || '').trim().toLowerCase();
+
+                     const matchedStudent = (schoolStudents || []).find((st: any) => 
+                       (s.id && st.id === s.id) || 
+                       (st.first_name?.trim().toLowerCase() === sFn && (!sLn || (st.last_name || '').trim().toLowerCase().startsWith(sLn[0])))
+);
+
+                     let studentTime = s.customStartTime || s.assignedTime || s.startTime;
+                     if (!studentTime) {
+                       const h = Math.floor(currentCumulativeMin / 60) % 24;
+                       const m = currentCumulativeMin % 60;
+                       studentTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                     }
+                     const studentDuration = s.duration || (matchedStudent as any)?.duration || 30;
+                     currentCumulativeMin += studentDuration;
+
+                     const isGroup = Boolean(s.isGroup || (s.groupStudents && s.groupStudents.length > 1) || (s.first_name && s.first_name.includes('&')) || (s.name && s.name.includes('&')));
+                     const groupStudents = s.groupStudents || [];
+                     const resolvedInstrument = resolveStudentInstrument(s.instrument, matchedStudent?.instrument, teacherProfile?.instrument);
+
+                     slots.push({
+                       id: `board-${todayBoard.id}-${s.id || studentTime}`,
+                       scheduleId: s.id || `board-${todayBoard.id}-${studentTime}`,
+                       time_slot: studentTime,
+                       duration: studentDuration,
+                       status: 'approved',
+                       day_of_week: todayWeekday,
+                       instrument: resolvedInstrument,
+                       isGroup,
+                       groupStudents,
+                       roomId: todayBoard.roomId || null,
+                       room: boardRoomName,
+                       rooms: { id: todayBoard.roomId || null, name: boardRoomName } as any,
+                       student: (matchedStudent ? {
+                         id: matchedStudent.id,
+                         name: `${matchedStudent.first_name} ${maskLastName(matchedStudent.last_name, showRealNames)}`.trim(),
+                         first_name: matchedStudent.first_name,
+                         last_name: matchedStudent.last_name,
+                         is_app_user: matchedStudent.is_app_user,
+                         instrument: resolvedInstrument,
+                         birth_date: matchedStudent.birth_date,
+                         avatars: matchedStudent.avatars
+                       } : {
+                         id: s.id || `temp-${s.first_name || 'student'}`,
+                         name: `${s.first_name || s.name || 'Schüler'} ${maskLastName(s.last_name || '', showRealNames)}`.trim(),
+                         first_name: s.first_name || s.name?.split(' ')[0] || 'Schüler',
+                         last_name: s.last_name || s.name?.split(' ').slice(1).join(' ') || '',
+                         is_app_user: false,
+                         instrument: resolvedInstrument,
+                         birth_date: null,
+                         avatars: []
+                       }) as any
+                     });
+                   });
+                 }
+               }
+             }
+           } catch (e) {
+             console.warn('Failed to parse planned_boards for briefing fallback:', e);
            }
 
-          const todayStr = new Date().toLocaleDateString('sv-SE');
+           // 2. Secondary Fallback: Load from schedules table if no board slots
+           if (slots.length === 0) {
+             const dayNamesMap: Record<number, string> = { 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday' };
+             const dayNameStr = dayNamesMap[todayWeekday] || 'Monday';
 
-          // Fetch occurrences for today for fallback
-          const { data: dbOccurrences } = await supabase
-            .from('schedule_occurrences')
-            .select(`
-              id,
-              date,
-              original_date,
-              start_time,
-              status,
-              schedule_id,
-              student_id,
-              student_acknowledged,
-              schedules (
-                duration,
-                instrument,
-                rooms (id, name)
-              ),
-              student:users!schedule_occurrences_student_id_fkey (
-                id,
-                first_name,
-                last_name,
-                is_app_user,
-                instrument,
-                birth_date,
-                avatars (avatar_style, evolution_level, xp, streak_flame)
-              )
-            `)
-            .eq('teacher_id', userId)
-            .eq('school_id', teacherProfile.school_id)
-            .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
+             const { data: allTeacherSlots } = await supabase
+               .from('schedules')
+               .select(`
+                 id,
+                 time_slot,
+                 duration,
+                 status,
+                 day_of_week,
+                 instrument,
+                 rooms (id, name),
+                 student:users!schedules_student_id_fkey (
+                   id,
+                   first_name,
+                   last_name,
+                   is_app_user,
+                   instrument,
+                   birth_date,
+                   avatars (avatar_style, evolution_level, xp, streak_flame)
+                 )
+               `)
+               .eq('teacher_id', userId)
+               .eq('school_id', teacherProfile.school_id)
+               .in('status', ['opened', 'approved', 'published']);
 
-          // Also collect local occurrences from localStorage
-          const localOccursForToday: any[] = [];
-          try {
-            const pendingSaved = typeof window !== 'undefined' ? ((userId ? localStorage.getItem(`groovelab_pending_schedule_changes_${userId}`) : null) || localStorage.getItem('groovelab_pending_schedule_changes')) : null;
-            if (pendingSaved) {
-              const parsedPending = JSON.parse(pendingSaved);
-              Object.values(parsedPending).forEach((item: any) => {
-                if (item && (item.date === todayStr || item.original_date === todayStr)) {
-                  const itemTeacherId = item.teacher_id || item.teacherId;
-                  if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
-                    localOccursForToday.push(item);
-                  }
-                }
-              });
-            }
-            const latestSaved = typeof window !== 'undefined' ? (userId ? localStorage.getItem('groovelab_calendar_active_occurrences_' + userId) : null) : null;
-            if (latestSaved) {
-              const parsedLatest = JSON.parse(latestSaved);
-              if (Array.isArray(parsedLatest)) {
-                parsedLatest.forEach((item: any) => {
-                  if (item && (item.date === todayStr || item.original_date === todayStr)) {
-                    const itemTeacherId = item.teacher_id || item.teacherId;
-                    if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
-                      localOccursForToday.push(item);
-                    }
-                  }
-                });
-              }
-            }
-          } catch (e) {}
+             const dbSlots = (allTeacherSlots || []).filter((s: any) => {
+               return s.day_of_week === todayWeekday || 
+                      s.day_of_week === dayNameStr || 
+                      String(s.day_of_week) === String(todayWeekday) ||
+                      String(s.day_of_week) === dayNameStr;
+             });
 
-          const combinedOccurrences = [...(dbOccurrences || [])];
-          localOccursForToday.forEach((loc: any) => {
-            const existingIdx = combinedOccurrences.findIndex(o => String(o.id) === String(loc.id));
-            if (existingIdx >= 0) {
-              combinedOccurrences[existingIdx] = { ...combinedOccurrences[existingIdx], ...loc };
-            } else {
-              combinedOccurrences.push(loc);
-            }
-          });
+             dbSlots.forEach((slot: any) => {
+               const student = slot.student;
+               const resolvedRoom = allRooms.find((r: any) => r.id === slot.rooms?.id)?.name || slot.rooms?.name || 'Raum 4';
+               const resolvedInstrument = resolveStudentInstrument(slot.instrument, student?.instrument, teacherProfile?.instrument);
+               slots.push({
+                 id: `sched-${slot.id}-${todayStr}`,
+                 scheduleId: slot.id,
+                 time_slot: slot.time_slot,
+                 duration: slot.duration || 30,
+                 status: slot.status,
+                 day_of_week: todayWeekday,
+                 instrument: resolvedInstrument,
+                 isGroup: false,
+                 roomId: slot.rooms?.id || null,
+                 room: resolvedRoom,
+                 rooms: { id: slot.rooms?.id || null, name: resolvedRoom },
+                 student: student ? {
+                   id: student.id,
+                   name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
+                   first_name: student.first_name,
+                   last_name: student.last_name,
+                   is_app_user: student.is_app_user ?? false,
+                   instrument: resolvedInstrument,
+                   birth_date: student.birth_date,
+                   avatars: student.avatars
+                 } : null
+               });
+             });
+           }
 
-          // Format regular schedules
-          const timeline = (slots || []).map((slot: any) => {
-            const student = slot.student;
-            const avatar = student?.avatars?.[0] || null;
-            const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
+           // Fetch occurrences strictly for target date
+           const { data: dbOccurrences } = await supabase
+             .from('schedule_occurrences')
+             .select(`
+               id,
+               date,
+               original_date,
+               start_time,
+               status,
+               schedule_id,
+               student_id,
+               student_acknowledged,
+               schedules (
+                 duration,
+                 instrument,
+                 rooms (id, name)
+               ),
+               student:users!schedule_occurrences_student_id_fkey (
+                 id,
+                 first_name,
+                 last_name,
+                 is_app_user,
+                 instrument,
+                 birth_date,
+                 avatars (avatar_style, evolution_level, xp, streak_flame)
+               )
+             `)
+             .eq('teacher_id', userId)
+             .eq('school_id', teacherProfile.school_id)
+             .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
 
-            return {
-              id: `virtual-${slot.id}-${todayStr}`,
-              scheduleId: slot.id,
-              date: todayStr,
-              timeSlot: slot.time_slot,
-              duration: slot.duration,
-              status: slot.status,
-              roomId: slot.rooms?.id || null,
-              room: slot.rooms?.name || 'Hauptraum',
-              instrument: resolveStudentInstrument(slot.instrument, student?.instrument, teacherProfile?.instrument),
-              student_acknowledged: true,
-              original_date: null,
-              student: student ? {
-                id: student.id,
-                name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
-                first_name: student.first_name,
-                last_name: student.last_name,
-                isAppUser: student.is_app_user ?? false,
-                isAnalogStickerUser,
-                birthDate: student.birth_date,
-                streakFlame: avatar?.streak_flame || 0
-              } : null
-            };
-          });
+           // Also collect local occurrences from localStorage for todayStr
+           const localOccursForToday: any[] = [];
+           try {
+             const pendingSaved = typeof window !== 'undefined' ? ((userId ? localStorage.getItem(`groovelab_pending_schedule_changes_${userId}`) : null) || localStorage.getItem('groovelab_pending_schedule_changes')) : null;
+             if (pendingSaved) {
+               const parsedPending = JSON.parse(pendingSaved);
+               Object.values(parsedPending).forEach((item: any) => {
+                 if (item && (item.date === todayStr || item.original_date === todayStr)) {
+                   const itemTeacherId = item.teacher_id || item.teacherId;
+                   if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
+                     localOccursForToday.push(item);
+                   }
+                 }
+               });
+             }
+             const latestSaved = typeof window !== 'undefined' ? (userId ? localStorage.getItem('groovelab_calendar_active_occurrences_' + userId) : null) : null;
+             if (latestSaved) {
+               const parsedLatest = JSON.parse(latestSaved);
+               if (Array.isArray(parsedLatest)) {
+                 parsedLatest.forEach((item: any) => {
+                   if (item && (item.date === todayStr || item.original_date === todayStr)) {
+                     const itemTeacherId = item.teacher_id || item.teacherId;
+                     if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
+                       localOccursForToday.push(item);
+                     }
+                   }
+                 });
+               }
+             }
+           } catch (e) {}
 
-          // Merge with occurrences for today
-          if (combinedOccurrences && combinedOccurrences.length > 0) {
-            combinedOccurrences.forEach((occ: any) => {
-              const student = occ.student;
-              const avatar = student?.avatars?.[0] || null;
-              const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
-              const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : (occ.startTime ? occ.startTime.substring(0, 5) : '00:00');
-              const occStudentId = occ.student?.id || occ.student_id || occ.studentId;
-              const occStudentFirstName = (occ.student?.first_name || occ.studentName || occ.student_name || '').split(' ')[0].toLowerCase();
+           const combinedOccurrences = [...(dbOccurrences || [])];
+           localOccursForToday.forEach((loc: any) => {
+             const existingIdx = combinedOccurrences.findIndex(o => String(o.id) === String(loc.id));
+             if (existingIdx >= 0) {
+               combinedOccurrences[existingIdx] = { ...combinedOccurrences[existingIdx], ...loc };
+             } else {
+               combinedOccurrences.push(loc);
+             }
+           });
 
-              const findMatchingTimelineIdx = () => {
-                return timeline.findIndex((t: any) => {
-                  if (occ.schedule_id && String(t.scheduleId) === String(occ.schedule_id)) return true;
-                  if (occStudentId && t.student?.id && String(t.student.id) === String(occStudentId)) return true;
-                  if (occStudentFirstName && t.student?.name && t.student.name.toLowerCase().startsWith(occStudentFirstName)) return true;
-                  return false;
-                });
-              };
+           // Format regular schedules
+           const timeline = (slots || []).map((slot: any) => {
+             const student = slot.student;
+             const avatar = student?.avatars?.[0] || null;
+             const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
+             const resolvedRoom = allRooms.find((r: any) => r.id === (slot.roomId || slot.rooms?.id))?.name || slot.room || slot.rooms?.name || 'Raum 4';
+             const resolvedInstrument = resolveStudentInstrument(slot.instrument, student?.instrument, teacherProfile?.instrument);
 
-              if (occ.original_date === todayStr && occ.date !== todayStr) {
-                // Rescheduled AWAY from today -> mark as rescheduled_away
-                const existingIdx = findMatchingTimelineIdx();
-                if (existingIdx !== -1) {
-                  timeline[existingIdx].status = 'rescheduled_away';
-                }
-              } else if (occ.date === todayStr) {
-                // Rescheduled TO today or updated today -> update or insert into today's timeline
-                const existingIdx = findMatchingTimelineIdx();
-                const existingItem = existingIdx !== -1 ? timeline[existingIdx] : null;
+             return {
+               id: slot.id || `virtual-${slot.scheduleId || Math.random()}-${todayStr}`,
+               scheduleId: slot.scheduleId || slot.id,
+               date: todayStr,
+               timeSlot: slot.time_slot || slot.timeSlot,
+               duration: slot.duration || 30,
+               status: slot.status,
+               isGroup: Boolean(slot.isGroup),
+               groupStudents: slot.groupStudents || [],
+               roomId: slot.roomId || slot.rooms?.id || null,
+               room: resolvedRoom,
+               instrument: resolvedInstrument,
+               student_acknowledged: true,
+               original_date: null,
+               student: student ? {
+                 id: student.id,
+                 name: student.name || `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
+                 first_name: student.first_name,
+                 last_name: student.last_name,
+                 isAppUser: student.is_app_user ?? false,
+                 isAnalogStickerUser,
+                 birthDate: student.birth_date,
+                 streakFlame: avatar?.streak_flame || 0
+               } : null
+             };
+           });
 
-                const mappedItem = {
-                  id: occ.id,
-                  scheduleId: occ.schedule_id || occ.id,
-                  date: occ.date,
-                  timeSlot: formattedTime,
-                  duration: occ.schedules?.duration || occ.duration || existingItem?.duration || 30,
-                  status: occ.status,
-                  roomId: occ.schedules?.rooms?.id || occ.room_id || existingItem?.roomId || null,
-                  room: occ.schedules?.rooms?.name || occ.roomName || occ.room_name || existingItem?.room || 'Hauptraum',
-                  instrument: resolveStudentInstrument(occ.schedules?.instrument || occ.instrument || existingItem?.instrument, student?.instrument, teacherProfile?.instrument),
-                  student_acknowledged: occ.student_acknowledged ?? occ.studentAcknowledged ?? false,
-                  original_date: occ.original_date,
-                  student: student ? {
-                    id: student.id,
-                    name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
-                    first_name: student.first_name,
-                    last_name: student.last_name,
-                    isAppUser: student.is_app_user ?? false,
-                    isAnalogStickerUser,
-                    birthDate: student.birth_date,
-                    streakFlame: avatar?.streak_flame || 0
-                  } : (existingItem?.student || null)
-                };
+           // Merge with occurrences for target date
+           if (combinedOccurrences && combinedOccurrences.length > 0) {
+             combinedOccurrences.forEach((occ: any) => {
+               const student = occ.student;
+               const avatar = student?.avatars?.[0] || null;
+               const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
+               const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : (occ.startTime ? occ.startTime.substring(0, 5) : '00:00');
+               const occStudentId = occ.student?.id || occ.student_id || occ.studentId;
+               const occStudentFirstName = (occ.student?.first_name || occ.studentName || occ.student_name || '').split(' ')[0].toLowerCase();
 
-                if (occ.status === 'cancelled') {
-                  mappedItem.status = 'canceled_by_student';
-                }
+               const findMatchingTimelineIdx = () => {
+                 return timeline.findIndex((t: any) => {
+                   if (occ.schedule_id && String(t.scheduleId) === String(occ.schedule_id)) return true;
+                   if (occStudentId && t.student?.id && String(t.student.id) === String(occStudentId)) return true;
+                   if (occStudentFirstName && t.student?.first_name && t.student.first_name.toLowerCase() === occStudentFirstName) return true;
+                   return false;
+                 });
+               };
 
-                if (existingIdx !== -1) {
-                  timeline[existingIdx] = mappedItem;
-                } else {
-                  timeline.push(mappedItem);
-                }
-              }
-            });
-          }
+               if (occ.original_date === todayStr && occ.date !== todayStr) {
+                 // Rescheduled AWAY from today -> mark as rescheduled_away
+                 const existingIdx = findMatchingTimelineIdx();
+                 if (existingIdx !== -1) {
+                   timeline[existingIdx].status = 'rescheduled_away';
+                 }
+               } else if (occ.date === todayStr) {
+                 // Rescheduled TO today or updated today -> update or insert into today's timeline
+                 const existingIdx = findMatchingTimelineIdx();
+                 const existingItem = existingIdx !== -1 ? timeline[existingIdx] : null;
+                 const resolvedRoom = allRooms.find((r: any) => r.id === (occ.room_id || occ.schedules?.room_id || existingItem?.roomId))?.name || 
+                                     occ.schedules?.rooms?.name || occ.roomName || occ.room_name || existingItem?.room || 'Raum 4';
+                 const resolvedInstrument = resolveStudentInstrument(occ.schedules?.instrument || occ.instrument || existingItem?.instrument, student?.instrument, teacherProfile?.instrument);
+
+                 const mappedItem = {
+                   id: occ.id,
+                   scheduleId: occ.schedule_id || occ.id,
+                   date: occ.date,
+                   timeSlot: formattedTime,
+                   duration: occ.schedules?.duration || occ.duration || existingItem?.duration || 30,
+                   status: occ.status,
+                   isGroup: Boolean(existingItem?.isGroup),
+                   groupStudents: existingItem?.groupStudents || [],
+                   roomId: occ.schedules?.rooms?.id || occ.room_id || existingItem?.roomId || null,
+                   room: resolvedRoom,
+                   instrument: resolvedInstrument,
+                   student_acknowledged: occ.student_acknowledged ?? occ.studentAcknowledged ?? false,
+                   original_date: occ.original_date,
+                   student: student ? {
+                     id: student.id,
+                     name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
+                     first_name: student.first_name,
+                     last_name: student.last_name,
+                     isAppUser: student.is_app_user ?? false,
+                     isAnalogStickerUser,
+                     birthDate: student.birth_date,
+                     streakFlame: avatar?.streak_flame || 0
+                   } : (existingItem?.student || null)
+                 };
+
+                 if (occ.status === 'cancelled') {
+                   mappedItem.status = 'canceled_by_student';
+                 }
+
+                 if (existingIdx !== -1) {
+                   timeline[existingIdx] = mappedItem;
+                 } else {
+                   timeline.push(mappedItem);
+                 }
+               }
+             });
+           }
 
           timeline.sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
 
@@ -4825,6 +5043,10 @@ export function TeacherDashboard({
 
       // 1. Info
       setTeacher(tData);
+      if (tData?.briefing_sidebar_collapsed !== undefined && tData?.briefing_sidebar_collapsed !== null) {
+        setIsTeacherBriefingSidebarCollapsed(Boolean(tData.briefing_sidebar_collapsed));
+        localStorage.setItem('campus_teacher_briefing_sidebar_collapsed', String(tData.briefing_sidebar_collapsed));
+      }
 
       if (tData?.school_id) {
         supabase.from('schools').select('*').eq('id', tData.school_id).single().then(({ data: sd }) => {
@@ -6323,6 +6545,31 @@ export function TeacherDashboard({
     return true;
   }) : [];
 
+  const teacherOpenAdminFeedbackCount = useMemo(() => {
+    const openFeedback = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id)).length;
+    const pendingFeedbackPoints = mySubmittedProgramPoints.filter(pp => 
+      pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
+    ).length;
+    return openFeedback + activePlanningEvents.length + pendingFeedbackPoints;
+  }, [adminFeedbackRequests, adminFeedbackResponses, mySubmittedProgramPoints, activePlanningEvents]);
+
+  const teacherScheduleChangesCount = (myChangedAppointments || []).length;
+
+  const teacherUnreadFeedCount = useMemo(() => {
+    if (!userId) return 0;
+    const unreadCampus = (campusFeedAnnouncements || []).filter((post: any) => {
+      return !feedInteractions.some(i => i.post_id === post.id && i.user_id === userId);
+    }).length;
+    const unreadClass = (classFeedPosts || []).filter((post: any) => {
+      return !feedInteractions.some(i => i.post_id === post.id && i.user_id === userId);
+    }).length;
+    return unreadCampus + unreadClass;
+  }, [campusFeedAnnouncements, classFeedPosts, feedInteractions, userId]);
+
+  const teacherSidebarTotalAlertsCount = teacherScheduleChangesCount + teacherOpenAdminFeedbackCount + teacherUnreadFeedCount;
+  const hasTeacherAppointmentAlerts = teacherScheduleChangesCount > 0;
+  const hasTeacherFeedAlerts = (teacherOpenAdminFeedbackCount > 0) || (teacherUnreadFeedCount > 0);
+
   const getCountdownString = (deadlineStr: string) => {
     const diff = new Date(deadlineStr).getTime() - Date.now();
     if (diff <= 0) return 'Abgelaufen';
@@ -6939,10 +7186,80 @@ export function TeacherDashboard({
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* Header: Student Info & Profile Ghost Button */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                {/* Multi-Student Group Switcher */}
+                {activeGroupStudents.length > 1 && (
+                  <div style={{
+                    display: 'flex',
+                    background: '#f1f5f9',
+                    padding: '4px',
+                    borderRadius: '14px',
+                    gap: '4px',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    {activeGroupStudents.map((stud: any) => {
+                      const isSelected = (!selectedGroupStudentId && activeGroupStudents[0]?.id === stud.id) || selectedGroupStudentId === stud.id;
+                      const fName = stud.first_name || (stud.name ? stud.name.split(' ')[0] : 'Schüler');
+                      const lName = stud.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
+                      return (
+                        <button
+                          key={stud.id}
+                          type="button"
+                          onClick={() => setSelectedGroupStudentId(stud.id)}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '10px',
+                            border: isSelected ? '1px solid #cbd5e1' : 'none',
+                            background: isSelected ? '#ffffff' : 'transparent',
+                            color: isSelected ? '#0f172a' : '#475569',
+                            fontWeight: isSelected ? 850 : 600,
+                            fontSize: '0.80rem',
+                            cursor: 'pointer',
+                            boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <User size={13} color={isSelected ? '#34a853' : '#64748b'} />
+                          <span>{fName} {maskLastName(lName, showRealNames)}</span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedGroupStudentId('both')}
+                      style={{
+                        flex: 1,
+                        padding: '8px 10px',
+                        borderRadius: '10px',
+                        border: selectedGroupStudentId === 'both' ? '1px solid #cbd5e1' : 'none',
+                        background: selectedGroupStudentId === 'both' ? '#ffffff' : 'transparent',
+                        color: selectedGroupStudentId === 'both' ? '#0f172a' : '#475569',
+                        fontWeight: selectedGroupStudentId === 'both' ? 850 : 600,
+                        fontSize: '0.80rem',
+                        cursor: 'pointer',
+                        boxShadow: selectedGroupStudentId === 'both' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <Users size={13} color={selectedGroupStudentId === 'both' ? '#34a853' : '#64748b'} />
+                      <span>Beide (Gruppe)</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Header: Student Info & Toolbox/Profile Buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
                   <div 
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0, flex: 1 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0, flex: '1 1 200px' }}
                     onClick={() => {
                       const foundStud = allStudents.find(s => s.id === prep.studentId);
                       setDocStudent({
@@ -6979,42 +7296,110 @@ export function TeacherDashboard({
                       <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.96rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                         {prep.studentName}
                       </div>
-                      <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                      <div style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600 }}>
                         {activeStudent?.id === prep.studentId ? 'Aktueller Schüler' : 'Nächster Schüler'}
                       </div>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setSelectedStudentProfile({
-                        id: prep.studentId,
-                        first_name: prep.studentName.split(' ')[0],
-                        last_name: prep.studentName.split(' ').slice(1).join(' '),
-                        photo_url: '/avatar_ghost.jpg'
-                      });
-                    }}
-                    style={{
-                      background: '#f8fafc',
-                      color: '#475569',
-                      border: '1px solid #e2e8f0',
-                      padding: '6px 12px',
-                      borderRadius: '10px',
-                      fontSize: '0.76rem',
-                      fontWeight: 750,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      flexShrink: 0,
-                      transition: 'all 0.2s'
-                    }}
-                    className="hover-scale"
-                    title="Schüler-Profil öffnen"
-                  >
-                    <User size={13} />
-                    <span>Profil</span>
-                  </button>
+                  {/* Stage Toolbox & Profil Action Buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    {/* Stimmgerät (Tuner) Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowStageToolbox('tuner')}
+                      style={{
+                        background: '#f8fafc',
+                        color: '#334155',
+                        border: '1px solid #e2e8f0',
+                        padding: '7px 10px',
+                        borderRadius: '10px',
+                        fontSize: '0.76rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px',
+                        minWidth: '36px',
+                        minHeight: '36px',
+                        transition: 'all 0.2s'
+                      }}
+                      className="hover-scale"
+                      title="Stimmgerät (Tuner) öffnen"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 12v10" />
+                        <path d="M18 2v7a6 6 0 0 1-12 0V2" />
+                      </svg>
+                      <span>Stimmgerät</span>
+                    </button>
+
+                    {/* Metronom Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowStageToolbox('metronome')}
+                      style={{
+                        background: '#f8fafc',
+                        color: '#334155',
+                        border: '1px solid #e2e8f0',
+                        padding: '7px 10px',
+                        borderRadius: '10px',
+                        fontSize: '0.76rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px',
+                        minWidth: '36px',
+                        minHeight: '36px',
+                        transition: 'all 0.2s'
+                      }}
+                      className="hover-scale"
+                      title="Metronom öffnen"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2L4 20h16L12 2z" />
+                        <path d="M12 10l5-3" />
+                        <circle cx="17" cy="7" r="1.5" fill="currentColor" />
+                      </svg>
+                      <span>Metronom</span>
+                    </button>
+
+                    {/* Profil Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStudentProfile({
+                          id: prep.studentId,
+                          first_name: prep.studentName.split(' ')[0],
+                          last_name: prep.studentName.split(' ').slice(1).join(' '),
+                          photo_url: '/avatar_ghost.jpg'
+                        });
+                      }}
+                      style={{
+                        background: '#f8fafc',
+                        color: '#334155',
+                        border: '1px solid #e2e8f0',
+                        padding: '7px 12px',
+                        borderRadius: '10px',
+                        fontSize: '0.76rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        minHeight: '36px',
+                        transition: 'all 0.2s'
+                      }}
+                      className="hover-scale"
+                      title="Schüler-Profil öffnen"
+                    >
+                      <User size={14} />
+                      <span>Profil</span>
+                    </button>
+                  </div>
                 </div>
 
                 {prep.streakCount > 0 && (
@@ -7692,13 +8077,27 @@ export function TeacherDashboard({
                         });
                       }
                     } else {
-                      // Active slot: only merge with another active slot at the same time that is NOT rescheduled_away
-                      const existing = groupedTimeline.find(item => 
+                      const subStudents = splitAndNormalizeStudents(
+                        slot.students && slot.students.length > 0 ? slot.students : [slot.student], 
+                        allStudents
+                      );
+                      const isExplicitGroup = Boolean(
+                        slot.isGroup || 
+                        slot.is_group || 
+                        (slot.groupStudents && slot.groupStudents.length > 1) || 
+                        subStudents.length > 1 || 
+                        (slot.student?.name && slot.student.name.includes('&')) ||
+                        (slot.student?.first_name && slot.student.first_name.includes('&'))
+                      );
+
+                      // Only merge with an existing slot if BOTH are explicitly marked as a group or belong to the same group/schedule:
+                      const existing = isExplicitGroup ? groupedTimeline.find(item => 
                         !item.isBreak && 
                         item.timeSlot === slot.timeSlot &&
+                        (item.isGroup || (slot.scheduleId && item.scheduleId === slot.scheduleId)) &&
                         !item.slots.some((s: any) => s.status === 'rescheduled_away')
-                      );
-                      const subStudents = splitAndNormalizeStudents([slot.student], allStudents);
+                      ) : null;
+
                       if (existing) {
                         existing.slots.push(slot);
                         subStudents.forEach(st => {
@@ -7728,7 +8127,7 @@ export function TeacherDashboard({
                         groupedTimeline.push({
                           ...slot,
                           isBreak: false,
-                          isGroup: subStudents.length > 1 || Boolean(slot.isGroup),
+                          isGroup: isExplicitGroup,
                           students: [...subStudents],
                           slots: [slot]
                         });
@@ -8071,7 +8470,23 @@ export function TeacherDashboard({
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis'
                                   }}>
-                                    👥 {getGroupTypeLabel(slot.students?.length || 2, slot.isFixedGroup !== false, slot.group_name)}
+                                    {(() => {
+                                      if (slot.students && slot.students.length > 0) {
+                                        const names = slot.students.map((stud: any) => {
+                                          const found = allStudents.find(s => s.id === stud.id);
+                                          const rawFn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
+                                          const cleanFn = rawFn.replace(/&.*/, '').trim() || 'Schüler';
+                                          const rawLn = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
+                                          const cleanLn = rawLn.replace(/&.*/, '').trim();
+                                          if (cleanFn || cleanLn) {
+                                            return `${cleanFn} ${maskLastName(cleanLn, showRealNames)}`.trim();
+                                          }
+                                          return stud.name || 'Schüler';
+                                        });
+                                        return Array.from(new Set(names)).join(' & ');
+                                      }
+                                      return slot.student?.name || 'Gruppentermin';
+                                    })()}
                                   </span>
                                 ) : slot.student ? (
                                   <span style={{ 
@@ -8117,6 +8532,24 @@ export function TeacherDashboard({
                                 )}
                               </div>
 
+                              {/* Monochrome Group Icon before Shoutbox */}
+                              {slot.isGroup && !isCanceled && !isRescheduledAway && (
+                                <span 
+                                  title={`Gruppentermin (${slot.students?.length || 2} Schüler)`}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#64748b',
+                                    marginLeft: 'auto',
+                                    marginRight: '2px',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <Users size={14} color="#64748b" />
+                                </span>
+                              )}
+
                               {/* 1:1 Shoutbox Icon Button on Top Row Right */}
                               {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (
                                 <button
@@ -8152,7 +8585,7 @@ export function TeacherDashboard({
                                     transition: 'all 0.2s',
                                     flexShrink: 0,
                                     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                    marginLeft: '4px'
+                                    marginLeft: slot.isGroup ? '2px' : '4px'
                                   }}
                                 >
                                   <MessageSquare size={12} />
@@ -8173,60 +8606,7 @@ export function TeacherDashboard({
                               flexWrap: 'wrap',
                               paddingLeft: isMobileDevice ? '0' : '0'
                             }}>
-                              {slot.isGroup ? (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-                                  {slot.students.map((stud: any, sIdx: number) => {
-                                    const originalSlot = slot.slots?.[sIdx] || slot.slots?.[0] || slot;
-                                    const isRescheduled = Boolean(
-                                      (originalSlot?.original_date && originalSlot?.date && String(originalSlot.original_date) !== String(originalSlot.date)) || 
-                                      originalSlot?.is_rescheduled || 
-                                      originalSlot?.status === 'rescheduled_confirmed' || 
-                                      originalSlot?.status === 'rescheduled' ||
-                                      originalSlot?.status === 'rescheduled_away' ||
-                                      slot?.is_rescheduled ||
-                                      slot?.status === 'rescheduled_confirmed' ||
-                                      slot?.status === 'rescheduled'
-                                    );
-                                    const ack = originalSlot?.student_acknowledged;
-                                    const isBirthday = isStudentBirthdayToday(stud);
-                                    return (
-                                      <span 
-                                        key={sIdx}
-                                        style={{
-                                          fontSize: '0.68rem',
-                                          fontWeight: 700,
-                                          background: isRescheduled ? (ack ? '#e6f4ea' : '#fef7e0') : '#f1f5f9',
-                                          color: isRescheduled ? (ack ? '#34a853' : '#b45309') : '#334155',
-                                          border: isRescheduled ? (ack ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid rgba(245, 158, 11, 0.25)') : '1px solid #e2e8f0',
-                                          padding: '1px 6px',
-                                          borderRadius: '4px',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '3px',
-                                          whiteSpace: 'nowrap'
-                                        }}
-                                      >
-                                        {isBirthday ? '🎂 ' : ''}{(() => {
-                                          const found = allStudents.find(s => s.id === stud.id);
-                                          const rawFn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
-                                          const cleanFn = rawFn.replace(/&.*/, '').trim() || 'Schüler';
-                                          const rawLn = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
-                                          const cleanLn = rawLn.replace(/&.*/, '').trim();
-                                          if (cleanFn || cleanLn) {
-                                            return `${cleanFn} ${maskLastName(cleanLn, showRealNames)}`.trim();
-                                          }
-                                          return stud.name || 'Schüler';
-                                        })()}
-                                        {isRescheduled && (
-                                          <span style={{ fontSize: '0.62rem', opacity: 0.8 }}>
-                                            {ack ? '✓' : '🕒'}
-                                          </span>
-                                        )}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                              ) : slot.student && (
+                              {(slot.student || slot.isGroup) && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', width: '100%' }}>
                                   {isCanceled || isRescheduledAway ? (() => {
                                     const isAcked = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
@@ -8234,10 +8614,11 @@ export function TeacherDashboard({
                                       <>
                                         {isRescheduledAway ? (
                                           <span style={{ 
-                                            color: '#d97706', 
-                                            fontWeight: 700, 
+                                            color: '#000000', 
+                                            fontWeight: 850, 
                                             fontSize: '0.68rem', 
-                                            background: '#fff7ed', 
+                                            background: '#facc15', 
+                                            border: '1px solid #000000',
                                             padding: '2px 8px', 
                                             borderRadius: '6px', 
                                             fontFamily: 'Inter',
@@ -8269,22 +8650,34 @@ export function TeacherDashboard({
                                     );
                                   })() : (
                                     <>
-                                      {resolveStudentInstrument(slot.instrument, slot.student?.instrument, teacher?.instrument) && <span style={{ color: '#64748b', fontWeight: 600 }}>• {resolveStudentInstrument(slot.instrument, slot.student?.instrument, teacher?.instrument)}</span>}
-                                      {slot.room && <span style={{ color: '#64748b', fontWeight: 600 }}>• {cleanRoomName(slot.room)}</span>}
+                                      {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument) && (
+                                        <span style={{ color: '#334155', fontWeight: 600 }}>• {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument)}</span>
+                                      )}
+                                      {slot.room && <span style={{ color: '#334155', fontWeight: 600 }}>• {cleanRoomName(slot.room)}</span>}
                                     </>
                                   )}
                                   {!slot.isGroup && isRescheduledPending && (
-                                    <span style={{
-                                      background: '#fffbeb',
-                                      color: '#eab308',
-                                      border: '1px solid #fde68a',
-                                      padding: '2px 6px',
-                                      borderRadius: '4px',
-                                      fontSize: '0.68rem',
-                                      fontWeight: 800,
-                                      marginLeft: 'auto'
-                                    }}>
-                                      Unbestätigt
+                                    <span 
+                                      title="Terminverschiebung ausstehend (noch nicht bestätigt)"
+                                      style={{
+                                        background: '#fef3c7',
+                                        color: '#b45309',
+                                        border: '1px solid #fde68a',
+                                        padding: '2px 8px',
+                                        borderRadius: '100px',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 750,
+                                        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        marginLeft: 'auto',
+                                        boxShadow: '0 1px 2px rgba(180, 83, 9, 0.05)',
+                                        letterSpacing: '0.01em'
+                                      }}
+                                    >
+                                      <Clock size={11} strokeWidth={2.5} color="#b45309" />
+                                      <span>Unbestätigt</span>
                                     </span>
                                   )}
                                 </div>
@@ -8309,8 +8702,8 @@ export function TeacherDashboard({
 
   const renderFeedWidget = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
-      {/* 1. TERMINÄNDERUNGEN */}
-      {myChangedAppointments.length > 0 && (
+      {/* 1. TERMINÄNDERUNGEN (Nächste 7 Tage) */}
+      {visibleChangedAppointments.length > 0 && (
         <div style={{ 
           background: '#ffffff', 
           borderRadius: '24px', 
@@ -8318,7 +8711,7 @@ export function TeacherDashboard({
           boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
           marginBottom: '20px'
         }}>
-        {/* Header with Title & Time Window Filter */}
+        {/* Header with Title */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertCircle size={18} color="#475569" />
@@ -8326,69 +8719,21 @@ export function TeacherDashboard({
               Terminänderungen
             </h3>
           </div>
-          
-          {myChangedAppointments.length > 0 && (
-            <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '2px' }}>
-              <button
-                onClick={() => setScheduleChangesTimeWindow('7days')}
-                style={{
-                  border: 'none',
-                  background: scheduleChangesTimeWindow === '7days' ? '#ffffff' : 'transparent',
-                  color: scheduleChangesTimeWindow === '7days' ? '#0f172a' : '#64748b',
-                  fontWeight: scheduleChangesTimeWindow === '7days' ? 800 : 600,
-                  fontSize: '0.68rem',
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  boxShadow: scheduleChangesTimeWindow === '7days' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                7 Tage
-              </button>
-              <button
-                onClick={() => setScheduleChangesTimeWindow('all')}
-                style={{
-                  border: 'none',
-                  background: scheduleChangesTimeWindow === 'all' ? '#ffffff' : 'transparent',
-                  color: scheduleChangesTimeWindow === 'all' ? '#0f172a' : '#64748b',
-                  fontWeight: scheduleChangesTimeWindow === 'all' ? 800 : 600,
-                  fontSize: '0.68rem',
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  boxShadow: scheduleChangesTimeWindow === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                Alle
-              </button>
-            </div>
-          )}
+          <span style={{
+            fontSize: '0.68rem',
+            fontWeight: 750,
+            color: '#64748b',
+            background: '#f1f5f9',
+            padding: '2px 8px',
+            borderRadius: '100px'
+          }}>
+            Nächste 7 Tage
+          </span>
         </div>
 
         {/* List of Compact Item Rows */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {myChangedAppointments.length === 0 ? (
-            <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', padding: '16px 14px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircle size={18} strokeWidth={2.5} />
-              </div>
-              <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.82rem', fontStyle: 'normal' }}>Keine bevorstehenden Terminänderungen</div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'normal' }}>Alle Unterrichtstermine finden regulär nach Stundenplan statt.</div>
-            </div>
-          ) : visibleChangedAppointments.length === 0 ? (
-            <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '12px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-              Keine Terminänderungen in den nächsten 7 Tagen.
-              <button
-                onClick={() => setScheduleChangesTimeWindow('all')}
-                style={{ display: 'block', margin: '6px auto 0 auto', border: 'none', background: 'none', color: '#3b82f6', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}
-              >
-                Alle {myChangedAppointments.length} Änderungen anzeigen
-              </button>
-            </div>
-          ) : (
-            (showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
+          {(showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
               const dateObj = new Date(b.date);
               const isCancelled = ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick'].includes(b.status);
               const isRescheduled = ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status) || 
@@ -8644,7 +8989,7 @@ export function TeacherDashboard({
                   )}
                 </div>
               );
-            }))}
+            })}
           </div>
 
           {visibleChangedAppointments.length > 3 && (
@@ -9515,6 +9860,12 @@ export function TeacherDashboard({
         }
       `}} />
 
+      {showStageToolbox && (
+        <LiveStageToolboxModal 
+          initialTab={showStageToolbox} 
+          onClose={() => setShowStageToolbox(null)} 
+        />
+      )}
       {selectedCoachProfile && <TeacherDetailModal teacher={selectedCoachProfile} onClose={() => setSelectedCoachProfile(null)} />}
       {selectedStudentProfile && (
         <StudentDetailModal 
@@ -9815,10 +10166,119 @@ export function TeacherDashboard({
           </header>
         )}
         {activeTab === 'briefing' && !hideHeader ? (
-          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '10px', alignItems: 'start', width: '100%' }} className="dashboard-main-grid">
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'row', 
+            flexWrap: 'wrap', 
+            gap: isTeacherBriefingSidebarCollapsed ? '0px' : '10px', 
+            alignItems: 'start', 
+            width: '100%',
+            position: 'relative'
+          }} className="dashboard-main-grid">
+
+            {/* Floating Right-Edge Toggle Button when Collapsed (Desktop only) */}
+            {isTeacherBriefingSidebarCollapsed && !isMobileDevice && (() => {
+              const isCampus = activePlatform === 'campus';
+              const btnBg = isCampus ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)';
+              const btnBorder = isCampus ? '1.5px solid #bbf7d0' : '1.5px solid #fde047';
+              const btnColor = isCampus ? '#15803d' : '#854d0e';
+              const btnShadow = isCampus ? '-4px 0 20px rgba(52, 168, 83, 0.2)' : '-4px 0 20px rgba(234, 179, 8, 0.25)';
+              const badgeColor = hasTeacherAppointmentAlerts ? '#f59e0b' : (isCampus ? '#34a853' : '#eab308');
+
+              return (
+                <button
+                  onClick={() => handleToggleTeacherBriefingSidebar(false)}
+                  style={{
+                    position: 'fixed',
+                    right: '0px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 99,
+                    background: btnBg,
+                    border: btnBorder,
+                    borderRight: 'none',
+                    borderRadius: '16px 0 0 16px',
+                    padding: '14px 10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '10px',
+                    cursor: 'pointer',
+                    boxShadow: btnShadow,
+                    color: btnColor,
+                    fontWeight: 900,
+                    fontSize: '0.7rem',
+                    transition: 'all 0.2s ease-in-out'
+                  }}
+                  className="hover-scale"
+                  title="Termine & Mitteilungen ausklappen"
+                >
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ChevronLeft size={18} color={btnColor} />
+                    {(hasTeacherAppointmentAlerts || hasTeacherFeedAlerts) && (
+                      <span style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        right: '-6px',
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        background: badgeColor,
+                        border: '2px solid #ffffff',
+                        boxShadow: `0 0 8px ${badgeColor}`,
+                        animation: 'pulse 1.5s infinite'
+                      }} />
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '8px',
+                      background: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                    }}>
+                      <Calendar size={15} color={btnColor} />
+                    </div>
+                    
+                    {teacherSidebarTotalAlertsCount > 0 && (
+                      <span style={{
+                        background: badgeColor,
+                        color: isCampus || hasTeacherAppointmentAlerts ? '#ffffff' : '#000000',
+                        fontSize: '0.65rem',
+                        fontWeight: 950,
+                        padding: '2px 6px',
+                        borderRadius: '100px',
+                        minWidth: '16px',
+                        textAlign: 'center',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                      }}>
+                        {teacherSidebarTotalAlertsCount}
+                      </span>
+                    )}
+                  </div>
+
+                  <span style={{ 
+                    writingMode: 'vertical-rl', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.08em', 
+                    fontSize: '0.68rem',
+                    fontWeight: 900,
+                    color: btnColor,
+                    marginTop: '2px'
+                  }}>
+                    Termine & Mitteilungen
+                  </span>
+                </button>
+              );
+            })()}
             
             <div style={{ 
-              flex: '1 1 600px',
+              flex: isTeacherBriefingSidebarCollapsed ? '1 1 100%' : '1 1 600px',
               minWidth: '320px',
               maxWidth: '100%',
               display: 'flex', 
@@ -9826,9 +10286,10 @@ export function TeacherDashboard({
               gap: '10px',
               maxHeight: 'calc(100vh - 60px)',
               overflowY: 'auto',
-              paddingRight: '10px',
+              paddingRight: (isTeacherBriefingSidebarCollapsed && !isMobileDevice) ? '56px' : '10px',
               paddingBottom: '80px',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              transition: 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1), flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
               {briefingLoading ? (
                 <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
@@ -10274,7 +10735,7 @@ export function TeacherDashboard({
                                     lineHeight: 1.15,
                                     letterSpacing: '-0.02em'
                                   }}>
-                                    Hi, <span style={{ color: activePlatform === 'campus' ? '#34a853' : '#eab308' }}>{teacher?.first_name || 'Lehrer'}</span>! ☀️
+                                    Hi, <span style={{ color: activePlatform === 'campus' ? '#34a853' : '#eab308' }}>{formatTeacherFullName(teacher) || teacher?.first_name || 'Lehrer'}</span>!
                                   </h2>
                                   <p style={{
                                     margin: '6px 0 0 0',
@@ -10335,9 +10796,14 @@ export function TeacherDashboard({
                                     <Users size={14} color="white" />
                                   </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
                                   <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{activeLessonsCount}</span>
                                   <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>UE</span>
+                                  {totalActiveStudentsToday > activeLessonsCount && (
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 700, opacity: 0.85, marginLeft: '2px' }}>
+                                      ({totalActiveStudentsToday} Schüler)
+                                    </span>
+                                  )}
                                 </div>
                               </div>
 
@@ -10436,9 +10902,14 @@ export function TeacherDashboard({
                             <Users size={14} color="white" />
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{activeLessonsCount}</span>
                           <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>UE</span>
+                          {totalActiveStudentsToday > activeLessonsCount && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 700, opacity: 0.85, marginLeft: '2px' }}>
+                              ({totalActiveStudentsToday} Schüler)
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -10612,10 +11083,7 @@ export function TeacherDashboard({
                                   fontWeight: 900,
                                   letterSpacing: '-0.01em',
                                   display: 'inline'
-                                }}>{teacher?.first_name || 'Coach'}</span>!{' '}
-                                <span className="inline-block animate-bounce" style={{ marginLeft: '4px', display: 'inline-block' }}>
-                                  ☀️
-                                </span>
+                                }}>{formatTeacherFullName(teacher) || teacher?.first_name || 'Coach'}</span>!
                               </h3>
                               {windowWidth >= 768 && (
                                 <p style={{ margin: isWeekend ? '14px 0 0 0' : '6px 0 0 0', fontSize: isWeekend ? '1rem' : '0.82rem', color: isWeekend ? '#4b5563' : '#64748b', fontWeight: 600, lineHeight: isWeekend ? 1.5 : 1.25, maxWidth: isWeekend ? '650px' : undefined }}>
@@ -10744,6 +11212,7 @@ export function TeacherDashboard({
                                 other.status !== 'canceled_by_student' &&
                                 other.status !== 'cancelled'
                               );
+                              // If there is an active replacement slot at this time, the moved-away slot is superseded in the timeline (it is displayed in the Vorbereitung card)
                               if (!hasActiveSlotAtSameTime) {
                                 groupedTimeline.push({
                                   ...slot,
@@ -10754,13 +11223,27 @@ export function TeacherDashboard({
                                 });
                               }
                             } else {
-                              // Active slot: only merge with another active slot at the same time that is NOT rescheduled_away
-                              const existing = groupedTimeline.find(item => 
+                              const subStudents = splitAndNormalizeStudents(
+                                slot.students && slot.students.length > 0 ? slot.students : [slot.student], 
+                                allStudents
+                              );
+                              const isExplicitGroup = Boolean(
+                                slot.isGroup || 
+                                slot.is_group || 
+                                (slot.groupStudents && slot.groupStudents.length > 1) || 
+                                subStudents.length > 1 || 
+                                (slot.student?.name && slot.student.name.includes('&')) ||
+                                (slot.student?.first_name && slot.student.first_name.includes('&'))
+                              );
+
+                              // Only merge with an existing slot if BOTH are explicitly marked as a group or belong to the same group/schedule:
+                              const existing = isExplicitGroup ? groupedTimeline.find(item => 
                                 !item.isBreak && 
                                 item.timeSlot === slot.timeSlot &&
+                                (item.isGroup || (slot.scheduleId && item.scheduleId === slot.scheduleId)) &&
                                 !item.slots.some((s: any) => s.status === 'rescheduled_away')
-                              );
-                              const subStudents = splitAndNormalizeStudents([slot.student], allStudents);
+                              ) : null;
+
                               if (existing) {
                                 existing.slots.push(slot);
                                 subStudents.forEach(st => {
@@ -10790,7 +11273,7 @@ export function TeacherDashboard({
                                 groupedTimeline.push({
                                   ...slot,
                                   isBreak: false,
-                                  isGroup: subStudents.length > 1 || Boolean(slot.isGroup),
+                                  isGroup: isExplicitGroup,
                                   students: [...subStudents],
                                   slots: [slot]
                                 });
@@ -11121,9 +11604,25 @@ export function TeacherDashboard({
                                           color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#34a853' : '#0f172a'), 
                                           fontSize: '0.9rem', 
                                           whiteSpace: 'nowrap',
-                                          marginRight: '12px'
+                                          flexShrink: 0
                                         }}>
-                                          👥 {getGroupTypeLabel(slot.students?.length || 2, slot.isFixedGroup !== false, slot.group_name)}
+                                          {(() => {
+                                            if (slot.students && slot.students.length > 0) {
+                                              const names = slot.students.map((stud: any) => {
+                                                const found = allStudents.find(s => s.id === stud.id);
+                                                const rawFn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
+                                                const cleanFn = rawFn.replace(/&.*/, '').trim() || 'Schüler';
+                                                const rawLn = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
+                                                const cleanLn = rawLn.replace(/&.*/, '').trim();
+                                                if (cleanFn || cleanLn) {
+                                                  return `${cleanFn} ${maskLastName(cleanLn, showRealNames)}`.trim();
+                                                }
+                                                return stud.name || 'Schüler';
+                                              });
+                                              return Array.from(new Set(names)).join(' & ');
+                                            }
+                                            return slot.student?.name || 'Gruppentermin';
+                                          })()}
                                         </span>
                                       ) : slot.student ? (
                                         <span style={{ 
@@ -11171,60 +11670,7 @@ export function TeacherDashboard({
 
                                     {/* Right part: Metadata / Status badges */}
                                     <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
-                                      {slot.isGroup ? (
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', marginLeft: 'auto' }}>
-                                          {slot.students.map((stud: any, sIdx: number) => {
-                                            const originalSlot = slot.slots?.[sIdx] || slot.slots?.[0] || slot;
-                                            const isRescheduled = Boolean(
-                                              (originalSlot?.original_date && originalSlot?.date && String(originalSlot.original_date) !== String(originalSlot.date)) || 
-                                              originalSlot?.is_rescheduled || 
-                                              originalSlot?.status === 'rescheduled_confirmed' || 
-                                              originalSlot?.status === 'rescheduled' ||
-                                              originalSlot?.status === 'rescheduled_away' ||
-                                              slot?.is_rescheduled ||
-                                              slot?.status === 'rescheduled_confirmed' ||
-                                              slot?.status === 'rescheduled'
-                                            );
-                                            const ack = originalSlot?.student_acknowledged;
-                                            const isBirthday = isStudentBirthdayToday(stud);
-                                            return (
-                                              <span 
-                                                key={sIdx}
-                                                style={{
-                                                  fontSize: '0.72rem',
-                                                  fontWeight: 700,
-                                                  background: isRescheduled ? (ack ? '#e6f4ea' : '#fef7e0') : '#f1f5f9',
-                                                  color: isRescheduled ? (ack ? '#34a853' : '#b45309') : '#334155',
-                                                  border: isRescheduled ? (ack ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid rgba(245, 158, 11, 0.25)') : '1px solid #e2e8f0',
-                                                  padding: '2px 8px',
-                                                  borderRadius: '6px',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  gap: '4px',
-                                                  whiteSpace: 'nowrap'
-                                                }}
-                                              >
-                                                {isBirthday ? '🎂 ' : ''}{(() => {
-                                                  const found = allStudents.find(s => s.id === stud.id);
-                                                  const rawFn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
-                                                  const cleanFn = rawFn.replace(/&.*/, '').trim() || 'Schüler';
-                                                  const rawLn = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
-                                                  const cleanLn = rawLn.replace(/&.*/, '').trim();
-                                                  if (cleanFn || cleanLn) {
-                                                    return `${cleanFn} ${maskLastName(cleanLn, showRealNames)}`.trim();
-                                                  }
-                                                  return stud.name || 'Schüler';
-                                                })()}
-                                                {isRescheduled && (
-                                                  <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>
-                                                    {ack ? '✓' : '🕒'}
-                                                  </span>
-                                                )}
-                                              </span>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : slot.student && (
+                                      {(slot.student || slot.isGroup) && (
                                         <div style={{ display: 'flex', alignItems: 'center', width: '100%', minWidth: 0 }}>
                                           {isCanceled || isRescheduledAway ? (() => {
                                             const isAcked = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
@@ -11232,10 +11678,11 @@ export function TeacherDashboard({
                                               <>
                                                 {isRescheduledAway ? (
                                                   <span style={{ 
-                                                    color: '#d97706', 
-                                                    fontWeight: 700, 
+                                                    color: '#000000', 
+                                                    fontWeight: 850, 
                                                     fontSize: '0.72rem', 
-                                                    background: '#fff7ed', 
+                                                    background: '#facc15', 
+                                                    border: '1px solid #000000',
                                                     padding: '4px 10px', 
                                                     borderRadius: '6px', 
                                                     marginLeft: 'auto',
@@ -11283,23 +11730,23 @@ export function TeacherDashboard({
                                             );
                                           })() : (
                                             <>
-                                              <span style={{ color: '#94a3b8', margin: '0 8px', fontWeight: 400, flexShrink: 0 }}>•</span>
+                                              <span style={{ color: '#64748b', margin: '0 8px', fontWeight: 600, flexShrink: 0 }}>•</span>
                                               
                                               <span style={{ 
-                                                color: '#64748b', 
-                                                fontWeight: 500, 
+                                                color: '#334155', 
+                                                fontWeight: 600, 
                                                 fontSize: '0.78rem', 
                                                 flexShrink: 0, 
                                                 whiteSpace: 'nowrap' 
                                               }}>
-                                                {resolveStudentInstrument(slot.instrument, slot.student?.instrument, teacher?.instrument)}
+                                                {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument)}
                                               </span>
                                               
-                                              <span style={{ color: '#94a3b8', margin: '0 8px', fontWeight: 400, flexShrink: 0 }}>•</span>
+                                              <span style={{ color: '#64748b', margin: '0 8px', fontWeight: 600, flexShrink: 0 }}>•</span>
                                               
                                               <span style={{ 
-                                                color: '#64748b', 
-                                                fontWeight: 500, 
+                                                color: '#334155', 
+                                                fontWeight: 600, 
                                                 fontSize: '0.78rem', 
                                                 flexShrink: 0, 
                                                 whiteSpace: 'nowrap',
@@ -11307,7 +11754,7 @@ export function TeacherDashboard({
                                                 alignItems: 'center',
                                                 gap: '4px'
                                               }}>
-                                                {slot.room || 'Groovelab'}
+                                                {slot.room || 'Raum 4'}
                                                 {Boolean(slot.is_room_booking || slot.isRoomBooking || slot.room_override_id || slot.roomOverrideId) && (
                                                   <span 
                                                     title="Raumbuchung vorgenommen" 
@@ -11328,48 +11775,74 @@ export function TeacherDashboard({
                                         </div>
                                       )}
                                     </div>
- 
+
                                   {/* Unbestätigt Badge (on the right) */}
                                   {!slot.isGroup && isRescheduledPending && (
-                                    <span style={{
-                                      background: '#fffbeb',
-                                      color: '#eab308',
-                                      border: '1px solid #fde68a',
-                                      padding: '4px 10px',
-                                      borderRadius: '6px',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 800,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      flexShrink: 0,
-                                      boxShadow: '0 1px 2px rgba(251, 188, 5, 0.04)'
-                                    }}>
-                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <circle cx="12" cy="12" r="10" strokeDasharray="3 3" />
-                                        <polyline points="12 6 12 12 16 14" />
-                                      </svg>
-                                      Unbestätigt
+                                    <span 
+                                      title="Terminverschiebung ausstehend (noch nicht bestätigt)"
+                                      style={{
+                                        background: '#fef3c7',
+                                        color: '#b45309',
+                                        border: '1px solid #fde68a',
+                                        padding: '3px 10px',
+                                        borderRadius: '100px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 750,
+                                        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        flexShrink: 0,
+                                        boxShadow: '0 1px 2px rgba(180, 83, 9, 0.05)',
+                                        letterSpacing: '0.01em'
+                                      }}
+                                    >
+                                      <Clock size={12} strokeWidth={2.5} color="#b45309" />
+                                      <span>Unbestätigt</span>
                                     </span>
                                   )}
  
                                   {/* Bestätigt Badge (on the right) */}
                                   {!slot.isGroup && isRescheduledConfirmed && (
-                                    <span style={{
-                                      background: '#e6f4ea',
-                                      color: '#34a853',
-                                      border: '1px solid #e6f4ea',
-                                      padding: '4px 6px',
-                                      borderRadius: '50%',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      flexShrink: 0,
-                                      boxShadow: '0 1px 2px rgba(52, 168, 83, 0.04)'
-                                    }}>
-                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="20 6 9 17 4 12" />
-                                      </svg>
+                                    <span 
+                                      title="Terminverschiebung bestätigt"
+                                      style={{
+                                        background: '#e6f4ea',
+                                        color: '#15803d',
+                                        border: '1px solid rgba(52, 168, 83, 0.2)',
+                                        padding: '3px 10px',
+                                        borderRadius: '100px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 750,
+                                        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        flexShrink: 0,
+                                        boxShadow: '0 1px 2px rgba(21, 128, 61, 0.05)',
+                                        letterSpacing: '0.01em'
+                                      }}
+                                    >
+                                      <Check size={12} strokeWidth={3} color="#15803d" />
+                                      <span>Bestätigt</span>
+                                    </span>
+                                  )}
+
+                                  {/* Monochrome Group Icon before Shoutbox Button */}
+                                  {slot.isGroup && !isCanceled && !isRescheduledAway && (
+                                    <span 
+                                      title={`Gruppentermin (${slot.students?.length || 2} Schüler)`}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#64748b',
+                                        marginLeft: 'auto',
+                                        marginRight: '6px',
+                                        flexShrink: 0
+                                      }}
+                                    >
+                                      <Users size={16} color="#64748b" />
                                     </span>
                                   )}
 
@@ -11401,7 +11874,7 @@ export function TeacherDashboard({
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         color: activeChatOccIds.has(slot.isGroup ? slot.slots[0]?.id : slot.id) ? '#eab308' : '#94a3b8',
-                                        marginLeft: confirmCancelSlotId === (slot.isGroup ? slot.slots[0]?.id : slot.id) ? '0' : 'auto',
+                                        marginLeft: (slot.isGroup || confirmCancelSlotId === (slot.isGroup ? slot.slots[0]?.id : slot.id)) ? '0' : 'auto',
                                         transition: 'all 0.2s',
                                         borderRadius: '50%',
                                         flexShrink: 0
@@ -11541,18 +12014,83 @@ export function TeacherDashboard({
             {/* briefing-right-sidebar */}
             {!isMobileDevice && (
             <aside style={{ 
-              flex: windowWidth < 768 ? '1 1 100%' : '1 1 320px',
-              maxWidth: windowWidth < 768 ? '100%' : '320px',
-              width: '100%',
+              flex: isTeacherBriefingSidebarCollapsed ? '0 0 0px' : (windowWidth < 768 ? '1 1 100%' : '1 1 320px'),
+              maxWidth: isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '100%' : '320px'),
+              minWidth: isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '0px' : '320px'),
+              width: isTeacherBriefingSidebarCollapsed ? '0px' : '100%',
+              opacity: isTeacherBriefingSidebarCollapsed ? 0 : 1,
+              transform: isTeacherBriefingSidebarCollapsed ? 'translateX(20px)' : 'translateX(0)',
+              pointerEvents: isTeacherBriefingSidebarCollapsed ? 'none' : 'auto',
+              overflowY: isTeacherBriefingSidebarCollapsed ? 'hidden' : (windowWidth < 768 ? 'visible' : 'auto'),
+              overflowX: 'hidden',
               display: 'flex', 
               flexDirection: 'column', 
               gap: '20px',
               maxHeight: windowWidth < 768 ? 'none' : 'calc(100vh - 80px)',
-              overflowY: windowWidth < 768 ? 'visible' : 'auto',
-              paddingRight: windowWidth < 768 ? '0' : '6px',
-              paddingBottom: windowWidth < 768 ? '20px' : '80px',
-              boxSizing: 'border-box'
+              paddingRight: isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '0' : '6px'),
+              paddingBottom: isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '20px' : '80px'),
+              boxSizing: 'border-box',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }} className="briefing-right-sidebar">
+              {/* Sidebar Header with Title & Collapse Button */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '4px 2px 4px 2px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '8px',
+                    background: activePlatform === 'campus' ? '#e6f4ea' : '#fef9c3',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Calendar size={15} color={activePlatform === 'campus' ? '#34a853' : '#ca8a04'} />
+                  </div>
+                  <span style={{ fontWeight: 950, fontSize: '0.88rem', color: '#1e293b', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
+                    Termine &amp; Mitteilungen
+                  </span>
+                  {teacherSidebarTotalAlertsCount > 0 && (
+                    <span style={{
+                      background: hasTeacherAppointmentAlerts ? '#f59e0b' : (activePlatform === 'campus' ? '#34a853' : '#eab308'),
+                      color: activePlatform === 'campus' || hasTeacherAppointmentAlerts ? '#ffffff' : '#000000',
+                      fontSize: '0.65rem',
+                      fontWeight: 900,
+                      padding: '2px 7px',
+                      borderRadius: '100px'
+                    }}>
+                      {teacherSidebarTotalAlertsCount}
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => handleToggleTeacherBriefingSidebar(true)}
+                  style={{
+                    background: '#f8fafc',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '6px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                  title="Sidebar einklappen"
+                >
+                  <span>Einklappen</span>
+                  <ChevronRight size={14} color="#64748b" />
+                </button>
+              </div>
               
               {/* SICKNESS CARD – always red */}
               <div style={{ 
@@ -11888,7 +12426,7 @@ export function TeacherDashboard({
 
 
 
-              {myChangedAppointments.length > 0 && (
+              {visibleChangedAppointments.length > 0 && (
                 <div style={{ 
                   background: '#ffffff', 
                   borderRadius: '24px', 
@@ -11896,7 +12434,7 @@ export function TeacherDashboard({
                   boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
                   marginBottom: '20px'
                 }}>
-                {/* Header with Title & Time Window Filter */}
+                {/* Header with Title */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <AlertCircle size={18} color="#475569" />
@@ -11904,69 +12442,21 @@ export function TeacherDashboard({
                       Terminänderungen
                     </h3>
                   </div>
-                  
-                  {myChangedAppointments.length > 0 && (
-                    <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '2px' }}>
-                      <button
-                        onClick={() => setScheduleChangesTimeWindow('7days')}
-                        style={{
-                          border: 'none',
-                          background: scheduleChangesTimeWindow === '7days' ? '#ffffff' : 'transparent',
-                          color: scheduleChangesTimeWindow === '7days' ? '#0f172a' : '#64748b',
-                          fontWeight: scheduleChangesTimeWindow === '7days' ? 800 : 600,
-                          fontSize: '0.68rem',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          boxShadow: scheduleChangesTimeWindow === '7days' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        7 Tage
-                      </button>
-                      <button
-                        onClick={() => setScheduleChangesTimeWindow('all')}
-                        style={{
-                          border: 'none',
-                          background: scheduleChangesTimeWindow === 'all' ? '#ffffff' : 'transparent',
-                          color: scheduleChangesTimeWindow === 'all' ? '#0f172a' : '#64748b',
-                          fontWeight: scheduleChangesTimeWindow === 'all' ? 800 : 600,
-                          fontSize: '0.68rem',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          boxShadow: scheduleChangesTimeWindow === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        Alle
-                      </button>
-                    </div>
-                  )}
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 750,
+                    color: '#64748b',
+                    background: '#f1f5f9',
+                    padding: '2px 8px',
+                    borderRadius: '100px'
+                  }}>
+                    Nächste 7 Tage
+                  </span>
                 </div>
 
                 {/* List of Compact Item Rows */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {myChangedAppointments.length === 0 ? (
-                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', padding: '16px 14px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <CheckCircle size={18} strokeWidth={2.5} />
-                      </div>
-                      <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.82rem', fontStyle: 'normal' }}>Keine bevorstehenden Terminänderungen</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'normal' }}>Alle Unterrichtstermine finden regulär nach Stundenplan statt.</div>
-                    </div>
-                  ) : visibleChangedAppointments.length === 0 ? (
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '12px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                      Keine Terminänderungen in den nächsten 7 Tagen.
-                      <button
-                        onClick={() => setScheduleChangesTimeWindow('all')}
-                        style={{ display: 'block', margin: '6px auto 0 auto', border: 'none', background: 'none', color: '#3b82f6', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}
-                      >
-                        Alle {myChangedAppointments.length} Änderungen anzeigen
-                      </button>
-                    </div>
-                  ) : (
-                    (showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
+                  {(showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
                       const dateObj = new Date(b.date);
                       const isCancelled = ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick'].includes(b.status);
                       const isRescheduled = ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status) || 
@@ -12281,7 +12771,7 @@ export function TeacherDashboard({
                           )}
                         </div>
                       );
-                    }))}
+                    })}
                   </div>
 
                   {/* Toggle Button for More Changes */}
@@ -16846,111 +17336,301 @@ export function TeacherDashboard({
           </div>
         </div>
       ) : activeTab === 'settings' ? (
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div>
             <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
               ⚙️ Einstellungen
             </h2>
             <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
-              Passe deine persönlichen Einstellungen und die Fokus-Stufen für deine Schüler an.
+              Wähle ein Modul aus, um deine persönlichen Einstellungen, Fokus-Stufen und dein Profil anzupassen.
             </p>
           </div>
 
-          <div style={{ 
-            display: 'flex',
-            flexDirection: windowWidth < 768 ? 'column' : 'row',
-            background: '#ffffff',
-            borderRadius: windowWidth < 768 ? '16px' : '24px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)',
-            minHeight: windowWidth < 768 ? 'auto' : '520px',
-            overflow: 'hidden',
-            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+          {/* MODULAR COVER CARDS GRID */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: windowWidth < 640 ? 'repeat(2, 1fr)' : windowWidth < 1024 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '18px',
+            width: '100%'
           }}>
-            {/* LEFT SIDEBAR / TOP TABS ON MOBILE */}
-            <div style={{
-              width: windowWidth < 768 ? '100%' : '240px',
-              background: '#f8fafc',
-              borderRight: windowWidth < 768 ? 'none' : '1px solid #e2e8f0',
-              borderBottom: windowWidth < 768 ? '1px solid #e2e8f0' : 'none',
-              padding: windowWidth < 768 ? '10px 12px' : '24px 16px',
-              display: 'flex',
-              flexDirection: windowWidth < 768 ? 'row' : 'column',
-              gap: windowWidth < 768 ? '8px' : '6px',
-              flexShrink: 0,
-              boxSizing: 'border-box'
-            }}>
-              {windowWidth >= 768 && (
-                <h3 style={{ margin: '0 0 16px 8px', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Bereiche</h3>
-              )}
-              {[
-                { id: 'fokus', label: 'Fokus-Stufen' },
-                { id: 'profile', label: 'Mein Profil' }
-              ].map((item) => {
-                const isSelected = teacherSettingsTab === item.id;
-                const brandColor = '#34a853';
-                const activeColor = isSelected ? brandColor : '#64748b';
-                
-                const renderIcon = () => {
-                  switch (item.id) {
-                    case 'fokus': return <Activity size={14} color={activeColor} />;
-                    case 'profile': return <User size={14} color={activeColor} />;
-                    default: return null;
-                  }
-                };
-
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setTeacherSettingsTab(item.id as any)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: windowWidth < 768 ? 'center' : 'flex-start',
-                      gap: '10px',
-                      flex: windowWidth < 768 ? 1 : 'none',
-                      width: windowWidth < 768 ? 'auto' : '100%',
-                      padding: windowWidth < 768 ? '8px 12px' : '10px 12px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      borderLeft: windowWidth >= 768 && isSelected ? `3px solid ${brandColor}` : 'none',
-                      background: isSelected ? '#e6f4ea' : (windowWidth < 768 ? '#ffffff' : 'transparent'),
-                      color: isSelected ? brandColor : '#475569',
-                      fontSize: '0.82rem',
-                      fontWeight: isSelected ? 700 : 500,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.15s ease',
-                      boxShadow: windowWidth < 768 && isSelected ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
-                    }}
-                    className="hover-scale"
-                  >
+            {[
+              {
+                id: 'fokus',
+                title: 'Fokus-Stufen',
+                subtitle: 'Flammen & XP-Zeiten',
+                badge: '3 Level aktiv',
+                gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                shadowColor: 'rgba(245, 158, 11, 0.40)',
+                icon: Flame
+              },
+              {
+                id: 'profile',
+                title: 'Mein Profil',
+                subtitle: `${teacher?.first_name || ''} ${teacher?.last_name || ''}`.trim() || 'Stammdaten & Rolle',
+                badge: 'Lehrkraft',
+                gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                shadowColor: 'rgba(59, 130, 246, 0.40)',
+                icon: User
+              },
+              {
+                id: 'avatar',
+                title: 'Profil-Avatar',
+                subtitle: 'Live Lab & Sidebar',
+                badge: 'Auswählen',
+                gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                shadowColor: 'rgba(139, 92, 246, 0.40)',
+                icon: Sparkles
+              },
+              {
+                id: 'security',
+                title: 'Sicherheit & PIN',
+                subtitle: 'Geräte-Pairing & Schutz',
+                badge: 'Aktiv',
+                gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                shadowColor: 'rgba(16, 185, 129, 0.40)',
+                icon: ShieldCheck
+              }
+            ].map((module) => {
+              const IconComp = module.icon;
+              return (
+                <div
+                  key={module.id}
+                  onClick={() => {
+                    setTeacherSettingsTab(module.id === 'avatar' ? 'profile' : (module.id as any));
+                    setActiveTeacherSettingsModal(module.id as any);
+                  }}
+                  style={{
+                    background: '#ffffff',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '20px',
+                    padding: '24px 16px 20px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                  className="hover-scale"
+                >
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '16px',
+                    background: module.gradient,
+                    boxShadow: `0 8px 18px -3px ${module.shadowColor}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(255, 255, 255, 0.25)'
+                  }}>
+                    <IconComp size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                  </div>
+                  <div style={{ marginTop: '14px', padding: '0 4px', width: '100%' }}>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                      {module.title}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', marginTop: '3px', lineHeight: '1.3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {module.subtitle}
+                    </div>
+                  </div>
+                  {module.badge && (
                     <span style={{
+                      marginTop: '10px',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      color: '#34a853',
+                      background: '#e6f4ea',
+                      padding: '2px 8px',
+                      borderRadius: '100px'
+                    }}>
+                      {module.badge}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* PERSISTENT BOTTOM SAVE BAR (IF DIRTY) */}
+          {(() => {
+            const isSettingsDirty = initialSchoolData && schoolData && 
+              JSON.stringify(schoolData.opening_hours?.fokus_levels) !== JSON.stringify(initialSchoolData.opening_hours?.fokus_levels);
+            const brandColor = '#34a853';
+
+            if (!isSettingsDirty) return null;
+
+            return (
+              <div style={{
+                display: 'flex',
+                flexDirection: windowWidth < 768 ? 'column' : 'row',
+                alignItems: windowWidth < 768 ? 'stretch' : 'center',
+                justifyContent: 'space-between',
+                gap: windowWidth < 768 ? '10px' : '0',
+                padding: windowWidth < 768 ? '12px 16px' : '16px 32px',
+                border: '1px solid #fecaca',
+                background: '#fef2f2',
+                borderRadius: windowWidth < 768 ? '16px' : '20px',
+                boxSizing: 'border-box',
+                width: '100%',
+                boxShadow: '0 4px 16px rgba(234, 67, 53, 0.1)'
+              }}>
+                <span style={{ fontSize: '0.82rem', color: '#ea4335', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚠️ Ungespeicherte Änderungen an den Fokus-Stufen vorhanden.
+                </span>
+                <button
+                  onClick={async () => {
+                    if (!teacher?.school_id || !schoolData) return;
+                    setIsSaving(true);
+                    const { error } = await supabase
+                      .from('schools')
+                      .update({ opening_hours: schoolData.opening_hours })
+                      .eq('id', teacher.school_id);
+                    setIsSaving(false);
+                    if (error) {
+                      alert("Fehler beim Speichern der Einstellungen: " + error.message);
+                    } else {
+                      setInitialSchoolData(JSON.parse(JSON.stringify(schoolData)));
+                      alert("Einstellungen erfolgreich gespeichert! 🎉");
+                    }
+                  }}
+                  disabled={isSaving}
+                  style={{
+                    padding: '10px 24px',
+                    width: windowWidth < 768 ? '100%' : 'auto',
+                    background: brandColor,
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: 800,
+                    fontSize: '0.84rem',
+                    cursor: 'pointer',
+                    boxShadow: `0 4px 12px ${brandColor}40`,
+                    transition: 'all 0.2s',
+                    opacity: isSaving ? 0.7 : 1
+                  }}
+                  className="hover-scale"
+                >
+                  {isSaving ? 'Wird gespeichert...' : 'Einstellungen speichern'}
+                </button>
+              </div>
+            );
+          })()}
+
+          {/* FOCUS MODAL FOR SELECTED SETTINGS CATEGORY */}
+          {activeTeacherSettingsModal && (
+            <div 
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(15, 23, 42, 0.55)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                zIndex: 10000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+                boxSizing: 'border-box'
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setActiveTeacherSettingsModal(null);
+              }}
+            >
+              <div 
+                style={{
+                  width: '100%',
+                  maxWidth: activeTeacherSettingsModal === 'fokus' ? '720px' : '620px',
+                  maxHeight: '90vh',
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  border: '1px solid rgba(255, 255, 255, 0.8)',
+                  boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.35)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}
+                className="animate-scale-in"
+              >
+                {/* Modal Header */}
+                <div style={{
+                  padding: '20px 24px',
+                  borderBottom: '1px solid #f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: '#f8fafc'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '12px',
+                      background: activeTeacherSettingsModal === 'fokus'
+                        ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                        : activeTeacherSettingsModal === 'profile'
+                        ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                        : activeTeacherSettingsModal === 'avatar'
+                        ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
+                        : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '6px',
-                      background: isSelected ? '#ffffff' : '#f1f5f9',
-                      boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
-                    }}>{renderIcon()}</span>
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* RIGHT PANEL */}
-            <div style={{ flex: 1, padding: windowWidth < 768 ? '16px' : '32px 40px', overflowY: 'auto', textAlign: 'left', boxSizing: 'border-box' }}>
-              {teacherSettingsTab === 'fokus' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: windowWidth < 768 ? '16px' : '28px' }}>
-                  <div>
-                    <h3 style={{ margin: '0 0 6px 0', fontSize: windowWidth < 768 ? '1.05rem' : '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Fokus-Stufen konfigurieren</h3>
-                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Definiere die Zeiten in Minuten, die für Flammen in den jeweiligen Leveln benötigt werden.</p>
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
+                    }}>
+                      {activeTeacherSettingsModal === 'fokus' && <Flame size={22} color="#ffffff" />}
+                      {activeTeacherSettingsModal === 'profile' && <User size={22} color="#ffffff" />}
+                      {activeTeacherSettingsModal === 'avatar' && <Sparkles size={22} color="#ffffff" />}
+                      {activeTeacherSettingsModal === 'security' && <ShieldCheck size={22} color="#ffffff" />}
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        {activeTeacherSettingsModal === 'fokus' && 'Fokus-Stufen konfigurieren'}
+                        {activeTeacherSettingsModal === 'profile' && 'Mein Profil & Stammdaten'}
+                        {activeTeacherSettingsModal === 'avatar' && 'Profil-Avatar auswählen'}
+                        {activeTeacherSettingsModal === 'security' && 'Sicherheit & Status'}
+                      </h3>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
+                        {activeTeacherSettingsModal === 'fokus' && 'Definiere die benötigten Übe-Minuten für Flammen in den Stufen 1–3.'}
+                        {activeTeacherSettingsModal === 'profile' && 'Deine hinterlegten Stammdaten im Campus-Groovelab.'}
+                        {activeTeacherSettingsModal === 'avatar' && 'Wähle dein bevorzugtes Avatar-Bild für Live Lab & Sidebar.'}
+                        {activeTeacherSettingsModal === 'security' && 'Aktiver Sicherheitsstatus und Zugriffsrechte.'}
+                      </p>
+                    </div>
                   </div>
+                  <button
+                    onClick={() => setActiveTeacherSettingsModal(null)}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      border: '1px solid #e2e8f0',
+                      background: '#ffffff',
+                      color: '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
 
-                  {(() => {
+                {/* Modal Body */}
+                <div style={{ padding: '24px', overflowY: 'auto', maxHeight: 'calc(80vh - 140px)', textAlign: 'left' }}>
+                  {activeTeacherSettingsModal === 'fokus' && (() => {
                     const currentConfig = schoolData?.opening_hours?.fokus_levels || {
                       level1: { kleine: 3, mittlere: 5, helden: 10 },
                       level2: { kleine: 5, mittlere: 10, helden: 15 },
@@ -16964,7 +17644,7 @@ export function TeacherDashboard({
                     ];
 
                     return (
-                      <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? '1fr' : 'repeat(3, 1fr)', gap: '16px' }}>
                         {levels.map((lvl) => {
                           const conf = currentConfig[lvl.key] || lvl.defaults;
                           return (
@@ -16992,7 +17672,7 @@ export function TeacherDashboard({
                                           opening_hours: { ...prev.opening_hours, fokus_levels: updated }
                                         }));
                                       }}
-                                      style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', fontWeight: 700, width: '100%', boxSizing: 'border-box' }}
+                                      style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', fontWeight: 700, width: '100%', boxSizing: 'border-box', background: '#ffffff' }}
                                     />
                                   </div>
                                 ))}
@@ -17003,192 +17683,204 @@ export function TeacherDashboard({
                       </div>
                     );
                   })()}
+
+                  {activeTeacherSettingsModal === 'profile' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? '1fr' : '1fr 1fr', gap: '14px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
+                        <input 
+                          type="text" 
+                          readOnly 
+                          value={teacher?.first_name || ''} 
+                          style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+                        <input 
+                          type="text" 
+                          readOnly 
+                          value={teacher?.last_name || ''} 
+                          style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: windowWidth < 640 ? 'span 1' : 'span 2' }}>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>E-Mail-Adresse</label>
+                        <input 
+                          type="text" 
+                          readOnly 
+                          value={teacher?.email || ''} 
+                          style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: windowWidth < 640 ? 'span 1' : 'span 2' }}>
+                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Rolle</label>
+                        <input 
+                          type="text" 
+                          readOnly 
+                          value="Campus-Lehrkraft" 
+                          style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTeacherSettingsModal === 'avatar' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(84px, 1fr))', gap: '12px' }}>
+                        {[
+                          { url: '/avatars/gitarre_avatar_new.png', name: 'Gitarre' },
+                          { url: '/avatars/egitarre_avatar.png', name: 'E-Gitarre' },
+                          { url: '/avatars/ebass_avatar.png', name: 'E-Bass' },
+                          { url: '/avatars/schlagzeug_avatar.png', name: 'Drums' },
+                          { url: '/avatars/klavier_avatar_new.png', name: 'Klavier' },
+                          { url: '/avatars/gesang_avatar.png', name: 'Gesang' },
+                          { url: '/avatars/trompete_avatar_new.png', name: 'Trompete' },
+                          { url: '/avatars/saxophon_avatar_new.png', name: 'Saxophon' },
+                          { url: '/avatar_ghost.jpg', name: 'Geist' }
+                        ].map((av) => {
+                          const isSelected = teacher?.photo_url === av.url || teacher?.avatar_url === av.url;
+                          return (
+                            <div
+                              key={av.url}
+                              onClick={async () => {
+                                if (!teacher?.id) return;
+                                try {
+                                  const { error } = await supabase
+                                    .from('users')
+                                    .update({ photo_url: av.url, avatar_url: av.url })
+                                    .eq('id', teacher.id);
+                                  if (error) throw error;
+                                  setTeacher((prev: any) => ({ ...prev, photo_url: av.url, avatar_url: av.url }));
+                                } catch (err: any) {
+                                  alert('Fehler beim Aktualisieren: ' + err.message);
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '10px 6px',
+                                borderRadius: '14px',
+                                background: isSelected ? '#e6f4ea' : '#f8fafc',
+                                border: isSelected ? '2px solid #34a853' : '1px solid #e2e8f0',
+                                cursor: 'pointer',
+                                boxShadow: isSelected ? '0 4px 14px rgba(52,168,83,0.2)' : 'none',
+                                transition: 'all 0.15s'
+                              }}
+                              className="hover-scale"
+                            >
+                              <img
+                                src={av.url}
+                                alt={av.name}
+                                style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
+                              />
+                              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isSelected ? '#34a853' : '#64748b', textAlign: 'center' }}>
+                                {av.name}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTeacherSettingsModal === 'security' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
+                          <ShieldCheck size={24} />
+                        </div>
+                        <div>
+                          <strong style={{ fontSize: '0.86rem', color: '#0f172a', display: 'block' }}>DSGVO & Datenschutz-Status</strong>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Dein Account ist mit Ende-zu-Ende verschlüsselter Sitzungssicherheit geschützt.</span>
+                        </div>
+                      </div>
+
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>Kopplung & Anmelde-Status</strong>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45 }}>
+                          Schul-ID: <strong>{teacher?.school_id || 'Aktiv'}</strong><br />
+                          Rolle: <strong>Lehrkraft (Teacher Profile)</strong><br />
+                          Zugriffsberechtigungen: <strong>Campus & Meisterwerk-Dokumentation</strong>
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {teacherSettingsTab === 'profile' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: windowWidth < 768 ? '16px' : '24px' }}>
-                  <div>
-                    <h3 style={{ margin: '0 0 6px 0', fontSize: windowWidth < 768 ? '1.05rem' : '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Mein Profil</h3>
-                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Deine hinterlegten Daten im Campus-Groovelab.</p>
-                  </div>
+                {/* Modal Footer */}
+                <div style={{
+                  padding: '16px 24px',
+                  borderTop: '1px solid #f1f5f9',
+                  background: '#f8fafc',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: '10px'
+                }}>
+                  <button
+                    onClick={() => setActiveTeacherSettingsModal(null)}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      color: '#475569',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                    className="hover-scale"
+                  >
+                    Schließen
+                  </button>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : '1fr 1fr', gap: '12px', background: '#f8fafc', padding: windowWidth < 768 ? '14px' : '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value={teacher?.first_name || ''} 
-                        style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value={teacher?.last_name || ''} 
-                        style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: windowWidth < 768 ? 'span 1' : 'span 2' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>E-Mail-Adresse</label>
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value={teacher?.email || ''} 
-                        style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: windowWidth < 768 ? 'span 1' : 'span 2' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Rolle</label>
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value="Campus-Lehrkraft" 
-                        style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                  </div>
+                  {activeTeacherSettingsModal === 'fokus' && (() => {
+                    const isSettingsDirty = initialSchoolData && schoolData && 
+                      JSON.stringify(schoolData.opening_hours?.fokus_levels) !== JSON.stringify(initialSchoolData.opening_hours?.fokus_levels);
 
-                  {/* AVATAR SELECTION SECTION */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: windowWidth < 768 ? '14px' : '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      🖼️ Profil-Avatar auswählen
-                    </label>
-                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>
-                      Wähle dein bevorzugtes Avatar-Bild für den Live Lab &amp; die Sidebar aus.
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(76px, 1fr))', gap: '10px', marginTop: '4px' }}>
-                      {[
-                        { url: '/avatars/gitarre_avatar_new.png', name: 'Gitarre' },
-                        { url: '/avatars/egitarre_avatar.png', name: 'E-Gitarre' },
-                        { url: '/avatars/ebass_avatar.png', name: 'E-Bass' },
-                        { url: '/avatars/schlagzeug_avatar.png', name: 'Drums' },
-                        { url: '/avatars/klavier_avatar_new.png', name: 'Klavier' },
-                        { url: '/avatars/gesang_avatar.png', name: 'Gesang' },
-                        { url: '/avatars/trompete_avatar_new.png', name: 'Trompete' },
-                        { url: '/avatars/saxophon_avatar_new.png', name: 'Saxophon' },
-                        { url: '/avatar_ghost.jpg', name: 'Geist' }
-                      ].map((av) => {
-                        const isSelected = teacher?.photo_url === av.url || teacher?.avatar_url === av.url;
-                        return (
-                          <div
-                            key={av.url}
-                            onClick={async () => {
-                              if (!teacher?.id) return;
-                              try {
-                                const { error } = await supabase
-                                  .from('users')
-                                  .update({ photo_url: av.url, avatar_url: av.url })
-                                  .eq('id', teacher.id);
-                                if (error) throw error;
-                                setTeacher((prev: any) => ({ ...prev, photo_url: av.url, avatar_url: av.url }));
-                              } catch (err: any) {
-                                alert('Fehler beim Aktualisieren: ' + err.message);
-                              }
-                            }}
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '8px 4px',
-                              borderRadius: '12px',
-                              background: isSelected ? '#e6f4ea' : 'white',
-                              border: isSelected ? '2px solid #34a853' : '1px solid #cbd5e1',
-                              cursor: 'pointer',
-                              boxShadow: isSelected ? '0 4px 12px rgba(52,168,83,0.15)' : 'none',
-                              transition: 'all 0.15s'
-                            }}
-                          >
-                            <img
-                              src={av.url}
-                              alt={av.name}
-                              style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }}
-                            />
-                            <span style={{ fontSize: '0.62rem', fontWeight: 700, color: isSelected ? '#34a853' : '#64748b', textAlign: 'center' }}>
-                              {av.name}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                    return (
+                      <button
+                        onClick={async () => {
+                          if (!teacher?.school_id || !schoolData) return;
+                          setIsSaving(true);
+                          const { error } = await supabase
+                            .from('schools')
+                            .update({ opening_hours: schoolData.opening_hours })
+                            .eq('id', teacher.school_id);
+                          setIsSaving(false);
+                          if (error) {
+                            alert("Fehler beim Speichern der Einstellungen: " + error.message);
+                          } else {
+                            setInitialSchoolData(JSON.parse(JSON.stringify(schoolData)));
+                            alert("Einstellungen erfolgreich gespeichert! 🎉");
+                            setActiveTeacherSettingsModal(null);
+                          }
+                        }}
+                        disabled={!isSettingsDirty || isSaving}
+                        style={{
+                          padding: '8px 20px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          background: isSettingsDirty ? '#34a853' : '#cbd5e1',
+                          color: isSettingsDirty ? '#ffffff' : '#94a3b8',
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
+                          cursor: isSettingsDirty ? 'pointer' : 'default',
+                          boxShadow: isSettingsDirty ? '0 4px 12px rgba(52,168,83,0.3)' : 'none'
+                        }}
+                        className={isSettingsDirty ? "hover-scale" : ""}
+                      >
+                        {isSaving ? 'Speichern...' : 'Speichern'}
+                      </button>
+                    );
+                  })()}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* PERSISTENT BOTTOM SAVE BAR */}
-          {(() => {
-            const isSettingsDirty = initialSchoolData && schoolData && 
-              JSON.stringify(schoolData.opening_hours?.fokus_levels) !== JSON.stringify(initialSchoolData.opening_hours?.fokus_levels);
-            const brandColor = '#34a853';
-
-            return (
-              <div style={{
-                display: 'flex',
-                flexDirection: windowWidth < 768 ? 'column' : 'row',
-                alignItems: windowWidth < 768 ? 'stretch' : 'center',
-                justifyContent: 'space-between',
-                gap: windowWidth < 768 ? '10px' : '0',
-                padding: windowWidth < 768 ? '12px 16px' : '16px 40px',
-                border: '1px solid #e2e8f0',
-                background: isSettingsDirty ? '#fef2f2' : '#f8fafc',
-                borderRadius: windowWidth < 768 ? '16px' : '20px',
-                transition: 'background-color 0.3s ease',
-                boxSizing: 'border-box',
-                width: '100%'
-              }}>
-                {isSettingsDirty ? (
-                  <span style={{ fontSize: '0.82rem', color: '#ea4335', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    ⚠️ Ungespeicherte Änderungen vorhanden.
-                  </span>
-                ) : (
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    ✓ Alle Änderungen gespeichert.
-                  </span>
-                )}
-                <button
-                  onClick={async () => {
-                    if (!teacher?.school_id || !schoolData) return;
-                    setIsSaving(true);
-                    const { error } = await supabase
-                      .from('schools')
-                      .update({ opening_hours: schoolData.opening_hours })
-                      .eq('id', teacher.school_id);
-                    setIsSaving(false);
-                    if (error) {
-                      alert("Fehler beim Speichern der Einstellungen: " + error.message);
-                    } else {
-                      setInitialSchoolData(JSON.parse(JSON.stringify(schoolData)));
-                      alert("Einstellungen erfolgreich gespeichert! 🎉");
-                    }
-                  }}
-                  disabled={!isSettingsDirty || isSaving}
-                  style={{
-                    padding: '10px 24px',
-                    width: windowWidth < 768 ? '100%' : 'auto',
-                    background: isSettingsDirty ? brandColor : '#cbd5e1',
-                    color: isSettingsDirty ? 'white' : '#94a3b8',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontWeight: 800,
-                    fontSize: '0.84rem',
-                    cursor: isSettingsDirty ? 'pointer' : 'default',
-                    boxShadow: isSettingsDirty ? `0 4px 12px ${brandColor}40` : 'none',
-                    transition: 'all 0.2s',
-                    opacity: isSaving ? 0.7 : 1
-                  }}
-                  className={isSettingsDirty ? "hover-scale" : ""}
-                >
-                  {isSaving ? 'Wird gespeichert...' : 'Einstellungen speichern'}
-                </button>
               </div>
-            );
-          })()}
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>

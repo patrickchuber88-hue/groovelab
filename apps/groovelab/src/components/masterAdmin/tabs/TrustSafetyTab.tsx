@@ -75,7 +75,7 @@ export function TrustSafetyTab() {
         timestamp: '15.08.2026, 14:22:08 MESZ',
         active: true,
         sha256Hash: 'a8f5b4923e811c9dc521098ef763190ab420404a011733cfb7b190d62c65bf0b',
-        legalBasis: 'Art. 6 DSA / § 10 TMG / UrhDaG'
+        legalBasis: 'Art. 6 DSA / § 10 DDG / UrhDaG'
       }
     ];
   });
@@ -255,7 +255,7 @@ export function TrustSafetyTab() {
       timestamp: timestamp,
       active: true,
       sha256Hash: hash,
-      legalBasis: 'Art. 6 DSA / § 10 TMG / UrhDaG'
+      legalBasis: 'Art. 6 DSA / § 10 DDG / UrhDaG'
     };
 
     // Update localStorage specific and registry
@@ -319,7 +319,7 @@ export function TrustSafetyTab() {
   const handleDownloadDsaCertificate = (rec: TakedownRecord) => {
     const certData = {
       $schema: "https://campus-groovelab.de/schemas/dsa-takedown-certificate-v1.json",
-      certificateTitle: "RECHTSSICHERES NOTICE-AND-TAKEDOWN PROTOKOLL GEMÄSS ART. 6 DSA / § 10 TMG",
+      certificateTitle: "RECHTSSICHERES NOTICE-AND-TAKEDOWN PROTOKOLL GEMÄSS ART. 6 DSA / § 10 DDG",
       incidentId: rec.id,
       platformOperator: "Campus-Groovelab Platform Systems",
       legalBasis: rec.legalBasis,
@@ -333,7 +333,7 @@ export function TrustSafetyTab() {
       takedownReason: rec.reason,
       complianceStatus: rec.active ? "HTTP_410_RESOURCE_SUSPENDED" : "RESTORED",
       tamperProofSha256Checksum: rec.sha256Hash,
-      legalDisclaimer: "Dieses Dokument dient als amtlicher Nachweis über die unverzügliche Erfüllung der Betreiberpflichten (Expeditious Action) nach Kenntniserlangung. Schadensersatz- und Störerhaftungsansprüche entfallen gem. Art. 6 DSA / § 10 TMG."
+      legalDisclaimer: "Dieses Dokument dient als amtlicher Nachweis über die unverzügliche Erfüllung der Betreiberpflichten (Expeditious Action) nach Kenntniserlangung. Schadensersatz- und Störerhaftungsansprüche entfallen gem. Art. 6 DSA / § 10 DDG."
     };
 
     const blob = new Blob([JSON.stringify(certData, null, 2)], { type: 'application/json;charset=utf-8;' });
@@ -413,7 +413,7 @@ export function TrustSafetyTab() {
               Trust & Safety • Enterprise Notice-and-Takedown Suite
             </span>
             <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600 }}>
-              Art. 6 DSA / § 10 TMG / UrhDaG
+              Art. 6 DSA / § 10 DDG / UrhDaG
             </span>
           </div>
           <h2 style={{ margin: '0 0 8px 0', fontSize: '1.6rem', fontWeight: 900, letterSpacing: '-0.02em' }}>

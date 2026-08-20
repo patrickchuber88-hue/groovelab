@@ -1657,8 +1657,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             <div class="data-box">
               <div class="data-row"><span class="data-label">Instrument:</span><span class="data-value">${student.instrument || '-'}</span></div>
               <div class="data-row"><span class="data-label">Unterrichtszeit:</span><span class="data-value">${lessonDuration} Min.</span></div>
-              <div class="data-row"><span class="data-label">Lizenzstatus Campus:</span><span class="data-value"><span class="badge ${isCampusActive ? 'badge-active' : 'badge-inactive'}">${isCampusActive ? 'Aktiv' : 'Inaktiv'}</span></span></div>
-              <div class="data-row"><span class="data-label">Lizenzstatus GrooveLab:</span><span class="data-value"><span class="badge ${isGroovelabActive ? 'badge-active' : 'badge-inactive'}">${isGroovelabActive ? 'Aktiv' : 'Inaktiv'}</span></span></div>
+              <div class="data-row"><span class="data-label">Aktivierungsstatus Campus:</span><span class="data-value"><span class="badge ${isCampusActive ? 'badge-active' : 'badge-inactive'}">${isCampusActive ? 'Aktiv' : 'Inaktiv'}</span></span></div>
+              <div class="data-row"><span class="data-label">Aktivierungsstatus GrooveLab:</span><span class="data-value"><span class="badge ${isGroovelabActive ? 'badge-active' : 'badge-inactive'}">${isGroovelabActive ? 'Aktiv' : 'Inaktiv'}</span></span></div>
             </div>
           </div>
         </div>

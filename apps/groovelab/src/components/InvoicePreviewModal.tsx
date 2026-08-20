@@ -114,11 +114,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const handleDownloadXRechnung = () => {
     const lineItems: EInvoiceLineItem[] = [];
 
-    // Canonical Item 1: Software License (Free)
+    // Canonical Item 1: Software Provisioning (Free)
     lineItems.push({
       id: 1,
-      name: 'Campus-Groovelab Software-Nutzungslizenz',
-      description: '100% kostenlose Basislizenz für Musikschulen',
+      name: 'Campus-Groovelab Software-Bereitstellung',
+      description: '100% kostenlose Software-Bereitstellung für Musikschulen',
       quantity: 1,
       unitPrice: 0,
       totalPrice: 0,
@@ -455,10 +455,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 <>
                   {isInf && (
                     <>
-                      {/* Position 1: 100% Kostenlose Software Lizenz */}
+                      {/* Position 1: 100% Kostenlose Software-Bereitstellung */}
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '8px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Software-Nutzungslizenz</strong>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Software-Bereitstellung</strong>
                           <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 700 }}>Pädagogische Schulplattform &amp; Web-App (100% kostenfrei / inklusive)</span>
                         </td>
                         <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>

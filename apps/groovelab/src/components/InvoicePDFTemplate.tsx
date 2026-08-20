@@ -258,10 +258,10 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
             <tbody>
               {isInf && (
                 <>
-                  {/* Position 1: 100% Kostenlose Software Lizenz */}
+                  {/* Position 1: 100% Kostenlose Software-Bereitstellung */}
                   <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: dynamicTdPadding }}>
-                      <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Software-Nutzungslizenz</strong>
+                      <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Software-Bereitstellung</strong>
                       <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 700 }}>100% kostenlos (0,00 €)</span>
                     </td>
                     <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>

@@ -21,7 +21,6 @@ import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { AVVModal } from './AVVModal';
-import { PricingTransparencyWidget } from './PricingTransparencyWidget';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -52,13 +51,18 @@ const getSimulatedNow = (): Date => {
   return new Date(baseSim.getTime() + elapsedMinutes * 60000);
 };
 
-const DEFAULT_IMPRESSUM = `Angaben gemäß § 5 TMG
+const DEFAULT_IMPRESSUM = `Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz) & § 18 MStV
 Patrick Huber
 Karl-Fürstenberg Str. 59
 79618 Rheinfelden
+Deutschland
 
 Kontakt
-E-Mail: patrick.huber@musaek.de
+E-Mail: patrick.huber@musaek.de / kontakt@campus-groovelab.de
+Website: https://campus-groovelab.de
+
+Umsatzsteuer
+Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
 
 EU-Streitschlichtung
 Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr/.
@@ -12678,7 +12682,7 @@ export function AdminDashboard({
                   <Award size={24} />
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <h2 style={{ fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word' }}>Performance & Highlights</h2>
+                  <h2 style={{ fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word' }}>Highlights & Fortschritt</h2>
                   <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: isMobile ? '0.8rem' : '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
                 </div>
               </div>
@@ -13381,11 +13385,6 @@ export function AdminDashboard({
           onResetPlanning={handleResetAllPlanning}
           activePlatform={activePlatform}
         />
-      )}
-      {(admin?.role?.toLowerCase() === 'admin' || admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'master_admin') && (
-        <div style={{ marginTop: '20px' }}>
-          <PricingTransparencyWidget school={schoolObj} activePlatform={activePlatform} />
-        </div>
       )}
     </div>
   );

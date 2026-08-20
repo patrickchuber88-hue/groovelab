@@ -6854,7 +6854,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     </h3>
                     <div style={{ display: 'flex', gap: '24px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', fontSize: '0.88rem' }}>
                       <div>
-                        <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.75rem' }}>B2B Lizenzgebühren (Musikschulen)</span>
+                        <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.75rem' }}>B2B Hosting- &amp; Bereitstellungsgebühren (Musikschulen)</span>
                         <strong style={{ color: '#ffffff' }}>{b2bMrr.toFixed(2)} €</strong>
                       </div>
                       <div>

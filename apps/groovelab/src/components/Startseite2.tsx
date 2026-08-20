@@ -67,7 +67,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
       },
       {
         q: 'Gibt es eine Regelung für Familien mit wenig Einkommen oder mehreren Kindern?',
-        a: 'Ja! Bei der Campus-Aktivierung gilt unser autom. Geschwister-Vorteil: Für Familien mit mehreren Kindern sind alle weiteren Kinder ab dem 3. Kind 100 % KOSTENLOS für die Eltern (0,00 €/Monat). Die Musikschule übernimmt hierbei lediglich den passiven Server-Beitrag von 0,09 €/Monat. Zusätzlich schaltet unser Solidaritätsversprechen für je 20 aktive Schüler 1 kostenfreie Lizenz für Härtefälle frei.'
+        a: 'Ja! Bei der Campus-Aktivierung gilt unser autom. Geschwister-Vorteil: Für Familien mit mehreren Kindern sind alle weiteren Kinder ab dem 3. Kind 100 % KOSTENLOS für die Eltern (0,00 €/Monat). Die Musikschule übernimmt hierbei lediglich den passiven Server-Beitrag von 0,09 €/Monat. Zusätzlich schaltet unser Solidaritätsversprechen für je 20 aktive Schüler 1 kostenfreie Freischaltung für Härtefälle frei.'
       }
     ],
     directors: [
@@ -635,7 +635,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
           marginBottom: '64px',
           marginTop: '0px'
         }}>
-          Die Basis-Softwarelizenz ist zu 100% kostenlos. Keine Kreditkarte erforderlich.
+          Die Software ist zu 100% kostenlos. Keine Kreditkarte erforderlich.
         </p>
 
         {/* Visual: Browser Mockup of Schedule Board */}
@@ -1427,7 +1427,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 margin: '0 0 12px 0',
                 letterSpacing: '-0.02em'
               }}>
-                Die Core-Softwarelizenz ist dauerhaft 100% kostenlos
+                Die Core-Software ist dauerhaft 100% kostenlos
               </h3>
               <p style={{
                 fontSize: '16px',
@@ -1437,7 +1437,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 lineHeight: 1.6,
                 fontWeight: 550
               }}>
-                Keine Einrichtungsgebühr und keine Lizenzkosten für die Softwarenutzung. Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab 4,99 € / Mo.) und aktive Profile.
+                Keine Einrichtungsgebühr und keine Softwaregebühren (Software dauerhaft zu 100% kostenlos). Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab 4,99 € / Mo.) und aktive Profile.
               </p>
             </div>
 
@@ -1626,7 +1626,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               {/* Left Column: User Profile Fees */}
               <div>
                 <h4 style={{ fontFamily: 'Urbanist, sans-serif', fontSize: '22px', fontWeight: 800, color: '#0f172a', marginBottom: '16px' }}>
-                  2. Nutzer-Lizenzen &amp; Profile
+                  2. Nutzer-Bereitstellungen &amp; Profile
                 </h4>
                 <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5, marginBottom: '24px' }}>
                   Um die anfallenden Cloud-Ressourcen fair und nutzungsbasiert zu skalieren, berechnen wir extrem geringe Gebühren pro aktivem Account.
@@ -1677,7 +1677,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       <div style={{ fontSize: '12px', color: '#334155', lineHeight: 1.45 }}>
                         Kein Kind soll aus finanziellen Gründen vom Musiklernen ausgeschlossen werden:
                         <br />• <strong>Geschwister-Vorteil:</strong> Ab dem 3. Kind ist die Campus-Aktivierung für Eltern <strong>100 % KOSTENLOS (0,00 €)</strong>!
-                        <br />• <strong>Solidaritäts-Prinzip:</strong> Für je 20 aktivierte Schüler-Profile schaltet das System automatisch 1 weitere kostenfreie Freilizenz für Härtefälle frei.
+                        <br />• <strong>Solidaritäts-Prinzip:</strong> Für je 20 aktivierte Schüler-Profile schaltet das System automatisch 1 weitere kostenfreie Freischaltung für Härtefälle frei.
                       </div>
                     </div>
                   </div>
@@ -2081,12 +2081,12 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       <div>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
                         <p style={{ margin: 0 }}>Der Anbieter betreibt und vertreibt die mandantenfähige, cloudbasierte Software-as-a-Service (SaaS)-Plattform „Campus-Groovelab“ (bestehend aus den Modulen „Campus“ und „GrooveLab“, nachfolgend einheitlich „Software“). Die Software dient als integriertes, digitales Zusatz- und Kommunikationssystem (Add-On) für Musikschulen zur Optimierung des Lehrbetriebs.</p>
-                        <p style={{ margin: '4px 0 0 0' }}>Die Software-Lizenz selbst wird dem Kunden dauerhaft zu 100 % kostenlos und lizenzgebührenfrei zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, das Hosting sowie Service- und Supportleistungen (nachfolgend „Server- & Servicegebühren“) durch den Anbieter.</p>
+                        <p style={{ margin: '4px 0 0 0' }}>Die Software selbst wird dem Kunden dauerhaft zu 100 % kostenlos zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, das Hosting sowie Service- und Supportleistungen (nachfolgend „Server- &amp; Servicegebühren“) durch den Anbieter.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>Souveränitäts-Versprechen:</strong> Die Bereitstellung erfolgt über zertifizierte, deutsche Server (Hetzner Online GmbH, Standort Falkenstein). Der Anbieter garantiert, dass keine außereuropäische Cloud-Infrastrukturen (wie AWS, Azure oder Google Cloud) zur Kern-Datenhaltung verwendet werden.</p>
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LEISTUNGSUMFANG & ÜBERGABEPUNKT</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LEISTUNGSUMFANG &amp; ÜBERGABEPUNKT</h4>
                         <p style={{ margin: 0 }}><strong>1. Vertragsgegenstand:</strong> Gegenstand ist die Bereitstellung der Software zur Nutzung über das Internet im Wege des SaaS-Modells. Die Vergütung versteht sich als reines Infrastruktur- und Serviceentgelt. Das Verhältnis qualifiziert sich rechtlich als gemischter Miet- und Dienstleistungsvertrag (§§ 535 ff., 611 BGB).</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Modulbezug:</strong> Der konkrete Leistungsumfang ist modulbezogen und beschränkt sich auf die vom Kunden jeweils separat gebuchten Systembestandteile (Modul „Campus“, Modul „GrooveLab“ oder Kombi-Paket).</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>3. Übergabepunkt:</strong> Der Übergabepunkt ist der Ausgang des Rechenzentrums. Für die Internetanbindung und Endgeräte ist der Kunde selbst verantwortlich.</p>
@@ -2094,7 +2094,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 2 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ & DEVICE-PAIRING</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 2 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ &amp; DEVICE-PAIRING</h4>
                         <p style={{ margin: 0 }}><strong>1. QR-Code-Login:</strong> Der Zugang erfolgt passwortlos über eindeutige QR-Codes. Der Kunde verpflichtet sich, Mitarbeiter im sorgsamen Umgang mit den Codes zu schulen.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Anti-Theft Device-Pairing (PIN-Schranke):</strong> Um unbefugten Zugriff bei physischem QR-Verlust zu verhindern, fordert das System auf neuen Geräten einmalig ein schülerbezogenes Sicherheitsmerkmal (PIN) an, bevor das Endgerät registriert wird.</p>
                       </div>
@@ -2102,23 +2102,23 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 3 DATENSCHUTZ UND GEHEIMHALTUNG (DSGVO)</h4>
                         <p style={{ margin: 0 }}><strong>1. Rollen:</strong> Der Kunde ist „Verantwortlicher“ (Art. 4 Nr. 7 DSGVO), der Anbieter ist „Auftragsverarbeiter“ (Art. 4 Nr. 8 DSGVO). Die Details regelt ein gesonderter AV-Vertrag (AVV) nach Art. 28 DSGVO.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Zero-Mail & Anti-CLOUD-Act:</strong> Administrative Benachrichtigungen erfolgen lokal via `mailto:` ohne externe E-Mail-Dienstleister. Da der Anbieter ein deutsches Unternehmen ohne US-Muttergesellschaft ist, besteht Schutz vor dem US-amerikanischen CLOUD Act.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Zero-Mail &amp; Anti-CLOUD-Act:</strong> Administrative Benachrichtigungen erfolgen lokal via `mailto:` ohne externe E-Mail-Dienstleister. Da der Anbieter ein deutsches Unternehmen ohne US-Muttergesellschaft ist, besteht Schutz vor dem US-amerikanischen CLOUD Act.</p>
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG & GEWÄHRLEISTUNG</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG &amp; GEWÄHRLEISTUNG</h4>
                         <p style={{ margin: 0 }}><strong>1. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Vorsatz, grobe Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf vertragstypisch vorhersehbare Schäden.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwarelizenzierung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwareüberlassung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 5 SYSTEMVERFÜGBARKEIT & RATE-LIMITING</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 5 SYSTEMVERFÜGBARKEIT &amp; RATE-LIMITING</h4>
                         <p style={{ margin: 0 }}><strong>1. Verfügbarkeit:</strong> Der Anbieter gewährleistet 99,0 % Systemverfügbarkeit im Jahresmittel am Übergabepunkt. Ausgenommen sind angekündigte Wartungsfenster und Ausfälle durch höhere Gewalt.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Rate-Limiting:</strong> Zum Schutz vor Cyberangriffen (DDoS, Bruteforce) blockiert das System auffällige IP-Adressen temporär. Diese Sperren dienen der Datensicherheit und stellen keinen Mangel dar.</p>
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 LIZENZGEBÜHRENFREIHEIT & NUTZUNGSRECHTE</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 GEBÜHRENFREIHEIT DER SOFTWARE &amp; NUTZUNGSRECHTE</h4>
                         <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Schutzrechte:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zurückzuentwickeln (Reverse Engineering) oder zu modifizieren.</p>
                       </div>
@@ -2126,7 +2126,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 7 VERTRAGSLAUFZEIT, PREISE &amp; KÜNDIGUNG</h4>
                         <p style={{ margin: 0 }}><strong>1. Schuljahres-Kopplung &amp; Kündigung:</strong> Die Vertragslaufzeit für den Serverbetrieb orientiert sich am Schuljahr (Kündigungsfrist 1 Monat zum 31. August). Ohne Kündigung verlängert sich die Laufzeit automatisch um ein weiteres Schuljahr.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Software-Lizenz:</strong> Die Bereitstellung der Basis-Softwarelizenz von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Zusatzlizenzen und aktive Schüler-Freischaltungen.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Basis-Software:</strong> Die Bereitstellung der Basis-Software von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Bereitstellungen und aktive Schüler-Freischaltungen.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ {pricing.campus.toFixed(2).replace('.', ',')} € und für das Modul „GrooveLab“ {pricing.groovelab.toFixed(2).replace('.', ',')} €. Werden beide Module gebucht, gilt der Kombi-Vorteil von {pricing.kombi.toFixed(2).replace('.', ',')} € (Ersparnis von {pricing.kombiSavings.toFixed(2).replace('.', ',')} €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit {pricing.teacher.toFixed(2).replace('.', ',')} €/Monat berechnet.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
                           <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit 0,49 €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
@@ -2215,14 +2215,14 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     <p style={{ margin: 0 }}>Kamera- und Mikrofonzugriffe dienen ausschließlich lokalen Anwendungsfunktionen (QR-Login, Einspielen von Übe-Protokollen) und werden beim Schließen des jeweiligen Moduls sofort physisch freigegeben. Audio-Aufnahmen werden verschlüsselt an ein geschütztes Supabase Storage-Bucket übermittelt und bei Löschung durch den Benutzer physisch und unwiderruflich vom Datenträger entfernt.</p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>5. Betroffenenrechte & Auskunft</h4>
-                    <p style={{ margin: 0 }}>Lizenznehmer und Erziehungsberechtigte können jederzeit unentgeltlich Auskunft, Berichtigung, Sperrung oder vollständige Löschung der dem Profil zugeordneten Fortschrittsdaten verlangen.</p>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>5. Betroffenenrechte &amp; Auskunft</h4>
+                    <p style={{ margin: 0 }}>Nutzer, Kunden und Erziehungsberechtigte können jederzeit unentgeltlich Auskunft, Berichtigung, Sperrung oder vollständige Löschung der dem Profil zugeordneten Fortschrittsdaten verlangen.</p>
                   </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Angaben gemäß § 5 TMG</h4>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz) &amp; § 18 MStV</h4>
                     <p style={{ margin: 0 }}>
                       Patrick Huber<br />
                       Karl-Fürstenberg Str. 59<br />
@@ -2233,13 +2233,20 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   <div>
                     <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Kontakt</h4>
                     <p style={{ margin: 0 }}>
-                      E-Mail: patrick.huber@musaek.de
+                      E-Mail: patrick.huber@musaek.de / kontakt@campus-groovelab.de<br />
+                      Website: campus-groovelab.de
                     </p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Haftungsausschluss (Disclaimer)</h4>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Umsatzsteuer</h4>
+                    <p style={{ margin: 0 }}>
+                      Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
+                    </p>
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Haftungsausschluss (Disclaimer &amp; Art. 6 DSA)</h4>
                     <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
-                      Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen. Bei Bekanntwerden von entsprechenden Rechtsverletzungen werden wir diese Inhalte umgehend entfernen.
+                      Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Gemäß §§ 8 bis 10 DDG und Art. 6 des Digital Services Act (DSA) sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen. Bei Bekanntwerden von entsprechenden Rechtsverletzungen werden wir diese Inhalte umgehend entfernen (Notice-and-Takedown).
                     </p>
                   </div>
                 </div>

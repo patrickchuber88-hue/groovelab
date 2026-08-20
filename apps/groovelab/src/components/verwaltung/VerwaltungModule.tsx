@@ -116,7 +116,7 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
               Administratives Briefing
             </h3>
             <p style={{ fontSize: '0.82rem', color: '#64748b' }}>
-              Auslastung stabil. Aktuell {props.students.filter(s => s.is_active).length} Lizenzen aktiv erfasst.
+              Auslastung stabil. Aktuell {props.students.filter(s => s.is_active).length} Profile aktiv erfasst.
             </p>
             {/* Standard KPI summary widgets */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
@@ -128,14 +128,8 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
               </div>
               <div style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
                 <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Lehrkräfte</span>
-                <strong style={{ display: 'block', fontSize: '1.8rem', color: '#ea4335', marginTop: '4px' }}>
+                <strong style={{ display: 'block', fontSize: '1.8rem', color: '#0f172a', marginTop: '4px' }}>
                   {props.coaches.length}
-                </strong>
-              </div>
-              <div style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Auslastungs-Limits</span>
-                <strong style={{ display: 'block', fontSize: '1.8rem', color: props.limitsEnabled ? '#34a853' : '#64748b', marginTop: '4px' }}>
-                  {props.limitsEnabled ? 'AKTIV' : 'BYPASS'}
                 </strong>
               </div>
             </div>
@@ -217,7 +211,7 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Award size={18} style={{ color: '#ea4335' }} />
-              Lizenz-Quotas &amp; Abrechnung
+              Bereitstellungs-Quotas &amp; Abrechnung
             </h3>
             <p style={{ fontSize: '0.82rem', color: '#64748b' }}>
               Ihr aktuelles Benutzerlimit beträgt <strong>{props.userQuota} Schüler</strong>.

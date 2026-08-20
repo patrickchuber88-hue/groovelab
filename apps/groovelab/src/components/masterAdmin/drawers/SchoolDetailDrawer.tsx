@@ -262,9 +262,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         }}>
           {[
             { id: 'overview', label: '🏢 Stammdaten', icon: Building },
-            { id: 'licenses', label: '📜 Module & Lizenzen', icon: Sliders },
+            { id: 'licenses', label: '📜 Module &amp; Tarife', icon: Sliders },
             { id: 'quotas', label: `🎙️ Audio-Tresor (${totalStorageGb} GB)`, icon: HardDrive },
-            { id: 'avv', label: '🛡️ DSGVO & AVV', icon: ShieldCheck }
+            { id: 'avv', label: '🛡️ DSGVO &amp; AVV', icon: ShieldCheck }
           ].map((tab) => {
             const isSel = activeTab === tab.id;
             const Icon = tab.icon;
@@ -584,7 +584,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
           </div>
         )}
 
-        {/* 📜 TAB 2: MODULE & LIZENZEN */}
+        {/* 📜 TAB 2: MODULE & TARIFE */}
         {activeTab === 'licenses' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: '28px' }} className="animate-fade-in">
             <div style={{

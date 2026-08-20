@@ -637,7 +637,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
       'Abo-Status',
       'Gesamt Schueler',
       'Gesamt Lehrer',
-      'Aktive Campus-Lizenzen',
+      'Aktive Campus-Bereitstellungen',
       'Bypass Aktiv',
       'Server-Grundpreis (EUR)',
       'Kombi-Rabatt (EUR)',
@@ -1245,9 +1245,9 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                     <div>
                       <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0' }}>Gebühren- &amp; Leistungsaufstellung</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {/* 1. Software Lizenz */}
+                        {/* 1. Software-Bereitstellung (Kostenlos) */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem' }}>
-                          <span style={{ color: '#0f172a', fontWeight: 600 }}>Campus-Groovelab Software-Nutzungslizenz</span>
+                          <span style={{ color: '#0f172a', fontWeight: 600 }}>Campus-Groovelab Software-Bereitstellung</span>
                           <span style={{ fontWeight: 700, color: '#34a853' }}>100% kostenlos (0,00 €)</span>
                         </div>
 

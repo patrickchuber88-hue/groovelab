@@ -1,6 +1,6 @@
-// Pure Domain Billing & License Calculator for Campus-Groovelab
+// Pure Domain Billing & Infrastructure Calculator for Campus-Groovelab
 // Strictly enforces AGENTS.md pricing rules and DSGVO data minimization:
-// - Software license base is 100% free of charge ("100% kostenlos").
+// - Software base is 100% free of charge ("100% kostenlos").
 // - Campus Module: 7,99 € / Mo. flat rate per music school.
 // - GrooveLab Module: 4,99 € / Mo. flat rate per music school.
 // - Kombi-Vorteil Bundle: 9,99 € / Mo. flat rate per music school (saves 2,99 € / Mo.).

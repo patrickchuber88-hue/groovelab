@@ -2702,9 +2702,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     return saved !== null ? saved === 'true' : true;
   });
 
-  const handleToggleRightSidebar = (collapsed: boolean) => {
+  const handleToggleRightSidebar = async (collapsed: boolean) => {
     setIsRightSidebarCollapsed(collapsed);
     localStorage.setItem('campus_student_briefing_sidebar_collapsed', String(collapsed));
+    try {
+      if (studentUser?.id || studentId) {
+        await supabase.from('users').update({ briefing_sidebar_collapsed: collapsed }).eq('id', studentUser?.id || studentId);
+      }
+    } catch (e) {
+      console.warn('Could not persist briefing_sidebar_collapsed to users table:', e);
+    }
   };
 
   useEffect(() => {
@@ -2862,6 +2869,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [editingProfile, setEditingProfile] = useState<any>(null);
   const [showSecondEmail, setShowSecondEmail] = useState(false);
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
+  const [avatarCategoryFilter, setAvatarCategoryFilter] = useState<string>('Alle');
   const [savingProfile, setSavingProfile] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushNotifScheduleChanges, setPushNotifScheduleChanges] = useState(true);
@@ -2873,8 +2881,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
 
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
-  const [avatarCategoryFilter, setAvatarCategoryFilter] = useState<string>('Alle');
   const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'security' | 'billing' | 'legal'>('notifications');
+  const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'security' | 'billing' | 'legal' | null>(null);
   const [pinFormNew, setPinFormNew] = useState('');
   const [pinFormConfirm, setPinFormConfirm] = useState('');
   const [pinFormError, setPinFormError] = useState('');
@@ -8096,6 +8104,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         setStudentUiLevel(user.campus_ui_level);
         localStorage.setItem('campus_student_ui_level', user.campus_ui_level);
       }
+      if (user?.briefing_sidebar_collapsed !== undefined && user?.briefing_sidebar_collapsed !== null) {
+        setIsRightSidebarCollapsed(Boolean(user.briefing_sidebar_collapsed));
+        localStorage.setItem('campus_student_briefing_sidebar_collapsed', String(user.briefing_sidebar_collapsed));
+      }
       setSchoolFokusLevels(user.schools?.opening_hours?.fokus_levels || null);
       setIsAppUser(user.is_app_user ?? false);
       setIsPremiumUser((user.is_premium_user || user.is_active || user.is_campus_active) ?? false);
@@ -8998,7 +9010,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           }}
         >
           <Trophy size={15} />
-          <span>Performance & Highlights</span>
+          <span>Highlights & Fortschritt</span>
         </button>
 
         <button
@@ -13081,7 +13093,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         {activeTab === 'campus_cup' && (
           rankingLoading ? (
             <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
-              Performance & Highlights werden geladen...
+              Highlights & Fortschritt werden geladen...
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animation-slide-up">
@@ -21803,602 +21815,140 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       </div>
 
       {/* Settings Tab */}
-      <div style={{ display: (activeTab === 'settings' && studentUser) ? 'flex' : 'none', marginTop: '0px', flexDirection: 'column', gap: '10px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0' }}>
+      <div style={{ display: (activeTab === 'settings' && studentUser) ? 'flex' : 'none', marginTop: '0px', flexDirection: 'column', gap: '20px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0' }}>
         {activeTab === 'settings' && studentUser && (
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ 
-              display: 'flex',
-              background: '#ffffff',
-              borderRadius: '24px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)',
-              minHeight: '520px',
-              overflow: 'hidden',
-              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
+                ⚙️ Einstellungen
+              </h2>
+              <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
+                Verwalte deine Push-Benachrichtigungen, persönliche PIN, Abrechnungsbelege und Datenschutz-Einstellungen.
+              </p>
+            </div>
+
+            {/* MODULAR COVER CARDS GRID */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: '18px',
+              width: '100%'
             }}>
-              {/* LEFT SIDEBAR */}
-              <div style={{
-                width: '250px',
-                background: '#f8fafc',
-                borderRight: '1px solid #e2e8f0',
-                padding: '24px 16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-                flexShrink: 0,
-                textAlign: 'left'
-              }}>
-                <h3 style={{ margin: '0 0 16px 8px', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Einstellungen</h3>
-                {[
-                  { id: 'notifications', label: 'System & Push-Benachrichtigungen' },
-                  { id: 'security', label: 'PIN & Sicherheit' },
-                  { id: 'billing', label: 'Abrechnung & Rechnungen' },
-                  { id: 'legal', label: 'Rechtliches & Datenschutz' }
-                ].map((item) => {
-                  const isSelected = settingsSubTab === item.id;
-                  const brandColor = '#34a853';
-                  const activeColor = isSelected ? brandColor : '#64748b';
-                  
-                  const renderIcon = () => {
-                    switch (item.id) {
-                      case 'notifications': return <Bell size={14} color={activeColor} />;
-                      case 'security': return <Lock size={14} color={activeColor} />;
-                      case 'billing': return <FileText size={14} color={activeColor} />;
-                      case 'legal': return <Shield size={14} color={activeColor} />;
-                      default: return null;
-                    }
-                  };
-
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setSettingsSubTab(item.id as any)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: isSelected ? '0 12px 12px 0' : '12px',
-                        border: 'none',
-                        borderLeft: isSelected ? `3px solid ${brandColor}` : '3px solid transparent',
-                        background: isSelected ? '#e6f4ea' : 'transparent',
-                        color: isSelected ? brandColor : '#475569',
-                        fontSize: '0.82rem',
-                        fontWeight: isSelected ? 700 : 500,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <span style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '6px',
-                        background: isSelected ? '#ffffff' : '#f1f5f9',
-                        boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'
-                      }}>{renderIcon()}</span>
-                      <span style={{ flex: 1 }}>{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* RIGHT PANEL */}
-              <div style={{ flex: 1, padding: '32px 40px', overflowY: 'auto', textAlign: 'left' }}>
-                {settingsSubTab === 'notifications' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                    <div>
-                      <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Benachrichtigungen</h3>
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Passe an, worüber und wie wir dich informieren.</p>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {/* Push-Benachrichtigungen Haupt-Toggle */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s', opacity: isPremiumUser ? 1 : 0.6 }}>
-                        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                          <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#34a85315' : '#f1f5f9', color: pushEnabled ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                            <Bell size={18} />
-                          </div>
-                          <div>
-                            <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Push-Benachrichtigungen aktivieren</h4>
-                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Erlaube der App, dir Direktnachrichten auf dein Handy zu schicken.</p>
-                          </div>
-                        </div>
-                        
-                        {isPremiumUser ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            {pushEnabled && (
-                              <button
-                                type="button"
-                                onClick={() => setShowPushSoftPrompt(true)}
-                                style={{
-                                  background: '#f1f5f9',
-                                  color: '#0f172a',
-                                  border: 'none',
-                                  borderRadius: '100px',
-                                  padding: '6px 14px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  transition: 'background 0.2s'
-                                }}
-                              >
-                                Anpassen
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (!pushEnabled) {
-                                  // Open soft-prompt modal with granular choices
-                                  setShowPushSoftPrompt(true);
-                                } else {
-                                  const success = await unsubscribeUserFromPush(studentId);
-                                  if (!success) {
-                                    alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
-                                  } else {
-                                    setPushEnabled(false);
-                                  }
-                                }
-                              }}
-                              className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
-                              style={{ backgroundColor: pushEnabled ? '#34a853' : undefined }}
-                            >
-                              <div className="app-binary-switch-knob" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                            <span>🔒 Nur für aktive Schüler</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {!isPremiumUser && (
-                        <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: '4px 0 0 0', fontWeight: 700 }}>
-                          * Dein Account muss in der Verwaltung aktiv geschaltet sein, um diese Echtzeit-Funktion nutzen zu können.
-                        </p>
-                      )}
-
-                      {/* iOS Helper Alert */}
-                      {isIOS && !isStandalone && (
-                        <div style={{
-                          padding: '12px 16px',
-                          background: '#fffbeb',
-                          border: '1px solid #fef3c7',
-                          borderRadius: '16px',
-                          fontSize: '0.75rem',
-                          color: '#b45309',
-                          lineHeight: '1.4',
-                          fontWeight: 600
-                        }}>
-                          <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne GrooveLab danach über das neue App-Icon auf deinem Homescreen.
-                        </div>
-                      )}
-
-                      {/* Detail-Toggles */}
-                      {pushEnabled && isPremiumUser && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-                          {[
-                            { k: 'changes', label: 'Terminänderungen', desc: 'Verschiebungen, Ausfälle oder Lehrerwechsel', val: pushNotifScheduleChanges, setter: setPushNotifScheduleChanges, dbKey: 'push_notif_schedule_changes', icon: <Calendar size={18} /> },
-                            { k: 'homework', label: 'Hausaufgaben', desc: 'Neue Übe-Aufgaben oder Feedback deiner Lehrkraft', val: pushNotifHomework, setter: setPushNotifHomework, dbKey: 'push_notif_homework', icon: <Pencil size={18} /> },
-                            { k: 'news', label: 'Neuigkeiten & Aktionen', desc: 'Mitteilungen der Musikschule und interessante Aktionen', val: pushNotifAllFeatures, setter: setPushNotifAllFeatures, dbKey: 'push_notif_all_features', icon: <Users size={18} /> }
-                          ].map((row) => (
-                            <div key={row.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
-                              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                                <div style={{ padding: '10px', borderRadius: '12px', background: row.val ? '#34a85315' : '#f1f5f9', color: row.val ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
-                                  {row.icon}
-                                </div>
-                                <div>
-                                  <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>{row.label}</h4>
-                                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{row.desc}</p>
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const nextVal = !row.val;
-                                  row.setter(nextVal);
-                                  await supabase.from('users').update({ [row.dbKey]: nextVal }).eq('id', studentId);
-                                }}
-                                className={`app-binary-switch ${row.val ? 'active' : ''}`}
-                                style={{ backgroundColor: row.val ? '#34a853' : undefined }}
-                              >
-                                <div className="app-binary-switch-knob" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* System zurücksetzen */}
-                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px' }}>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#ef4444', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <RotateCcw size={18} color="#ef4444" /> System zurücksetzen
-                      </h3>
-                      <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px', fontWeight: 600, lineHeight: '1.4' }}>
-                        Wenn die App nicht korrekt lädt, der Timer hakt oder Anzeigefehler auftreten, kannst du hier alle lokalen Cache-Daten zurücksetzen.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (window.confirm('Möchtest du wirklich den lokalen Cache-Speicher leeren? Deine Anmeldung bleibt dabei vollständig erhalten.')) {
-                            try {
-                              if ('caches' in window) {
-                                const keys = await caches.keys();
-                                await Promise.all(keys.map(key => caches.delete(key)));
-                              }
-                            } catch (e) {
-                              console.warn('Could not clear PWA cache:', e);
-                            }
-                            // Purge non-essential caches while keeping login session intact
-                            localStorage.removeItem('groovelab_active_practice_session');
-                            localStorage.removeItem('student_lehrwerke_progress');
-                            localStorage.removeItem('groovelab_offline_user_cache');
-                            localStorage.removeItem('groovelab_cached_schools');
-                            localStorage.removeItem('groovelab_cached_user');
-                            window.location.reload();
-                          }
-                        }}
-                        style={{
-                          background: '#fee2e2',
-                          color: '#ef4444',
-                          border: '1px solid #fca5a5',
-                          padding: '12px 20px',
-                          borderRadius: '14px',
-                          fontWeight: 800,
-                          fontSize: '0.85rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}
-                      >
-                        <RotateCcw size={14} /> Lokalen Cache leeren (ohne Abmeldung)
-                      </button>
-                    </div>
-                  </div>
-                ) : settingsSubTab === 'security' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                    <div>
-                      <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>PIN & Sicherheit</h3>
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Erstelle oder ändere deine persönliche 4-stellige PIN für deinen Campus-Login.</p>
-                    </div>
-
-                    <div style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
+              {[
+                {
+                  id: 'notifications',
+                  title: 'System & Alerts',
+                  subtitle: pushEnabled ? 'Push-Mitteilungen aktiv' : 'Mitteilungen & Cache',
+                  badge: pushEnabled ? 'Aktiv' : 'Konfigurieren',
+                  gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  shadowColor: 'rgba(59, 130, 246, 0.40)',
+                  icon: Bell
+                },
+                {
+                  id: 'security',
+                  title: 'PIN & Sicherheit',
+                  subtitle: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : 'Persönliche PIN festlegen',
+                  badge: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? 'Geschützt' : 'Empfohlen',
+                  gradient: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+                  shadowColor: 'rgba(52, 168, 83, 0.40)',
+                  icon: Lock
+                },
+                {
+                  id: 'billing',
+                  title: 'Belege & Bereitstellung',
+                  subtitle: '100% freie App & Belege',
+                  badge: '100% Kostenlos',
+                  gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                  shadowColor: 'rgba(139, 92, 246, 0.40)',
+                  icon: FileText
+                },
+                {
+                  id: 'legal',
+                  title: 'Rechtliches & DSGVO',
+                  subtitle: 'Datenschutz & Impressum',
+                  badge: 'DSGVO Konform',
+                  gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  shadowColor: 'rgba(2, 132, 199, 0.40)',
+                  icon: ShieldCheck
+                }
+              ].map((module) => {
+                const IconComp = module.icon;
+                return (
+                  <div
+                    key={module.id}
+                    onClick={() => {
+                      setSettingsSubTab(module.id as any);
+                      setActiveStudentSettingsModal(module.id as any);
+                    }}
+                    style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #e2e8f0',
                       borderRadius: '20px',
-                      padding: '24px',
+                      padding: '24px 16px 20px 16px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '20px',
-                      maxWidth: '480px'
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                      position: 'relative'
+                    }}
+                    className="hover-scale"
+                  >
+                    {/* Square Cover Icon Box */}
+                    <div style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '16px',
+                      background: module.gradient,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '14px',
+                      boxShadow: `0 8px 20px -4px ${module.shadowColor}`
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ padding: '10px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853' }}>
-                          <Shield size={20} />
-                        </div>
-                        <div>
-                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>4-stellige PIN festlegen</h4>
-                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Schützt deinen Stundenplan und dein persönliches Konto.</p>
-                        </div>
-                      </div>
-
-                      {pinFormError && (
-                        <div style={{ padding: '10px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '12px', color: '#dc2626', fontSize: '0.8rem', fontWeight: 700 }}>
-                          {pinFormError}
-                        </div>
-                      )}
-
-                      {pinFormSuccess && (
-                        <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', color: '#166534', fontSize: '0.8rem', fontWeight: 700 }}>
-                          {pinFormSuccess}
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#475569', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            Neue 4-stellige PIN
-                          </label>
-                          <input
-                            type="password"
-                            maxLength={4}
-                            pattern="[0-9]*"
-                            inputMode="numeric"
-                            placeholder="z. B. 1234"
-                            value={pinFormNew}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                              setPinFormNew(val);
-                              setPinFormError('');
-                              setPinFormSuccess('');
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '12px 16px',
-                              borderRadius: '12px',
-                              border: '1.5px solid #cbd5e1',
-                              fontSize: '1.2rem',
-                              fontWeight: 800,
-                              letterSpacing: '0.25em',
-                              textAlign: 'center',
-                              background: '#ffffff',
-                              color: '#0f172a',
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#475569', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            PIN bestätigen
-                          </label>
-                          <input
-                            type="password"
-                            maxLength={4}
-                            pattern="[0-9]*"
-                            inputMode="numeric"
-                            placeholder="PIN wiederholen"
-                            value={pinFormConfirm}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                              setPinFormConfirm(val);
-                              setPinFormError('');
-                              setPinFormSuccess('');
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '12px 16px',
-                              borderRadius: '12px',
-                              border: '1.5px solid #cbd5e1',
-                              fontSize: '1.2rem',
-                              fontWeight: 800,
-                              letterSpacing: '0.25em',
-                              textAlign: 'center',
-                              background: '#ffffff',
-                              color: '#0f172a',
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={isSavingPin || pinFormNew.length !== 4 || pinFormConfirm.length !== 4}
-                          onClick={async () => {
-                            if (pinFormNew.length !== 4) {
-                              setPinFormError('Bitte gib eine vollständige 4-stellige PIN ein.');
-                              return;
-                            }
-                            if (pinFormNew !== pinFormConfirm) {
-                              setPinFormError('Die eingegebenen PINs stimmen nicht überein.');
-                              return;
-                            }
-
-                            const dayOfBirth = (studentUser as any)?.day_of_birth || (Array.isArray((studentUser as any)?.activation_days) ? (studentUser as any)?.activation_days[0]?.day_of_birth : (studentUser as any)?.activation_days?.day_of_birth);
-                            const validation = validateNewPin(pinFormNew, dayOfBirth);
-                            if (!validation.isValid) {
-                              setPinFormError(validation.error || 'Ungültige PIN.');
-                              return;
-                            }
-
-                            setIsSavingPin(true);
-                            setPinFormError('');
-
-                            try {
-                              if (studentId) {
-                                sessionStorage.setItem('groovelab_user_id', studentId);
-                                localStorage.setItem('groovelab_user_id', studentId);
-                                const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
-                                if (authQrToken) {
-                                  sessionStorage.setItem('groovelab_qr_token', authQrToken);
-                                }
-                              }
-
-                              try {
-                                await supabase.from('students').update({
-                                  personal_pin: pinFormNew,
-                                  parent_pin: pinFormNew,
-                                  onboarding_pin: pinFormNew,
-                                  is_pin_activated: true,
-                                  is_campus_active: true
-                                }).eq('id', studentId);
-
-                                await supabase.from('pending_students').update({
-                                  personal_pin: pinFormNew,
-                                  parent_pin: pinFormNew,
-                                  onboarding_pin: pinFormNew,
-                                  is_pin_activated: true,
-                                  is_campus_active: true
-                                }).eq('id', studentId);
-                              } catch (e) {}
-
-                              try {
-                                await supabase.from('users_raw').update({
-                                  personal_pin: pinFormNew,
-                                  parent_pin: pinFormNew,
-                                  onboarding_pin: pinFormNew,
-                                  is_pin_activated: true,
-                                  is_campus_active: true
-                                }).eq('id', studentId);
-                              } catch (e) {}
-
-                              const userUpdatePayload: any = {
-                                personal_pin: pinFormNew,
-                                parent_pin: pinFormNew,
-                                onboarding_pin: pinFormNew,
-                                is_pin_activated: true,
-                                is_campus_active: true
-                              };
-                              let { error } = await supabase
-                                .from('users')
-                                .update(userUpdatePayload)
-                                .eq('id', studentId);
-
-                              if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                                delete userUpdatePayload.onboarding_pin;
-                                const fallbackRes = await supabase
-                                  .from('users')
-                                  .update(userUpdatePayload)
-                                  .eq('id', studentId);
-                                error = fallbackRes.error;
-                              }
-
-                              if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                                console.warn('[StudentAvatarDashboard] users view trigger warning ignored because student table was updated:', error);
-                                error = null;
-                              }
-
-                              localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
-                              localStorage.setItem(`groovelab_student_pin_${studentId}`, pinFormNew);
-                              sessionStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
-
-                              if (error) {
-                                setPinFormError('Fehler beim Speichern der PIN: ' + error.message);
-                              } else {
-                                setPinFormSuccess('Deine 4-stellige PIN wurde erfolgreich gespeichert! 🔒');
-                                setStudentUser((prev: any) => prev ? {
-                                  ...prev,
-                                  is_pin_activated: true,
-                                  has_personal_pin: true,
-                                  has_parent_pin: true,
-                                  personal_pin: pinFormNew,
-                                  parent_pin: pinFormNew
-                                } : prev);
-                                if (onProfileUpdate) {
-                                  try { onProfileUpdate({ is_pin_activated: true, personal_pin: pinFormNew }); } catch (e) {}
-                                }
-                                setPinFormNew('');
-                                setPinFormConfirm('');
-                              }
-                            } catch (err: any) {
-                              setPinFormError('Fehler: ' + (err?.message || 'Speichern fehlgeschlagen.'));
-                            } finally {
-                              setIsSavingPin(false);
-                            }
-                          }}
-                          style={{
-                            marginTop: '8px',
-                            padding: '14px 20px',
-                            borderRadius: '14px',
-                            background: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#34a853' : '#e2e8f0',
-                            color: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#ffffff' : '#94a3b8',
-                            border: 'none',
-                            fontWeight: 800,
-                            fontSize: '0.875rem',
-                            cursor: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && !isSavingPin) ? 'pointer' : 'not-allowed',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px'
-                          }}
-                        >
-                          <Lock size={16} />
-                          {isSavingPin ? 'Speichere PIN...' : 'Neue PIN jetzt speichern'}
-                        </button>
-                      </div>
+                      <IconComp size={30} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} />
                     </div>
+
+                    {/* Status Badge */}
+                    <span style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      padding: '3px 9px',
+                      borderRadius: '100px',
+                      background: '#e6f4ea',
+                      color: '#15803d',
+                      marginBottom: '10px',
+                      letterSpacing: '0.02em',
+                      textTransform: 'uppercase'
+                    }}>
+                      {module.badge}
+                    </span>
+
+                    {/* Title & Subtitle */}
+                    <h3 style={{
+                      margin: '0 0 4px 0',
+                      fontSize: '1.05rem',
+                      fontWeight: 900,
+                      color: '#0f172a',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      letterSpacing: '-0.01em'
+                    }}>
+                      {module.title}
+                    </h3>
+                    <p style={{
+                      margin: 0,
+                      fontSize: '0.78rem',
+                      color: '#64748b',
+                      fontWeight: 600,
+                      lineHeight: '1.35'
+                    }}>
+                      {module.subtitle}
+                    </p>
                   </div>
-                ) : settingsSubTab === 'billing' ? (
-                  <div>
-                    {/* Abrechnung */}
-                    {studentUser?.role?.toLowerCase() === 'student' && (
-                      <StudentBillingInvoicesSection studentUser={studentUser} studentId={studentId} />
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '640px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ padding: '10px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853' }}>
-                        <Shield size={20} />
-                      </div>
-                      <div>
-                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>Rechtliches, Jugendschutz &amp; DSGVO</h4>
-                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Transparente Information für Schüler und Erziehungsberechtigte.</p>
-                      </div>
-                    </div>
-
-                    {/* DSGVO & Datenschutz Karte */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        🔒 Datenschutz &amp; Datenminimierung
-                      </span>
-                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
-                        Campus-Groovelab folgt dem Grundsatz der strikten Datenvermeidung. Es werden <strong>keine Bankdaten, keine SEPA-Mandate und keine privaten E-Mail-Adressen von Schülern</strong> in der App-Datenbank gespeichert.
-                      </p>
-                      <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px', fontSize: '0.78rem', color: '#475569', lineHeight: 1.6 }}>
-                        <li>Hosting ausschließlich in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH &amp; Supabase EU).</li>
-                        <li>Audiodaten und Memos dienen rein dem Unterricht und können jederzeit rückstandslos gelöscht werden.</li>
-                        <li>Volle Betroffenenrechte nach Art. 15–21 DSGVO (Auskunft &amp; Löschung jederzeit über das Sekretariat).</li>
-                      </ul>
-                    </div>
-
-                    {/* Privatsphäre in der Klasse & Helden-Momente */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                        <div>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            ✨ Meilensteine in Klassen-Highlights teilen
-                          </span>
-                          <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#475569', lineHeight: 1.4, fontWeight: 550 }}>
-                            Erlaube Mitschülern deiner Klasse, gemeisterte Songs und Meilensteine (anonymisiert als Vorname + Initiale) im Feed zu sehen und dir Kudos zu senden.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = !privacyShowHighlights;
-                            setPrivacyShowHighlights(next);
-                            try {
-                              localStorage.setItem(`campus_privacy_show_highlights_${studentId}`, JSON.stringify(next));
-                            } catch (e) {}
-                          }}
-                          className={`app-binary-switch ${privacyShowHighlights ? 'active' : ''}`}
-                          style={{ backgroundColor: privacyShowHighlights ? '#34a853' : undefined, flexShrink: 0 }}
-                          title="Sichtbarkeit in Klassen-Highlights anpassen"
-                        >
-                          <div className="app-binary-switch-knob" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Lizenz & Software-Nutzung */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        ⚖️ Campus-Groovelab Software-Lizenz
-                      </span>
-                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
-                        Die Campus-Groovelab Software-Nutzungslizenz ist für alle Schüler und Lehrkräfte <strong>100% kostenlos</strong>.
-                      </p>
-                    </div>
-
-                    {/* Impressum & Anbieterkennzeichnung */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        📄 Impressum &amp; Anbieterkennzeichnung
-                      </span>
-                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
-                        <strong>Campus-Groovelab</strong> ist ein Produkt und Service für Musikschulen.<br />
-                        Plattform-Lizenz: 100% kostenlose Nutzungslizenz.<br />
-                        Server-Standort &amp; Datenspeicherung: Bundesrepublik Deutschland (EU).
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                );
+              })}
             </div>
 
             {/* PERSISTENT STATUS BAR */}
@@ -22406,19 +21956,647 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '16px 40px',
+              padding: '16px 28px',
               border: '1px solid #e2e8f0',
               background: '#f8fafc',
               borderRadius: '20px',
               marginTop: '8px'
             }}>
               <span style={{ fontSize: '0.82rem', color: '#34a853', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                ✓ Alle Änderungen gespeichert.
+                ✓ Alle Einstellungen synchronisiert.
               </span>
               <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                 Änderungen werden sofort wirksam und gesichert.
               </span>
             </div>
+
+            {/* FOCUS MODAL */}
+            {activeStudentSettingsModal && (
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 10000,
+                  background: 'rgba(15, 23, 42, 0.65)',
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '20px'
+                }}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    setActiveStudentSettingsModal(null);
+                  }
+                }}
+              >
+                <div
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    width: '100%',
+                    maxWidth: activeStudentSettingsModal === 'billing' ? '920px' : '680px',
+                    maxHeight: '88vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    border: '1px solid #e2e8f0',
+                    overflow: 'hidden'
+                  }}
+                  className="animation-slide-up"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Modal Header */}
+                  <div style={{
+                    padding: '20px 24px',
+                    borderBottom: '1px solid #f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#f8fafc'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: activeStudentSettingsModal === 'notifications'
+                          ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                          : activeStudentSettingsModal === 'security'
+                          ? 'linear-gradient(135deg, #34a853 0%, #15803d 100%)'
+                          : activeStudentSettingsModal === 'billing'
+                          ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
+                          : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                      }}>
+                        {activeStudentSettingsModal === 'notifications' && <Bell size={20} color="#ffffff" />}
+                        {activeStudentSettingsModal === 'security' && <Lock size={20} color="#ffffff" />}
+                        {activeStudentSettingsModal === 'billing' && <FileText size={20} color="#ffffff" />}
+                        {activeStudentSettingsModal === 'legal' && <ShieldCheck size={20} color="#ffffff" />}
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {activeStudentSettingsModal === 'notifications' && 'System & Push-Benachrichtigungen'}
+                          {activeStudentSettingsModal === 'security' && 'PIN & Sicherheit'}
+                          {activeStudentSettingsModal === 'billing' && 'Abrechnung & Rechnungen'}
+                          {activeStudentSettingsModal === 'legal' && 'Rechtliches & Datenschutz'}
+                        </h3>
+                        <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                          {activeStudentSettingsModal === 'notifications' && 'Passe an, worüber und wie wir dich informieren.'}
+                          {activeStudentSettingsModal === 'security' && 'Erstelle oder ändere deine persönliche 4-stellige Campus-PIN.'}
+                          {activeStudentSettingsModal === 'billing' && 'Übersicht über Gebühren, Rechnungen & Zahlungsstatus.'}
+                          {activeStudentSettingsModal === 'legal' && 'Transparente Informationen zu Datenschutz & Jugendschutz.'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveStudentSettingsModal(null)}
+                      style={{
+                        background: '#f1f5f9',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '36px',
+                        height: '36px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: '#64748b'
+                      }}
+                      className="hover-scale"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Modal Body */}
+                  <div style={{ padding: '24px', overflowY: 'auto', flex: 1, textAlign: 'left' }}>
+                    {activeStudentSettingsModal === 'notifications' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {/* Push-Benachrichtigungen Haupt-Toggle */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s', opacity: isPremiumUser ? 1 : 0.6 }}>
+                            <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                              <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#34a85315' : '#f1f5f9', color: pushEnabled ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                                <Bell size={18} />
+                              </div>
+                              <div>
+                                <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Push-Benachrichtigungen aktivieren</h4>
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Erlaube der App, dir Direktnachrichten auf dein Handy zu schicken.</p>
+                              </div>
+                            </div>
+                            
+                            {isPremiumUser ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                {pushEnabled && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPushSoftPrompt(true)}
+                                    style={{
+                                      background: '#f1f5f9',
+                                      color: '#0f172a',
+                                      border: 'none',
+                                      borderRadius: '100px',
+                                      padding: '6px 14px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      transition: 'background 0.2s'
+                                    }}
+                                  >
+                                    Anpassen
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!pushEnabled) {
+                                      setShowPushSoftPrompt(true);
+                                    } else {
+                                      const success = await unsubscribeUserFromPush(studentId);
+                                      if (!success) {
+                                        alert('Fehler beim Deaktivieren der Push-Benachrichtigungen.');
+                                      } else {
+                                        setPushEnabled(false);
+                                      }
+                                    }
+                                  }}
+                                  className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
+                                  style={{ backgroundColor: pushEnabled ? '#34a853' : undefined }}
+                                >
+                                  <div className="app-binary-switch-knob" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                                <span>🔒 Nur für aktive Schüler</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {!isPremiumUser && (
+                            <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: '4px 0 0 0', fontWeight: 700 }}>
+                              * Dein Account muss in der Verwaltung aktiv geschaltet sein, um diese Echtzeit-Funktion nutzen zu können.
+                            </p>
+                          )}
+
+                          {/* iOS Helper Alert */}
+                          {isIOS && !isStandalone && (
+                            <div style={{
+                              padding: '12px 16px',
+                              background: '#fffbeb',
+                              border: '1px solid #fef3c7',
+                              borderRadius: '16px',
+                              fontSize: '0.75rem',
+                              color: '#b45309',
+                              lineHeight: '1.4',
+                              fontWeight: 600
+                            }}>
+                              <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne GrooveLab danach über das neue App-Icon auf deinem Homescreen.
+                            </div>
+                          )}
+
+                          {/* Detail-Toggles */}
+                          {pushEnabled && isPremiumUser && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
+                              {[
+                                { k: 'changes', label: 'Terminänderungen', desc: 'Verschiebungen, Ausfälle oder Lehrerwechsel', val: pushNotifScheduleChanges, setter: setPushNotifScheduleChanges, dbKey: 'push_notif_schedule_changes', icon: <Calendar size={18} /> },
+                                { k: 'homework', label: 'Hausaufgaben', desc: 'Neue Übe-Aufgaben oder Feedback deiner Lehrkraft', val: pushNotifHomework, setter: setPushNotifHomework, dbKey: 'push_notif_homework', icon: <Pencil size={18} /> },
+                                { k: 'news', label: 'Neuigkeiten & Aktionen', desc: 'Mitteilungen der Musikschule und interessante Aktionen', val: pushNotifAllFeatures, setter: setPushNotifAllFeatures, dbKey: 'push_notif_all_features', icon: <Users size={18} /> }
+                              ].map((row) => (
+                                <div key={row.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
+                                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                                    <div style={{ padding: '10px', borderRadius: '12px', background: row.val ? '#34a85315' : '#f1f5f9', color: row.val ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                                      {row.icon}
+                                    </div>
+                                    <div>
+                                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>{row.label}</h4>
+                                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{row.desc}</p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const nextVal = !row.val;
+                                      row.setter(nextVal);
+                                      await supabase.from('users').update({ [row.dbKey]: nextVal }).eq('id', studentId);
+                                    }}
+                                    className={`app-binary-switch ${row.val ? 'active' : ''}`}
+                                    style={{ backgroundColor: row.val ? '#34a853' : undefined }}
+                                  >
+                                    <div className="app-binary-switch-knob" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* System zurücksetzen */}
+                        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
+                          <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#ef4444', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <RotateCcw size={16} color="#ef4444" /> System-Cache leeren
+                          </h3>
+                          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '14px', fontWeight: 600, lineHeight: '1.4' }}>
+                            Wenn die App nicht korrekt lädt, der Timer hakt oder Anzeigefehler auftreten, kannst du hier alle lokalen Cache-Daten zurücksetzen.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (window.confirm('Möchtest du wirklich den lokalen Cache-Speicher leeren? Deine Anmeldung bleibt dabei vollständig erhalten.')) {
+                                try {
+                                  if ('caches' in window) {
+                                    const keys = await caches.keys();
+                                    await Promise.all(keys.map(key => caches.delete(key)));
+                                  }
+                                } catch (e) {
+                                  console.warn('Could not clear PWA cache:', e);
+                                }
+                                localStorage.removeItem('groovelab_active_practice_session');
+                                localStorage.removeItem('student_lehrwerke_progress');
+                                localStorage.removeItem('groovelab_offline_user_cache');
+                                localStorage.removeItem('groovelab_cached_schools');
+                                localStorage.removeItem('groovelab_cached_user');
+                                window.location.reload();
+                              }
+                            }}
+                            style={{
+                              background: '#fee2e2',
+                              color: '#ef4444',
+                              border: '1px solid #fca5a5',
+                              padding: '10px 18px',
+                              borderRadius: '12px',
+                              fontWeight: 800,
+                              fontSize: '0.82rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}
+                            className="hover-scale"
+                          >
+                            <RotateCcw size={14} /> Lokalen Cache leeren
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeStudentSettingsModal === 'security' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '20px',
+                          padding: '24px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '20px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ padding: '10px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853' }}>
+                              <Shield size={20} />
+                            </div>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>4-stellige PIN festlegen</h4>
+                              <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Schützt deinen Stundenplan und dein persönliches Konto.</p>
+                            </div>
+                          </div>
+
+                          {pinFormError && (
+                            <div style={{ padding: '10px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '12px', color: '#dc2626', fontSize: '0.8rem', fontWeight: 700 }}>
+                              {pinFormError}
+                            </div>
+                          )}
+
+                          {pinFormSuccess && (
+                            <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', color: '#166534', fontSize: '0.8rem', fontWeight: 700 }}>
+                              {pinFormSuccess}
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#475569', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                Neue 4-stellige PIN
+                              </label>
+                              <input
+                                type="password"
+                                maxLength={4}
+                                pattern="[0-9]*"
+                                inputMode="numeric"
+                                placeholder="z. B. 1234"
+                                value={pinFormNew}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                  setPinFormNew(val);
+                                  setPinFormError('');
+                                  setPinFormSuccess('');
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 16px',
+                                  borderRadius: '12px',
+                                  border: '1.5px solid #cbd5e1',
+                                  fontSize: '1.2rem',
+                                  fontWeight: 800,
+                                  letterSpacing: '0.25em',
+                                  textAlign: 'center',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                  boxSizing: 'border-box'
+                                }}
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#475569', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                PIN bestätigen
+                              </label>
+                              <input
+                                type="password"
+                                maxLength={4}
+                                pattern="[0-9]*"
+                                inputMode="numeric"
+                                placeholder="PIN wiederholen"
+                                value={pinFormConfirm}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                  setPinFormConfirm(val);
+                                  setPinFormError('');
+                                  setPinFormSuccess('');
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 16px',
+                                  borderRadius: '12px',
+                                  border: '1.5px solid #cbd5e1',
+                                  fontSize: '1.2rem',
+                                  fontWeight: 800,
+                                  letterSpacing: '0.25em',
+                                  textAlign: 'center',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                  boxSizing: 'border-box'
+                                }}
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={isSavingPin || pinFormNew.length !== 4 || pinFormConfirm.length !== 4}
+                              onClick={async () => {
+                                if (pinFormNew.length !== 4) {
+                                  setPinFormError('Bitte gib eine vollständige 4-stellige PIN ein.');
+                                  return;
+                                }
+                                if (pinFormNew !== pinFormConfirm) {
+                                  setPinFormError('Die eingegebenen PINs stimmen nicht überein.');
+                                  return;
+                                }
+
+                                const dayOfBirth = (studentUser as any)?.day_of_birth || (Array.isArray((studentUser as any)?.activation_days) ? (studentUser as any)?.activation_days[0]?.day_of_birth : (studentUser as any)?.activation_days?.day_of_birth);
+                                const validation = validateNewPin(pinFormNew, dayOfBirth);
+                                if (!validation.isValid) {
+                                  setPinFormError(validation.error || 'Ungültige PIN.');
+                                  return;
+                                }
+
+                                setIsSavingPin(true);
+                                setPinFormError('');
+
+                                try {
+                                  if (studentId) {
+                                    sessionStorage.setItem('groovelab_user_id', studentId);
+                                    localStorage.setItem('groovelab_user_id', studentId);
+                                    const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
+                                    if (authQrToken) {
+                                      sessionStorage.setItem('groovelab_qr_token', authQrToken);
+                                    }
+                                  }
+
+                                  try {
+                                    await supabase.from('students').update({
+                                      personal_pin: pinFormNew,
+                                      parent_pin: pinFormNew,
+                                      onboarding_pin: pinFormNew,
+                                      is_pin_activated: true,
+                                      is_campus_active: true
+                                    }).eq('id', studentId);
+
+                                    await supabase.from('pending_students').update({
+                                      personal_pin: pinFormNew,
+                                      parent_pin: pinFormNew,
+                                      onboarding_pin: pinFormNew,
+                                      is_pin_activated: true,
+                                      is_campus_active: true
+                                    }).eq('id', studentId);
+                                  } catch (e) {}
+
+                                  try {
+                                    await supabase.from('users_raw').update({
+                                      personal_pin: pinFormNew,
+                                      parent_pin: pinFormNew,
+                                      onboarding_pin: pinFormNew,
+                                      is_pin_activated: true,
+                                      is_campus_active: true
+                                    }).eq('id', studentId);
+                                  } catch (e) {}
+
+                                  const userUpdatePayload: any = {
+                                    personal_pin: pinFormNew,
+                                    parent_pin: pinFormNew,
+                                    onboarding_pin: pinFormNew,
+                                    is_pin_activated: true,
+                                    is_campus_active: true
+                                  };
+                                  let { error } = await supabase
+                                    .from('users')
+                                    .update(userUpdatePayload)
+                                    .eq('id', studentId);
+
+                                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                                    delete userUpdatePayload.onboarding_pin;
+                                    const fallbackRes = await supabase
+                                      .from('users')
+                                      .update(userUpdatePayload)
+                                      .eq('id', studentId);
+                                    error = fallbackRes.error;
+                                  }
+
+                                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                                    console.warn('[StudentAvatarDashboard] users view trigger warning ignored because student table was updated:', error);
+                                    error = null;
+                                  }
+
+                                  localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
+                                  localStorage.setItem(`groovelab_student_pin_${studentId}`, pinFormNew);
+                                  sessionStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
+
+                                  if (error) {
+                                    setPinFormError('Fehler beim Speichern der PIN: ' + error.message);
+                                  } else {
+                                    setPinFormSuccess('Deine 4-stellige PIN wurde erfolgreich gespeichert! 🔒');
+                                    setStudentUser((prev: any) => prev ? {
+                                      ...prev,
+                                      is_pin_activated: true,
+                                      has_personal_pin: true,
+                                      has_parent_pin: true,
+                                      personal_pin: pinFormNew,
+                                      parent_pin: pinFormNew
+                                    } : prev);
+                                    if (onProfileUpdate) {
+                                      try { onProfileUpdate({ is_pin_activated: true, personal_pin: pinFormNew }); } catch (e) {}
+                                    }
+                                    setPinFormNew('');
+                                    setPinFormConfirm('');
+                                  }
+                                } catch (err: any) {
+                                  setPinFormError('Fehler: ' + (err?.message || 'Speichern fehlgeschlagen.'));
+                                } finally {
+                                  setIsSavingPin(false);
+                                }
+                              }}
+                              style={{
+                                marginTop: '8px',
+                                padding: '14px 20px',
+                                borderRadius: '14px',
+                                background: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#34a853' : '#e2e8f0',
+                                color: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#ffffff' : '#94a3b8',
+                                border: 'none',
+                                fontWeight: 800,
+                                fontSize: '0.875rem',
+                                cursor: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && !isSavingPin) ? 'pointer' : 'not-allowed',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px'
+                              }}
+                              className={(pinFormNew.length === 4 && pinFormConfirm.length === 4) ? "hover-scale" : ""}
+                            >
+                              <Lock size={16} />
+                              {isSavingPin ? 'Speichere PIN...' : 'Neue PIN jetzt speichern'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeStudentSettingsModal === 'billing' && (
+                      <div>
+                        {studentUser?.role?.toLowerCase() === 'student' && (
+                          <StudentBillingInvoicesSection studentUser={studentUser} studentId={studentId} />
+                        )}
+                      </div>
+                    )}
+
+                    {activeStudentSettingsModal === 'legal' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* DSGVO & Datenschutz Karte */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            🔒 Datenschutz &amp; Datenminimierung
+                          </span>
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
+                            Campus-Groovelab folgt dem Grundsatz der strikten Datenvermeidung. Es werden <strong>keine Bankdaten, keine SEPA-Mandate und keine privaten E-Mail-Adressen von Schülern</strong> in der App-Datenbank gespeichert.
+                          </p>
+                          <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px', fontSize: '0.78rem', color: '#475569', lineHeight: 1.6 }}>
+                            <li>Hosting ausschließlich in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH &amp; Supabase EU).</li>
+                            <li>Audiodaten und Memos dienen rein dem Unterricht und können jederzeit rückstandslos gelöscht werden.</li>
+                            <li>Volle Betroffenenrechte nach Art. 15–21 DSGVO (Auskunft &amp; Löschung jederzeit über das Sekretariat).</li>
+                          </ul>
+                        </div>
+
+                        {/* Privatsphäre in der Klasse & Helden-Momente */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                            <div>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                ✨ Meilensteine in Klassen-Highlights teilen
+                              </span>
+                              <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#475569', lineHeight: 1.4, fontWeight: 550 }}>
+                                Erlaube Mitschülern deiner Klasse, gemeisterte Songs und Meilensteine (anonymisiert als Vorname + Initiale) im Feed zu sehen und dir Kudos zu senden.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = !privacyShowHighlights;
+                                setPrivacyShowHighlights(next);
+                                try {
+                                  localStorage.setItem(`campus_privacy_show_highlights_${studentId}`, JSON.stringify(next));
+                                } catch (e) {}
+                              }}
+                              className={`app-binary-switch ${privacyShowHighlights ? 'active' : ''}`}
+                              style={{ backgroundColor: privacyShowHighlights ? '#34a853' : undefined, flexShrink: 0 }}
+                              title="Sichtbarkeit in Klassen-Highlights anpassen"
+                            >
+                              <div className="app-binary-switch-knob" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Kostenfreie Software & Bereitstellung */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            ⚖️ Campus-Groovelab Software-Nutzung
+                          </span>
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
+                            Die Campus-Groovelab Software-Nutzung ist für alle Schüler und Lehrkräfte <strong>dauerhaft 100% kostenlos</strong> (Reine Cloud- &amp; Hosting-Infrastruktur).
+                          </p>
+                        </div>
+
+                        {/* Impressum & Anbieterkennzeichnung */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            📄 Impressum &amp; Anbieterkennzeichnung
+                          </span>
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
+                            <strong>Campus-Groovelab</strong> ist ein Produkt und Service für Musikschulen.<br />
+                            Software-Bereitstellung: 100% kostenlos.<br />
+                            Server-Standort &amp; Datenspeicherung: Bundesrepublik Deutschland (EU).
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div style={{
+                    padding: '16px 24px',
+                    borderTop: '1px solid #f1f5f9',
+                    background: '#f8fafc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: '10px'
+                  }}>
+                    <button
+                      onClick={() => setActiveStudentSettingsModal(null)}
+                      style={{
+                        padding: '8px 20px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        color: '#475569',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                      className="hover-scale"
+                    >
+                      Schließen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

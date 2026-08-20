@@ -300,8 +300,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>2. Software-Lizenz & Hosting-Gebühren (§ 19 UStG Kleinunternehmer)</strong><br />
-                - <strong>Software-Lizenz:</strong> Die Überlassung der Anwendungssoftware ist <strong>100% kostenlos</strong>.<br />
+                <strong style={{ color: '#0f172a' }}>2. Kostenfreie Software-Nutzung &amp; Hosting-Gebühren (§ 19 UStG Kleinunternehmer)</strong><br />
+                - <strong>Software-Bereitstellung:</strong> Die Nutzung der Anwendungssoftware ist <strong>dauerhaft 100% kostenlos</strong> (0,00 €).<br />
                 - <strong>Campus-Modul Hosting:</strong> {masterPricing.priceCampus.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting & Webspace-Flatrate per Musikschule).<br />
                 - <strong>GrooveLab-Modul Hosting:</strong> {masterPricing.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting & Webspace-Flatrate per Musikschule).<br />
                 - <strong>Kombi-Vorteil Hosting:</strong> {masterPricing.priceKombi.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting & Webspace-Flatrate für beide Module).<br />

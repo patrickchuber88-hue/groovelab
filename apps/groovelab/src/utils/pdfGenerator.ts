@@ -35,7 +35,7 @@ export const generateConsentPDF = async (
   // Determine pricing text based on the school's billing option
   let costTitle = '100% KOSTENLOS';
   let costDesc = 'Die Musikschule übernimmt alle Aktivierungsgebühren.';
-  let costDetailText = 'Die Nutzung dieser App ist für Sie und Ihr Kind vollständig kostenlos. Sämtliche Lizenz-, Hosting- und Bereitstellungsgebühren werden im Rahmen des Schulbetriebs zu 100% von der Musikschule getragen. Es entstehen Ihnen keine versteckten Kosten.';
+  let costDetailText = 'Die Nutzung dieser App ist für Sie und Ihr Kind vollständig kostenlos. Sämtliche Hosting- und Bereitstellungsgebühren werden im Rahmen des Schulbetriebs zu 100% von der Musikschule getragen. Es entstehen Ihnen keine versteckten Kosten.';
 
   if (studentBillingOption === 'student_full') {
     costTitle = '5,88 € / SCHULJAHR';
@@ -51,7 +51,7 @@ export const generateConsentPDF = async (
   if (activePlatform === 'groovelab') {
     costTitle = '100% KOSTENLOS';
     costDesc = 'Kosten für die Band-Aktivierung trägt die Schule.';
-    costDetailText = 'Die Nutzung des GrooveLab-Moduls ist für Sie und Ihr Kind vollständig kostenlos. Alle anfallenden Lizenz- und Hosting-Gebühren werden zu 100% von der Musikschule übernommen.';
+    costDetailText = 'Die Nutzung des GrooveLab-Moduls ist für Sie und Ihr Kind vollständig kostenlos. Alle anfallenden Hosting- und Bereitstellungsgebühren werden zu 100% von der Musikschule übernommen.';
   }
 
   // 1. Draw Top Header accent bar

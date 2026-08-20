@@ -944,7 +944,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#64748b' }}>Rechtsgrundlage:</span>
-              <span style={{ fontWeight: 800, color: '#f8fafc' }}>Art. 6 DSA / § 10 TMG / UrhDaG</span>
+              <span style={{ fontWeight: 800, color: '#f8fafc' }}>Art. 6 DSA / § 10 DDG / UrhDaG</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#64748b' }}>Status:</span>

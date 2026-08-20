@@ -1771,12 +1771,12 @@ function App() {
                       <div>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
                         <p style={{ margin: 0 }}>Der Anbieter betreibt und vertreibt die mandantenfähige, cloudbasierte Software-as-a-Service (SaaS)-Plattform „Campus-Groovelab“ (bestehend aus den Modulen „Campus“ und „GrooveLab“, nachfolgend einheitlich „Software“). Die Software dient als integriertes, digitales Zusatz- und Kommunikationssystem (Add-On) für Musikschulen zur Optimierung des Lehrbetriebs.</p>
-                        <p style={{ margin: '4px 0 0 0' }}>Die Software-Lizenz selbst wird dem Kunden dauerhaft zu 100 % kostenlos und lizenzgebührenfrei zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, das Hosting sowie Service- und Supportleistungen (nachfolgend „Server- & Servicegebühren“) durch den Anbieter.</p>
+                        <p style={{ margin: '4px 0 0 0' }}>Die Software selbst wird dem Kunden dauerhaft zu 100 % kostenlos zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, das Hosting sowie Service- und Supportleistungen (nachfolgend „Server- &amp; Servicegebühren“) durch den Anbieter.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>Souveränitäts-Versprechen:</strong> Die Bereitstellung erfolgt über zertifizierte, deutsche Server (Hetzner Online GmbH, Standort Falkenstein). Der Anbieter garantiert, dass keine außereuropäischen Cloud-Infrastrukturen (wie AWS, Azure oder Google Cloud) zur Kern-Datenhaltung verwendet werden.</p>
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LICHTUNG & ÜBERGABEPUNKT</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LEISTUNGSUMFANG &amp; ÜBERGABEPUNKT</h4>
                         <p style={{ margin: 0 }}><strong>1. Vertragsgegenstand:</strong> Gegenstand ist die Bereitstellung der Software zur Nutzung über das Internet im Wege des SaaS-Modells. Die Vergütung versteht sich als reines Infrastruktur- und Serviceentgelt. Das Verhältnis qualifiziert sich rechtlich als gemischter Miet- und Dienstleistungsvertrag (§§ 535 ff., 611 BGB).</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Modulbezug:</strong> Der konkrete Leistungsumfang ist modulbezogen und beschränkt sich auf die vom Kunden jeweils separat gebuchten Systembestandteile (Modul „Campus“, Modul „GrooveLab“ oder Kombi-Paket).</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>3. Übergabepunkt:</strong> Der Übergabepunkt ist der Ausgang des Rechenzentrums. Für die Internetanbindung und Endgeräte ist der Kunde selbst verantwortlich.</p>
@@ -1784,7 +1784,7 @@ function App() {
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 2 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ & DEVICE-PAIRING</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 2 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ &amp; DEVICE-PAIRING</h4>
                         <p style={{ margin: 0 }}><strong>1. QR-Code-Login:</strong> Der Zugang erfolgt passwortlos über eindeutige QR-Codes. Der Kunde verpflichtet sich, Mitarbeiter im sorgsamen Umgang mit den Codes zu schulen.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Anti-Theft Device-Pairing (PIN-Schranke):</strong> Um unbefugten Zugriff bei physischem QR-Verlust zu verhindern, fordert das System auf neuen Geräten einmalig ein schülerbezogenes Sicherheitsmerkmal (PIN) an, bevor das Endgerät registriert wird.</p>
                       </div>
@@ -1792,23 +1792,23 @@ function App() {
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 3 DATENSCHUTZ UND GEHEIMHALTUNG (DSGVO)</h4>
                         <p style={{ margin: 0 }}><strong>1. Rollen:</strong> Der Kunde ist „Verantwortlicher“ (Art. 4 Nr. 7 DSGVO), der Anbieter ist „Auftragsverarbeiter“ (Art. 4 Nr. 8 DSGVO). Die Details regelt ein gesonderter AV-Vertrag (AVV) nach Art. 28 DSGVO.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Zero-Mail & Anti-CLOUD-Act:</strong> Administrative Benachrichtigungen erfolgen lokal via `mailto:` ohne externe E-Mail-Dienstleister. Da der Anbieter ein deutsches Unternehmen ohne US-Muttergesellschaft ist, besteht Schutz vor dem US-amerikanischen CLOUD Act.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Zero-Mail &amp; Anti-CLOUD-Act:</strong> Administrative Benachrichtigungen erfolgen lokal via `mailto:` ohne externe E-Mail-Dienstleister. Da der Anbieter ein deutsches Unternehmen ohne US-Muttergesellschaft ist, besteht Schutz vor dem US-amerikanischen CLOUD Act.</p>
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG & GEWÄHRLEISTUNG</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG &amp; GEWÄHRLEISTUNG</h4>
                         <p style={{ margin: 0 }}><strong>1. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Vorsatz, grobe Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf vertragstypisch vorhersehbare Schäden.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwarelizenzierung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwareüberlassung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 5 SYSTEMVERFÜGBARKEIT & RATE-LIMITING</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 5 SYSTEMVERFÜGBARKEIT &amp; RATE-LIMITING</h4>
                         <p style={{ margin: 0 }}><strong>1. Verfügbarkeit:</strong> Der Anbieter gewährleistet 99,0 % Systemverfügbarkeit im Jahresmittel am Übergabepunkt. Ausgenommen sind angekündigte Wartungsfenster und Ausfälle durch höhere Gewalt.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Rate-Limiting:</strong> Zum Schutz vor Cyberangriffen (DDoS, Bruteforce) blockiert das System auffällige IP-Adressen temporär. Diese Sperren dienen der Datensicherheit und stellen keinen Mangel dar.</p>
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 LIZENZGEBÜHRENFREIHEIT & NUTZUNGSRECHTE</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 GEBÜHRENFREIHEIT DER SOFTWARE &amp; NUTZUNGSRECHTE</h4>
                         <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Schutzrechte:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zurückzuentwickeln (Reverse Engineering) oder zu modifizieren.</p>
                       </div>
@@ -1816,7 +1816,7 @@ function App() {
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 7 VERTRAGSLAUFZEIT, PREISE &amp; KÜNDIGUNG</h4>
                         <p style={{ margin: 0 }}><strong>1. Schuljahres-Kopplung &amp; Kündigung:</strong> Die Vertragslaufzeit für den Serverbetrieb orientiert sich am Schuljahr (Kündigungsfrist 1 Monat zum 31. August). Ohne Kündigung verlängert sich die Laufzeit automatisch um ein weiteres Schuljahr.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Software-Lizenz:</strong> Die Bereitstellung der Basis-Softwarelizenz von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Zusatzlizenzen und aktive Schüler-Freischaltungen.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Basis-Software:</strong> Die Bereitstellung der Basis-Software von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Bereitstellungen und aktive Schüler-Freischaltungen.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ {masterPricing.priceCampus.toFixed(2).replace('.', ',')} € und für das Modul „GrooveLab“ {masterPricing.priceGroovelab.toFixed(2).replace('.', ',')} €. Werden beide Module gebucht, gilt der Kombi-Vorteil von {masterPricing.priceKombi.toFixed(2).replace('.', ',')} € (Ersparnis von {masterPricing.kombiSavings.toFixed(2).replace('.', ',')} €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit {masterPricing.priceTeacher.toFixed(2).replace('.', ',')} €/Monat berechnet.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
                           <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit {masterPricing.priceStudent.toFixed(2).replace('.', ',')} €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
@@ -8830,7 +8830,7 @@ function App() {
                   </button>
                   {showLeaderboard && (
                     <button onClick={() => setActiveStudentTab('campus_cup')} className={`sidebar-item ${activeStudentTab === 'campus_cup' ? `active ${activePlatform}` : ''}`}>
-                      <Trophy size={20} /> Performance & Highlights
+                      <Trophy size={20} /> Highlights & Fortschritt
                     </button>
                   )}
 
@@ -8968,7 +8968,7 @@ function App() {
                   </button>
                 )}
                 <button onClick={() => setActiveStudentTab('stats')} className={`sidebar-item ${activeStudentTab === 'stats' ? `active ${activePlatform}` : ''}`}>
-                  <Trophy size={20} /> Performance & Highlights
+                  <Trophy size={20} /> Highlights & Fortschritt
                 </button>
                 <button onClick={() => setActiveStudentTab('setup')} className={`sidebar-item ${activeStudentTab === 'setup' ? `active ${activePlatform}` : ''}`}>
                   <Settings size={20} /> Einstellungen
@@ -9525,7 +9525,7 @@ function App() {
                             )}
                             <span style={{ color: '#34a853', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span>
-                                CAMPUS SCHÜLER
+                                {user?.first_name ? user.first_name.toUpperCase() : 'CAMPUS SCHÜLER'}
                               </span>
                             </span>
                           </span>
@@ -9552,37 +9552,6 @@ function App() {
                                   : `${user.first_name} ${user.last_name}`}
                               </span>
                             </span>
-                            {(user.roles && (user.roles.includes('admin') || user.roles.includes('secretary'))) && (
-                              <button
-                                onClick={() => {
-                                  const targetRole = user.roles.includes('admin') ? 'admin' : 'secretary';
-                                  handleSwitchActiveRole(targetRole);
-                                }}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  padding: '2px',
-                                  color: '#3b82f6',
-                                  borderRadius: '50%',
-                                  marginLeft: '4px',
-                                  transition: 'background 0.2s, transform 0.2s',
-                                }}
-                                title="Zur Verwaltung wechseln"
-                                className="hover-scale"
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = 'transparent';
-                                }}
-                              >
-                                <RefreshCw size={12} />
-                              </button>
-                            )}
                           </span>
                         </div>
                       );
@@ -9891,8 +9860,8 @@ function App() {
                 )}
               </div>
 
-              {/* Elegant Switch to Admin/Verwaltung Button */}
-              {user && (user.role === 'teacher' || (user.roles && user.roles.includes('teacher'))) && (
+              {/* Elegant Switch to Admin/Verwaltung Button (Only for users with admin or secretary privileges) */}
+              {user && ((user.roles && (user.roles.includes('admin') || user.roles.includes('secretary'))) || user.role === 'admin' || user.role === 'secretary') && (
                 <button 
                   onClick={() => {
                     const targetRole = (user.roles && user.roles.includes('admin')) ? 'admin' : (user.role === 'admin' ? 'admin' : 'secretary');
@@ -14068,8 +14037,8 @@ function App() {
                       <Calendar size={18} /> <span>Termine</span>
                     </button>
                     {showLeaderboard && (
-                      <button onClick={() => setActiveStudentTab('campus_cup')} style={getMobileButtonStyle('campus_cup', 'campus')} className="hover-scale" title="Performance & Highlights">
-                        <Trophy size={18} /> <span>Performance & Highlights</span>
+                      <button onClick={() => setActiveStudentTab('campus_cup')} style={getMobileButtonStyle('campus_cup', 'campus')} className="hover-scale" title="Highlights & Fortschritt">
+                        <Trophy size={18} /> <span>Highlights & Fortschritt</span>
                       </button>
                     )}
                     <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
@@ -14157,8 +14126,8 @@ function App() {
                       <Compass size={18} /> <span>Missions</span>
                     </button>
                   )}
-                  <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'campus')} className="hover-scale" title="Performance & Highlights">
-                    <Trophy size={18} /> <span>Performance & Highlights</span>
+                  <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'campus')} className="hover-scale" title="Highlights & Fortschritt">
+                    <Trophy size={18} /> <span>Highlights & Fortschritt</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'campus')} className="hover-scale" title="Einstellungen">
                     <Settings size={18} /> <span>Einstellungen</span>

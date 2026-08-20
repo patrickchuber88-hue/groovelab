@@ -34,7 +34,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
 
         if (schoolErr) throw schoolErr;
         if (!schoolData) {
-          throw new Error('Ungültiger Geräte-Lizenzschlüssel.');
+          throw new Error('Ungültiger Geräte-Kopplungsschlüssel.');
         }
         setSchool(schoolData);
 

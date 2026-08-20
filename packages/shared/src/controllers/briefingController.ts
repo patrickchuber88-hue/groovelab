@@ -179,7 +179,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
     // Fetch teacher profile
     const { data: teacher, error: teacherErr } = await supabase
       .from('users')
-      .select('id, school_id, first_name, last_name, role')
+      .select('id, school_id, first_name, last_name, role, instrument')
       .eq('id', userId)
       .single();
 
@@ -191,12 +191,14 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
     const schoolId = teacher.school_id;
     const allowMessages = await checkAllowMessagesGlobal(schoolId);
 
-    // Determine current day of week (1 = Monday, ..., 7 = Sunday)
-    // Javascript's Date.getDay() returns 0 for Sunday, 1 for Monday, etc.
-    const rawDay = new Date().getDay();
+    // Determine target date and day of week (1 = Monday, ..., 7 = Sunday)
+    const targetDateStr = (req.query.date as string) || (req.body.date as string) || new Date().toLocaleDateString('sv-SE');
+    const targetDate = new Date(targetDateStr + 'T12:00:00');
+    const rawDay = targetDate.getDay();
     const todayWeekday = rawDay === 0 ? 7 : rawDay;
+    const todayStr = targetDateStr;
 
-    // Fetch schedules for today for this teacher
+    // Fetch schedules for target day for this teacher
     const { data: slots, error: slotsErr } = await supabase
       .from('schedules')
       .select(`
@@ -204,6 +206,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
         time_slot,
         status,
         day_of_week,
+        instrument,
         rooms (id, name),
         student:users!schedules_student_id_fkey (
           id,
@@ -224,9 +227,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
       return;
     }
 
-    const todayStr = new Date().toLocaleDateString('sv-SE');
-
-    // Fetch occurrences for today for this teacher
+    // Fetch occurrences for target date for this teacher
     const { data: occurrences } = await supabase
       .from('schedule_occurrences')
       .select(`
@@ -238,6 +239,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
         schedule_id,
         student_id,
         schedules (
+          instrument,
           rooms (id, name)
         ),
         student:users!schedule_occurrences_student_id_fkey (
@@ -266,8 +268,8 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
         timeSlot: slot.time_slot,
         status: slot.status,
         roomId: slot.rooms?.id || null,
-        room: slot.rooms?.name || 'Hauptraum',
-        instrument: student?.instrument || 'Klavier',
+        room: slot.rooms?.name || 'Raum 4',
+        instrument: slot.instrument || student?.instrument || teacher?.instrument || 'Gitarre',
         student: student ? {
           id: student.id,
           name: `${student.first_name} ${student.last_name}`,
@@ -279,7 +281,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
       };
     });
 
-    // Merge with occurrences for today
+    // Merge with occurrences for target date
     if (occurrences && occurrences.length > 0) {
       occurrences.forEach((occ: any) => {
         const student = occ.student;
@@ -303,8 +305,8 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
             timeSlot: formattedTime,
             status: occ.status === 'rescheduled_confirmed' ? 'approved' : occ.status,
             roomId: occ.schedules?.rooms?.id || null,
-            room: occ.schedules?.rooms?.name || 'Hauptraum',
-            instrument: student?.instrument || 'Klavier',
+            room: occ.schedules?.rooms?.name || 'Raum 4',
+            instrument: occ.schedules?.instrument || occ.instrument || student?.instrument || teacher?.instrument || 'Gitarre',
             student: student ? {
               id: student.id,
               name: `${student.first_name} ${student.last_name}`,

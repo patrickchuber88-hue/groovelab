@@ -558,7 +558,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               Laufende Mandanten &amp; Schulen
             </h3>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.84rem', color: '#64748b' }}>
-              Multi-Tenant Instanzen, Lizenzstatus, Aktivierungszahlen und Support-Zugänge.
+              Multi-Tenant Instanzen, Bereitstellungsstatus, Aktivierungszahlen und Support-Zugänge.
             </p>
           </div>
 
@@ -845,7 +845,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               <div style={{ fontWeight: 850, borderBottom: '1px solid #f1f5f9', paddingBottom: '5px', marginBottom: '6px', color: '#0f172a' }}>
                                 Kanonische MRR-Kalkulation
                               </div>
-                              <div style={{ color: '#16a34a', fontWeight: 600 }}>1. Software-Nutzungslizenz: 0,00 € (100% kostenlos)</div>
+                              <div style={{ color: '#16a34a', fontWeight: 600 }}>1. Campus-Groovelab Software-Bereitstellung: 100% kostenlos (0,00 €)</div>
                               {school.has_campus_subscription && school.has_groovelab_subscription ? (
                                 <>
                                   <div style={{ color: '#475569' }}>2. Cloud Campus: {rates.priceCampus.toFixed(2)} €</div>
@@ -1254,7 +1254,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               {/* Trial Mode */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                  Testphase / Lizenzmodus
+                  Testphase / Bereitstellungsmodus
                 </label>
                 <select
                   value={newSchoolTrialMode}

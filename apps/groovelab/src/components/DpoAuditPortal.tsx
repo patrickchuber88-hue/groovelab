@@ -51,7 +51,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
       timestamp: '15.08.2026, 14:22:08 MESZ',
       actorRole: 'MASTER_ADMIN',
       actorName: 'Platform Trust & Safety Engine',
-      action: 'Notice-and-Takedown Sofortsperrung: Freigabelink blockiert nach Art. 6 DSA / § 10 TMG (HTTP 410)',
+      action: 'Notice-and-Takedown Sofortsperrung: Freigabelink blockiert nach Art. 6 DSA / § 10 DDG (HTTP 410)',
       category: 'LEGAL_TAKEDOWN',
       target: 'Playlist pl_sommer_2026 (Schüler ID #4B87)',
       status: 'VERIFIED_WORM',

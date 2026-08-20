@@ -554,7 +554,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           marginBottom: '64px',
           marginTop: '0px'
         }}>
-          Die Basis-Softwarelizenz ist zu 100% kostenlos. Keine Kreditkarte erforderlich.
+          Die Software ist zu 100% kostenlos. Keine Kreditkarte erforderlich.
         </p>
 
         {/* Visual: Browser Mockup of Schedule Board */}
@@ -1337,7 +1337,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 margin: '0 0 12px 0',
                 letterSpacing: '-0.02em'
               }}>
-                Die Core-Softwarelizenz ist dauerhaft 100% kostenlos
+                Die Core-Software ist dauerhaft 100% kostenlos
               </h3>
               <p style={{
                 fontSize: '16px',
@@ -1347,7 +1347,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 lineHeight: 1.6,
                 fontWeight: 550
               }}>
-                Keine Einrichtungsgebühr und keine Lizenzkosten für die Softwarenutzung. Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab 4,99 € / Mo.) und aktive Profile.
+                Keine Einrichtungsgebühr und keine Softwaregebühren (Software dauerhaft zu 100% kostenlos). Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab 4,99 € / Mo.) und aktive Profile.
               </p>
             </div>
 
@@ -1536,7 +1536,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               {/* Left Column: User Profile Fees */}
               <div>
                 <h4 style={{ fontFamily: 'Urbanist, sans-serif', fontSize: '22px', fontWeight: 800, color: '#0f172a', marginBottom: '16px' }}>
-                  2. Nutzer-Lizenzen &amp; Profile
+                  2. Nutzer-Bereitstellungen &amp; Profile
                 </h4>
                 <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5, marginBottom: '24px' }}>
                   Um die anfallenden Cloud-Ressourcen fair und nutzungsbasiert zu skalieren, berechnen wir extrem geringe Gebühren pro aktivem Account.
@@ -1585,7 +1585,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                         <span>💚 Das Solidaritätsversprechen deiner Musikschule: Das 20:1 Prinzip</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#334155', lineHeight: 1.45 }}>
-                        Kein Kind soll aus finanziellen Gründen vom Musiklernen ausgeschlossen werden. Bei der Eltern-Direktabrechnung schaltet das System für <strong>je 20 aktivierte Schüler-Profile automatisch 1 kostenfreie Freilizenz für Härtefälle &amp; Geschwisterkinder</strong> frei. Wer ein aktives Profil bezahlt, unterstützt so solidarisch benachteiligte Familien!
+                        Kein Kind soll aus finanziellen Gründen vom Musiklernen ausgeschlossen werden. Bei der Eltern-Direktabrechnung schaltet das System für <strong>je 20 aktivierte Schüler-Profile automatisch 1 kostenfreie Freischaltung für Härtefälle &amp; Geschwisterkinder</strong> frei. Wer ein aktives Profil bezahlt, unterstützt so solidarisch benachteiligte Familien!
                       </div>
                     </div>
                   </div>
