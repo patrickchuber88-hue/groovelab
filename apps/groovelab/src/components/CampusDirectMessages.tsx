@@ -2034,6 +2034,38 @@ export default function CampusDirectMessages({
                   );
                 })()}
 
+                {/* Right to Disconnect / Ruhezeit-Hinweis (Arbeitszeit- & Lehrkräfte-Schutz) */}
+                {(() => {
+                  const now = new Date();
+                  const day = now.getDay();
+                  const hour = now.getHours();
+                  const isWeekend = day === 0 || day === 6;
+                  const isAfterHours = hour < 8 || hour >= 19;
+                  if ((isWeekend || isAfterHours) && user?.role === 'student') {
+                    return (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        padding: '6px 12px',
+                        marginBottom: '6px',
+                        fontSize: '0.72rem',
+                        color: '#64748b',
+                        fontWeight: 600,
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}>
+                        <Clock size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
+                        <span>🌱 <strong>Ruhezeit der Lehrkraft:</strong> Deine Nachricht wird zugestellt und am nächsten Schultag beantwortet.</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 <form onSubmit={handleSend} style={{ display: 'flex', gap: '10px', width: '100%' }}>
                   <input 
                     type="text" 

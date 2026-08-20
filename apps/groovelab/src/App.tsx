@@ -9525,7 +9525,7 @@ function App() {
                             )}
                             <span style={{ color: '#34a853', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span>
-                                {user.first_name || 'Schüler'}
+                                CAMPUS SCHÜLER
                               </span>
                             </span>
                           </span>

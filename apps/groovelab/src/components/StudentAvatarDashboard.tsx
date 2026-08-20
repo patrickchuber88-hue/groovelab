@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, Coffee, Clock, Timer, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
-  Mic, Disc, Trash2, Download, Key, Delete, Headphones
+  Mic, Disc, Trash2, Download, Key, Delete, Headphones, ArrowRight
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -2874,7 +2874,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
   const [avatarCategoryFilter, setAvatarCategoryFilter] = useState<string>('Alle');
-  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'security' | 'billing'>('notifications');
+  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'security' | 'billing' | 'legal'>('notifications');
   const [pinFormNew, setPinFormNew] = useState('');
   const [pinFormConfirm, setPinFormConfirm] = useState('');
   const [pinFormError, setPinFormError] = useState('');
@@ -4284,6 +4284,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     } catch {
       return null;
     }
+  });
+  const [customTone2Min, setCustomTone2Min] = useState<number>(() => {
+    try {
+      const saved = typeof window !== 'undefined' && studentId ? localStorage.getItem(`cg_magictone2_${studentId}`) : null;
+      if (saved) return parseInt(saved, 10);
+    } catch {}
+    return 10;
+  });
+  const [customTone3Min, setCustomTone3Min] = useState<number>(() => {
+    try {
+      const saved = typeof window !== 'undefined' && studentId ? localStorage.getItem(`cg_magictone3_${studentId}`) : null;
+      if (saved) return parseInt(saved, 10);
+    } catch {}
+    return 15;
   });
   const [anchorTrigger, setAnchorTrigger] = useState('den Hausaufgaben');
   const [customTriggerText, setCustomTriggerText] = useState('');
@@ -6474,19 +6488,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           }
 
           // Acoustic Milestone Sound Triggers (0.4s - 0.8s unobtrusive chimes)
-          const streak = avatar?.streak_flame || 0;
-          if (streak >= 3) {
-            if (nextVal === 600) playMilestoneSound(1);
-            else if (nextVal === 900) playMilestoneSound(2);
-            else if (nextVal === 1200) playMilestoneSound(3);
-          } else if (streak === 2) {
-            if (nextVal === 300) playMilestoneSound(1);
-            else if (nextVal === 600) playMilestoneSound(2);
-            else if (nextVal === 900) playMilestoneSound(3);
-          } else {
-            if (nextVal === 180) playMilestoneSound(1);
-            else if (nextVal === 300) playMilestoneSound(2);
-            else if (nextVal === 600) playMilestoneSound(3);
+          const targetMins = getTargetMinutes(avatar?.streak_flame || 0);
+          const targetSecs = targetMins * 60;
+          const tone2Mins = Math.max(targetMins + 1, customTone2Min || (targetMins + 5));
+          const tone2Secs = tone2Mins * 60;
+          const tone3Mins = Math.max(tone2Mins + 1, customTone3Min || (tone2Mins + 5));
+          const tone3Secs = tone3Mins * 60;
+
+          if (nextVal === targetSecs) {
+            playMilestoneSound(1); // 🔔 Glocke: Tagesziel erreicht!
+          } else if (nextVal === tone2Secs) {
+            playMilestoneSound(2); // 🎶 Harfe: Freies Üben Meilenstein 1
+          } else if (nextVal === tone3Secs) {
+            playMilestoneSound(3); // 🎹 Akkord: Freies Üben Meilenstein 2
           }
 
           return nextVal;
@@ -9064,10 +9078,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       return `${Math.round(totalSecs)} Sek.`;
                     }
                     const mins = Math.floor(totalSecs / 60);
-                    const remainingSecs = Math.round(totalSecs % 60);
-                    if (remainingSecs > 0) {
-                      return `${mins}m ${remainingSecs}s`;
-                    }
                     return `${mins} Min.`;
                   })()}</span>
                 </div>
@@ -9079,18 +9089,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 minWidth: 0,
                 background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', 
                 borderRadius: '18px', 
-                color: 'white', 
+                color: '#0f172a', 
                 padding: '13px 16px', 
-                boxShadow: '0 4px 15px rgba(234, 179, 8, 0.15)',
+                boxShadow: '0 4px 15px rgba(234, 179, 8, 0.2)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '6px'
               }} className="kpi-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Fokus Heute</span>
-                  <Activity size={15} />
+                  <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#713f12', textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Fokus Heute</span>
+                  <Activity size={15} color="#713f12" />
                 </div>
-                <span style={{ fontSize: '1.2rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '5px' }} className="kpi-card-value">{(() => {
+                <span style={{ fontSize: '1.2rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif", display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '5px' }} className="kpi-card-value">{(() => {
                   const todayStr = toLocalYYYYMMDD(getSimulatedNow());
                   const todayLogs = (fokusLogs || []).filter(log => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === todayStr);
                   
@@ -9119,23 +9129,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     return `0 Min.`;
                   }
                   if (totalDaySecs > 0 && totalDaySecs < 60) {
-                    return `${Math.round(totalDaySecs)} Sek. Frei`;
+                    return `${Math.round(totalDaySecs)} Sek.`;
                   }
                   
                   const focusMin = Math.floor(totalFocusSecs / 60);
                   
                   if (totalExtraSecs > 0) {
                     const extraFormatted = totalExtraSecs < 60 
-                      ? `${Math.round(totalExtraSecs)}s Frei` 
+                      ? `${Math.round(totalExtraSecs)}s Extra` 
                       : (totalExtraSecs % 60 === 0 
-                          ? `${Math.floor(totalExtraSecs / 60)}m Frei` 
-                          : `${Math.floor(totalExtraSecs / 60)}m ${Math.round(totalExtraSecs % 60)}s Frei`);
+                          ? `${Math.floor(totalExtraSecs / 60)}m Extra` 
+                          : `${Math.floor(totalExtraSecs / 60)}m ${Math.round(totalExtraSecs % 60)}s Extra`);
                     
                     if (totalFocusSecs > 0) {
                       return (
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                           <span>{focusMin} Min. Fokus</span>
-                          <span style={{ fontSize: '0.74rem', opacity: 0.95, fontWeight: 800, background: 'rgba(255, 255, 255, 0.22)', padding: '1px 6px', borderRadius: '6px' }}>
+                          <span style={{ fontSize: '0.74rem', opacity: 0.95, fontWeight: 900, background: 'rgba(0, 0, 0, 0.08)', color: '#713f12', padding: '1px 6px', borderRadius: '6px' }}>
                             + {extraFormatted}
                           </span>
                         </span>
@@ -9780,29 +9790,44 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           background: '#f8fafc', 
-                          padding: '9px 14px', 
-                          borderRadius: '999px', 
+                          padding: '10px 14px', 
+                          borderRadius: '16px', 
                           width: '100%', 
                           border: '1px solid rgba(226, 232, 240, 0.9)',
                           boxSizing: 'border-box',
-                          gap: '8px'
+                          gap: '10px',
+                          flexWrap: 'wrap'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                            <Anchor size={13} style={{ color: '#34a853', flexShrink: 0 }} />
-                            <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              <span style={{ color: '#64748b' }}>Anker:</span> „{practiceAnchor.replace(/^Direct nach/, 'Direkt nach')}“
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', flex: 1, minWidth: '180px' }}>
+                            <Anchor size={14} style={{ color: '#34a853', flexShrink: 0, marginTop: '2px' }} />
+                            <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', lineHeight: 1.35, wordBreak: 'break-word' }}>
+                              <span style={{ color: '#64748b', fontWeight: 800 }}>Anker:</span> „{practiceAnchor.replace(/^Direct nach/, 'Direkt nach')}“
                             </span>
                             <button
                               onClick={() => setPracticeAnchor(null)}
-                              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px', display: 'flex', flexShrink: 0 }}
-                              title="Bearbeiten"
+                              style={{ 
+                                background: 'transparent', 
+                                border: 'none', 
+                                color: '#64748b', 
+                                cursor: 'pointer', 
+                                minWidth: '28px', 
+                                minHeight: '28px', 
+                                padding: '4px', 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                flexShrink: 0,
+                                borderRadius: '6px'
+                              }}
+                              title="Anker bearbeiten"
+                              className="hover-scale"
                             >
                               <Pencil size={12} />
                             </button>
                           </div>
                           
-                          <div style={{ fontSize: '0.74rem', fontWeight: 850, color: '#34a853', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Target size={13} style={{ color: '#34a853', flexShrink: 0 }} />
+                          <div style={{ fontSize: '0.74rem', fontWeight: 850, color: '#34a853', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+                            <Target size={14} style={{ color: '#34a853', flexShrink: 0 }} />
                             <span>Ziel: {getTargetMinutes(avatar?.streak_flame || 0)} Min.</span>
                           </div>
                         </div>
@@ -9813,7 +9838,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           width: '100%',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '6px',
+                          gap: '8px',
                           boxSizing: 'border-box'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -9822,42 +9847,143 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               <span>Zaubertöne dieser Session:</span>
                             </span>
                             <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '1px 6px', borderRadius: '6px' }}>
-                              Level {((avatar?.streak_flame || 0) >= 3) ? 3 : (((avatar?.streak_flame || 0) === 2) ? 2 : 1)}
+                              Akustische Meilensteine
                             </span>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                             {(() => {
-                              const streak = avatar?.streak_flame || 0;
-                              const milestones = (streak >= 3) ? [
-                                { min: 10, sound: 'Glocke' },
-                                { min: 15, sound: 'Harfe' },
-                                { min: 20, sound: 'Akkord' }
-                              ] : ((streak === 2) ? [
-                                { min: 5, sound: 'Glocke' },
-                                { min: 10, sound: 'Harfe' },
-                                { min: 15, sound: 'Akkord' }
-                              ] : [
-                                { min: 3, sound: 'Glocke' },
-                                { min: 5, sound: 'Harfe' },
-                                { min: 10, sound: 'Akkord' }
-                              ]);
-                              return milestones;
-                            })().map((m, idx) => (
-                              <div key={idx} style={{
-                                background: '#f8fafc',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '10px',
-                                padding: '5px 3px',
-                                textAlign: 'center',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '1px'
-                              }}>
-                                <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#1e293b' }}>{m.min} Min</span>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#34a853' }}>{m.sound}</span>
-                              </div>
-                            ))}
+                              const targetMins = getTargetMinutes(avatar?.streak_flame || 0);
+                              const tone2Mins = Math.max(targetMins + 1, customTone2Min || (targetMins + 5));
+                              const tone3Mins = Math.max(tone2Mins + 1, customTone3Min || (tone2Mins + 5));
+
+                              const cycleTone2 = () => {
+                                const options = [targetMins + 2, targetMins + 5, targetMins + 7, 10, 15, 20].filter(m => m > targetMins);
+                                const uniqueOptions = Array.from(new Set(options)).sort((a, b) => a - b);
+                                const currIdx = uniqueOptions.indexOf(tone2Mins);
+                                const nextVal = uniqueOptions[(currIdx + 1) % uniqueOptions.length] || (targetMins + 5);
+                                setCustomTone2Min(nextVal);
+                                try { localStorage.setItem(`cg_magictone2_${studentId}`, String(nextVal)); } catch {}
+                                playMilestoneSound(2);
+                              };
+
+                              const cycleTone3 = () => {
+                                const options = [tone2Mins + 3, tone2Mins + 5, tone2Mins + 10, 15, 20, 25, 30, 45].filter(m => m > tone2Mins);
+                                const uniqueOptions = Array.from(new Set(options)).sort((a, b) => a - b);
+                                const currIdx = uniqueOptions.indexOf(tone3Mins);
+                                const nextVal = uniqueOptions[(currIdx + 1) % uniqueOptions.length] || (tone2Mins + 5);
+                                setCustomTone3Min(nextVal);
+                                try { localStorage.setItem(`cg_magictone3_${studentId}`, String(nextVal)); } catch {}
+                                playMilestoneSound(3);
+                              };
+
+                              return (
+                                <>
+                                  {/* Ton 1: Immer synchron mit dem Zielwert */}
+                                  <div
+                                    style={{
+                                      background: '#e6f4ea',
+                                      border: '1.5px solid #86efac',
+                                      borderRadius: '12px',
+                                      padding: '8px 4px',
+                                      minHeight: '48px',
+                                      textAlign: 'center',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '2px',
+                                      boxShadow: '0 1px 3px rgba(34, 197, 94, 0.08)',
+                                      cursor: 'default'
+                                    }}
+                                    title="Zauberton 1 ist fest an dein Tages-Fokus-Ziel gekoppelt"
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      <span style={{ fontSize: '0.80rem', fontWeight: 950, color: '#15803d' }}>{targetMins} Min</span>
+                                    </div>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#166534' }}>🎯 Glocke</span>
+                                  </div>
+
+                                  {/* Ton 2: Interaktiv wählbar */}
+                                  <button
+                                    type="button"
+                                    onClick={cycleTone2}
+                                    style={{
+                                      background: '#f8fafc',
+                                      border: '1.5px solid #e2e8f0',
+                                      borderRadius: '12px',
+                                      padding: '8px 4px',
+                                      minHeight: '48px',
+                                      textAlign: 'center',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '2px',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale"
+                                    title="Klicken, um Meilenstein 2 für freies Weiterspielen zu ändern (spielt Ton-Vorschau)"
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#1e293b' }}>{tone2Mins} Min</span>
+                                      <span style={{ fontSize: '0.60rem', color: '#94a3b8' }}>✎</span>
+                                    </div>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 850, color: '#4338ca' }}>🎵 Harfe</span>
+                                  </button>
+
+                                  {/* Ton 3: Interaktiv wählbar */}
+                                  <button
+                                    type="button"
+                                    onClick={cycleTone3}
+                                    style={{
+                                      background: '#f8fafc',
+                                      border: '1.5px solid #e2e8f0',
+                                      borderRadius: '12px',
+                                      padding: '8px 4px',
+                                      minHeight: '48px',
+                                      textAlign: 'center',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '2px',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale"
+                                    title="Klicken, um Meilenstein 3 für freies Weiterspielen zu ändern (spielt Ton-Vorschau)"
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#1e293b' }}>{tone3Mins} Min</span>
+                                      <span style={{ fontSize: '0.60rem', color: '#94a3b8' }}>✎</span>
+                                    </div>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 850, color: '#9333ea' }}>🎹 Akkord</span>
+                                  </button>
+                                </>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Notenständer-Modus & Audio Readiness Status Badge (HM2) */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            padding: '6px 10px',
+                            borderRadius: '10px',
+                            background: 'rgba(52, 168, 83, 0.08)',
+                            border: '1px solid rgba(52, 168, 83, 0.2)',
+                            color: '#15803d',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            marginTop: '2px'
+                          }}>
+                            <span>💡 Notenständer-Modus bereit (Display bleibt an)</span>
                           </div>
                         </div>
 
@@ -9951,7 +10077,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             ? 'Rakete zünden & Üben starten' 
                             : (studentUiLevel === 'teen' 
                                 ? 'Flow-Session starten & XP sammeln' 
-                                : 'Fokus-Tracking aktivieren')}
+                                : 'Fokus-Session starten')}
                         </span>
                       </button>
                     </>
@@ -10700,6 +10826,374 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </>
                   )}
 
+                  {/* 🎼 BLENDFREIE NOTENSTÄNDER-KARTE IM AKTIVEN FOKUS-TIMER (OLED-DARK) */}
+                  {(() => {
+                    const latestItem = (progressItems || []).find(item => item.is_current_homework || item.topic_name?.startsWith('Hausaufgabe KW '));
+                    const currentWeekStr = latestItem ? getItemWeek(latestItem) : getISOWeekRaw(new Date(), 1);
+                    const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+
+                    const cleanNoteText = (raw: any) => {
+                      if (!raw) return '';
+                      let text = typeof raw === 'string' ? raw : JSON.stringify(raw);
+                      if (text.startsWith('[') || text.startsWith('{')) {
+                        try {
+                          const parsed = JSON.parse(text);
+                          if (Array.isArray(parsed)) {
+                            text = parsed.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                          } else if (typeof parsed === 'string') {
+                            text = parsed;
+                          }
+                        } catch {}
+                      }
+                      return String(text)
+                        .replace(/\["AUDIO:[^"]*"\]/g, '')
+                        .replace(/AUDIO:[^\s,|]+/g, '')
+                        .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                        .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
+                        .trim();
+                    };
+
+                    // 1. Books with granular pages & specific page notes
+                    const activeBooksMap: Record<string, { pages: number[]; pageNotes: { num: number; text: string }[] }> = {};
+
+                    (localProgress || []).forEach((assignment: any) => {
+                      if (String(assignment.studentId) !== String(studentId) || !assignment.pageStates) return;
+                      const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
+                      if (!book) return;
+                      if (!activeBooksMap[book.title]) {
+                        activeBooksMap[book.title] = { pages: [], pageNotes: [] };
+                      }
+
+                      Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
+                        if (pState?.status === 'homework' || pState?.isCurrentHomework) {
+                          const pNum = parseInt(pNumStr, 10);
+                          if (!isNaN(pNum)) {
+                            if (!activeBooksMap[book.title].pages.includes(pNum)) {
+                              activeBooksMap[book.title].pages.push(pNum);
+                            }
+                            const rawNote = pState.homeworkNotes || pState.homework_notes;
+                            const cleaned = cleanNoteText(rawNote);
+                            if (cleaned && !activeBooksMap[book.title].pageNotes.some(n => n.num === pNum)) {
+                              activeBooksMap[book.title].pageNotes.push({ num: pNum, text: cleaned });
+                            }
+                          }
+                        }
+                      });
+                    });
+
+                    (progressItems || []).forEach(item => {
+                      if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+                        const parts = item.topic_name.split(' - Seite ');
+                        const bookTitle = parts[0].trim();
+                        const pageNum = parseInt(parts[1], 10);
+                        const isHw = Boolean(item.is_current_homework) || item.status === 'homework';
+                        if (isHw && !isNaN(pageNum)) {
+                          if (!activeBooksMap[bookTitle]) {
+                            activeBooksMap[bookTitle] = { pages: [], pageNotes: [] };
+                          }
+                          if (!activeBooksMap[bookTitle].pages.includes(pageNum)) {
+                            activeBooksMap[bookTitle].pages.push(pageNum);
+                          }
+                          const cleaned = cleanNoteText(item.homework_notes);
+                          if (cleaned && !activeBooksMap[bookTitle].pageNotes.some(n => n.num === pageNum)) {
+                            activeBooksMap[bookTitle].pageNotes.push({ num: pageNum, text: cleaned });
+                          }
+                        }
+                      }
+                    });
+
+                    const activeBooks = Object.entries(activeBooksMap).map(([title, info]) => {
+                      info.pages.sort((a, b) => a - b);
+                      info.pageNotes.sort((a, b) => a.num - b.num);
+                      return {
+                        title,
+                        pages: info.pages,
+                        pageNotes: info.pageNotes
+                      };
+                    });
+
+                    // 2. Active Songs & Roadmaps
+                    const activeSongs: { id?: string; title: string; artist?: string; roadmap?: string; bpm?: string }[] = [];
+
+                    (progressItems || []).forEach(item => {
+                      if (item.topic_name?.startsWith('Hausaufgabe KW ') || item.topic_name?.includes(' - Seite ')) return;
+                      const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
+                                      (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                      if (localHw === 'false') return;
+                      const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
+                      if (isSongHw) {
+                        const rawTitle = (item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+                        const cleanT = cleanTitle(rawTitle);
+                        if (cleanT && !activeSongs.some(existing => cleanTitle(existing.title) === cleanT)) {
+                          const cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
+                                             (item.song_id ? localStorage.getItem(`song_note_${studentId}_${item.song_id}`) : null) ||
+                                             item.homework_notes || '';
+                          const bpmMatch = rawTitle.match(/(\d+)\s*(?:bpm|tempo|\/min)/i);
+                          const bpmVal = item.bpm || (bpmMatch ? bpmMatch[1] : undefined);
+                          activeSongs.push({
+                            id: item.id,
+                            title: cleanT,
+                            artist: item.artist,
+                            roadmap: cleanNoteText(cachedNote),
+                            bpm: bpmVal
+                          });
+                        }
+                      }
+                    });
+
+                    (activeSongSkills || []).forEach((skill: any) => {
+                      const localHw = localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
+                                      (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
+                                      (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null);
+                      const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
+                      if (isHw) {
+                        const songArtist = skill.songs?.artist || skill.artist || '';
+                        const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                        const fullTitle = songArtist ? `${songArtist} - ${songTitle}` : songTitle;
+                        const cleanT = cleanTitle(fullTitle);
+                        if (cleanT && !activeSongs.some(existing => cleanTitle(existing.title) === cleanT)) {
+                          const cachedNote = localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
+                                             (skill.song_id ? localStorage.getItem(`song_note_${studentId}_${skill.song_id}`) : null) ||
+                                             (skill.songs?.id ? localStorage.getItem(`song_note_${studentId}_${skill.songs.id}`) : null) ||
+                                             skill.homework_notes || '';
+                          activeSongs.push({
+                            id: skill.id,
+                            title: cleanT,
+                            artist: songArtist,
+                            roadmap: cleanNoteText(cachedNote)
+                          });
+                        }
+                      }
+                    });
+
+                    // 3. Audio & Notes
+                    const currentWeekNotes: string[] = [];
+                    (progressItems || []).forEach(item => {
+                      const itemW = getItemWeek(item);
+                      const isActive = item.is_current_homework || item.topic_name?.startsWith('Hausaufgabe KW ') || itemW === currentWeekStr;
+                      if (isActive && item.homework_notes && item.homework_notes.trim()) {
+                        try {
+                          const parsed = JSON.parse(item.homework_notes);
+                          if (Array.isArray(parsed)) {
+                            parsed.forEach((n: any) => {
+                              if (typeof n === 'string' && n.trim() && !currentWeekNotes.includes(n.trim())) currentWeekNotes.push(n.trim());
+                            });
+                          } else if (typeof parsed === 'string' && parsed.trim() && !currentWeekNotes.includes(parsed.trim())) {
+                            currentWeekNotes.push(parsed.trim());
+                          }
+                        } catch {
+                          if (!currentWeekNotes.includes(item.homework_notes.trim())) currentWeekNotes.push(item.homework_notes.trim());
+                        }
+                      }
+                    });
+
+                    try {
+                      const localGenNotes = localStorage.getItem(`campus_homework_notes_${studentId}`);
+                      if (localGenNotes && localGenNotes.trim()) {
+                        try {
+                          const parsed = JSON.parse(localGenNotes);
+                          if (Array.isArray(parsed)) {
+                            parsed.forEach((n: any) => {
+                              if (typeof n === 'string' && n.trim() && !currentWeekNotes.includes(n.trim())) currentWeekNotes.push(n.trim());
+                            });
+                          } else if (typeof parsed === 'string' && parsed.trim() && !currentWeekNotes.includes(parsed.trim())) {
+                            currentWeekNotes.push(parsed.trim());
+                          }
+                        } catch {
+                          if (!currentWeekNotes.includes(localGenNotes.trim())) currentWeekNotes.push(localGenNotes.trim());
+                        }
+                      }
+                    } catch {}
+
+                    const audioTracks: { url: string; label: string; duration?: number }[] = [];
+                    currentWeekNotes.forEach((n) => {
+                      if (typeof n === 'string' && n.startsWith('AUDIO:')) {
+                        const parts = n.substring(6).split('|');
+                        let label = (parts[3] || '').trim();
+                        if (!label || label.toLowerCase() === 'aufnahme' || label.toLowerCase() === 'test' || label.toLowerCase() === 'audio') {
+                          label = `Demo-Aufnahme #${audioTracks.length + 1}`;
+                        }
+                        audioTracks.push({
+                          url: parts[0],
+                          duration: parseFloat(parts[1]) || 0,
+                          label
+                        });
+                      }
+                    });
+
+                    const generalNote = currentWeekNotes
+                      .filter(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_'))
+                      .map(n => cleanNoteText(n))
+                      .filter(Boolean)
+                      .join(' • ');
+
+                    const hasHomework = activeBooks.length > 0 || activeSongs.length > 0 || audioTracks.length > 0 || Boolean(generalNote);
+
+                    return (
+                      <div style={{
+                        width: '100%',
+                        maxWidth: '480px',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        backdropFilter: 'blur(20px)',
+                        WebkitBackdropFilter: 'blur(20px)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '24px',
+                        padding: '16px 20px',
+                        boxSizing: 'border-box',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        color: '#ffffff',
+                        textAlign: 'left',
+                        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)'
+                      }}>
+                        {/* Notenständer Header */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', paddingBottom: '10px' }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>🎼</span>
+                            <span>Notenständer-Begleiter ({currentWeekStr})</span>
+                          </span>
+                          <span style={{ fontSize: '0.66rem', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 700 }}>
+                            {hasHomework ? 'Aktuelle Aufgaben' : 'Freies Üben'}
+                          </span>
+                        </div>
+
+                        {hasHomework ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {/* Lehrwerke Books with Granular Page Badges & Page Notes */}
+                            {activeBooks.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {activeBooks.map((b, bIdx) => (
+                                  <div key={bIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                        <BookOpen size={14} color="#4ade80" />
+                                        <span style={{ fontSize: '0.86rem', fontWeight: 850, color: '#ffffff' }}>{b.title}</span>
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                        {b.pages.map((p) => (
+                                          <span key={`p-${p}`} style={{ background: 'rgba(34, 197, 94, 0.25)', border: '1px solid rgba(74, 222, 128, 0.4)', color: '#86efac', padding: '2px 7px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 900 }}>
+                                            S. {p}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    {b.pageNotes.map((pn, pnIdx) => (
+                                      <div key={pnIdx} style={{ fontSize: '0.78rem', color: '#e2e8f0', marginLeft: '22px', fontWeight: 600, display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+                                        <span style={{ color: '#f87171', fontWeight: 850 }}>S. {pn.num}:</span>
+                                        <span>{pn.text}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Songs & Roadmaps */}
+                            {activeSongs.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: activeBooks.length > 0 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none', paddingTop: activeBooks.length > 0 ? '8px' : '0' }}>
+                                {activeSongs.map((s, sIdx) => (
+                                  <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                      <Music size={14} color="#facc15" />
+                                      <span style={{ fontSize: '0.86rem', fontWeight: 850, color: '#ffffff' }}>{s.title}</span>
+                                      {s.bpm && (
+                                        <span style={{ background: 'rgba(250, 204, 21, 0.2)', border: '1px solid rgba(250, 204, 21, 0.4)', color: '#fef08a', padding: '1px 6px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 850 }}>
+                                          ⏱️ {s.bpm} BPM
+                                        </span>
+                                      )}
+                                    </div>
+                                    {s.roadmap && (
+                                      <div style={{ fontSize: '0.78rem', color: '#e2e8f0', marginLeft: '22px', fontWeight: 600, display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+                                        <span style={{ color: '#818cf8', fontWeight: 850 }}>📌 Fahrplan:</span>
+                                        <span>{s.roadmap}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Audio notes in Notenständer */}
+                            {audioTracks.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '8px' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 850, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                  🎙️ Unterrichtsaufnahmen ({audioTracks.length})
+                                </span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  {audioTracks.map((tr, aIdx) => (
+                                    <div key={aIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.12)', padding: '6px 10px', borderRadius: '12px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                        <Volume2 size={15} color="#4ade80" style={{ flexShrink: 0 }} />
+                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {tr.label}
+                                        </span>
+                                      </div>
+                                      {tr.url && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              const audioEl = (e.currentTarget.parentElement?.querySelector('audio') as HTMLAudioElement);
+                                              if (audioEl) {
+                                                const newRate = audioEl.playbackRate === 1 ? 0.75 : 1;
+                                                audioEl.playbackRate = newRate;
+                                                e.currentTarget.textContent = `${newRate}×`;
+                                              }
+                                            }}
+                                            style={{
+                                              background: 'rgba(255, 255, 255, 0.15)',
+                                              border: '1px solid rgba(255, 255, 255, 0.3)',
+                                              borderRadius: '6px',
+                                              padding: '3px 7px',
+                                              fontSize: '0.70rem',
+                                              fontWeight: 850,
+                                              color: '#ffffff',
+                                              cursor: 'pointer'
+                                            }}
+                                            title="Geschwindigkeit umschalten (0.75x für langsames Üben / 1.0x)"
+                                          >
+                                            1.0×
+                                          </button>
+                                          <audio
+                                            controls
+                                            src={tr.url}
+                                            style={{ height: '32px', maxWidth: '170px' }}
+                                            onPlay={(e) => {
+                                              const allAudios = document.querySelectorAll('audio');
+                                              allAudios.forEach((a) => {
+                                                if (a !== e.currentTarget && !a.paused) {
+                                                  a.pause();
+                                                }
+                                              });
+                                            }}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* General Note */}
+                            {generalNote && (
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', borderTop: '1px dashed rgba(255, 255, 255, 0.15)', paddingTop: '8px', fontSize: '0.78rem', color: '#e2e8f0', fontWeight: 600 }}>
+                                <FileText size={13} color="#4ade80" style={{ flexShrink: 0 }} />
+                                <span style={{ color: '#4ade80', fontWeight: 850 }}>Hinweis:</span>
+                                <span>{generalNote}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p style={{ margin: 0, fontSize: '0.76rem', color: 'rgba(255, 255, 255, 0.7)', fontStyle: 'italic' }}>
+                            Keine festen Hausaufgaben hinterlegt. Viel Spaß bei deiner freien Übe-Session! 🎸
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <div style={{ display: 'flex', gap: '14px', width: '100%', maxWidth: '350px' }}>
                     <button
                       onClick={finishPracticeSession}
@@ -11065,13 +11559,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       isToday,
                       isFuture,
                       totalDaySecs,
-                      totalMins: Math.round(totalDaySecs / 60),
+                      totalMins: Math.floor(totalDaySecs / 60),
                       hasMastered,
                       isJoker
                     });
                   }
 
-                  const weekTotalMins = Math.round(weekTotalSeconds / 60);
+                  const weekTotalMins = Math.floor(weekTotalSeconds / 60);
 
                   // 2. Format Friendly Date Helper
                   const formatFriendlyDate = (dateStr: string) => {
@@ -11135,7 +11629,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     label: `${monthNamesFull[now.getMonth()]} ${now.getFullYear()}`,
                     key: currentMonthKey,
                     entries: [],
-                    totalMins: todayHasMastered || todayTotalSecs > 0 ? Math.round(todayTotalSecs / 60) : 0,
+                    totalMins: todayHasMastered || todayTotalSecs > 0 ? Math.floor(todayTotalSecs / 60) : 0,
                     practiceDays: todayHasMastered || todayTotalSecs > 0 ? 1 : 0
                   };
 
@@ -11157,7 +11651,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     }
                     monthsMap[key].entries.push(entry);
                     const totalSecs = (entry.focusSeconds || 0) + (entry.extraSeconds || 0);
-                    monthsMap[key].totalMins += Math.round(totalSecs / 60);
+                    monthsMap[key].totalMins += Math.floor(totalSecs / 60);
                     monthsMap[key].practiceDays += 1;
                   });
 
@@ -11250,9 +11744,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         }}>
                           {weekDays.map((day, idx) => {
                             let bg = '#f8fafc';
-                            let border = '1px solid #f1f5f9';
-                            let textColor = '#64748b';
-                            let iconElement = <span style={{ fontSize: '0.65rem', color: '#cbd5e1', fontWeight: 900 }}>·</span>;
+                            let border = '1px solid #e2e8f0';
+                            let textColor = '#475569';
+                            let iconElement = <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 900 }}>·</span>;
                             let subLabel = day.isFuture ? '·' : (day.totalMins > 0 ? `${day.totalMins}m` : 'Pause');
 
                             if (day.isToday) {
@@ -11289,9 +11783,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               subLabel = `${day.totalMins}m`;
                             } else if (!day.isFuture) {
                               bg = '#f8fafc';
-                              border = '1px solid #f1f5f9';
-                              textColor = '#94a3b8';
-                              iconElement = <span style={{ fontSize: '0.62rem', color: '#cbd5e1' }}>☕</span>;
+                              border = '1px solid #e2e8f0';
+                              textColor = '#475569';
+                              iconElement = <span style={{ fontSize: '0.62rem', color: '#64748b' }}>☕</span>;
                               subLabel = 'Pause';
                             }
 
@@ -11302,26 +11796,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   background: bg,
                                   border: border,
                                   borderRadius: '16px',
-                                  padding: '8px 2px',
+                                  padding: '10px 2px',
                                   display: 'flex',
                                   flexDirection: 'column',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  gap: '2px',
-                                  minHeight: '62px',
+                                  gap: '3px',
+                                  minHeight: '66px',
+                                  minWidth: '32px',
                                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                   boxShadow: day.isToday && day.hasMastered 
                                     ? '0 4px 12px rgba(52, 168, 83, 0.15)' 
                                     : (day.isToday ? '0 4px 12px rgba(202, 138, 4, 0.12)' : 'none')
                                 }}
                               >
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: textColor, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: textColor, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                                   {day.dayName}
                                 </span>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '18px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '20px' }}>
                                   {iconElement}
                                 </div>
-                                <span style={{ fontSize: '0.58rem', fontWeight: 800, color: textColor }}>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: textColor }}>
                                   {subLabel}
                                 </span>
                               </div>
@@ -11329,7 +11824,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           })}
                         </div>
 
-                        {/* Informative Footer Bar with 3 Schutzschilde Status */}
+                        {/* Informative Footer Bar with 3 Schutzschilde Status & Offline Sync */}
                         {(() => {
                           const currentWeek = getISOWeek(now);
                           const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
@@ -11337,43 +11832,54 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           const availableShields = Math.max(0, 3 - usedJokersThisWeek);
 
                           return (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#64748b', fontWeight: 700, borderTop: '1px solid #f1f5f9', paddingTop: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                              <span>Wochenzeit: <strong style={{ color: '#1e293b' }}>{weekTotalMins} Min.</strong></span>
-                              
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  <Shield size={11} color="#0284c7" />
-                                  3 Schilde (KW {currentWeek}):
-                                </span>
-                                <div style={{ display: 'flex', gap: '3px' }}>
-                                  {[1, 2, 3].map((shieldNum) => {
-                                    const isShieldActive = shieldNum <= availableShields;
-                                    return (
-                                      <div
-                                        key={`logbook-shield-${shieldNum}`}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '3px',
-                                          padding: '2px 7px',
-                                          borderRadius: '6px',
-                                          background: isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)',
-                                          border: isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)',
-                                          color: isShieldActive ? '#0369a1' : '#b45309',
-                                          fontSize: '0.62rem',
-                                          fontWeight: 850
-                                        }}
-                                        title={isShieldActive ? `Schutzschild ${shieldNum} bereit (Glut-Schutz bei verpasstem Tag)` : `Schutzschild ${shieldNum} als Glut-Schutz verbraucht`}
-                                      >
-                                        <Shield size={9} color={isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : 'none'} />
-                                        <span>{isShieldActive ? `Schild ${shieldNum}` : 'Glut'}</span>
-                                      </div>
-                                    );
-                                  })}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#64748b', fontWeight: 700, flexWrap: 'wrap', gap: '6px' }}>
+                                <span>Wochenzeit: <strong style={{ color: '#1e293b' }}>{weekTotalMins} Min.</strong></span>
+                                
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <Shield size={11} color="#0284c7" />
+                                    3 Schilde (KW {currentWeek}):
+                                  </span>
+                                  <div style={{ display: 'flex', gap: '3px' }}>
+                                    {[1, 2, 3].map((shieldNum) => {
+                                      const isShieldActive = shieldNum <= availableShields;
+                                      return (
+                                        <div
+                                          key={`logbook-shield-${shieldNum}`}
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '3px',
+                                            padding: '2px 7px',
+                                            borderRadius: '6px',
+                                            background: isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)',
+                                            border: isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)',
+                                            color: isShieldActive ? '#0369a1' : '#b45309',
+                                            fontSize: '0.62rem',
+                                            fontWeight: 850
+                                          }}
+                                          title={isShieldActive ? `Schutzschild ${shieldNum} bereit (Glut-Schutz bei verpasstem Tag)` : `Schutzschild ${shieldNum} als Glut-Schutz verbraucht`}
+                                        >
+                                          <Shield size={9} color={isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : 'none'} />
+                                          <span>{isShieldActive ? `Schild ${shieldNum}` : 'Glut'}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
+
+                                <span>Tagesziel: <strong style={{ color: '#34a853' }}>3 Min. am Stück</strong></span>
                               </div>
 
-                              <span>Tagesziel: <strong style={{ color: '#34a853' }}>3 Min. am Stück</strong></span>
+                              {/* Offline-Puffer & Sync Indikator (HM3) */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: '#94a3b8', fontWeight: 650, paddingTop: '4px', borderTop: '1px dashed #f1f5f9' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#166534' }}>
+                                  <ShieldCheck size={11} color="#16a34a" />
+                                  <span>Lokal gesichert &amp; Cloud-Sync aktiv</span>
+                                </span>
+                                <span>Alle Einträge DSGVO-konform verschlüsselt</span>
+                              </div>
                             </div>
                           );
                         })()}
@@ -11440,21 +11946,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </div>
                         ) : (
                           <div style={{
-                            background: 'linear-gradient(135deg, #fffbeb 0%, #fefce8 100%)',
-                            border: '1.5px dashed #ca8a04',
+                            background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 100%)',
+                            border: '1.5px solid #facc15',
                             borderRadius: '20px',
                             padding: '14px 16px',
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
-                            boxShadow: '0 2px 10px rgba(202, 138, 4, 0.06)'
+                            boxShadow: '0 4px 14px rgba(234, 179, 8, 0.08)'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <div style={{
                                 width: '38px',
                                 height: '38px',
                                 borderRadius: '12px',
-                                background: '#ca8a04',
+                                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -11464,167 +11970,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               </div>
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#854d0e' }}>
+                                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#854d0e' }}>
                                     Heute ({dayNamesFull[now.getDay()]})
                                   </span>
-                                  <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fef08a', color: '#854d0e', padding: '1px 6px', borderRadius: '100px', textTransform: 'uppercase' }}>
-                                    Offen
+                                  <span style={{ fontSize: '0.6rem', fontWeight: 850, background: '#fef08a', color: '#854d0e', border: '1px solid #fde047', padding: '1px 8px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <Shield size={10} color="#854d0e" />
+                                    3 Schilde aktiv
                                   </span>
                                 </div>
                                 <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', fontWeight: 700, color: '#a16207' }}>
                                   {todayTotalSecs > 0 
-                                    ? `Bereits ${Math.round(todayTotalSecs / 60)} Min. geübt • Noch ${Math.max(1, Math.ceil((180 - todayTotalSecs) / 60))} Min. am Stück zur Flamme!`
-                                    : 'Entfache heute deine Tages-Flamme! (3 Min. am Stück) 🎯'}
+                                    ? `Bereits ${Math.floor(todayTotalSecs / 60)} Min. geübt • Noch ${Math.max(1, Math.ceil((180 - todayTotalSecs) / 60))} Min. am Stück zur Flamme!`
+                                    : 'Entfache heute deine Tages-Flamme! (3 Min. am Stück) 🎸'}
                                 </p>
                               </div>
                             </div>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e', background: '#ffffff', border: '1px solid #fde047', padding: '4px 8px', borderRadius: '10px' }}>
-                              +3 XP möglich
+                            <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#854d0e', background: '#ffffff', border: '1.5px solid #facc15', padding: '4px 10px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(234, 179, 8, 0.08)' }}>
+                              +3 XP warten auf dich ⚡
                             </span>
                           </div>
                         )}
-
-                        {/* 📅 MONATS-ABSCHNITTE FÜR HISTORISCHE SESSIONS */}
-                        {sortedMonths.map((month, mIdx) => {
-                          const isExpanded = expandedMonths[month.key] !== undefined 
-                            ? expandedMonths[month.key] 
-                            : mIdx === 0;
-
-                          const toggleMonth = () => {
-                            setExpandedMonths(prev => ({
-                              ...prev,
-                              [month.key]: !isExpanded
-                            }));
-                          };
-
-                          return (
-                            <div key={month.key} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
-                              
-                              {/* Month Header Accordion */}
-                              <div
-                                onClick={toggleMonth}
-                                style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  background: '#f8fafc',
-                                  border: '1px solid #e2e8f0',
-                                  borderRadius: '16px',
-                                  padding: '10px 14px',
-                                  cursor: 'pointer',
-                                  userSelect: 'none',
-                                  transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <ChevronRight 
-                                    size={15} 
-                                    style={{ 
-                                      color: '#64748b', 
-                                      transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', 
-                                      transition: 'transform 0.2s ease-in-out' 
-                                    }} 
-                                  />
-                                  <span style={{ fontWeight: 850, fontSize: '0.82rem', color: '#1e293b' }}>
-                                    {month.label}
-                                  </span>
-                                </div>
-
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                  <span style={{
-                                    fontSize: '0.68rem',
-                                    fontWeight: 800,
-                                    color: month.practiceDays > 0 ? '#166534' : '#64748b',
-                                    background: month.practiceDays > 0 ? '#e6f4ea' : '#f1f5f9',
-                                    border: month.practiceDays > 0 ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                                    padding: '3px 8px',
-                                    borderRadius: '100px'
-                                  }}>
-                                    {month.practiceDays} {month.practiceDays === 1 ? 'Übetag' : 'Übetage'} • {month.totalMins}m
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Collapsed/Expanded List of Past Sessions */}
-                              {isExpanded && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  {month.entries.length === 0 ? (
-                                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.74rem', fontStyle: 'italic', padding: '16px 10px', background: '#fafafa', borderRadius: '14px', border: '1px dashed #e2e8f0' }}>
-                                      Noch keine vergangenen Sessions in diesem Monat archiviert. 🚀
-                                    </div>
-                                  ) : (
-                                    month.entries.map((entry, eIdx) => {
-                                      const fSecs = entry.focusSeconds || 0;
-                                      const eSecs = entry.extraSeconds || 0;
-                                      const totalSecs = fSecs + eSecs;
-                                      const totalMins = Math.round(totalSecs / 60);
-                                      const xp = totalMins;
-
-                                      return (
-                                        <div
-                                          key={eIdx}
-                                          style={{
-                                            background: '#ffffff',
-                                            border: entry.hasMasteredSession ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                                            borderRadius: '16px',
-                                            padding: '12px 14px',
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
-                                            borderLeft: entry.hasMasteredSession ? '4px solid #34a853' : '4px solid #eab308'
-                                          }}
-                                        >
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <div style={{
-                                              width: '32px',
-                                              height: '32px',
-                                              borderRadius: '10px',
-                                              background: entry.hasMasteredSession ? '#e6f4ea' : '#fefce8',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center'
-                                            }}>
-                                              <Flame size={16} color={entry.hasMasteredSession ? '#34a853' : '#ca8a04'} fill={entry.hasMasteredSession ? '#34a853' : 'none'} />
-                                            </div>
-                                            <div>
-                                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                                                {formatFriendlyDate(entry.date)}
-                                              </span>
-                                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
-                                                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#15803d' }}>
-                                                  ⏱️ {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
-                                                </span>
-                                                <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>•</span>
-                                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7' }}>
-                                                  +{xp} XP ⚡
-                                                </span>
-                                              </div>
-                                            </div>
-                                          </div>
-
-                                          <span style={{
-                                            fontSize: '0.66rem',
-                                            fontWeight: 800,
-                                            color: entry.hasMasteredSession ? '#166534' : '#854d0e',
-                                            background: entry.hasMasteredSession ? '#e6f4ea' : '#fef9c3',
-                                            padding: '3px 8px',
-                                            borderRadius: '8px',
-                                            border: entry.hasMasteredSession ? '1px solid #bbf7d0' : '1px solid #fef08a'
-                                          }}>
-                                            {entry.flameLevel && entry.flameLevel !== 'Keine Flamme' ? entry.flameLevel : (entry.hasMasteredSession ? 'Gemeistert' : 'Teil-Session')}
-                                          </span>
-                                        </div>
-                                      );
-                                    })
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
                       </div>
 
                     </div>
@@ -11633,8 +11998,272 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
             )}
           </div>
-
         </div>
+
+
+
+          {/* ========================================================================= */}
+          {/* 📅 ROW 5: ÜBE-CHRONIK & ARCHIV (VERGANGENE MONATE & SESSIONS)            */}
+          {/* ========================================================================= */}
+          {(() => {
+            const now = getSimulatedNow();
+            const todayDd = String(now.getDate()).padStart(2, '0');
+            const todayMm = String(now.getMonth() + 1).padStart(2, '0');
+            const todayYy = String(now.getFullYear()).substring(2);
+            const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
+
+            const monthNamesShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+            const monthNamesFull = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+            const dayNamesFull = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+            const formatFriendlyDate = (dateStr: string) => {
+              const parts = dateStr.split('.');
+              if (parts.length < 3) return dateStr;
+              const day = parseInt(parts[0], 10);
+              const monthIndex = parseInt(parts[1], 10) - 1;
+              const year = 2000 + parseInt(parts[2], 10);
+              const d = new Date(year, monthIndex, day);
+
+              const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              const targetStart = new Date(year, monthIndex, day);
+              const diffDays = Math.round((todayStart.getTime() - targetStart.getTime()) / (1000 * 60 * 60 * 24));
+
+              if (diffDays === 0) return `Heute (${dayNamesFull[d.getDay()]})`;
+              if (diffDays === 1) return `Gestern (${dayNamesFull[d.getDay()]})`;
+              if (diffDays === 2) return `Vorgestern (${dayNamesFull[d.getDay()]})`;
+              return `${dayNamesFull[d.getDay()]}, ${day}. ${monthNamesShort[monthIndex]}`;
+            };
+
+            const rawGrouped = getGroupedLogs();
+            const pastPracticedLogs = rawGrouped.filter(g => {
+              const totalSecs = (g.focusSeconds || 0) + (g.extraSeconds || 0);
+              const isJoker = Boolean(studentUser?.joker_used_at && (() => {
+                const jd = new Date(studentUser.joker_used_at);
+                const dd = String(jd.getDate()).padStart(2, '0');
+                const mm = String(jd.getMonth() + 1).padStart(2, '0');
+                const yy = String(jd.getFullYear()).substring(2);
+                return `${dd}.${mm}.${yy}` === g.date;
+              })());
+              return g.date !== todayDateStr && (totalSecs > 0 || isJoker);
+            });
+
+            const monthsMap: Record<string, { label: string, key: string, entries: typeof pastPracticedLogs, totalMins: number, practiceDays: number }> = {};
+            const currentMonthKey = `${now.getMonth()}-${now.getFullYear()}`;
+            monthsMap[currentMonthKey] = {
+              label: `${monthNamesFull[now.getMonth()]} ${now.getFullYear()}`,
+              key: currentMonthKey,
+              entries: [],
+              totalMins: 0,
+              practiceDays: 0
+            };
+
+            pastPracticedLogs.forEach(entry => {
+              const parts = entry.date.split('.');
+              if (parts.length < 3) return;
+              const monthIndex = parseInt(parts[1], 10) - 1;
+              const yearFull = 2000 + parseInt(parts[2], 10);
+              const key = `${monthIndex}-${yearFull}`;
+
+              if (!monthsMap[key]) {
+                monthsMap[key] = {
+                  label: `${monthNamesFull[monthIndex]} ${yearFull}`,
+                  key,
+                  entries: [],
+                  totalMins: 0,
+                  practiceDays: 0
+                };
+              }
+              monthsMap[key].entries.push(entry);
+              const totalSecs = (entry.focusSeconds || 0) + (entry.extraSeconds || 0);
+              monthsMap[key].totalMins += Math.floor(totalSecs / 60);
+              monthsMap[key].practiceDays += 1;
+            });
+
+            const sortedMonths = Object.values(monthsMap).sort((a, b) => {
+              const [aMonth, aYear] = a.key.split('-').map(Number);
+              const [bMonth, bYear] = b.key.split('-').map(Number);
+              if (aYear !== bYear) return bYear - aYear;
+              return bMonth - aMonth;
+            });
+
+            return (
+              <div style={{
+                width: '100%',
+                background: 'rgba(255, 255, 255, 0.92)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                borderRadius: '24px',
+                padding: '22px 26px',
+                boxShadow: '0 20px 40px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.6) inset',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+                boxSizing: 'border-box'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ background: '#e6f4ea', color: '#34a853', padding: '8px', borderRadius: '12px' }}>
+                      <Calendar size={18} color="#34a853" />
+                    </div>
+                    <div>
+                      <h4 style={{ fontWeight: 850, fontSize: '18px', color: '#1e293b', margin: 0 }}>
+                        Übe-Chronik &amp; Archiv
+                      </h4>
+                      <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>
+                        Alle vergangenen Übe-Tage &amp; gesammelten XP im Monatsverlauf
+                      </p>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 750, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 12px', borderRadius: '100px' }}>
+                    {pastPracticedLogs.length} archivierte {pastPracticedLogs.length === 1 ? 'Session' : 'Sessions'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {sortedMonths.map((month, mIdx) => {
+                    const isExpanded = expandedMonths[month.key] !== undefined 
+                      ? expandedMonths[month.key] 
+                      : mIdx === 0;
+
+                    const toggleMonth = () => {
+                      setExpandedMonths(prev => ({
+                        ...prev,
+                        [month.key]: !isExpanded
+                      }));
+                    };
+
+                    return (
+                      <div key={month.key} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {/* Month Header Accordion */}
+                        <div
+                          onClick={toggleMonth}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '16px',
+                            padding: '12px 16px',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <ChevronRight 
+                              size={15} 
+                              style={{ 
+                                color: '#64748b', 
+                                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', 
+                                transition: 'transform 0.2s ease-in-out' 
+                              }} 
+                            />
+                            <span style={{ fontWeight: 850, fontSize: '0.86rem', color: '#1e293b' }}>
+                              {month.label}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <span style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              color: month.practiceDays > 0 ? '#166534' : '#64748b',
+                              background: month.practiceDays > 0 ? '#e6f4ea' : '#f1f5f9',
+                              border: month.practiceDays > 0 ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                              padding: '3px 10px',
+                              borderRadius: '100px'
+                            }}>
+                              {month.practiceDays} {month.practiceDays === 1 ? 'Übetag' : 'Übetage'} • {month.totalMins}m
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Collapsed/Expanded List of Past Sessions */}
+                        {isExpanded && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '6px' }}>
+                            {month.entries.length === 0 ? (
+                              <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.76rem', fontStyle: 'italic', padding: '16px 10px', background: '#fafafa', borderRadius: '14px', border: '1px dashed #e2e8f0' }}>
+                                Noch keine vergangenen Sessions in diesem Monat archiviert. 🚀
+                              </div>
+                            ) : (
+                              month.entries.map((entry, eIdx) => {
+                                const fSecs = entry.focusSeconds || 0;
+                                const eSecs = entry.extraSeconds || 0;
+                                const totalSecs = fSecs + eSecs;
+                                const totalMins = Math.floor(totalSecs / 60);
+                                const xp = totalMins;
+
+                                return (
+                                  <div
+                                    key={eIdx}
+                                    style={{
+                                      background: '#ffffff',
+                                      border: entry.hasMasteredSession ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                      borderRadius: '16px',
+                                      padding: '12px 16px',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                                      borderLeft: entry.hasMasteredSession ? '4px solid #34a853' : '4px solid #eab308'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      <div style={{
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '10px',
+                                        background: entry.hasMasteredSession ? '#e6f4ea' : '#fefce8',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                      }}>
+                                        <Flame size={17} color={entry.hasMasteredSession ? '#34a853' : '#ca8a04'} fill={entry.hasMasteredSession ? '#34a853' : 'none'} />
+                                      </div>
+                                      <div>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 850, color: '#1e293b' }}>
+                                          {formatFriendlyDate(entry.date)}
+                                        </span>
+                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
+                                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#15803d' }}>
+                                            ⏱️ {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
+                                          </span>
+                                          <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>•</span>
+                                          <span style={{ fontSize: '0.7rem', fontWeight: 850, color: '#0284c7' }}>
+                                            +{xp} XP ⚡
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <span style={{
+                                      fontSize: '0.68rem',
+                                      fontWeight: 800,
+                                      color: entry.hasMasteredSession ? '#166534' : '#854d0e',
+                                      background: entry.hasMasteredSession ? '#e6f4ea' : '#fef9c3',
+                                      padding: '3px 10px',
+                                      borderRadius: '8px',
+                                      border: entry.hasMasteredSession ? '1px solid #bbf7d0' : '1px solid #fef08a'
+                                    }}>
+                                      {entry.flameLevel && entry.flameLevel !== 'Keine Flamme' ? entry.flameLevel : (entry.hasMasteredSession ? 'Gemeistert' : 'Teil-Session')}
+                                    </span>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
       </div>
 
@@ -20973,7 +21602,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 {[
                   { id: 'notifications', label: 'System & Push-Benachrichtigungen' },
                   { id: 'security', label: 'PIN & Sicherheit' },
-                  { id: 'billing', label: 'Abrechnung & Rechnungen' }
+                  { id: 'billing', label: 'Abrechnung & Rechnungen' },
+                  { id: 'legal', label: 'Rechtliches & Datenschutz' }
                 ].map((item) => {
                   const isSelected = settingsSubTab === item.id;
                   const brandColor = '#34a853';
@@ -20984,6 +21614,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       case 'notifications': return <Bell size={14} color={activeColor} />;
                       case 'security': return <Lock size={14} color={activeColor} />;
                       case 'billing': return <FileText size={14} color={activeColor} />;
+                      case 'legal': return <Shield size={14} color={activeColor} />;
                       default: return null;
                     }
                   };
@@ -21451,12 +22082,61 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       </div>
                     </div>
                   </div>
-                ) : (
+                ) : settingsSubTab === 'billing' ? (
                   <div>
                     {/* Abrechnung */}
                     {studentUser?.role?.toLowerCase() === 'student' && (
                       <StudentBillingInvoicesSection studentUser={studentUser} studentId={studentId} />
                     )}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '640px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ padding: '10px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853' }}>
+                        <Shield size={20} />
+                      </div>
+                      <div>
+                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>Rechtliches, Jugendschutz &amp; DSGVO</h4>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Transparente Information für Schüler und Erziehungsberechtigte.</p>
+                      </div>
+                    </div>
+
+                    {/* DSGVO & Datenschutz Karte */}
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        🔒 Datenschutz &amp; Datenminimierung
+                      </span>
+                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
+                        Campus-Groovelab folgt dem Grundsatz der strikten Datenvermeidung. Es werden <strong>keine Bankdaten, keine SEPA-Mandate und keine privaten E-Mail-Adressen von Schülern</strong> in der App-Datenbank gespeichert.
+                      </p>
+                      <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px', fontSize: '0.78rem', color: '#475569', lineHeight: 1.6 }}>
+                        <li>Hosting ausschließlich in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH &amp; Supabase EU).</li>
+                        <li>Audiodaten und Memos dienen rein dem Unterricht und können jederzeit rückstandslos gelöscht werden.</li>
+                        <li>Volle Betroffenenrechte nach Art. 15–21 DSGVO (Auskunft &amp; Löschung jederzeit über das Sekretariat).</li>
+                      </ul>
+                    </div>
+
+                    {/* Lizenz & Software-Nutzung */}
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        ⚖️ Campus-Groovelab Software-Lizenz
+                      </span>
+                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
+                        Die Campus-Groovelab Software-Nutzungslizenz ist für alle Schüler und Lehrkräfte <strong>100% kostenlos</strong>.
+                      </p>
+                    </div>
+
+                    {/* Impressum & Anbieterkennzeichnung */}
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        📄 Impressum &amp; Anbieterkennzeichnung
+                      </span>
+                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
+                        <strong>Campus-Groovelab</strong> ist ein Produkt und Service für Musikschulen.<br />
+                        Plattform-Lizenz: 100% kostenlose Nutzungslizenz.<br />
+                        Server-Standort &amp; Datenspeicherung: Bundesrepublik Deutschland (EU).
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
