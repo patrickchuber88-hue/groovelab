@@ -342,7 +342,7 @@ export function AdminDashboard({
   const [studentMissionsMap, setStudentMissionsMap] = useState<Record<string, any>>({});
   const [missionsActiveSubTab, setMissionsActiveSubTab] = useState<'assignments' | 'templates' | 'approvals'>('assignments');
   const tabStorageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
-  const [activeTab, setActiveTab] = useState<string>(() => forceTab || localStorage.getItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab') || 'live');
+  const [activeTab, setActiveTab] = useState<string>(() => forceTab || (typeof window !== 'undefined' ? sessionStorage.getItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab') : null) || 'live');
   const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke' | 'schnelltext'>('songs');
   const mediathekTouchStartXRef = useRef<number | null>(null);
 
@@ -2462,7 +2462,7 @@ export function AdminDashboard({
       if (activeTab === 'live' || activeTab === 'schedule') {
         // Fetch live / schedule resources
       } else if (activeTab === 'students') {
-        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
         const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
         const canSeeAllStudents = (adminData.role === 'admin' || adminData.role === 'secretary') && !isTeacherMode;
         let studentsData: any[] = [];
@@ -2575,10 +2575,10 @@ export function AdminDashboard({
       }
     }
 
-    // Fallback 2: Retrieve from cached localStorage user if API failed
+    // Fallback 2: Retrieve from cached localStorage/sessionStorage user if API failed
     if (!adminData) {
       console.error('[AdminDashboard] Failed to fetch admin/teacher user profile:', fetchError);
-      const cached = localStorage.getItem('groovelab_cached_user');
+      const cached = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user')) : null;
       if (cached) {
         try {
           adminData = JSON.parse(cached);
@@ -2651,7 +2651,7 @@ export function AdminDashboard({
         //  • Teacher in GrooveLab:           ALL groovelab-active students school-wide
         //                                    (no teacher_id filter — GrooveLab is a shared platform)
         // ──────────────────────────────────────────────────────────────────────
-        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
         const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
         const canSeeAllStudents = (adminData.role === 'admin' || adminData.role === 'secretary') && !isTeacherMode;
         let studentsData: any[] = [];
@@ -2938,7 +2938,7 @@ export function AdminDashboard({
           .eq('school_id', adminData.school_id);
         if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
         else sq = sq.eq('is_groovelab_active', true);
-        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
         const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
 
         // REGEL: Lehrer sehen nur ihre eigenen Songs (teacher_id-Filter)
@@ -2999,7 +2999,7 @@ export function AdminDashboard({
           }
         }
         // Also fetch students for the search function in band edit
-        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
         const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
         let bsq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
         if (activePlatform !== 'campus') bsq = bsq.eq('is_groovelab_active', true);
@@ -3033,7 +3033,7 @@ export function AdminDashboard({
         if (activePlatform !== 'campus') usq = usq.eq('is_groovelab_active', true);
         const { data: allUsers } = await usq.order('first_name');
         if (allUsers) {
-          const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+          const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
           const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
           if (isTeacherMode) {
             setStudents(allUsers.filter(u => u.role === 'student' && u.teacher_id === adminData.id));
@@ -3060,7 +3060,7 @@ export function AdminDashboard({
         // Fetch students roster for manual check-in
         let ssq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
         if (activePlatform !== 'campus') ssq = ssq.eq('is_groovelab_active', true);
-        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
         const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
         if (isTeacherMode) ssq = ssq.eq('teacher_id', adminData.id);
         const { data: studentsData } = await ssq.order('first_name');
@@ -3105,7 +3105,7 @@ export function AdminDashboard({
         }
 
         let studentsData: any[] = [];
-        const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+        const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
         const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
         if (isTeacherMode) {
           studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
@@ -3234,7 +3234,7 @@ export function AdminDashboard({
     const sessionStartDate = new Date(queryStartDate.getTime() - 24 * 60 * 60 * 1000); // 1 day buffer for session overlap
 
     let schoolStudents: any[] = [];
-    const activeWorkspace = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_workspace') : null;
+    const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
     const isTeacherMode = admin?.role === 'teacher' || activeWorkspace === 'teacher';
     if (isTeacherMode && admin?.id) {
       schoolStudents = await fetchTeacherStudentsHelper(admin.id, schoolId, activePlatform);

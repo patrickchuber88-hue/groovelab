@@ -1726,7 +1726,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           if (isGroovelabKiosk) {
             if (!user.is_groovelab_active) {
               if (user.is_campus_active && user.role === 'student') {
-                localStorage.setItem('groovelab_active_platform', 'campus');
+                sessionStorage.setItem('groovelab_active_platform', 'campus');
               } else {
                 const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
                 sessionStorage.setItem('groovelab_user_id', user.id);
@@ -1735,12 +1735,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 return;
               }
             } else {
-              localStorage.setItem('groovelab_active_platform', 'groovelab');
+              sessionStorage.setItem('groovelab_active_platform', 'groovelab');
             }
           } else {
             if (!user.is_campus_active) {
               if (user.is_groovelab_active && user.role === 'student') {
-                localStorage.setItem('groovelab_active_platform', 'groovelab');
+                sessionStorage.setItem('groovelab_active_platform', 'groovelab');
               } else {
                 const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
                 sessionStorage.setItem('groovelab_user_id', user.id);
@@ -1749,19 +1749,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 return;
               }
             } else {
-              localStorage.setItem('groovelab_active_platform', 'campus');
+              sessionStorage.setItem('groovelab_active_platform', 'campus');
               if (user.role === 'student' || user.role === 'teacher') {
-                localStorage.setItem('campus_active_tab', 'briefing');
+                sessionStorage.setItem('campus_active_tab', 'briefing');
               }
             }
           }
         } else {
           // Admins and secretaries bypass activation flags and always land in the administration module under briefing
-          localStorage.setItem('groovelab_active_workspace', 'secretary');
-          localStorage.setItem('groovelab_active_platform', 'campus');
-          localStorage.setItem('campus_active_tab', 'briefing');
+          sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+          sessionStorage.setItem('groovelab_active_platform', 'campus');
+          sessionStorage.setItem('campus_active_tab', 'briefing');
           if (user.role === 'secretary') {
-            localStorage.setItem('groovelab_secretary_subtab', 'briefing');
+            sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
           }
         }
 
@@ -1897,7 +1897,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       // Set user_id immediately so customFetch interceptor injects user_id into x-client-info for RLS authorization
       if (user?.id) {
         sessionStorage.setItem('groovelab_user_id', user.id);
-        localStorage.setItem('groovelab_user_id', user.id);
       }
 
       // 1.5 Check opening hours for sessions (Students only) - Bypassed per user request
@@ -1909,7 +1908,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       console.log(`[Login] Final Station ID: ${finalStationId}, isHome: ${isHome}, withinHours: ${withinHours}`);
 
       // Save station ID to localStorage based on geofence & check-in result
-      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      const activePlatform = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : 'groovelab') || 'groovelab';
       if (activePlatform === 'groovelab') {
         if (isHome) {
           localStorage.removeItem('groovelab_station_id');
@@ -6372,11 +6371,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
 
                 if (targetUser) {
-                  localStorage.setItem('groovelab_active_workspace', 'teacher');
-                  localStorage.setItem('groovelab_active_platform', 'campus');
-                  localStorage.setItem('campus_active_tab', 'live');
+                  sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+                  sessionStorage.setItem('groovelab_active_platform', 'campus');
+                  sessionStorage.setItem('campus_active_tab', 'live');
                   sessionStorage.setItem('groovelab_user_id', targetUser.id);
-                  localStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
                   onLogin(targetUser.id, true);
                 } else {
@@ -6440,10 +6438,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
 
                 if (targetUser) {
-                  localStorage.setItem('groovelab_active_workspace', 'student');
-                  localStorage.setItem('groovelab_active_platform', 'campus');
+                  sessionStorage.setItem('groovelab_active_workspace', 'student');
+                  sessionStorage.setItem('groovelab_active_platform', 'campus');
                   sessionStorage.setItem('groovelab_user_id', targetUser.id);
-                  localStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
                   onLogin(targetUser.id, true);
                 } else {
@@ -6511,11 +6508,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
 
                 if (targetUser) {
-                  localStorage.setItem('groovelab_active_workspace', 'secretary');
-                  localStorage.setItem('groovelab_active_platform', 'campus');
-                  localStorage.setItem('campus_active_tab', 'briefing');
+                  sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+                  sessionStorage.setItem('groovelab_active_platform', 'campus');
+                  sessionStorage.setItem('campus_active_tab', 'briefing');
                   sessionStorage.setItem('groovelab_user_id', targetUser.id);
-                  localStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
                   onLogin(targetUser.id, true);
                 } else {
@@ -6569,7 +6565,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 const targetId = targetUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90';
                 console.log('[Bypass] Master Admin logging in with ID:', targetId);
                 sessionStorage.setItem('groovelab_user_id', targetId);
-                localStorage.setItem('groovelab_user_id', targetId);
                 sessionStorage.setItem('groovelab_is_master_admin', 'true');
                 sessionStorage.removeItem('groovelab_qr_token');
                 onLogin(targetId, true);

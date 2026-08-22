@@ -46,16 +46,16 @@ export const JUNIOR_STICKER_REWARDS = [
   { id: 'stk_lion', emoji: '🦁', label: 'Löwen-Groove', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#10b981' },
   { id: 'stk_crown', emoji: '👑', label: 'Meister-Krone', gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', color: '#eab308' },
   { id: 'stk_game', emoji: '🎮', label: 'Gaming-XP', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: '#8b5cf6' },
-  { id: 'stk_heart', emoji: '💖', label: 'Herz-Melodie', gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', color: '#ec4899' },
+  { id: 'stk_flame', emoji: '🔥', label: 'Feuer-Solo', gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#f97316' },
 ];
 
 export const JUNIOR_GIFT_RECIPIENTS = [
-  { id: 'mama', label: 'Für Mama', name: 'Mama', emoji: '🌸', color: '#ec4899' },
+  { id: 'mama', label: 'Für Mama', name: 'Mama', emoji: '🌸', color: '#f97316' },
   { id: 'papa', label: 'Für Papa', name: 'Papa', emoji: '🧢', color: '#3b82f6' },
   { id: 'oma', label: 'Für Oma', name: 'Oma', emoji: '👵', color: '#8b5cf6' },
   { id: 'opa', label: 'Für Opa', name: 'Opa', emoji: '👴', color: '#059669' },
   { id: 'birthday', label: 'Geburtstagskind', name: 'das Geburtstagskind', emoji: '🎂', color: '#f59e0b' },
-  { id: 'family', label: 'Familie & Freunde', name: 'meine Familie', emoji: '💖', color: '#10b981' },
+  { id: 'family', label: 'Familie & Freunde', name: 'meine Familie', emoji: '✨', color: '#0d9488' },
 ];
 
 export const PRO_COVER_PRESETS = [
@@ -901,13 +901,13 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   style={{
                     padding: '16px',
                     borderRadius: '20px',
-                    border: `2.5px solid ${selectedGoalType === 'gift' ? '#ec4899' : '#e2e8f0'}`,
-                    background: selectedGoalType === 'gift' ? '#fdf2f8' : '#ffffff',
+                    border: `2.5px solid ${selectedGoalType === 'gift' ? '#f97316' : '#e2e8f0'}`,
+                    background: selectedGoalType === 'gift' ? '#fff7ed' : '#ffffff',
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px',
-                    boxShadow: selectedGoalType === 'gift' ? '0 6px 20px rgba(236, 72, 153, 0.18)' : '0 2px 6px rgba(0,0,0,0.03)',
+                    boxShadow: selectedGoalType === 'gift' ? '0 6px 20px rgba(249, 115, 22, 0.18)' : '0 2px 6px rgba(0,0,0,0.03)',
                     transition: 'all 0.18s ease'
                   }}
                   className="hover-scale"
@@ -918,36 +918,36 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                         width: '48px',
                         height: '48px',
                         borderRadius: '16px',
-                        background: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
                         color: 'white',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontSize: '1.4rem',
-                        boxShadow: '0 4px 12px rgba(236, 72, 153, 0.35)',
+                        boxShadow: '0 4px 12px rgba(249, 115, 22, 0.35)',
                         flexShrink: 0
                       }}>
                         🎁
                       </div>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '0.66rem', fontWeight: 900, background: '#ec4899', color: 'white', padding: '1px 7px', borderRadius: '100px' }}>
+                          <span style={{ fontSize: '0.66rem', fontWeight: 900, background: '#f97316', color: 'white', padding: '1px 7px', borderRadius: '100px' }}>
                             GESCHENK
                           </span>
-                          <span style={{ fontSize: '0.66rem', fontWeight: 900, background: '#fce7f3', color: '#be185d', padding: '1px 7px', borderRadius: '100px' }}>
-                            +30 XP
+                          <span style={{ fontSize: '0.66rem', fontWeight: 900, background: '#ffedd5', color: '#c2410c', padding: '1px 7px', borderRadius: '100px' }}>
+                            +50 XP
                           </span>
                         </div>
                         <div style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
                           3. Musik-Geschenk für Familie & Freunde
                         </div>
                         <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                          Nimm ein persönliches Ständchen auf & teile es direkt per WhatsApp
+                          Nimm ein Lied für deine Familie auf & verschicke es danach per WhatsApp
                         </div>
                       </div>
                     </div>
                     {selectedGoalType === 'gift' && (
-                      <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#ec4899', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#f97316', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Check size={16} strokeWidth={3} />
                       </div>
                     )}
@@ -957,12 +957,12 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   {selectedGoalType === 'gift' && (
                     <div style={{
                       paddingTop: '12px',
-                      borderTop: '1px dashed #fbcfe8',
+                      borderTop: '1px dashed #fed7aa',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '10px'
                     }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#be185d' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#9a3412' }}>
                         Für wen ist dieses Musik-Geschenk?
                       </span>
 
@@ -980,9 +980,9 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                               style={{
                                 padding: '10px 8px',
                                 borderRadius: '12px',
-                                border: isRecChosen ? '2px solid #ec4899' : '1px solid #fbcfe8',
-                                background: isRecChosen ? '#fce7f3' : '#ffffff',
-                                color: isRecChosen ? '#9d174d' : '#334155',
+                                border: isRecChosen ? '2px solid #f97316' : '1px solid #e2e8f0',
+                                background: isRecChosen ? '#ffedd5' : '#ffffff',
+                                color: isRecChosen ? '#9a3412' : '#334155',
                                 fontSize: '0.76rem',
                                 fontWeight: 800,
                                 cursor: 'pointer',
@@ -1347,11 +1347,11 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
               {/* Studio Master Audio Card */}
               <div style={{
                 background: selectedGoalType === 'gift' 
-                  ? 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)' 
+                  ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)' 
                   : 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
                 borderRadius: '24px',
                 padding: '18px',
-                border: `1.5px solid ${selectedGoalType === 'gift' ? '#f472b6' : '#86efac'}`,
+                border: `1.5px solid ${selectedGoalType === 'gift' ? '#fdba74' : '#86efac'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -1363,7 +1363,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     height: '46px',
                     borderRadius: '16px',
                     background: selectedGoalType === 'gift' 
-                      ? 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)' 
+                      ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' 
                       : selectedSticker.gradient,
                     display: 'flex',
                     alignItems: 'center',
@@ -1375,7 +1375,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     {selectedGoalType === 'gift' ? '🎁' : selectedSticker.emoji}
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: selectedGoalType === 'gift' ? '#db2777' : '#059669', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: selectedGoalType === 'gift' ? '#ea580c' : '#059669', textTransform: 'uppercase' }}>
                       ✨ Studio-Klang veredelt • {formatSec(recordedDuration)} Min.
                     </div>
                     <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
@@ -1393,7 +1393,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     height: '48px',
                     borderRadius: '50%',
                     border: 'none',
-                    background: isPlayingPreview ? '#ef4444' : (selectedGoalType === 'gift' ? '#ec4899' : '#10b981'),
+                    background: isPlayingPreview ? '#ef4444' : (selectedGoalType === 'gift' ? '#f97316' : '#10b981'),
                     color: 'white',
                     display: 'flex',
                     alignItems: 'center',
@@ -1412,9 +1412,9 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                 <div style={{
                   background: '#ffffff',
                   borderRadius: '24px',
-                  border: '2px solid #ec4899',
+                  border: '2px solid #f97316',
                   padding: '20px',
-                  boxShadow: '0 8px 24px rgba(236, 72, 153, 0.15)',
+                  boxShadow: '0 8px 24px rgba(249, 115, 22, 0.15)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '14px',
@@ -1422,7 +1422,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                 }}>
                   <div style={{ fontSize: '2.4rem' }}>🎁✨</div>
                   <div>
-                    <h3 style={{ margin: '0 0 4px 0', fontSize: '1.18rem', fontWeight: 900, color: '#9d174d' }}>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: '1.18rem', fontWeight: 900, color: '#9a3412' }}>
                       Dein Musik-Geschenk für {selectedRecipient.name} ist bereit!
                     </h3>
                     <p style={{ margin: 0, fontSize: '0.80rem', color: '#64748b', lineHeight: 1.4 }}>
@@ -1570,7 +1570,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                   className="hover-scale"
                 >
                   <Trophy size={20} />
-                  <span>{isSaving ? 'Speichere...' : 'In Schatztruhe sichern! 🏆'}</span>
+                  <span>{isSaving ? 'Speichere...' : (selectedGoalType === 'gift' ? 'Geschenk sichern & bereitstellen! 🎁' : 'In Schatztruhe sichern! 🏆')}</span>
                 </button>
               </div>
             </div>

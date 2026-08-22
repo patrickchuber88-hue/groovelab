@@ -11887,51 +11887,56 @@ export function TeacherDashboard({
                                   )}
 
                                    {/* 1:1 Shoutbox Icon Button */}
-                                  {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const targetSlot = slot.isGroup ? slot.slots[0] : slot;
-                                        if (targetSlot) {
-                                          setActiveChatOcc({
-                                            id: targetSlot.id,
-                                            student_id: slot.isGroup ? slot.students[0]?.id : slot.student?.id,
-                                            teacher_id: targetSlot.teacher_id || userId,
-                                            date: targetSlot.date,
-                                            start_time: targetSlot.startTime || targetSlot.timeSlot,
-                                            student: slot.isGroup ? slot.students[0] : slot.student,
-                                            teacher: teacher
-                                          });
-                                        }
-                                      }}
-                                      style={{
-                                        border: 'none',
-                                        background: 'none',
-                                        padding: '6px',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: activeChatOccIds.has(slot.isGroup ? slot.slots[0]?.id : slot.id) ? '#eab308' : '#94a3b8',
-                                        marginLeft: (slot.isGroup || confirmCancelSlotId === (slot.isGroup ? slot.slots[0]?.id : slot.id)) ? '0' : 'auto',
-                                        transition: 'all 0.2s',
-                                        borderRadius: '50%',
-                                        flexShrink: 0
-                                      }}
-                                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
-                                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-                                      title="1:1 Shoutbox öffnen"
-                                    >
-                                      <MessageSquare 
-                                        size={16} 
-                                        fill={activeChatOccIds.has(slot.isGroup ? slot.slots[0]?.id : slot.id) ? '#eab308' : 'none'} 
-                                        style={{
-                                          animation: activeChatOccIds.has(slot.isGroup ? slot.slots[0]?.id : slot.id) ? 'pulse 2s infinite' : 'none'
+                                  {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
+                                    const targetSlot = slot.isGroup ? slot.slots[0] : slot;
+                                    const hasChatMsgs = activeChatOccIds.has(slot.isGroup ? slot.slots[0]?.id : slot.id) || Boolean(slot.occurrence_id && activeChatOccIds.has(slot.occurrence_id));
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (targetSlot) {
+                                            setActiveChatOcc({
+                                              id: targetSlot.id,
+                                              student_id: slot.isGroup ? slot.students[0]?.id : slot.student?.id,
+                                              teacher_id: targetSlot.teacher_id || userId,
+                                              date: targetSlot.date,
+                                              start_time: targetSlot.startTime || targetSlot.timeSlot,
+                                              student: slot.isGroup ? slot.students[0] : slot.student,
+                                              teacher: teacher
+                                            });
+                                          }
                                         }}
-                                      />
-                                    </button>
-                                  )}
+                                        style={{
+                                          border: hasChatMsgs ? '1px solid #fde047' : 'none',
+                                          background: hasChatMsgs ? '#fefce8' : 'none',
+                                          padding: '6px',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: hasChatMsgs ? '#ca8a04' : '#94a3b8',
+                                          marginLeft: (slot.isGroup || confirmCancelSlotId === (slot.isGroup ? slot.slots[0]?.id : slot.id)) ? '0' : 'auto',
+                                          transition: 'all 0.2s',
+                                          borderRadius: '50%',
+                                          flexShrink: 0,
+                                          boxShadow: hasChatMsgs ? '0 1px 4px rgba(202, 138, 4, 0.15)' : 'none'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = hasChatMsgs ? '#fef08a' : 'rgba(0,0,0,0.06)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = hasChatMsgs ? '#fefce8' : 'none'}
+                                        title={hasChatMsgs ? "1:1 Shoutbox (Nachrichten vorhanden)" : "1:1 Shoutbox öffnen"}
+                                      >
+                                        <MessageSquare 
+                                          size={16} 
+                                          color={hasChatMsgs ? '#ca8a04' : '#94a3b8'}
+                                          fill={hasChatMsgs ? '#eab308' : 'none'} 
+                                          style={{
+                                            animation: hasChatMsgs ? 'pulse 2s infinite' : 'none'
+                                          }}
+                                        />
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             );

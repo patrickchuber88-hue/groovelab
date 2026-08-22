@@ -247,6 +247,8 @@ services:
       PGRST_DB_USE_LEGACY_GUCS: "false"
       PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
       PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY}
+      PGRST_DB_POOL: 100
+      PGRST_DB_POOL_TIMEOUT: 10
     command:
       [
         "postgrest"
@@ -490,6 +492,24 @@ services:
         "postgres",
         "-c",
         "config_file=/etc/postgresql/postgresql.conf",
+        "-c",
+        "shared_buffers=2GB",
+        "-c",
+        "effective_cache_size=6GB",
+        "-c",
+        "work_mem=32MB",
+        "-c",
+        "maintenance_work_mem=512MB",
+        "-c",
+        "max_connections=200",
+        "-c",
+        "statement_timeout=15000",
+        "-c",
+        "idle_in_transaction_session_timeout=10000",
+        "-c",
+        "checkpoint_completion_target=0.9",
+        "-c",
+        "wal_buffers=16MB",
         "-c",
         "log_min_messages=fatal" # prevents Realtime polling queries from appearing in logs
       ]

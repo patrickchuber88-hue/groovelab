@@ -851,11 +851,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         const assignedDay = scheduledMember?.assignedDay;
         const assignedTime = scheduledMember?.assignedTime;
         
+        const validGroupInsts = members.map(m => m.instrument).filter(inst => inst && !['musiker', 'musikerin', 'instrument', 'keines', 'none', '-'].includes(inst.toLowerCase().trim()));
+        const cleanGroupInst = validGroupInsts.length > 0 ? Array.from(new Set(validGroupInsts)).join(', ') : 'Gitarre';
+
         const merged: Student = {
           id: `group-${groupId}`,
           first_name: members.map(m => m.first_name).join(' & '),
           last_name: '',
-          instrument: members.map(m => m.instrument || 'Musiker').filter((val, idx, arr) => arr.indexOf(val) === idx).join('/'),
+          instrument: cleanGroupInst,
           duration: Math.max(...members.map(m => m.duration || 30)),
           assignedDay,
           assignedTime,
@@ -865,6 +868,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           group_id: groupId,
           groupStudents: members.map(m => ({
             ...m,
+            instrument: m.instrument && !['musiker', 'musikerin', 'instrument', 'keines', 'none', '-'].includes(m.instrument.toLowerCase().trim()) ? m.instrument : cleanGroupInst,
             assignedDay,
             assignedTime
           }))
@@ -3427,11 +3431,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     const firstSelectedIndex = targetBoard.students.findIndex(s => selectedForGroup.includes(s.id));
     const remainingStudents = targetBoard.students.filter(s => !selectedForGroup.includes(s.id));
 
+    const validGroupInsts = groupStudents.map(s => s.instrument).filter(inst => inst && !['musiker', 'musikerin', 'instrument', 'keines', 'none', '-'].includes(inst.toLowerCase().trim()));
+    const cleanGroupInst = validGroupInsts.length > 0 ? Array.from(new Set(validGroupInsts)).join(', ') : 'Gitarre';
+
     const newGroupBlock: Student = {
       id: `group-${crypto.randomUUID()}`,
       first_name: groupStudents.map(s => s.first_name).join(' & '),
       last_name: '',
-      instrument: groupStudents.map(s => s.instrument || 'Musiker').filter((v, i, a) => a.indexOf(v) === i).join('/'),
+      instrument: cleanGroupInst,
       duration: Math.max(...groupStudents.map(s => s.duration || 30)),
       isGroup: true,
       hasPreferences: groupStudents.some(s => Boolean(s.hasPreferences)),
@@ -3439,7 +3446,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         id: s.id,
         first_name: s.first_name,
         last_name: s.last_name,
-        instrument: s.instrument,
+        instrument: s.instrument && !['musiker', 'musikerin', 'instrument', 'keines', 'none', '-'].includes(s.instrument.toLowerCase().trim()) ? s.instrument : cleanGroupInst,
         duration: s.duration,
         assignedDay: s.assignedDay,
         assignedTime: s.assignedTime

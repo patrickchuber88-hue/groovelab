@@ -1060,13 +1060,7 @@ export function ScheduleCalendarViewDesktop({
       console.warn(err);
     }
 
-    const typedMsg = chatTypedMessage.trim();
-    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-    const d = new Date(occ.date);
-    const dayLabel = DAYS_DE[d.getDay()] || 'Termin';
-    const timeLabel = occ.start_time.substring(0, 5);
-    const prefix = `[Termin ${dayLabel} ${timeLabel} Uhr] `;
-    const messageContent = `${prefix}${typedMsg}`;
+    const messageContent = chatTypedMessage.trim();
 
     try {
       // Optimistic update
@@ -5878,9 +5872,15 @@ export function ScheduleCalendarViewDesktop({
                     finalColors.text = '#b91c1c';
                   }
                   
-                  const firstGroupId = occurrencesInGroup[0]?.student?.group_id;
-                  const isGruppenunterricht = isGroup && occurrencesInGroup.length >= 2 && !!firstGroupId && occurrencesInGroup.every(o => o.student?.group_id === firstGroupId);
-                  const isEnsemble = isGroup && !isGruppenunterricht;
+                  const isExplicitMerged = Boolean(
+                    (occ as any)?.is_merged || 
+                    (occ as any)?.is_ensemble || 
+                    (occ as any)?.is_adhoc_group ||
+                    (occ as any)?.merged_from_individual ||
+                    occurrencesInGroup.some(o => (o as any).is_merged || (o as any).is_ensemble || (o.is_moved && o.original_start_time && o.original_start_time.substring(0, 5) !== o.start_time.substring(0, 5)) || (o.is_moved && o.original_date && o.original_date !== o.date))
+                  );
+                  const isGruppenunterricht = isGroup && !isExplicitMerged;
+                  const isEnsemble = isGroup && isExplicitMerged;
 
                   if (isGap) return null;
 
@@ -6853,10 +6853,15 @@ return (
           }
         });
 
-        const firstGroupId = groupOccs[0]?.student?.group_id;
-        const isDbLinkedGroup = isGroupOcc && !!firstGroupId && groupOccs.every(o => o.student?.group_id === firstGroupId);
-        const isGruppenunterrichtOcc = isDbLinkedGroup;
-        const isEnsembleOcc = isGroupOcc && !isGruppenunterrichtOcc;
+        const isExplicitMerged = Boolean(
+          (occ as any)?.is_merged || 
+          (occ as any)?.is_ensemble || 
+          (occ as any)?.is_adhoc_group ||
+          (occ as any)?.merged_from_individual ||
+          groupOccs.some(o => (o as any).is_merged || (o as any).is_ensemble || ((o as any).is_moved && o.original_start_time && o.original_start_time.substring(0, 5) !== o.start_time.substring(0, 5)) || ((o as any).is_moved && o.original_date && o.original_date !== o.date))
+        );
+        const isGruppenunterrichtOcc = isGroupOcc && !isExplicitMerged;
+        const isEnsembleOcc = isGroupOcc && isExplicitMerged;
 
         const isMoved = occ?.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time);
         const isCancelled = occ?.status && ['cancelled', 'canceled_by_student'].includes(occ.status);

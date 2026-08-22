@@ -34,6 +34,7 @@ export interface ComputeProgressParams {
   stats?: any;
   simulatedDate?: Date;
   targetMinutes?: number;
+  shieldDates?: string[] | Set<string>;
 }
 
 export const DEFAULT_FOKUS_LEVELS = {
@@ -185,7 +186,8 @@ export function computeGroundTruthMetrics({
   avatar,
   stats,
   simulatedDate,
-  targetMinutes = 3
+  targetMinutes = 3,
+  shieldDates
 }: ComputeProgressParams): StudentProgressMetrics {
   const now = simulatedDate || getEngineSimulatedNow();
   const todayStr = toEngineYYYYMMDD(now);
@@ -263,7 +265,29 @@ export function computeGroundTruthMetrics({
     if (isMastered) masteredDatesSet.add(dStr);
   });
 
-  // 4. Compute deterministic streak from logs
+  // 4. Compute deterministic streak from logs & shield bridges
+  const shieldDatesSet = new Set<string>();
+  if (shieldDates) {
+    if (Array.isArray(shieldDates)) {
+      shieldDates.forEach(d => shieldDatesSet.add(d));
+    } else if (shieldDates instanceof Set) {
+      shieldDates.forEach(d => shieldDatesSet.add(d));
+    }
+  }
+  if (user?.joker_used_at) {
+    shieldDatesSet.add(toEngineYYYYMMDD(new Date(user.joker_used_at)));
+  }
+  try {
+    if (typeof window !== 'undefined') {
+      candidateIds.forEach(id => {
+        const localShields = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${id}`) || '[]');
+        if (Array.isArray(localShields)) {
+          localShields.forEach((d: string) => shieldDatesSet.add(d));
+        }
+      });
+    }
+  } catch (e) {}
+
   let computedStreak = 0;
   let checkDate = new Date(now);
   let checkDateStr = toEngineYYYYMMDD(checkDate);
@@ -275,6 +299,9 @@ export function computeGroundTruthMetrics({
       const prevStr = toEngineYYYYMMDD(checkDate);
       if (masteredDatesSet.has(prevStr)) {
         computedStreak += 1;
+      } else if (shieldDatesSet.has(prevStr)) {
+        // Shielded day preserves streak continuity (bridge)
+        continue;
       } else {
         break;
       }
@@ -282,13 +309,18 @@ export function computeGroundTruthMetrics({
   } else {
     checkDate.setDate(checkDate.getDate() - 1);
     const yestStr = toEngineYYYYMMDD(checkDate);
-    if (masteredDatesSet.has(yestStr)) {
-      computedStreak = 1;
+    if (masteredDatesSet.has(yestStr) || shieldDatesSet.has(yestStr)) {
+      if (masteredDatesSet.has(yestStr)) {
+        computedStreak = 1;
+      }
       while (true) {
         checkDate.setDate(checkDate.getDate() - 1);
         const prevStr = toEngineYYYYMMDD(checkDate);
         if (masteredDatesSet.has(prevStr)) {
           computedStreak += 1;
+        } else if (shieldDatesSet.has(prevStr)) {
+          // Shielded day preserves streak continuity (bridge)
+          continue;
         } else {
           break;
         }
@@ -374,3 +406,15 @@ export function broadcastPracticeUpdate(studentId: string, payload?: any) {
     }
   } catch (e) {}
 }
+
+/**
+ * Calculates remaining available shields for the current week (max 3 per week)
+ */
+export function getAvailableShieldsCount(user: any, simulatedDate?: Date): number {
+  const now = simulatedDate || getEngineSimulatedNow();
+  const currentWeek = getEngineISOWeek(now);
+  const lastJokerWeek = user?.joker_used_at ? getEngineISOWeek(new Date(user.joker_used_at)) : null;
+  const usedThisWeek = lastJokerWeek === currentWeek ? (user?.weekly_jokers_used || 1) : 0;
+  return Math.max(0, 3 - usedThisWeek);
+}
+

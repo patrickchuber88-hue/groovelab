@@ -12,6 +12,9 @@ export default defineConfig({
     },
   },
   server: {
+    host: true, // Listen on all network addresses (0.0.0.0, 127.0.0.1, localhost)
+    port: 5173,
+    strictPort: true,
     // Alle URL-Pfade (wie /qr/:token) auf index.html fallbacken — SPA-Routing
     historyApiFallback: true,
   },

@@ -31,6 +31,7 @@ import { downloadStudentAudioBackup } from '../utils/audioBackupHelper';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate } from '../utils/studentProgressEngine';
 import { PushNotificationSoftPromptModal } from './ui/PushNotificationSoftPromptModal';
 import { generateGdprDataReportPDF } from '../utils/pdfGenerator';
+import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
 
 const showMissionsFeature = false;
 
@@ -172,6 +173,7 @@ const STUDENT_AVATARS = [
 
 interface StudentAvatarDashboardProps {
   studentId: string;
+  initialUser?: any;
   parentActiveTab?: string;
   onTabChange?: (tab: string) => void;
   onProfileUpdate?: (updatedFields: any) => void;
@@ -577,6 +579,7 @@ interface MobileBriefingViewProps {
   schoolFokusLevels?: any;
   handleTriggerCancelOccurrence?: (occ: any) => void;
   handleUndoCancelOccurrence?: (occ: any) => void;
+  getDeterministicWeekMetrics?: () => any;
 }
 
 function MobileBriefingView({
@@ -614,7 +617,8 @@ function MobileBriefingView({
   getOccRoomName,
   unreadClassFeedCount,
   studentUiLevel = 'pro',
-  schoolFokusLevels
+  schoolFokusLevels,
+  getDeterministicWeekMetrics
 }: MobileBriefingViewProps) {
   const campusSettings = studentUser?.schools?.opening_hours?.campus_settings || {};
   const flamesActive = campusSettings.flames_active !== false;
@@ -1402,10 +1406,10 @@ function MobileBriefingView({
                   </div>
                   {/* 3 Schutzschilde indicator */}
                   {(() => {
-                    const currentWeek = getISOWeek(new Date());
-                    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                    const usedJokersThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
-                    const availableShields = Math.max(0, 3 - usedJokersThisWeek);
+                    const weekMetrics = getDeterministicWeekMetrics ? getDeterministicWeekMetrics() : { availableShields: 3, weekShieldedCount: 0, weekDays: [] };
+                    const currentWeek = getISOWeek(getSimulatedNow());
+                    const availableShields = weekMetrics.availableShields;
+                    const weekShieldedCount = weekMetrics.weekShieldedCount;
                     
                     return (
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
@@ -1415,7 +1419,11 @@ function MobileBriefingView({
                         </span>
                         <div style={{ display: 'flex', gap: '3px' }}>
                           {[1, 2, 3].map((shieldNum) => {
-                            const isShieldActive = shieldNum <= availableShields;
+                            const isConsumed = shieldNum <= weekShieldedCount;
+                            const isShieldActive = shieldNum > weekShieldedCount;
+                            const shieldedDay = weekMetrics.weekDays.find((d: any) => d.shieldNumber === shieldNum);
+                            const dayLabel = shieldedDay ? shieldedDay.dayName : '';
+
                             return (
                               <div
                                 key={`modal-shield-${shieldNum}`}
@@ -1425,16 +1433,16 @@ function MobileBriefingView({
                                   gap: '3px',
                                   padding: '2px 6px',
                                   borderRadius: '6px',
-                                  background: isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)',
-                                  border: isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)',
-                                  color: isShieldActive ? '#0369a1' : '#b45309',
+                                  background: isConsumed ? 'rgba(2, 132, 199, 0.12)' : (isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
+                                  border: isConsumed ? '1px solid #38bdf8' : (isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
+                                  color: isConsumed ? '#0284c7' : (isShieldActive ? '#0369a1' : '#b45309'),
                                   fontSize: '0.62rem',
                                   fontWeight: 850
                                 }}
-                                title={isShieldActive ? `Schutzschild ${shieldNum} bereit` : `Schutzschild ${shieldNum} als Glut-Schutz verbraucht`}
+                                title={isConsumed ? `Schutzschild ${shieldNum} wurde am ${dayLabel} als Glut-Schutz eingesetzt` : `Schutzschild ${shieldNum} bereit`}
                               >
-                                <Shield size={9} color={isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : 'none'} />
-                                <span>{isShieldActive ? `${shieldNum}` : 'Glut'}</span>
+                                <Shield size={9} color={isConsumed || isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : (isConsumed ? '#38bdf8' : 'none')} />
+                                <span>{isConsumed ? `${shieldNum} (${dayLabel})` : `${shieldNum}`}</span>
                               </div>
                             );
                           })}
@@ -2740,9 +2748,8 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
   );
 }
 
-export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
-  console.log('StudentAvatarDashboard Render:', { activeTab: parentActiveTab, studentId });
-  const [studentUser, setStudentUser] = useState<any>(null);
+export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
+  const [studentUser, setStudentUser] = useState<any>(() => initialUser || null);
 
   // 3-Level Adaptive UI State ('junior' | 'teen' | 'pro')
   const [studentUiLevel, setStudentUiLevel] = useState<CampusUiLevel | null>(() => {
@@ -3983,7 +3990,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       console.warn(err);
     }
 
-    const messageContent = `[Termin ${appointmentChatData.label}] ${chatTypedMessage.trim()}`;
+    const messageContent = chatTypedMessage.trim();
 
     try {
       // Optimistic update
@@ -4793,13 +4800,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   };
   
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    let initial = parentActiveTab;
-    if (initial === 'mediathek') initial = 'songs';
-    if (initial === 'termine' || initial === 'all_appointments') initial = 'events';
-    return (initial as any) || 'briefing';
-  });
-  const [homeworkBookTab, setHomeworkBookTab] = useState<'document' | 'logbook' | 'stickeralbum'>('document');
+  const mapTabName = (tab?: string) => {
+    if (!tab) return 'briefing';
+    if (tab === 'mediathek') return 'songs';
+    if (tab === 'termine' || tab === 'all_appointments') return 'events';
+    return tab;
+  };
+
+  const [activeTabLocal, setActiveTabLocal] = useState<string>(() => mapTabName(parentActiveTab));
+  const activeTab = parentActiveTab ? mapTabName(parentActiveTab) : activeTabLocal;
+  const setActiveTab = (tab: string) => {
+    setActiveTabLocal(tab);
+    if (onTabChange) {
+      onTabChange(tab);
+    }
+  };
+  const [homeworkBookTab, setHomeworkBookTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>('document');
 
   // ── Asset Preloading Hook (3.2) ──
   useEffect(() => {
@@ -4825,17 +4841,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   }, []);
 
   useEffect(() => {
-    if (parentActiveTab) {
-      let mapped = parentActiveTab;
-      if (mapped === 'mediathek') mapped = 'songs';
-      if (mapped === 'termine' || mapped === 'all_appointments') mapped = 'events';
-      if (['briefing', 'hero', 'songs', 'practice_board', 'campus_cup', 'events', 'profile', 'settings', 'homework_book'].includes(mapped)) {
-        setActiveTab(mapped as any);
-      }
-    }
-  }, [parentActiveTab]);
-
-  useEffect(() => {
     if (activeTab === 'events') {
       fetchSchoolYearSchedule();
     }
@@ -4844,16 +4849,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const handleUseJoker = async (dateStr: string) => {
     if (!studentId || !studentUser) return;
     
-    const currentWeek = getISOWeek(new Date());
+    const nowSim = getSimulatedNow();
+    const currentWeek = getISOWeek(nowSim);
     const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-    const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+    const usedJokersThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
+    const availableShields = Math.max(0, 3 - usedJokersThisWeek);
     
-    if (!isJokerAvailable) {
-      alert('Du hast deinen Joker für diese Woche bereits verbraucht!');
+    if (availableShields <= 0) {
+      alert('Du hast alle 3 Schutzschilde für diese Woche bereits verbraucht!');
       return;
     }
 
-    if (!window.confirm(`Möchtest du deinen Joker für den ${dateStr} einsetzen, um deinen Streak zu sichern?`)) {
+    if (!window.confirm(`Möchtest du ein Schutzschild für den ${dateStr} einsetzen, um deinen Streak zu sichern? (Noch ${availableShields} von 3 Schilden verfügbar)`)) {
       return;
     }
 
@@ -4863,16 +4870,39 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const month = parseInt(parts[1], 10) - 1;
       const year = 2000 + parseInt(parts[2], 10);
       const jokerDate = new Date(year, month, day, 12, 0, 0);
+      const jokerDateStr = toLocalYYYYMMDD(jokerDate);
+
+      let shieldDatesArr: string[] = [];
+      try {
+        shieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${studentId}`) || '[]');
+        if (!Array.isArray(shieldDatesArr)) shieldDatesArr = [];
+      } catch (e) {
+        shieldDatesArr = [];
+      }
+      if (!shieldDatesArr.includes(jokerDateStr)) {
+        shieldDatesArr.push(jokerDateStr);
+      }
+      try {
+        localStorage.setItem(`cg_shield_usage_dates_${studentId}`, JSON.stringify(shieldDatesArr));
+      } catch (e) {}
+
+      const newWeeklyUsed = Math.min(3, usedJokersThisWeek + 1);
 
       const { error: userErr } = await supabase
         .from('users')
-        .update({ joker_used_at: jokerDate.toISOString() })
+        .update({ 
+          joker_used_at: jokerDate.toISOString(),
+          weekly_jokers_used: newWeeklyUsed
+        })
         .eq('id', studentId);
 
       if (userErr) throw userErr;
 
+      studentUser.joker_used_at = jokerDate.toISOString();
+      studentUser.weekly_jokers_used = newWeeklyUsed;
+
       const currentStreak = avatar?.streak_flame || 0;
-      const newStreak = currentStreak === 0 ? 1 : currentStreak + 1;
+      const newStreak = currentStreak === 0 ? 1 : currentStreak;
       
       const { error: avatarErr } = await supabase
         .from('avatars')
@@ -4883,8 +4913,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       await fetchStudentAndAvatar();
     } catch (err) {
-      console.error('Error using joker:', err);
-      alert('Fehler beim Einsetzen des Jokers. Bitte versuche es erneut.');
+      console.error('Error using shield:', err);
+      alert('Fehler beim Einsetzen des Schutzschildes. Bitte versuche es erneut.');
     }
   };
 
@@ -4892,58 +4922,85 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     if (!studentId || !studentUser || !avatar) return;
 
     const currentStreak = avatar?.streak_flame || 0;
-    if (currentStreak <= 0) return; // Joker is only automatically applied if there is an active streak to save
+    if (currentStreak <= 0) return; // Shields are only automatically applied if there is an active streak to protect
 
-    // Check consecutive missed days from newest to oldest
-    let consecutiveMissed = 0;
-    let missedGroup: any = null;
-    let missedDateObj: Date | null = null;
+    const nowSim = getSimulatedNow();
+    const currentWeek = getISOWeek(nowSim);
+    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+    let usedJokersThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
+    let availableShields = Math.max(0, 3 - usedJokersThisWeek);
 
+    if (availableShields <= 0) return;
+
+    // Collect missed days from newest to oldest before today
+    const missedDayGroups: any[] = [];
     for (let i = 0; i < groupedList.length; i++) {
       const group = groupedList[i];
       if (group.isToday) continue;
 
-      if (group.isPlaceholder) {
-        consecutiveMissed++;
-        if (consecutiveMissed === 1) {
-          missedGroup = group;
-          const parts = group.date.split('.');
-          const day = parseInt(parts[0], 10);
-          const month = parseInt(parts[1], 10) - 1;
-          const year = 2000 + parseInt(parts[2], 10);
-          missedDateObj = new Date(year, month, day, 12, 0, 0);
-        }
+      if (group.isPlaceholder || (!group.hasMasteredSession && (group.focusSeconds + group.extraSeconds) < 180)) {
+        missedDayGroups.push(group);
       } else {
-        // Encountered a practice day
+        // Encountered a mastered practice day
         break;
       }
     }
 
-    // A Joker can ONLY be applied if exakt 1 day was missed while having an active streak!
-    // If consecutiveMissed >= 2, streak is broken (0), and NO joker can be used.
-    if (consecutiveMissed !== 1 || !missedGroup || !missedDateObj) return;
+    if (missedDayGroups.length === 0) return;
 
-    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-    const weekOfMissed = getISOWeek(missedDateObj);
+    // Read existing shield usage dates
+    let shieldDatesArr: string[] = [];
+    try {
+      shieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${studentId}`) || '[]');
+      if (!Array.isArray(shieldDatesArr)) shieldDatesArr = [];
+    } catch (e) {
+      shieldDatesArr = [];
+    }
+    const shieldDatesSet = new Set(shieldDatesArr);
 
-    if (lastJokerWeek && weekOfMissed <= lastJokerWeek) return; // Joker already used this week
+    // Sort missed days chronologically (oldest to newest)
+    const missedDaysChronological = [...missedDayGroups].reverse();
+    let shieldsToApply = 0;
+    let lastJokerDateIso: string | null = null;
 
-    const firstMissedDayGroup = missedGroup;
-    const foundJokerDate = missedDateObj;
+    for (const mGroup of missedDaysChronological) {
+      const parts = mGroup.date.split('.');
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = 2000 + parseInt(parts[2], 10);
+      const mDate = new Date(year, month, day, 12, 0, 0);
+      const mDateStr = toLocalYYYYMMDD(mDate);
 
-    if (firstMissedDayGroup && foundJokerDate) {
-      console.log('Automatically applying joker to save streak for date:', firstMissedDayGroup.date);
+      if (!shieldDatesSet.has(mDateStr) && availableShields > 0) {
+        shieldDatesSet.add(mDateStr);
+        availableShields--;
+        shieldsToApply++;
+        lastJokerDateIso = mDate.toISOString();
+      }
+    }
+
+    if (shieldsToApply > 0 && lastJokerDateIso) {
+      const newWeeklyUsed = Math.min(3, usedJokersThisWeek + shieldsToApply);
+      try {
+        localStorage.setItem(`cg_shield_usage_dates_${studentId}`, JSON.stringify(Array.from(shieldDatesSet)));
+      } catch (e) {}
+
       try {
         const { error: userErr } = await supabase
           .from('users')
-          .update({ joker_used_at: foundJokerDate.toISOString() })
+          .update({ 
+            joker_used_at: lastJokerDateIso,
+            weekly_jokers_used: newWeeklyUsed
+          })
           .eq('id', studentId);
 
         if (userErr) throw userErr;
 
-        // Preserve current streak, don't increment it
+        studentUser.joker_used_at = lastJokerDateIso;
+        studentUser.weekly_jokers_used = newWeeklyUsed;
+
+        // Preserve current streak
         const newStreak = currentStreak;
-        
         const { error: avatarErr } = await supabase
           .from('avatars')
           .update({ streak_flame: newStreak })
@@ -4952,22 +5009,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         if (avatarErr) throw avatarErr;
 
         await fetchStudentAndAvatar();
-
-        // Trigger celebration overlay for saved streak!
-        setCelebrationDetails({
-          xpGained: 0,
-          streakFlame: newStreak,
-          sessionCompletedTarget: false,
-          usedJokerThisSession: true,
-          streak: newStreak,
-          sessionMinutes: 0,
-          dailyGoal: 3
-        });
-        setCelebrationRingProgress(1.0);
-        setCelebrationExploded(false);
-        setShowCelebration(true);
       } catch (err) {
-        console.error('Error auto applying joker:', err);
+        console.error('Error auto applying shields:', err);
       }
     }
   };
@@ -5090,11 +5133,83 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [juniorSelectedPreviewSticker, setJuniorSelectedPreviewSticker] = useState<any | null>(null);
   const [juniorCheckedPages, setJuniorCheckedPages] = useState<Record<string, boolean>>({});
 
-  // 🗣️ TTS (Text-to-Speech) Vorlese-Engine für Hausaufgaben
+  // 🗣️ TTS (Text-to-Speech) Vorlese-Engine für Hausaufgaben mit 3 wählbaren Varianten
+  // 'neural_thorsten' = Option A: Neuronale KI-Stimme (Piper WASM Studio-Hörbuch)
+  // 'neural_kerstin'  = Option A: Neuronale KI-Frauenstimme (Piper WASM)
+  // 'cheerful'        = Option B: Fröhlich & Motivierend (Native Acoustic Tuning + Chime)
+  // 'classic'         = Option C: Klassisch & Sachlich (Native Pitch 1.0)
+  const [ttsMode, setTtsMode] = useState<'neural_thorsten' | 'neural_kerstin' | 'cheerful' | 'classic'>(() => {
+    try {
+      const saved = localStorage.getItem('campus_tts_mode');
+      if (saved === 'neural_thorsten' || saved === 'neural_kerstin' || saved === 'cheerful' || saved === 'classic') {
+        return saved;
+      }
+      return 'neural_thorsten';
+    } catch {
+      return 'neural_thorsten';
+    }
+  });
+
+  const [ttsStatusText, setTtsStatusText] = useState<string | null>(null);
+
+  const handleSetTtsMode = useCallback((mode: 'neural_thorsten' | 'neural_kerstin' | 'cheerful' | 'classic') => {
+    setTtsMode(mode);
+    try {
+      localStorage.setItem('campus_tts_mode', mode);
+    } catch {}
+  }, []);
+
   const [ttsAvailableVoices, setTtsAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isTtsSpeaking, setIsTtsSpeaking] = useState<boolean>(false);
   const [activeTtsKey, setActiveTtsKey] = useState<string | null>(null);
   const ttsSessionIdRef = useRef<number>(0);
+
+  // 🎵 Web Audio API Motivational Intro Chime (100% Kostenlos, 0kb Netzwerklast, DSGVO-konform)
+  const playMotivationalTtsIntroChime = useCallback((mode: string) => {
+    if (mode === 'classic') return; // Kein Chime in Variante classic
+    try {
+      if (typeof window === 'undefined') return;
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const now = ctx.currentTime;
+
+      // Fröhlicher 4-Ton-Aufgang (C5, E5, G5, C6)
+      const notes = [
+        { freq: 523.25, time: 0.00, dur: 0.10 },
+        { freq: 659.25, time: 0.07, dur: 0.12 },
+        { freq: 783.99, time: 0.14, dur: 0.14 },
+        { freq: 1046.50, time: 0.21, dur: 0.24 }
+      ];
+
+      notes.forEach(({ freq, time, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + time);
+        gain.gain.setValueAtTime(0.001, now + time);
+        gain.gain.exponentialRampToValueAtTime(0.15, now + time + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + time + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + time);
+        osc.stop(now + time + dur + 0.04);
+      });
+
+      setTimeout(() => {
+        try {
+          ctx.close();
+        } catch {
+          // ignore
+        }
+      }, 700);
+    } catch (e) {
+      console.warn('[TTS] Audio chime failed gracefully:', e);
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -5124,35 +5239,86 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     const germanVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('de'));
     if (germanVoices.length === 0) return voices[0] || null;
 
+    // 1. Moderne Microsoft Edge / Azure Neural Voices
+    const msNatural = germanVoices.find(v => 
+      v.name.includes('Online (Natural)') || 
+      (v.name.includes('Natural') && (v.name.includes('Katja') || v.name.includes('Amira') || v.name.includes('Conrad') || v.name.includes('Killian')))
+    );
+    if (msNatural) return msNatural;
+
+    // 2. Apple Siri & Enhanced/Premium Stimmen
+    const siriOrPremium = germanVoices.find(v => 
+      v.name.toLowerCase().includes('siri') || 
+      v.name.toLowerCase().includes('premium') || 
+      v.name.toLowerCase().includes('enhanced') || 
+      v.name.toLowerCase().includes('erweitert')
+    );
+    if (siriOrPremium) return siriOrPremium;
+
+    // 3. Apple Anna / Helena / Martin
     const annaVoice = germanVoices.find(v => v.name.toLowerCase().includes('anna'));
     if (annaVoice) return annaVoice;
-    const googleVoice = germanVoices.find(v => v.name.includes('Google'));
+    const helenaVoice = germanVoices.find(v => v.name.toLowerCase().includes('helena'));
+    if (helenaVoice) return helenaVoice;
+    const martinVoice = germanVoices.find(v => v.name.toLowerCase().includes('martin'));
+    if (martinVoice) return martinVoice;
+
+    // 4. Google Neural / Android Stimmen
+    const googleVoice = germanVoices.find(v => v.name.includes('Google') || v.name.includes('deg-network'));
     if (googleVoice) return googleVoice;
-    const naturalVoice = germanVoices.find(v => v.name.toLowerCase().includes('natural') || v.name.includes('Katja'));
-    if (naturalVoice) return naturalVoice;
+
+    // 5. Beliebte Synthesizer (Katja, Marlene, Vicki, Hedda)
+    const friendlyVoice = germanVoices.find(v => 
+      v.name.toLowerCase().includes('katja') || 
+      v.name.toLowerCase().includes('amira') || 
+      v.name.toLowerCase().includes('marlene') || 
+      v.name.toLowerCase().includes('vicki')
+    );
+    if (friendlyVoice) return friendlyVoice;
+
     return germanVoices[0] || null;
   }, [ttsAvailableVoices]);
 
   const cleanTextForTts = (text: string): string => {
     if (!text) return '';
     return text
+      // Kalenderwochen & Termine
       .replace(/KW\s*(\d+)/gi, 'Kalenderwoche $1')
+      // Takte & Seiten mit Bindestrichen
       .replace(/Takt\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Takt $1 bis $2')
       .replace(/S\.\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Seite $1 bis $2')
       .replace(/S\.\s*(\d+)/gi, 'Seite $1')
-      .replace(/z\.\s*B\./gi, 'zum Beispiel')
-      .replace(/bzw\./gi, 'beziehungsweise')
+      .replace(/Seite\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Seite $1 bis $2')
+      // Musikalische Taktarten
+      .replace(/\b4\/4\s*(?:-?\s*Takt)?/gi, 'Vier-Viertel-Takt')
+      .replace(/\b3\/4\s*(?:-?\s*Takt)?/gi, 'Drei-Viertel-Takt')
+      .replace(/\b2\/4\s*(?:-?\s*Takt)?/gi, 'Zwei-Viertel-Takt')
+      .replace(/\b6\/8\s*(?:-?\s*Takt)?/gi, 'Sechs-Achtel-Takt')
+      .replace(/\b12\/8\s*(?:-?\s*Takt)?/gi, 'Zwölf-Achtel-Takt')
+      // Dynamik & Spielanweisungen
+      .replace(/\bp\/f\b|\bp \/ f\b/gi, 'piano und forte')
+      .replace(/\bfff\b/gi, 'sehr sehr laut, fortississimo')
+      .replace(/\bff\b/gi, 'fortissimo, sehr kräftig')
+      .replace(/\bpp\b/gi, 'pianissimo, sehr leise')
+      // Metronom & Einheiten
       .replace(/(\d+)\s*BPM/gi, '$1 Schläge pro Minute')
       .replace(/BPM/gi, 'Schläge pro Minute')
-      .replace(/(\d+)\s*min/gi, '$1 Minuten')
+      .replace(/(\d+)\s*min\b/gi, '$1 Minuten')
+      .replace(/(\d+)\s*sek\b/gi, '$1 Sekunden')
       .replace(/(\d+)\s*x\b/gi, '$1 mal')
-      .replace(/Übe-Timer/gi, 'Übe Timer')
+      // Begrifflichkeiten
+      .replace(/z\.\s*B\./gi, 'zum Beispiel')
+      .replace(/bzw\./gi, 'beziehungsweise')
+      .replace(/inkl\./gi, 'inklusive')
+      .replace(/evtl\./gi, 'eventuell')
+      .replace(/Übe-Timer/gi, 'Übe-Timer')
       .replace(/Play-Along/gi, 'Play Along')
       .replace(/•/g, ', ')
       .replace(/#/g, 'Nummer ')
-      .replace(/p\/f/gi, 'piano und forte')
-      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Keine Emojis vorlesen
+      // Keine Emojis vorlesen
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
       .replace(/[\u{2600}-\u{27BF}]/gu, '')
+      // Bindestriche zu sanften Sprechpausen machen
       .replace(/\s*[-–—]\s*/g, ', ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -5160,16 +5326,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const handleStopSpeaking = useCallback(() => {
     ttsSessionIdRef.current += 1;
+    stopNeuralSpeech();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
     setIsTtsSpeaking(false);
     setActiveTtsKey(null);
+    setTtsStatusText(null);
   }, []);
 
   useEffect(() => {
     return () => {
       ttsSessionIdRef.current += 1;
+      stopNeuralSpeech();
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
@@ -5177,11 +5346,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   }, []);
 
   const handleSpeakText = useCallback(async (textOrPhrases: string | string[], elementKey: string = 'global') => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      alert('Sprachausgabe wird in diesem Browser leider nicht unterstützt.');
-      return;
-    }
-
     if (isTtsSpeaking && activeTtsKey === elementKey) {
       handleStopSpeaking();
       return;
@@ -5190,7 +5354,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     handleStopSpeaking();
 
     const rawPhrases = Array.isArray(textOrPhrases)
-      ? textOrPhrases
+      ? [...textOrPhrases]
       : textOrPhrases
           .split(/(?<=[.!?])\s+/)
           .filter(p => p.trim().length > 0);
@@ -5205,7 +5369,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     setIsTtsSpeaking(true);
     setActiveTtsKey(elementKey);
 
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      alert('Sprachausgabe wird in diesem Browser leider nicht unterstützt.');
+      setIsTtsSpeaking(false);
+      setActiveTtsKey(null);
+      return;
+    }
+
     const bestVoice = selectBestGermanVoice();
+
+    // 🎵 Fröhlicher Intro-Chime
+    playMotivationalTtsIntroChime('cheerful');
+    await new Promise((r) => setTimeout(r, 220));
 
     for (let i = 0; i < phrases.length; i++) {
       if (ttsSessionIdRef.current !== currentSessionId) break;
@@ -5214,24 +5389,32 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       await new Promise<void>((resolve) => {
         const utterance = new SpeechSynthesisUtterance(phrase);
         utterance.lang = 'de-DE';
+        utterance.pitch = 1.04; // 🌟 Fröhliche, sympathisch modulierte Tonhöhe
+        utterance.rate = 0.91;  // 🌟 Entspannter, verständlicher Redefluss
+        utterance.volume = 0.65; // 🔉 Sanfte Zimmerlautstärke
+
         if (bestVoice) utterance.voice = bestVoice;
         utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
+        utterance.onerror = (e) => {
+          console.warn('[TTS] Phrase speech error:', e);
+          resolve();
+        };
         window.speechSynthesis.speak(utterance);
       });
 
       if (ttsSessionIdRef.current !== currentSessionId) break;
 
       if (i < phrases.length - 1) {
-        await new Promise((r) => setTimeout(r, 380));
+        await new Promise((r) => setTimeout(r, 280));
       }
     }
 
     if (ttsSessionIdRef.current === currentSessionId) {
       setIsTtsSpeaking(false);
       setActiveTtsKey(null);
+      setTtsStatusText(null);
     }
-  }, [isTtsSpeaking, activeTtsKey, handleStopSpeaking, selectBestGermanVoice]);
+  }, [isTtsSpeaking, activeTtsKey, handleStopSpeaking, selectBestGermanVoice, playMotivationalTtsIntroChime]);
 
   // Junior Audio Recording State
   const [juniorIsRecording, setJuniorIsRecording] = useState(false);
@@ -5745,104 +5928,117 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   };
 
-  // Junior Student Recordings List (Exclusively containing recorded songs from Box 3 "Aufnahme starten")
+  // Junior Student Recordings List (Exclusively containing recorded songs from Box 3 "Aufnahme starten" & Übe-Studio)
   const juniorStudentRecordings = useMemo(() => {
     const recsMap = new Map<string, { id: string; title: string; url: string; duration?: number; date: string; fullItem?: any; blobKey?: string }>();
 
-    // Exclusively from Box 3 local junior recordings
-    (juniorLocalRecordings || []).forEach(item => {
-      if (item && item.id) {
-        recsMap.set(item.id, {
-          id: item.id,
+    // 1. From local junior recordings state & localStorage
+    const localItems = Array.isArray(juniorLocalRecordings) && juniorLocalRecordings.length > 0
+      ? juniorLocalRecordings
+      : (() => {
+          try {
+            const raw = localStorage.getItem(`campus_junior_recordings_${studentId}`);
+            return raw ? JSON.parse(raw) : [];
+          } catch {
+            return [];
+          }
+        })();
+
+    (localItems || []).forEach((item: any) => {
+      if (item && (item.id || item.url)) {
+        const uniqueKey = item.id || item.url;
+        recsMap.set(uniqueKey, {
+          id: uniqueKey,
           title: item.title || 'Mein Song',
           url: item.url || '',
           duration: item.duration,
-          date: item.date || new Date().toISOString(),
-          blobKey: item.blobKey || `campus_audio_${item.id}_raw`
+          date: item.date || item.recordedAt || new Date().toISOString(),
+          blobKey: item.blobKey || `campus_audio_${uniqueKey}_raw`
         });
       }
     });
 
     return Array.from(recsMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [juniorLocalRecordings]);
+  }, [juniorLocalRecordings, studentId]);
 
   // Junior Teacher Recordings (All historical recordings created by the teacher across all weeks/progressItems)
   const juniorTeacherRecordings = useMemo(() => {
     const recsMap = new Map<string, { id: string; title: string; url: string; duration?: number; date: string; topic?: string; week?: string; blobKey?: string }>();
 
+    const processAudioString = (str: string, fallbackTopic: string, fallbackDate: string, defaultIdx: number) => {
+      if (!str || typeof str !== 'string' || !str.includes('AUDIO:')) return;
+      const cleanStr = str.startsWith('[') ? str.replace(/[\[\]"]/g, '') : str;
+      const audioIndex = cleanStr.indexOf('AUDIO:');
+      if (audioIndex === -1) return;
+      const parts = cleanStr.substring(audioIndex + 6).split('|');
+      const audioUrl = parts[0]?.trim() || '';
+      if (!audioUrl && !parts[6]) return;
+      const duration = parseFloat(parts[1]) || 0;
+      const audioDate = parts[2] || fallbackDate || new Date().toISOString();
+      const label = parts[3] || fallbackTopic || `Aufnahme #${defaultIdx + 1}`;
+      const author = parts[4] || 'teacher';
+      const uniqueKey = parts[6] || audioUrl || `audio_${defaultIdx}`;
+
+      if (!recsMap.has(uniqueKey) && author !== 'student') {
+        recsMap.set(uniqueKey, {
+          id: uniqueKey,
+          title: label,
+          url: audioUrl,
+          duration,
+          date: audioDate,
+          topic: fallbackTopic,
+          blobKey: parts[6] ? `campus_audio_${parts[6]}_raw` : undefined
+        });
+      }
+    };
+
     // 1. From progressItems across all weeks/history
-    (progressItems || []).forEach((item: any) => {
-      if (!item || !item.homework_notes) return;
-      const notesList: string[] = [];
-      try {
-        const parsed = JSON.parse(item.homework_notes);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((n: any) => { if (typeof n === 'string' && n.trim()) notesList.push(n.trim()); });
-        } else if (typeof parsed === 'string' && parsed.trim()) {
-          notesList.push(parsed.trim());
+    (progressItems || []).forEach((item: any, itemIdx: number) => {
+      if (!item) return;
+      const itemDate = item.created_at || item.updated_at || new Date().toISOString();
+      const itemTopic = item.topic_name || 'Unterrichts-Übung';
+
+      if (item.homework_notes) {
+        try {
+          const parsed = JSON.parse(item.homework_notes);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((n: any, idx: number) => processAudioString(n, itemTopic, itemDate, idx));
+          } else if (typeof parsed === 'string') {
+            processAudioString(parsed, itemTopic, itemDate, itemIdx);
+          }
+        } catch {
+          processAudioString(item.homework_notes, itemTopic, itemDate, itemIdx);
         }
-      } catch {
-        notesList.push(item.homework_notes.trim());
       }
 
-      notesList.forEach((n, idx) => {
-        if (n.startsWith('AUDIO:')) {
-          const parts = n.substring(6).split('|');
-          const audioUrl = parts[0] || '';
-          if (!audioUrl && !parts[6]) return;
-          const duration = parseFloat(parts[1]) || 0;
-          const audioDate = parts[2] || item.created_at || item.updated_at || new Date().toISOString();
-          const label = parts[3] || item.topic_name || `Aufnahme #${idx + 1}`;
-          const author = parts[4] || 'teacher';
-          const uniqueKey = parts[6] || audioUrl || `prog_${item.id}_${idx}`;
-          const itemWeek = getItemWeek(item);
-
-          if (!recsMap.has(uniqueKey) && (author === 'teacher' || author === '')) {
-            recsMap.set(uniqueKey, {
-              id: uniqueKey,
-              title: label,
-              url: audioUrl,
-              duration,
-              date: audioDate,
-              topic: item.topic_name || 'Unterrichts-Übung',
-              week: itemWeek,
-              blobKey: parts[6] ? `campus_audio_${parts[6]}_raw` : undefined
-            });
-          }
+      if (item.audio_url) {
+        const uniqueKey = item.audio_url;
+        if (!recsMap.has(uniqueKey)) {
+          recsMap.set(uniqueKey, {
+            id: uniqueKey,
+            title: itemTopic,
+            url: item.audio_url,
+            duration: item.duration || 0,
+            date: itemDate,
+            topic: itemTopic
+          });
         }
-      });
+      }
     });
 
     // 2. Also from localStorage campus_homework_notes_${studentId}
     try {
       const localGenNotes = localStorage.getItem(`campus_homework_notes_${studentId}`);
       if (localGenNotes && localGenNotes.trim()) {
-        const parsed = JSON.parse(localGenNotes);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((n: any, idx: number) => {
-            if (typeof n === 'string' && n.startsWith('AUDIO:')) {
-              const parts = n.substring(6).split('|');
-              const audioUrl = parts[0] || '';
-              if (!audioUrl && !parts[6]) return;
-              const duration = parseFloat(parts[1]) || 0;
-              const audioDate = parts[2] || new Date().toISOString();
-              const label = parts[3] || `Aufnahme #${idx + 1}`;
-              const author = parts[4] || 'teacher';
-              const uniqueKey = parts[6] || audioUrl || `local_gen_${idx}`;
-
-              if (!recsMap.has(uniqueKey) && (author === 'teacher' || author === '')) {
-                recsMap.set(uniqueKey, {
-                  id: uniqueKey,
-                  title: label,
-                  url: audioUrl,
-                  duration,
-                  date: audioDate,
-                  topic: 'Hausaufgabe',
-                  blobKey: parts[6] ? `campus_audio_${parts[6]}_raw` : undefined
-                });
-              }
-            }
-          });
+        try {
+          const parsed = JSON.parse(localGenNotes);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((n: any, idx: number) => processAudioString(n, 'Hausaufgabe', new Date().toISOString(), idx));
+          } else if (typeof parsed === 'string') {
+            processAudioString(parsed, 'Hausaufgabe', new Date().toISOString(), 0);
+          }
+        } catch {
+          processAudioString(localGenNotes, 'Hausaufgabe', new Date().toISOString(), 0);
         }
       }
     } catch {}
@@ -6464,6 +6660,157 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   };
 
+  function getDeterministicWeekMetrics() {
+    const now = getSimulatedNow();
+    const currentDay = now.getDay();
+    const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + mondayOffset);
+    monday.setHours(0, 0, 0, 0);
+
+    const dayNamesShort = ['MO', 'DI', 'MI', 'DO', 'FR', 'SA', 'SO'];
+    const dayNamesFull = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+    // Map mastered dates across all logs
+    const masteredDates = new Set<string>();
+    const logsByDateStr: Record<string, any[]> = {};
+
+    (fokusLogs || []).forEach(log => {
+      if (!log.created_at) return;
+      const dStr = toLocalYYYYMMDD(new Date(log.created_at));
+      if (!logsByDateStr[dStr]) logsByDateStr[dStr] = [];
+      logsByDateStr[dStr].push(log);
+
+      const isMastered = !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3);
+      if (isMastered) masteredDates.add(dStr);
+    });
+
+    // Check streak entering this week (before Monday)
+    let initialStreak = 0;
+    let checkPriorDate = new Date(monday);
+    checkPriorDate.setDate(checkPriorDate.getDate() - 1);
+    const priorSundayStr = toLocalYYYYMMDD(checkPriorDate);
+    
+    let priorShieldDatesArr: string[] = [];
+    try {
+      priorShieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${studentId}`) || '[]');
+      if (!Array.isArray(priorShieldDatesArr)) priorShieldDatesArr = [];
+    } catch (e) {
+      priorShieldDatesArr = [];
+    }
+    const priorShieldDatesSet = new Set(priorShieldDatesArr);
+    if (studentUser?.joker_used_at) {
+      priorShieldDatesSet.add(toLocalYYYYMMDD(new Date(studentUser.joker_used_at)));
+    }
+
+    if (masteredDates.has(priorSundayStr) || priorShieldDatesSet.has(priorSundayStr)) {
+      if (masteredDates.has(priorSundayStr)) {
+        initialStreak = 1;
+      }
+      while (true) {
+        checkPriorDate.setDate(checkPriorDate.getDate() - 1);
+        const prevStr = toLocalYYYYMMDD(checkPriorDate);
+        if (masteredDates.has(prevStr)) {
+          initialStreak += 1;
+        } else if (priorShieldDatesSet.has(prevStr)) {
+          continue;
+        } else {
+          break;
+        }
+      }
+    }
+
+    let runningStreak = initialStreak;
+    const weekDays = [];
+    let weekPracticedCount = 0;
+    let weekShieldedCount = 0;
+    let weekTotalSeconds = 0;
+    let consumedShieldsCount = 0;
+    const newlyShieldedDates: string[] = [];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dStr = toLocalYYYYMMDD(d);
+
+      const isToday = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      const isFuture = d > now && !isToday;
+
+      const dayLogs = logsByDateStr[dStr] || [];
+      let totalDaySecs = dayLogs.reduce((sum, log) => {
+        return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
+      }, 0);
+
+      if (isToday && sessionActive && secondsElapsed > 0) {
+        totalDaySecs += secondsElapsed;
+      }
+
+      const hasMastered = dayLogs.some(log => !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3)) || totalDaySecs >= 180;
+      
+      let isJoker = false;
+      let shieldNumber = 0;
+
+      if (isToday) {
+        if (hasMastered) {
+          runningStreak += 1;
+          weekPracticedCount += 1;
+        }
+      } else if (isFuture) {
+        // Future day
+      } else {
+        // Past day
+        if (hasMastered) {
+          runningStreak += 1;
+          weekPracticedCount += 1;
+        } else {
+          if (runningStreak > 0 && consumedShieldsCount < 3) {
+            consumedShieldsCount += 1;
+            weekShieldedCount += 1;
+            isJoker = true;
+            shieldNumber = consumedShieldsCount;
+            newlyShieldedDates.push(dStr);
+          } else {
+            // Soft decay: streak decreases by 1 on each missed day without a shield, down to 0 (pause)
+            runningStreak = Math.max(0, runningStreak - 1);
+          }
+        }
+      }
+
+      weekTotalSeconds += totalDaySecs;
+
+      weekDays.push({
+        dayName: dayNamesShort[i],
+        dayFullName: dayNamesFull[d.getDay()],
+        dayNumber: d.getDate(),
+        dateStr: dStr,
+        isToday,
+        isFuture,
+        totalDaySecs,
+        totalMins: Math.floor(totalDaySecs / 60),
+        hasMastered,
+        isJoker,
+        shieldNumber
+      });
+    }
+
+    const availableShields = Math.max(0, 3 - consumedShieldsCount);
+    const calculatedStreak = runningStreak;
+
+    return {
+      monday,
+      now,
+      weekDays,
+      weekPracticedCount,
+      weekShieldedCount,
+      weekTotalSeconds,
+      weekTotalMins: Math.floor(weekTotalSeconds / 60),
+      consumedShieldsCount,
+      availableShields,
+      calculatedStreak,
+      newlyShieldedDates
+    };
+  };
+
   const getGroupedLogs = () => {
     const groups: Record<string, { 
       date: string, 
@@ -6471,7 +6818,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       extraSeconds: number, 
       hasMasteredSession: boolean, 
       flameLevel: string, 
-      isPlaceholder?: boolean 
+      isPlaceholder?: boolean,
+      isToday?: boolean
     }> = {};
     
     // Initialize placeholders for the last 7 days starting from user activation date
@@ -6480,6 +6828,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     // Rule: Der Start des Übe-Streaks startet erst mit der PIN-Aktivierung des Schülers! Davor werden keine Streaks/Fehltage erfasst.
     const activationDate = actDateStr ? new Date(actDateStr) : new Date();
     const startOfActivation = new Date(activationDate.getFullYear(), activationDate.getMonth(), activationDate.getDate());
+
+    const todayDd = String(now.getDate()).padStart(2, '0');
+    const todayMm = String(now.getMonth() + 1).padStart(2, '0');
+    const todayYy = String(now.getFullYear()).substring(2);
+    const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
 
     for (let i = 0; i < 7; i++) {
       const d = new Date(now);
@@ -6501,7 +6854,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         extraSeconds: 0,
         hasMasteredSession: false,
         flameLevel: 'Keine Flamme',
-        isPlaceholder: true
+        isPlaceholder: true,
+        isToday: dateStr === todayDateStr
       };
     }
 
@@ -6522,7 +6876,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           extraSeconds: 0,
           hasMasteredSession: false,
           flameLevel: log.flame_level || 'Keine Flamme',
-          isPlaceholder: true
+          isPlaceholder: true,
+          isToday: dateStr === todayDateStr
         };
       }
       
@@ -6583,11 +6938,43 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   }, [studentId, activeTab]);
 
   useEffect(() => {
-    if (studentUser && avatar) {
-      const grouped = getGroupedLogs();
-      checkAndAutoApplyJoker(grouped);
+    if (studentUser && avatar && studentId) {
+      const weekMetrics = getDeterministicWeekMetrics();
+      const shieldedDates = weekMetrics.weekDays.filter(d => d.isJoker).map(d => d.dateStr);
+      
+      // Sync shielded dates locally
+      try {
+        localStorage.setItem(`cg_shield_usage_dates_${studentId}`, JSON.stringify(shieldedDates));
+      } catch (e) {}
+
+      // If shields were consumed but not yet recorded in DB or state, sync in background
+      if (weekMetrics.weekShieldedCount > 0 && (!studentUser.weekly_jokers_used || studentUser.weekly_jokers_used !== weekMetrics.weekShieldedCount)) {
+        const lastShieldedDay = [...weekMetrics.weekDays].reverse().find(d => d.isJoker);
+        const lastIso = lastShieldedDay ? new Date(lastShieldedDay.dateStr + 'T12:00:00').toISOString() : new Date().toISOString();
+        
+        supabase.from('users').update({
+          joker_used_at: lastIso,
+          weekly_jokers_used: weekMetrics.weekShieldedCount
+        }).eq('id', studentId).then(() => {
+          studentUser.joker_used_at = lastIso;
+          studentUser.weekly_jokers_used = weekMetrics.weekShieldedCount;
+        }, (err: any) => {
+          console.warn('Shield background sync:', err);
+        });
+      }
+
+      // If avatar streak in DB is out of sync with calculated streak, sync
+      if (weekMetrics.calculatedStreak > (avatar.streak_flame || 0)) {
+        supabase.from('avatars').update({
+          streak_flame: weekMetrics.calculatedStreak
+        }).eq('user_id', studentId).then(() => {
+          avatar.streak_flame = weekMetrics.calculatedStreak;
+        }, (err: any) => {
+          console.warn('Avatar streak background sync:', err);
+        });
+      }
     }
-  }, [studentUser?.id, avatar?.streak_flame, fokusLogs]);
+  }, [studentUser?.id, studentId, fokusLogs, avatar?.streak_flame]);
 
   // Campus Cup States
   const [rankingData, setRankingData] = useState<any[]>([]);
@@ -7827,6 +8214,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
 
       let usedJokerThisSession = false;
+      let shieldsUsedNow = 0;
       
       // Streak wird nur erhöht wenn Tagesziel gemeistert wurde
       if (sessionCompletedTarget) {
@@ -7836,20 +8224,29 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           // Keep same streak
         } else if (lastSecuredDate) {
           const diffDays = getDaysBetweenLocal(lastSecuredDate, todayStr);
-          const totalMissedDays = diffDays - 1;
+          const totalMissedDays = Math.max(0, diffDays - 1);
           
-          const currentWeek = getISOWeek(new Date());
+          const currentWeek = getISOWeek(getSimulatedNow());
           const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-          const isJokerAvailable = !studentUser?.joker_used_at || lastJokerWeek !== currentWeek;
+          const usedThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
+          const availableShields = Math.max(0, 3 - usedThisWeek);
 
           let unprotectedMissedDays = totalMissedDays;
-          if (isJokerAvailable && streak > 0) {
-            unprotectedMissedDays = totalMissedDays - 1;
-            usedJokerThisSession = true;
+          if (availableShields > 0 && streak > 0) {
+            shieldsUsedNow = Math.min(availableShields, totalMissedDays);
+            unprotectedMissedDays = Math.max(0, totalMissedDays - shieldsUsedNow);
+            if (shieldsUsedNow > 0) {
+              usedJokerThisSession = true;
+            }
           }
 
-          const decayedStreak = Math.max(0, streak - unprotectedMissedDays);
-          streakFlame = decayedStreak + 1;
+          if (unprotectedMissedDays === 0) {
+            streakFlame = (streak || 0) + 1;
+          } else {
+            // Soft decay: decrease streak by 1 per unshielded missed day, then add +1 for today's completed session
+            const decayedStreak = Math.max(0, (streak || 0) - unprotectedMissedDays);
+            streakFlame = decayedStreak + 1;
+          }
         } else {
           streakFlame = 1;
         }
@@ -8029,12 +8426,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }));
       } catch (e) {}
 
-      // 5. Update user's joker_used_at if consumed
+      // 5. Update user's joker_used_at and weekly_jokers_used if consumed
       if (usedJokerThisSession) {
+        const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+        const currentWeek = getISOWeek(getSimulatedNow());
+        const prevUsed = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
+        const newWeeklyUsed = Math.min(3, prevUsed + (shieldsUsedNow || 1));
+
         await supabase
           .from('users')
-          .update({ joker_used_at: new Date().toISOString() })
+          .update({ 
+            joker_used_at: new Date().toISOString(),
+            weekly_jokers_used: newWeeklyUsed
+          })
           .eq('id', studentId);
+        
+        studentUser.joker_used_at = new Date().toISOString();
+        studentUser.weekly_jokers_used = newWeeklyUsed;
       }
 
       // 6. Optimistic React State Updates (instant UI reaction)
@@ -9180,32 +9588,76 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             supabase.from('avatars').update({ 
               last_focus_date: todayStr 
             }).eq('user_id', studentId).then(() => {});
-          } else if (diffDays === 2) {
-            // Missed EXACTLY 1 day
-            const missedDate = new Date(lastSecuredDateStr);
-            missedDate.setDate(missedDate.getDate() + 1);
-            const weekOfMissed = getISOWeek(missedDate);
-            const initialJokerWeek = user?.joker_used_at ? getISOWeek(new Date(user.joker_used_at)) : null;
-
-            if (!initialJokerWeek || weekOfMissed > initialJokerWeek) {
-              // Apply Joker for the single missed day
-              await supabase.from('users').update({ joker_used_at: missedDate.toISOString() }).eq('id', studentId);
-              user.joker_used_at = missedDate.toISOString();
-            } else {
-              // Joker already used this week -> Streak breaks to 0
-              activeStreak = 0;
-              if (avatarRecord) avatarRecord.streak_flame = 0;
-              await supabase.from('avatars').update({ streak_flame: 0 }).eq('user_id', studentId);
-              await supabase.from('student_stats').update({ streak_flame: 0 }).eq('student_id', studentId);
-            }
           } else {
-            // Missed 2 OR MORE DAYS -> Streak breaks to 0 immediately! No Joker allowed!
-            activeStreak = 0;
-            if (avatarRecord) avatarRecord.streak_flame = 0;
-            await supabase.from('avatars').update({ streak_flame: 0 }).eq('user_id', studentId);
-            await supabase.from('student_stats').update({ streak_flame: 0 }).eq('student_id', studentId);
+            // Multi-Day Shield Resolver (up to 3 shields per calendar week)
+            const missedDaysCount = diffDays - 1;
+            const nowSim = getSimulatedNow();
+            const currentWeek = getISOWeek(nowSim);
+            const lastJokerWeek = user?.joker_used_at ? getISOWeek(new Date(user.joker_used_at)) : null;
+            let currentWeeklyUsed = lastJokerWeek === currentWeek ? (user?.weekly_jokers_used || 1) : 0;
+            let availableShields = Math.max(0, 3 - currentWeeklyUsed);
+
+            let shieldDatesArr: string[] = [];
+            try {
+              shieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${studentId}`) || '[]');
+              if (!Array.isArray(shieldDatesArr)) shieldDatesArr = [];
+            } catch (e) {
+              shieldDatesArr = [];
+            }
+            const shieldDatesSet = new Set(shieldDatesArr);
+
+            let shieldsApplied = 0;
+            let unshieldedMissedCount = 0;
+            let lastAppliedDateIso: string | null = null;
+
+            for (let dOffset = 1; dOffset <= missedDaysCount; dOffset++) {
+              const mDate = new Date(lastSecuredDateStr);
+              mDate.setDate(mDate.getDate() + dOffset);
+              const mDateStr = toLocalYYYYMMDD(mDate);
+
+              if (availableShields > 0 && activeStreak > 0) {
+                availableShields--;
+                shieldsApplied++;
+                shieldDatesSet.add(mDateStr);
+                lastAppliedDateIso = mDate.toISOString();
+              } else {
+                unshieldedMissedCount++;
+              }
+            }
+
+            if (shieldsApplied > 0 && lastAppliedDateIso) {
+              const newWeeklyUsed = Math.min(3, currentWeeklyUsed + shieldsApplied);
+              user.joker_used_at = lastAppliedDateIso;
+              user.weekly_jokers_used = newWeeklyUsed;
+              try {
+                localStorage.setItem(`cg_shield_usage_dates_${studentId}`, JSON.stringify(Array.from(shieldDatesSet)));
+              } catch (e) {}
+              supabase.from('users').update({ 
+                joker_used_at: lastAppliedDateIso, 
+                weekly_jokers_used: newWeeklyUsed 
+              }).eq('id', studentId).then(() => {});
+            }
+
+            if (unshieldedMissedCount > 0) {
+              // Soft decay: decrease streak by 1 per unshielded missed day down to 0 (pause)
+              activeStreak = Math.max(0, activeStreak - unshieldedMissedCount);
+              if (avatarRecord) avatarRecord.streak_flame = activeStreak;
+              supabase.from('avatars').update({ streak_flame: activeStreak }).eq('user_id', studentId).then(() => {});
+              supabase.from('student_stats').update({ streak_flame: activeStreak }).eq('student_id', studentId).then(() => {});
+            }
           }
         }
+      }
+
+      let currentShieldDatesArr: string[] = [];
+      try {
+        currentShieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${studentId}`) || '[]');
+        if (!Array.isArray(currentShieldDatesArr)) currentShieldDatesArr = [];
+      } catch (e) {
+        currentShieldDatesArr = [];
+      }
+      if (user?.joker_used_at) {
+        currentShieldDatesArr.push(toLocalYYYYMMDD(new Date(user.joker_used_at)));
       }
 
       const statsData = statsRes.data;
@@ -9217,7 +9669,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         avatar: avatarRecord,
         stats: statsData,
         simulatedDate: getSimulatedNow(),
-        targetMinutes: getTargetMinutes(activeStreak)
+        targetMinutes: getTargetMinutes(activeStreak),
+        shieldDates: currentShieldDatesArr
       });
 
       let effectiveAvatar = avatarRecord ? { ...avatarRecord } : {
@@ -10111,7 +10564,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       </div>
 
       <div id="tour-student-practice" style={{ display: activeTab === 'practice_board' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }} className="animation-slide-up practice-board-wrapper">
-            
+        {activeTab === 'practice_board' && (
+          <>
             {/* KPI Cards Grid (Row 1 - Top) */}
             <div style={{ display: 'flex', flexDirection: 'row', gap: '10px', width: '100%' }} className="kpi-row-container">
               
@@ -10320,65 +10774,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 'fit-content' }}>
                       <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }} className="kpi-card-value">
                         {(() => {
-                          let streakVal = avatar?.streak_flame || 0;
+                          const weekMetrics = getDeterministicWeekMetrics();
+                          let streakVal = Math.max(avatar?.streak_flame || 0, weekMetrics.calculatedStreak);
                           try {
                             const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
                             if (localStats.streak_flame) streakVal = Math.max(streakVal, localStats.streak_flame);
-                            const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || '{}');
-                            if (localPractice.streak_flame) streakVal = Math.max(streakVal, localPractice.streak_flame);
                           } catch (e) {}
-                          
-                          const masteredDates = new Set<string>();
-                          (fokusLogs || []).forEach(log => {
-                            if (!log.created_at) return;
-                            const dStr = toLocalYYYYMMDD(new Date(log.created_at));
-                            const isMastered = !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3);
-                            if (isMastered) masteredDates.add(dStr);
-                          });
-                          
-                          const nowSim = getSimulatedNow();
-                          let checkDate = new Date(nowSim);
-                          let checkDateStr = toLocalYYYYMMDD(checkDate);
-                          let logsStreak = 0;
-                          if (masteredDates.has(checkDateStr)) {
-                            logsStreak = 1;
-                            while (true) {
-                              checkDate.setDate(checkDate.getDate() - 1);
-                              const prevStr = toLocalYYYYMMDD(checkDate);
-                              if (masteredDates.has(prevStr)) {
-                                logsStreak += 1;
-                              } else {
-                                break;
-                              }
-                            }
-                          } else {
-                            checkDate.setDate(checkDate.getDate() - 1);
-                            const yestStr = toLocalYYYYMMDD(checkDate);
-                            if (masteredDates.has(yestStr)) {
-                              logsStreak = 1;
-                              while (true) {
-                                checkDate.setDate(checkDate.getDate() - 1);
-                                const prevStr = toLocalYYYYMMDD(checkDate);
-                                if (masteredDates.has(prevStr)) {
-                                  logsStreak += 1;
-                                } else {
-                                  break;
-                                }
-                              }
-                            }
-                          }
-                          
-                          streakVal = Math.max(streakVal, logsStreak);
                           return `${streakVal} ${streakVal === 1 ? 'Tag' : 'Tage'}`;
                         })()}
                       </span>
                     </div>
                     
                     {(() => {
-                      const currentWeek = getISOWeek(new Date());
-                      const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                      const usedJokersThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
-                      const availableShields = Math.max(0, 3 - usedJokersThisWeek);
+                      const weekMetrics = getDeterministicWeekMetrics();
+                      const availableShields = weekMetrics.availableShields;
+                      const currentWeek = getISOWeek(getSimulatedNow());
                       
                       if (isTodayHoliday) {
                         return (
@@ -10397,12 +10807,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             alignItems: 'center',
                             justifyContent: 'center',
                             lineHeight: '1.1',
-                            textAlign: 'center',
-                            letterSpacing: '0.03em',
-                            flexShrink: 0
-                          }} title="Ferienpause aktiv: Streak ist sicher eingefroren!">
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><Palmtree size={10} /> Ferien</span>
-                            <span style={{ fontWeight: 900, color: '#fef08a' }}>2× XP</span>
+                            gap: '1px'
+                          }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <Palmtree size={12} color="#ffffff" />
+                              <span>Ferienpause</span>
+                            </span>
+                            <span style={{ fontSize: '0.52rem', opacity: 0.85 }}>Streak sicher</span>
                           </span>
                         );
                       }
@@ -12644,67 +13055,36 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               /* 2-TIER HYBRID SOUND JOURNAL (MASTERPIECE DUO EDITION) */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }} className="animation-fade-in">
                 {(() => {
-                  const now = getSimulatedNow();
-                  const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, ...
-                  const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
-                  const monday = new Date(now);
-                  monday.setDate(now.getDate() + mondayOffset);
-                  monday.setHours(0, 0, 0, 0);
+                  const weekMetrics = getDeterministicWeekMetrics();
+                  const { 
+                    now, 
+                    weekDays, 
+                    weekPracticedCount, 
+                    weekShieldedCount, 
+                    weekTotalMins, 
+                    availableShields, 
+                    consumedShieldsCount 
+                  } = weekMetrics;
 
-                  const dayNamesShort = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
                   const dayNamesFull = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
                   const monthNamesShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
                   const monthNamesFull = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
-                  // 1. Calculate 7-Day Current Week Strip
-                  const weekDays = [];
-                  let weekPracticedCount = 0;
-                  let weekTotalSeconds = 0;
-
-                  for (let i = 0; i < 7; i++) {
-                    const d = new Date(monday);
-                    d.setDate(monday.getDate() + i);
-
-                    const isToday = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                    const isFuture = d > now && !isToday;
-
-                    const dayLogs = (fokusLogs || []).filter(log => {
-                      if (!log.created_at) return false;
-                      return toLocalYYYYMMDD(new Date(log.created_at)) === toLocalYYYYMMDD(d);
-                    });
-
-                    let totalDaySecs = dayLogs.reduce((sum, log) => {
-                      return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
-                    }, 0);
-
-                    if (isToday && sessionActive && secondsElapsed > 0) {
-                      totalDaySecs += secondsElapsed;
-                    }
-
-                    const hasMastered = dayLogs.some(log => !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3)) || totalDaySecs >= 180;
-                    const isJoker = Boolean(studentUser?.joker_used_at && (() => {
-                      const jd = new Date(studentUser.joker_used_at);
-                      return toLocalYYYYMMDD(jd) === toLocalYYYYMMDD(d);
-                    })());
-
-                    if (totalDaySecs > 0 || hasMastered || isJoker) {
-                      weekPracticedCount += 1;
-                    }
-                    weekTotalSeconds += totalDaySecs;
-
-                    weekDays.push({
-                      dayName: dayNamesShort[i],
-                      dayNumber: d.getDate(),
-                      isToday,
-                      isFuture,
-                      totalDaySecs,
-                      totalMins: Math.floor(totalDaySecs / 60),
-                      hasMastered,
-                      isJoker
-                    });
+                  // Read shield usage dates
+                  let shieldDatesArr: string[] = [];
+                  try {
+                    shieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${studentId}`) || '[]');
+                    if (!Array.isArray(shieldDatesArr)) shieldDatesArr = [];
+                  } catch (e) {
+                    shieldDatesArr = [];
                   }
-
-                  const weekTotalMins = Math.floor(weekTotalSeconds / 60);
+                  if (studentUser?.joker_used_at) {
+                    shieldDatesArr.push(toLocalYYYYMMDD(new Date(studentUser.joker_used_at)));
+                  }
+                  weekDays.forEach(d => {
+                    if (d.isJoker) shieldDatesArr.push(d.dateStr);
+                  });
+                  const shieldDatesSet = new Set(shieldDatesArr);
 
                   // 2. Format Friendly Date Helper
                   const formatFriendlyDate = (dateStr: string) => {
@@ -12750,13 +13130,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   // Group past genuine practice sessions by Month
                   const pastPracticedLogs = rawGrouped.filter(g => {
                     const totalSecs = (g.focusSeconds || 0) + (g.extraSeconds || 0);
-                    const isJoker = Boolean(studentUser?.joker_used_at && (() => {
-                      const jd = new Date(studentUser.joker_used_at);
-                      const dd = String(jd.getDate()).padStart(2, '0');
-                      const mm = String(jd.getMonth() + 1).padStart(2, '0');
-                      const yy = String(jd.getFullYear()).substring(2);
-                      return `${dd}.${mm}.${yy}` === g.date;
-                    })());
+                    const isJoker = Boolean(shieldDatesSet.has((() => {
+                      const parts = g.date.split('.');
+                      if (parts.length < 3) return '';
+                      return `20${parts[2]}-${parts[1]}-${parts[0]}`;
+                    })()));
                     return g.date !== todayDateStr && (totalSecs > 0 || isJoker);
                   });
 
@@ -12830,7 +13208,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             padding: '2px 10px', 
                             borderRadius: '100px' 
                           }}>
-                            {weekPracticedCount} von 7 Tagen gemeistert
+                            {weekPracticedCount} von 7 Tagen gemeistert{weekShieldedCount > 0 ? ` (${weekShieldedCount} geschützt)` : ''}
                           </span>
                         </div>
 
@@ -12868,7 +13246,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 borderRadius: '100px', 
                                 background: d.hasMastered 
                                   ? 'linear-gradient(90deg, #34a853, #22c55e)' 
-                                  : (d.totalDaySecs > 0 ? '#86efac' : (d.isJoker ? '#f97316' : '#e2e8f0')),
+                                  : (d.isJoker ? '#38bdf8' : (d.totalDaySecs >= 180 ? '#86efac' : '#e2e8f0')),
                                 transition: 'all 0.3s ease'
                               }} 
                             />
@@ -12904,21 +13282,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               }
                             } else if (day.isJoker) {
                               bg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
-                              border = '1px solid #38bdf8';
+                              border = '1.5px solid #38bdf8';
                               textColor = '#0369a1';
                               iconElement = <Shield size={14} color="#0284c7" fill="#0284c7" />;
-                              subLabel = 'Schild';
+                              subLabel = `Schild ${day.shieldNumber || ''}`.trim();
                             } else if (day.hasMastered) {
                               bg = 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)';
                               border = '1px solid #34a853';
                               textColor = '#166534';
                               iconElement = <Flame size={14} color="#34a853" fill="#34a853" />;
-                              subLabel = `${day.totalMins}m`;
-                            } else if (day.totalDaySecs > 0) {
-                              bg = '#f0fdf4';
-                              border = '1px solid #86efac';
-                              textColor = '#15803d';
-                              iconElement = <Flame size={13} color="#22c55e" />;
+                              subLabel = `${Math.max(1, day.totalMins)}m`;
+                            } else if (day.totalMins > 0) {
+                              bg = '#f8fafc';
+                              border = '1px solid #cbd5e1';
+                              textColor = '#475569';
+                              iconElement = <Clock size={13} color="#64748b" />;
                               subLabel = `${day.totalMins}m`;
                             } else if (!day.isFuture) {
                               bg = '#f8fafc';
@@ -12966,9 +13344,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         {/* Informative Footer Bar with 3 Schutzschilde Status & Offline Sync */}
                         {(() => {
                           const currentWeek = getISOWeek(now);
-                          const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                          const usedJokersThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
-                          const availableShields = Math.max(0, 3 - usedJokersThisWeek);
 
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
@@ -12982,7 +13357,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   </span>
                                   <div style={{ display: 'flex', gap: '3px' }}>
                                     {[1, 2, 3].map((shieldNum) => {
-                                      const isShieldActive = shieldNum <= availableShields;
+                                      const isConsumed = shieldNum <= weekShieldedCount;
+                                      const isShieldActive = shieldNum > weekShieldedCount;
+                                      const shieldedDay = weekDays.find(d => d.shieldNumber === shieldNum);
+                                      const dayLabel = shieldedDay ? shieldedDay.dayName : '';
+
                                       return (
                                         <div
                                           key={`logbook-shield-${shieldNum}`}
@@ -12992,16 +13371,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                             gap: '3px',
                                             padding: '2px 7px',
                                             borderRadius: '6px',
-                                            background: isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)',
-                                            border: isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)',
-                                            color: isShieldActive ? '#0369a1' : '#b45309',
+                                            background: isConsumed ? '#f1f5f9' : 'rgba(2, 132, 199, 0.08)',
+                                            border: isConsumed ? '1px solid #cbd5e1' : '1px solid rgba(2, 132, 199, 0.28)',
+                                            color: isConsumed ? '#64748b' : '#0369a1',
                                             fontSize: '0.62rem',
                                             fontWeight: 850
                                           }}
-                                          title={isShieldActive ? `Schutzschild ${shieldNum} bereit (Glut-Schutz bei verpasstem Tag)` : `Schutzschild ${shieldNum} als Glut-Schutz verbraucht`}
+                                          title={isConsumed ? `Schutzschild ${shieldNum} wurde am ${dayLabel} als Glut-Schutz eingesetzt` : `Schutzschild ${shieldNum} bereit (Glut-Schutz bei verpasstem Tag)`}
                                         >
-                                          <Shield size={9} color={isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : 'none'} />
-                                          <span>{isShieldActive ? `Schild ${shieldNum}` : 'Glut'}</span>
+                                          <Shield size={9} color={isConsumed ? '#64748b' : '#0284c7'} fill={isConsumed ? '#94a3b8' : '#0284c7'} />
+                                          <span>{isConsumed ? `Schild ${shieldNum} (${dayLabel})` : `Schild ${shieldNum}`}</span>
                                         </div>
                                       );
                                     })}
@@ -13090,7 +13469,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             borderRadius: '20px',
                             padding: '14px 16px',
                             display: 'flex',
-                            justifyContent: 'space-between',
+                                justifyContent: 'space-between',
                             alignItems: 'center',
                             boxShadow: '0 4px 14px rgba(234, 179, 8, 0.08)'
                           }}>
@@ -13112,10 +13491,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#854d0e' }}>
                                     Heute ({dayNamesFull[now.getDay()]})
                                   </span>
-                                  <span style={{ fontSize: '0.6rem', fontWeight: 850, background: '#fef08a', color: '#854d0e', border: '1px solid #fde047', padding: '1px 8px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                    <Shield size={10} color="#854d0e" />
-                                    3 Schilde aktiv
-                                  </span>
+                                  {isTodayHoliday ? (
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 850, background: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0', padding: '1px 8px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      <Palmtree size={10} color="#059669" />
+                                      Ferienpause
+                                    </span>
+                                  ) : weekMetrics.availableShields > 0 ? (
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 850, background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', padding: '1px 8px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      <Shield size={10} color="#0284c7" fill="#0284c7" />
+                                      {weekMetrics.availableShields === 1 ? '1 Schild bereit' : `${weekMetrics.availableShields} Schilde bereit`}
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 850, background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', padding: '1px 8px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      <Shield size={10} color="#dc2626" />
+                                      Keine Schilde mehr
+                                    </span>
+                                  )}
                                 </div>
                                 <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', fontWeight: 700, color: '#a16207' }}>
                                   {todayTotalSecs > 0 
@@ -13173,16 +13564,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               return `${dayNamesFull[d.getDay()]}, ${day}. ${monthNamesShort[monthIndex]}`;
             };
 
+            let shieldDatesArr: string[] = [];
+            try {
+              shieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${studentId}`) || '[]');
+              if (!Array.isArray(shieldDatesArr)) shieldDatesArr = [];
+            } catch (e) {
+              shieldDatesArr = [];
+            }
+            if (studentUser?.joker_used_at) {
+              shieldDatesArr.push(toLocalYYYYMMDD(new Date(studentUser.joker_used_at)));
+            }
+            const shieldDatesSet = new Set(shieldDatesArr);
+
             const rawGrouped = getGroupedLogs();
             const pastPracticedLogs = rawGrouped.filter(g => {
               const totalSecs = (g.focusSeconds || 0) + (g.extraSeconds || 0);
-              const isJoker = Boolean(studentUser?.joker_used_at && (() => {
-                const jd = new Date(studentUser.joker_used_at);
-                const dd = String(jd.getDate()).padStart(2, '0');
-                const mm = String(jd.getMonth() + 1).padStart(2, '0');
-                const yy = String(jd.getFullYear()).substring(2);
-                return `${dd}.${mm}.${yy}` === g.date;
-              })());
+              const isJoker = Boolean(shieldDatesSet.has((() => {
+                const parts = g.date.split('.');
+                if (parts.length < 3) return '';
+                return `20${parts[2]}-${parts[1]}-${parts[0]}`;
+              })()));
               return g.date !== todayDateStr && (totalSecs > 0 || isJoker);
             });
 
@@ -13403,7 +13804,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
             );
           })()}
-
+          </>
+        )}
       </div>
 
       <div id="tour-student-songs" style={{ display: activeTab === 'songs' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
@@ -14975,6 +15377,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             schoolFokusLevels={schoolFokusLevels}
             handleTriggerCancelOccurrence={handleTriggerCancelOccurrence}
             handleUndoCancelOccurrence={handleUndoCancelOccurrence}
+            getDeterministicWeekMetrics={getDeterministicWeekMetrics}
           />
         ) : (() => {
           const sidebarAppointmentChanges = (scheduleOccurrences || []).filter(occ => 
@@ -15633,22 +16036,36 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                     {/* 1. Gather all active homework books & pages from localProgress */}
-                    const activeJuniorBooks: { title: string; pages: number[]; formattedPages: string }[] = [];
+                    const activeJuniorBooks: { title: string; pages: number[]; formattedPages: string; notes?: string[] }[] = [];
                     (localProgress || []).forEach((assignment: any) => {
                       if (String(assignment.studentId) !== String(studentId) || !assignment.pageStates) return;
                       const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
                       if (!book) return;
                       const pages: number[] = [];
+                      const notes: string[] = [];
                       Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
                         if (pState?.status === 'homework' || pState?.isCurrentHomework) {
                           const pNum = parseInt(pNumStr, 10);
                           if (!isNaN(pNum) && !pages.includes(pNum)) pages.push(pNum);
+                          let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
+                          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
+                            try {
+                              const parsed = JSON.parse(cleanNote);
+                              if (Array.isArray(parsed)) {
+                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                              }
+                            } catch {}
+                          }
+                          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                          if (cleanNote) {
+                            notes.push(`Seite ${pNum}: ${cleanNote}`);
+                          }
                         }
                       });
                       if (pages.length > 0) {
                         pages.sort((a, b) => a - b);
                         const formattedPages = pages.length === 1 ? `S. ${pages[0]}` : `S. ${pages[0]}–${pages[pages.length - 1]}`;
-                        activeJuniorBooks.push({ title: book.title, pages, formattedPages });
+                        activeJuniorBooks.push({ title: book.title, pages, formattedPages, notes });
                       }
                     });
 
@@ -15663,7 +16080,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       if (isSongHw) {
                         const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
                         if (!activeJuniorSongs.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                          activeJuniorSongs.push(item);
+                          let cleanNote = item.homework_notes || '';
+                          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
+                            try {
+                              const parsed = JSON.parse(cleanNote);
+                              if (Array.isArray(parsed)) {
+                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                              }
+                            } catch {}
+                          }
+                          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                          activeJuniorSongs.push({
+                            ...item,
+                            homework_notes: cleanNote
+                          });
                         }
                       }
                     });
@@ -15683,13 +16113,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         const cleanT = cleanTitle(fullTitle);
 
                         if (!activeJuniorSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                          let cleanNote = localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
+                                           (skill.song_id ? localStorage.getItem(`song_note_${studentId}_${skill.song_id}`) : '') ||
+                                           (skill.songs?.id ? localStorage.getItem(`song_note_${studentId}_${skill.songs.id}`) : '') ||
+                                           skill.homework_notes || '';
+                          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
+                            try {
+                              const parsed = JSON.parse(cleanNote);
+                              if (Array.isArray(parsed)) {
+                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                              }
+                            } catch {}
+                          }
+                          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
                           activeJuniorSongs.push({
                             id: skill.id,
                             song_id: skill.song_id || skill.songs?.id,
                             topic_name: fullTitle,
                             title: fullTitle,
                             is_current_homework: true,
-                            status: 'IN_PROGRESS'
+                            status: 'IN_PROGRESS',
+                            homework_notes: cleanNote
                           });
                         }
                       }
@@ -15831,21 +16276,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      const visiblePhrases: string[] = ["Hausaufgaben:"];
-                                      if (activeJuniorBooks.length > 0) {
-                                        activeJuniorBooks.forEach(b => {
-                                          visiblePhrases.push(`${b.title}, ${b.formattedPages.replace('S.', 'Seite').replace('–', ' bis ')}.`);
-                                        });
-                                      }
-                                      if (activeJuniorSongs.length > 0) {
-                                        activeJuniorSongs.forEach(s => {
-                                          visiblePhrases.push(`Song: ${cleanTitle(s.topic_name || s.title)}.`);
-                                        });
-                                      }
-                                      if (audioTracks.length > 0) {
-                                        visiblePhrases.push(`Dazu ${audioTracks.length === 1 ? 'eine Aufnahme' : `${audioTracks.length} Aufnahmen`} von deiner Lehrkraft.`);
-                                      }
-                                      handleSpeakText(visiblePhrases, 'junior_box1');
+                                      const narrative = buildContinuousHomeworkNarrative({
+                                        teacherName: briefingData?.todayLesson?.teacher_name || (studentUser as any)?.teacher_name,
+                                        instrument: studentUser?.instrument_type || (studentUser as any)?.instrument || avatar?.instrument_type,
+                                        books: activeJuniorBooks.map(b => ({ 
+                                          title: b.title, 
+                                          formattedPages: b.formattedPages,
+                                          pageNums: b.pages,
+                                          notes: b.notes
+                                        })),
+                                        songs: activeJuniorSongs.map(s => ({ 
+                                          title: cleanTitle(s.topic_name || s.title), 
+                                          note: s.homework_notes || s.note 
+                                        })),
+                                        audioCount: audioTracks.length,
+                                        generalNotes: generalNote
+                                      });
+                                      handleSpeakText(narrative, 'junior_box1');
                                     }}
                                     style={{
                                       background: isTtsSpeaking && activeTtsKey === 'junior_box1' 
@@ -16226,13 +16673,29 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           );
                         })()}
 
-                        {/* BOX 4: LEHRER-AUFNAHMEN (ALLE WOCHEN & HISTORIE) */}
+                        {/* BOX 4: AUFNAHMEN (UNTERRICHT & ÜBE-STUDIO) */}
                         {(() => {
                           const teacherNameDisplay = briefingData?.todayLesson?.teacher_name || (studentUser as any)?.teacher_name || 'deiner Lehrkraft';
+                          const totalAudiosCount = juniorTeacherRecordings.length + juniorStudentRecordings.length;
+
+                          const handleOpenRecordings = (e?: React.MouseEvent) => {
+                            if (e) e.stopPropagation();
+                            setHomeworkBookTab('audiobiography');
+                            handleTabChangeLocal('homework_book');
+                          };
+
+                          let subtitle = 'Alle Aufnahmen aus Unterricht & Studio';
+                          if (juniorTeacherRecordings.length > 0 && juniorStudentRecordings.length > 0) {
+                            subtitle = `${juniorTeacherRecordings.length} vom Unterricht • ${juniorStudentRecordings.length} eigene`;
+                          } else if (juniorTeacherRecordings.length > 0) {
+                            subtitle = `Alle ${juniorTeacherRecordings.length} Aufnahmen von ${teacherNameDisplay}`;
+                          } else if (juniorStudentRecordings.length > 0) {
+                            subtitle = `Alle ${juniorStudentRecordings.length} Aufnahmen aus deinem Studio`;
+                          }
 
                           return (
                             <div 
-                              onClick={() => setShowJuniorRecordingsModal(true)}
+                              onClick={handleOpenRecordings}
                               style={{
                                 background: '#ffffff',
                                 borderRadius: '32px',
@@ -16265,19 +16728,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                                 <div>
                                   <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Unterrichts-Audios
+                                    Aufnahmen
                                   </div>
                                   <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    {juniorTeacherRecordings.length} {juniorTeacherRecordings.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
+                                    {totalAudiosCount} {totalAudiosCount === 1 ? 'Aufnahme' : 'Aufnahmen'}
                                   </h3>
-                                  <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Alle Aufnahmen von ${teacherNameDisplay}`}>
-                                    Alle Aufnahmen von {teacherNameDisplay}
+                                  <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={subtitle}>
+                                    {subtitle}
                                   </p>
                                 </div>
                               </div>
 
                               <button
-                                onClick={(e) => { e.stopPropagation(); setShowJuniorRecordingsModal(true); }}
+                                onClick={handleOpenRecordings}
                                 style={{
                                   width: '100%',
                                   padding: '16px',
@@ -16695,39 +17158,29 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       </div>
                                     </div>
 
-                                    <button
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <button
                                       type="button"
                                       onClick={() => {
                                         if (isTtsSpeaking && activeTtsKey === 'junior_modal') {
                                           handleStopSpeaking();
                                         } else {
-                                          const phrases: string[] = ["Deine aktuellen Hausaufgaben für diese Woche:"];
-                                          if (formattedJuniorBooks.length > 0) {
-                                            formattedJuniorBooks.forEach(b => {
-                                              const pageStr = b.pageNums.length === 1 ? `Seite ${b.pageNums[0]}` : `Seiten ${b.pageNums.join(', ')}`;
-                                              phrases.push(`${b.title}, ${pageStr}.`);
-                                              if (b.notesList && b.notesList.length > 0) {
-                                                b.notesList.forEach(n => {
-                                                  phrases.push(`Notiz zu Seite ${n.num}: ${n.text}.`);
-                                                });
-                                              }
-                                            });
-                                          }
-                                          if (otherActiveSongs.length > 0) {
-                                            otherActiveSongs.forEach(s => {
-                                              phrases.push(`Song: ${cleanTitle(s.topic_name || s.title)}.`);
-                                              if (s.homework_notes && s.homework_notes.trim()) {
-                                                phrases.push(`Fahrplan: ${s.homework_notes}.`);
-                                              }
-                                            });
-                                          }
-                                          if (audioTracks.length > 0) {
-                                            phrases.push(`Dazu gibt es ${audioTracks.length === 1 ? 'eine Unterrichtsaufnahme' : `${audioTracks.length} Unterrichtsaufnahmen`} zum Mitspielen.`);
-                                          }
-                                          if (generalNote) {
-                                            phrases.push(`Zusätzlicher Hinweis: ${generalNote}.`);
-                                          }
-                                          handleSpeakText(phrases, 'junior_modal');
+                                          const narrative = buildContinuousHomeworkNarrative({
+                                            teacherName: briefingData?.todayLesson?.teacher_name || (studentUser as any)?.teacher_name,
+                                            instrument: studentUser?.instrument_type || (studentUser as any)?.instrument || avatar?.instrument_type,
+                                            books: formattedJuniorBooks.map(b => ({
+                                              title: b.title,
+                                              pageNums: b.pageNums,
+                                              notes: b.notesList ? b.notesList.map(n => n.text) : []
+                                            })),
+                                            songs: otherActiveSongs.map(s => ({
+                                              title: cleanTitle(s.topic_name || s.title),
+                                              note: s.homework_notes
+                                            })),
+                                            audioCount: audioTracks.length,
+                                            generalNotes: generalNote
+                                          });
+                                          handleSpeakText(narrative, 'junior_modal');
                                         }
                                       }}
                                       style={{
@@ -16784,6 +17237,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       )}
                                     </button>
                                   </div>
+                                </div>
 
                                   <div style={{
                                     background: '#ffffff',
@@ -21034,10 +21488,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       const isTier2Unlocked = streak >= 4;
                       const isTier3Unlocked = streak >= 9;
 
-                      const currentWeek = getISOWeek(new Date());
-                      const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-                      const usedJokersThisWeek = lastJokerWeek === currentWeek ? (studentUser?.weekly_jokers_used || 1) : 0;
-                      const availableShields = Math.max(0, 3 - usedJokersThisWeek);
+                      const weekMetrics = getDeterministicWeekMetrics();
+                      const currentWeek = getISOWeek(getSimulatedNow());
+                      const availableShields = weekMetrics.availableShields;
+                      const weekShieldedCount = weekMetrics.weekShieldedCount;
 
                       return (
                         <div style={{ 
@@ -21130,7 +21584,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               </div>
                               <div style={{ display: 'flex', gap: '6px' }}>
                                 {[1, 2, 3].map((shieldNum) => {
-                                  const isShieldActive = shieldNum <= availableShields;
+                                  const isConsumed = shieldNum <= weekShieldedCount;
+                                  const isShieldActive = shieldNum > weekShieldedCount;
+                                  const shieldedDay = weekMetrics.weekDays.find(d => d.shieldNumber === shieldNum);
+                                  const dayLabel = shieldedDay ? shieldedDay.dayName : '';
+
                                   return (
                                     <div key={`pro-shield-${shieldNum}`} style={{
                                       flex: 1,
@@ -21140,14 +21598,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                       gap: '4px',
                                       padding: '4px 6px',
                                       borderRadius: '6px',
-                                      background: isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)',
-                                      border: isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)',
-                                      color: isShieldActive ? '#0369a1' : '#b45309',
+                                      background: isConsumed ? 'rgba(2, 132, 199, 0.12)' : (isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
+                                      border: isConsumed ? '1px solid #38bdf8' : (isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
+                                      color: isConsumed ? '#0284c7' : (isShieldActive ? '#0369a1' : '#b45309'),
                                       fontSize: '0.65rem',
                                       fontWeight: 800
                                     }}>
-                                      <Shield size={10} color={isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : 'none'} />
-                                      <span>{isShieldActive ? `Schild ${shieldNum}` : 'Glut-Schutz'}</span>
+                                      <Shield size={10} color={isConsumed || isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : (isConsumed ? '#38bdf8' : 'none')} />
+                                      <span>{isConsumed ? `Schild ${shieldNum} (${dayLabel})` : `Schild ${shieldNum}`}</span>
                                     </div>
                                   );
                                 })}
@@ -25215,7 +25673,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               try {
                                 if (studentId) {
                                   sessionStorage.setItem('groovelab_user_id', studentId);
-                                  localStorage.setItem('groovelab_user_id', studentId);
                                   const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
                                   if (authQrToken) {
                                     sessionStorage.setItem('groovelab_qr_token', authQrToken);
@@ -26854,7 +27311,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   // Ensure security session tokens are set so RLS authorizes the update
                   if (studentId) {
                     sessionStorage.setItem('groovelab_user_id', studentId);
-                    localStorage.setItem('groovelab_user_id', studentId);
                     const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
                     if (authQrToken) {
                       sessionStorage.setItem('groovelab_qr_token', authQrToken);

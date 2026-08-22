@@ -385,8 +385,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         type="button"
         onClick={togglePlay}
         style={{
-          width: '28px',
-          height: '28px',
+          width: '30px',
+          height: '30px',
           borderRadius: '50%',
           background: countInStep !== null 
             ? '#f59e0b' 
@@ -401,11 +401,11 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           justifyContent: 'center',
           flexShrink: 0,
           boxShadow: isPlaying 
-            ? '0 0 8px rgba(34, 197, 94, 0.4)' 
-            : '0 2px 5px rgba(22, 163, 74, 0.25)',
+            ? '0 0 10px rgba(34, 197, 94, 0.4)' 
+            : '0 2px 6px rgba(22, 163, 74, 0.28)',
           transition: 'all 0.15s ease',
           padding: 0,
-          fontSize: countInStep !== null ? '0.74rem' : undefined,
+          fontSize: countInStep !== null ? '0.78rem' : undefined,
           fontWeight: 900
         }}
         className="hover-scale"
@@ -414,17 +414,17 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         {countInStep !== null ? (
           <span>{countInStep}</span>
         ) : isPlaying ? (
-          <Pause size={11} fill="currentColor" strokeWidth={0} />
+          <Pause size={12} fill="currentColor" strokeWidth={0} />
         ) : (
-          <Play size={11} fill="currentColor" strokeWidth={0} style={{ marginLeft: '1px' }} />
+          <Play size={12} fill="currentColor" strokeWidth={0} style={{ marginLeft: '1.5px' }} />
         )}
       </button>
 
       {/* Middle: Title, Waveform, Time */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
           <span style={{
-            fontSize: '0.74rem',
+            fontSize: '0.75rem',
             fontWeight: 800,
             color: '#0f172a',
             overflow: 'hidden',
@@ -445,7 +445,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           </span>
         </div>
 
-        {/* Mini Waveform with Klick-zu-Position Scrubbing */}
+        {/* Mini Waveform with Klick-zu-Position Scrubbing - narrower & taller for organic presence */}
         <div 
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
@@ -458,24 +458,25 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '1.5px',
-            height: '10px',
+            gap: '2px',
+            height: '13px',
             cursor: 'pointer',
-            width: '100%'
+            width: '100%',
+            maxWidth: '140px'
           }}
           title="Tippen zum Spulen"
         >
-          {ORGANIC_WAVEFORM.slice(0, 24).map((h, i) => {
-            const barRatio = i / 24;
+          {ORGANIC_WAVEFORM.slice(0, 16).map((h, i) => {
+            const barRatio = i / 16;
             const isFilled = barRatio <= progressRatio;
             return (
               <div
                 key={i}
                 style={{
                   flex: 1,
-                  minWidth: '2px',
+                  minWidth: '2.5px',
                   height: `${Math.max(25, h)}%`,
-                  borderRadius: '1px',
+                  borderRadius: '1.5px',
                   background: isFilled ? '#16a34a' : '#e2e8f0',
                   transition: 'background 0.1s ease'
                 }}
@@ -485,140 +486,152 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         </div>
       </div>
 
-      {/* 🔁 Loop Toggle Button */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsLooping(!isLooping);
-        }}
-        style={{
-          border: isLooping ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
-          background: isLooping ? '#dcfce7' : '#ffffff',
-          color: isLooping ? '#15803d' : '#94a3b8',
-          fontSize: '0.60rem',
-          padding: '3px 5px',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0
-        }}
-        className="hover-scale-mini"
-        title={isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)'}
-      >
-        <Repeat size={10} strokeWidth={isLooping ? 2.6 : 2} />
-      </button>
-
-      {/* ⏱️ 4-Beat Count-In Vorzähler Toggle */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setCountInActive(!countInActive);
-        }}
-        style={{
-          border: countInActive ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
-          background: countInActive ? '#dcfce7' : '#ffffff',
-          color: countInActive ? '#15803d' : '#94a3b8',
-          fontSize: '0.58rem',
-          fontWeight: 850,
-          padding: '3px 5px',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1px',
-          flexShrink: 0
-        }}
-        className="hover-scale-mini"
-        title={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler vor Abspielen aktivieren'}
-      >
-        <Timer size={10} strokeWidth={countInActive ? 2.4 : 2} />
-        <span>4</span>
-      </button>
-
-      {/* Speed Button (Extended rates) */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          const rates = [1, 0.85, 0.75, 0.5, 1.2];
-          const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-          setPlaybackRate(nextRate);
-        }}
-        style={{
-          border: '1px solid #cbd5e1',
-          background: playbackRate !== 1 ? '#f0fdf4' : '#ffffff',
-          color: playbackRate !== 1 ? '#15803d' : '#64748b',
-          fontSize: '0.58rem',
-          fontWeight: 850,
-          padding: '2px 4px',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          flexShrink: 0
-        }}
-        className="hover-scale-mini"
-        title="Tempo anpassen"
-      >
-        {playbackRate}×
-      </button>
-
-      {/* ✂️ Studio Trimmer Button */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsEditorOpen(true);
-        }}
-        style={{
-          border: '1px solid #cbd5e1',
-          background: '#ffffff',
-          color: '#6366f1',
-          padding: '3px 5px',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0
-        }}
-        className="hover-scale-mini"
-        title="Zuschneiden & Pitch"
-      >
-        <Scissors size={10} strokeWidth={2.2} />
-      </button>
-
-      {/* Delete Button */}
-      {onDelete && (
+      {/* Action Buttons Group with generous touch padding and clear typography */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+        {/* 🔁 Loop Toggle Button */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onDelete();
+            setIsLooping(!isLooping);
           }}
           style={{
-            border: 'none',
-            background: 'none',
-            color: '#ef4444',
+            border: isLooping ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
+            background: isLooping ? '#dcfce7' : '#ffffff',
+            color: isLooping ? '#15803d' : '#64748b',
+            height: '26px',
+            minWidth: '26px',
+            padding: '0 6px',
+            borderRadius: '7px',
             cursor: 'pointer',
-            padding: '2px',
-            borderRadius: '4px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: 0.6,
-            flexShrink: 0,
-            transition: 'opacity 0.15s ease'
+            boxShadow: isLooping ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)'
           }}
-          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-          onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
-          title="Aufnahme entfernen"
+          className="hover-scale-mini"
+          title={isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)'}
         >
-          <Trash2 size={12} />
+          <Repeat size={12} strokeWidth={isLooping ? 2.6 : 2.2} />
         </button>
-      )}
+
+        {/* ⏱️ 4-Beat Count-In Vorzähler Toggle */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setCountInActive(!countInActive);
+          }}
+          style={{
+            border: countInActive ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
+            background: countInActive ? '#dcfce7' : '#ffffff',
+            color: countInActive ? '#15803d' : '#64748b',
+            fontSize: '0.68rem',
+            fontWeight: 850,
+            height: '26px',
+            padding: '0 6px',
+            borderRadius: '7px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+            boxShadow: countInActive ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)'
+          }}
+          className="hover-scale-mini"
+          title={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler vor Abspielen aktivieren'}
+        >
+          <Timer size={12} strokeWidth={countInActive ? 2.5 : 2.2} />
+          <span>4</span>
+        </button>
+
+        {/* Speed Button (Extended rates) */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const rates = [1, 0.85, 0.75, 0.5, 1.2];
+            const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+            setPlaybackRate(nextRate);
+          }}
+          style={{
+            border: playbackRate !== 1 ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
+            background: playbackRate !== 1 ? '#dcfce7' : '#ffffff',
+            color: playbackRate !== 1 ? '#15803d' : '#64748b',
+            fontSize: '0.68rem',
+            fontWeight: 850,
+            height: '26px',
+            padding: '0 6px',
+            borderRadius: '7px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: playbackRate !== 1 ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)'
+          }}
+          className="hover-scale-mini"
+          title="Tempo anpassen"
+        >
+          {playbackRate}×
+        </button>
+
+        {/* ✂️ Studio Trimmer Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsEditorOpen(true);
+          }}
+          style={{
+            border: '1px solid #cbd5e1',
+            background: '#ffffff',
+            color: '#6366f1',
+            height: '26px',
+            minWidth: '26px',
+            padding: '0 6px',
+            borderRadius: '7px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+          }}
+          className="hover-scale-mini"
+          title="Zuschneiden & Pitch"
+        >
+          <Scissors size={12} strokeWidth={2.2} />
+        </button>
+
+        {/* Delete Button */}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            style={{
+              border: 'none',
+              background: 'none',
+              color: '#ef4444',
+              cursor: 'pointer',
+              height: '26px',
+              width: '24px',
+              padding: 0,
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: 0.6,
+              transition: 'opacity 0.15s ease'
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+            title="Aufnahme entfernen"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
+      </div>
 
       {/* Audio Editor Modal */}
       {isEditorOpen && (
@@ -1099,20 +1112,22 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           style={{
             border: isLooping ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
             background: isLooping ? '#dcfce7' : '#ffffff',
-            color: isLooping ? '#15803d' : '#94a3b8',
-            fontSize: '0.62rem',
-            padding: '3px 5px',
-            borderRadius: '6px',
+            color: isLooping ? '#15803d' : '#64748b',
+            height: '26px',
+            minWidth: '26px',
+            padding: '0 6px',
+            borderRadius: '7px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            boxShadow: isLooping ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
             flexShrink: 0
           }}
           className="hover-scale-mini"
           title={isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)'}
         >
-          <Repeat size={11} strokeWidth={isLooping ? 2.6 : 2} />
+          <Repeat size={12} strokeWidth={isLooping ? 2.6 : 2.2} />
         </button>
 
         <button
@@ -1124,21 +1139,23 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           style={{
             border: countInActive ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
             background: countInActive ? '#dcfce7' : '#ffffff',
-            color: countInActive ? '#15803d' : '#94a3b8',
-            fontSize: '0.60rem',
+            color: countInActive ? '#15803d' : '#64748b',
+            fontSize: '0.68rem',
             fontWeight: 850,
-            padding: '3px 5px',
-            borderRadius: '6px',
+            height: '26px',
+            padding: '0 6px',
+            borderRadius: '7px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '2px',
+            boxShadow: countInActive ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
             flexShrink: 0
           }}
           className="hover-scale-mini"
           title={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler vor Abspielen aktivieren'}
         >
-          <Timer size={11} strokeWidth={countInActive ? 2.4 : 2} />
+          <Timer size={12} strokeWidth={countInActive ? 2.5 : 2.2} />
           <span>4</span>
         </button>
 
@@ -1151,14 +1168,19 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             setPlaybackRate(nextRate);
           }}
           style={{
-            border: '1px solid #cbd5e1',
-            background: playbackRate !== 1 ? '#f0fdf4' : '#ffffff',
+            border: playbackRate !== 1 ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
+            background: playbackRate !== 1 ? '#dcfce7' : '#ffffff',
             color: playbackRate !== 1 ? '#15803d' : '#64748b',
-            fontSize: '0.62rem',
+            fontSize: '0.68rem',
             fontWeight: 850,
-            padding: '3px 5px',
-            borderRadius: '6px',
+            height: '26px',
+            padding: '0 6px',
+            borderRadius: '7px',
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: playbackRate !== 1 ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
             flexShrink: 0
           }}
           className="hover-scale-mini"
@@ -1178,18 +1200,21 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             border: '1px solid #cbd5e1',
             background: '#ffffff',
             color: '#6366f1',
-            padding: '3px 5px',
-            borderRadius: '6px',
+            height: '26px',
+            minWidth: '26px',
+            padding: '0 6px',
+            borderRadius: '7px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
             flexShrink: 0
           }}
           className="hover-scale-mini"
           title="Zuschneiden & Pitch"
         >
-          <Scissors size={11} strokeWidth={2.2} />
+          <Scissors size={12} strokeWidth={2.2} />
         </button>
       </div>
 

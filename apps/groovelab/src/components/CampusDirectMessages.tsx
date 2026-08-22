@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   Lock,
   Sparkles,
-  CheckCheck
+  CheckCheck,
+  ChevronDown
 } from 'lucide-react';
 import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
 
@@ -94,6 +95,11 @@ const formatStudentDisplayName = (u: any): string => {
   return u.first_name || u.name || 'Benutzer';
 };
 
+export const cleanChatMessageContent = (content: string | null | undefined): string => {
+  if (!content) return '';
+  return String(content).replace(/^\[Termin[^\]]+\]\s*/i, '').trim();
+};
+
 const parseLocalDate = (dateStr: string): Date => {
   if (!dateStr) return new Date();
   const cleanDate = dateStr.split('T')[0];
@@ -104,11 +110,21 @@ const parseLocalDate = (dateStr: string): Date => {
   return new Date(dateStr);
 };
 
-const AppleSystemNotificationCard: React.FC<{ 
-  msg: any; 
+interface AppleSystemNotificationCardProps {
+  msg: any;
   selectedRecipient?: any;
   onSendMessage?: (recipientId: string, content: string) => Promise<void>;
-}> = ({ msg, selectedRecipient, onSendMessage }) => {
+  isSuperseded?: boolean;
+  currentOcc?: any;
+}
+
+const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = ({ 
+  msg, 
+  selectedRecipient, 
+  onSendMessage,
+  isSuperseded = false,
+  currentOcc
+}) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionDoneStatus, setActionDoneStatus] = useState<'confirmed' | 'rejected' | null>(null);
 
@@ -127,9 +143,22 @@ const AppleSystemNotificationCard: React.FC<{
   const arrowIndex = content.indexOf('->');
   if (arrowIndex !== -1) {
     title = 'Terminverschiebung angefragt';
-    badgeText = 'Bestätigung ausstehend';
-    isPending = true;
     isShift = true;
+
+    // Check if shift is still active and pending confirmation
+    if (isSuperseded) {
+      badgeText = 'Nicht mehr aktuell';
+      isPending = false;
+    } else if (currentOcc && (currentOcc.status === 'confirmed' || (currentOcc.status === 'scheduled' && !currentOcc.is_rescheduled && !currentOcc.rescheduled_from))) {
+      badgeText = currentOcc.status === 'confirmed' ? 'Bestätigt' : 'Nicht mehr aktuell';
+      isPending = false;
+    } else if (currentOcc && (currentOcc.status === 'cancelled' || currentOcc.status === 'canceled_by_student')) {
+      badgeText = 'Abgesagt';
+      isPending = false;
+    } else {
+      badgeText = 'Bestätigung ausstehend';
+      isPending = true;
+    }
 
     const leftRaw = content.substring(0, arrowIndex)
       .replace(/Dein Termin wurde verschoben:/i, '')
@@ -145,10 +174,10 @@ const AppleSystemNotificationCard: React.FC<{
       newTime = rightRaw;
     }
     oldTime = leftRaw;
-  } else if (content.includes('zurückgesetzt')) {
+  } else if (content.includes('zurückgesetzt') || content.includes('wiederhergestellt')) {
     title = 'Regulärer Termin wiederhergestellt';
-    badgeText = 'Termin zurückgesetzt';
-    note = content.replace(/Der verschobene oder abgesagte Termin wurde auf den regulären Termin zurückgesetzt:/i, '').trim();
+    badgeText = 'Termin regulär';
+    note = content.replace(/Der verschobene oder abgesagte Termin wurde auf den regulären (Stamm-)?Termin zurückgesetzt:?/i, '').replace(/Der verschobene Termin wurde auf den regulären (Stamm-)?Termin zurückgesetzt:?/i, '').trim();
   } else if (content.includes('abgelehnt')) {
     title = 'Verschiebung abgelehnt';
     badgeText = 'Abgelehnt';
@@ -156,7 +185,7 @@ const AppleSystemNotificationCard: React.FC<{
   } else if (content.includes('storniert') || content.includes('abgesagt')) {
     title = 'Termin abgesagt';
     badgeText = 'Abgesagt';
-    note = content;
+    note = content.replace(/❌/g, '').trim();
   } else if (content.includes('bestätigt')) {
     title = 'Termin bestätigt';
     badgeText = 'Bestätigt';
@@ -189,13 +218,13 @@ const AppleSystemNotificationCard: React.FC<{
     badgeBg = '#e6f4ea';
     badgeColor = '#15803d';
     badgeBorder = '#bbf7d0';
-  } else if (badgeText === 'Termin zurückgesetzt') {
-    // Soft Slate Gray (Reset - Not bright blue!)
+  } else if (badgeText === 'Termin regulär' || badgeText === 'Termin zurückgesetzt' || badgeText === 'Nicht mehr aktuell') {
+    // Soft Slate Gray (Reset / Regular / Superseded)
     badgeBg = '#f1f5f9';
     badgeColor = '#475569';
     badgeBorder = '#e2e8f0';
   } else if (badgeText === 'Abgelehnt' || badgeText === 'Abgesagt') {
-    // Soft Muted Rose (Rejected)
+    // Soft Muted Rose (Rejected / Canceled)
     badgeBg = '#fef2f2';
     badgeColor = '#991b1b';
     badgeBorder = '#fecaca';
@@ -410,7 +439,7 @@ interface CampusDirectMessagesProps {
   onNavigateToSchedule?: (dateStr?: string) => void;
 }
 
-export default function CampusDirectMessages({
+export function CampusDirectMessages({
   user,
   schoolUsers,
   campusMessages,
@@ -551,7 +580,7 @@ export default function CampusDirectMessages({
     if (isStudent) {
       const fetchStudentTeachers = async () => {
         try {
-          const studentId = user?.id || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null);
+          const studentId = user?.id || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
           if (!studentId) return;
 
           const teacherMap = new Map<string, any>();
@@ -629,7 +658,7 @@ export default function CampusDirectMessages({
 
     const fetchAssignedStudents = async () => {
       try {
-        const teacherId = user?.id || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null);
+        const teacherId = user?.id || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
         if (!teacherId) return;
 
         const userRole = (user?.role || '').toLowerCase();
@@ -798,22 +827,26 @@ export default function CampusDirectMessages({
 
   const isSystemMessage = (msg: any) => {
     if (!msg) return false;
-    if (msg.is_system || msg.message_type === 'reschedule_notification' || msg.message_type === 'system' || msg.message_type === 'shoutbox' || msg.message_type === 'term_shout') return true;
-    const content = String(msg.content || '');
-    if (content.includes('Termin') ||
-        content.includes('Stamm-Termin') ||
-        content.includes('Stammtermin') ||
-        content.includes('Unterrichtstermin') || 
-        content.includes('storniert') || 
-        content.includes('bestätigt') ||
-        content.includes('regulär') ||
-        content.includes('verschoben') ||
-        content.includes('zurückgesetzt') ||
-        content.includes('abgesagt') ||
-        content.includes('Verschiebung') ||
-        content.includes('abgelehnt') ||
-        content.includes('Shoutbox') ||
-        content.includes('1:1')) {
+    if (msg.is_system || msg.message_type === 'reschedule_notification' || msg.message_type === 'system') return true;
+    const content = String(msg.content || '').trim();
+    const lower = content.toLowerCase();
+    
+    // System notification patterns generated by the engine
+    if (
+      lower.includes('termin wurde verschoben') ||
+      lower.includes('termin wurde auf den regulären') ||
+      lower.includes('termin zurückgesetzt') ||
+      lower.includes('stamm-termin zurückgesetzt') ||
+      lower.includes('abgesagt') ||
+      content.includes('❌') ||
+      lower.includes('unterrichtstermin bestätigt') ||
+      lower.includes('termin bestätigt') ||
+      lower.includes('terminbestätigung') ||
+      lower.includes('verschiebung abgelehnt') ||
+      lower.includes('bitte bestätige den neuen termin') ||
+      lower.includes('bitte bestätige, dass du dies gesehen hast') ||
+      (content.includes('->') && (lower.includes('uhr') || lower.includes('termin')))
+    ) {
       return true;
     }
     return false;
@@ -823,85 +856,91 @@ export default function CampusDirectMessages({
   const userRole = (user?.role || '').toLowerCase();
   const isAdminOrSecretary = userRole === 'admin' || userRole === 'secretary';
 
-  const sourceUsers = isAdminOrSecretary
-    ? [...(schoolUsers || []), ...(assignedStudents || [])] 
-    : (assignedStudents || []);
+  const sourceUsers = useMemo(() => {
+    return isAdminOrSecretary
+      ? [...(schoolUsers || []), ...(assignedStudents || [])] 
+      : (assignedStudents || []);
+  }, [isAdminOrSecretary, schoolUsers, assignedStudents]);
 
-  const allAvailableUsersMap = new Map<string, any>();
-  sourceUsers.forEach(u => {
-    if (u && u.id) {
-      allAvailableUsersMap.set(u.id, u);
-    }
-  });
-  const allAvailableUsers = Array.from(allAvailableUsersMap.values());
+  const allAvailableUsers = useMemo(() => {
+    const map = new Map<string, any>();
+    sourceUsers.forEach(u => {
+      if (u && u.id) {
+        map.set(u.id, u);
+      }
+    });
+    return Array.from(map.values());
+  }, [sourceUsers]);
 
   // Get potential chat partners
-  const chatPartners = allAvailableUsers.filter(u => {
-    if (u.id === user.id) return false;
-    if (selectedRecipient && u.id === selectedRecipient.id) return true;
-    if (isStudent) {
-      const isTeacherRole = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
-      return isTeacherRole;
-    }
+  const chatPartners = useMemo(() => {
+    return allAvailableUsers.filter(u => {
+      if (!u || u.id === user?.id) return false;
+      if (selectedRecipient && u.id === selectedRecipient.id) return true;
+      if (isStudent) {
+        const isTeacherRole = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
+        return isTeacherRole;
+      }
 
-    const role = (u.role || '').toLowerCase();
-    const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
-    const isStaffUser = role === 'teacher' || role === 'admin' || role === 'secretary' ||
-                        roles.includes('teacher') || roles.includes('admin') || roles.includes('secretary');
+      const role = (u.role || '').toLowerCase();
+      const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
+      const isStaffUser = role === 'teacher' || role === 'admin' || role === 'secretary' ||
+                          roles.includes('teacher') || roles.includes('admin') || roles.includes('secretary');
 
-    if (isStaffUser) return false;
+      if (isStaffUser) return false;
 
-    // Remove ghost users / corrupted entries
-    if (!u.first_name || u.first_name.trim() === '') return false;
+      // Remove ghost users / corrupted entries
+      if (!u.first_name || u.first_name.trim() === '') return false;
 
-    return true;
-  });
+      return true;
+    });
+  }, [allAvailableUsers, user?.id, selectedRecipient, isStudent]);
 
   // Filter partners based on search
-  const filteredPartners = chatPartners.filter(p => 
-    `${p.first_name} ${p.last_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredPartners = useMemo(() => {
+    return chatPartners.filter(p => 
+      `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [chatPartners, searchQuery]);
 
   // Group messages and unread counts
-  const partnersWithMetadata = filteredPartners.map(partner => {
-    const threadMessages = campusMessages.filter(m => 
-      (m.sender_id === user.id && m.recipient_id === partner.id) ||
-      (m.sender_id === partner.id && m.recipient_id === user.id)
-    );
+  const partnersWithMetadata = useMemo(() => {
+    return filteredPartners.map(partner => {
+      const threadMessages = (campusMessages || []).filter(m => 
+        (m.sender_id === user?.id && m.recipient_id === partner.id) ||
+        (m.sender_id === partner.id && m.recipient_id === user?.id)
+      );
 
-    const directHumanMessages = threadMessages.filter(m => !m.occurrence_id && !isSystemMessage(m));
-    const lastMessage = directHumanMessages.length > 0 
-      ? directHumanMessages[directHumanMessages.length - 1] 
-      : threadMessages[threadMessages.length - 1];
-    const unreadCount = directHumanMessages.filter(m => 
-      m.sender_id === partner.id && m.recipient_id === user.id && !m.is_read
-    ).length;
+      const directHumanMessages = threadMessages.filter(m => !isSystemMessage(m));
+      const lastMessage = directHumanMessages.length > 0 
+        ? directHumanMessages[directHumanMessages.length - 1] 
+        : threadMessages[threadMessages.length - 1];
+      const unreadCount = directHumanMessages.filter(m => 
+        m.sender_id === partner.id && m.recipient_id === user?.id && !m.is_read
+      ).length;
 
-    return {
-      ...partner,
-      lastMessage,
-      unreadCount,
-      lastMessageTime: lastMessage ? new Date(lastMessage.created_at) : null
-    };
-  });
+      return {
+        ...partner,
+        lastMessage,
+        unreadCount,
+        lastMessageTime: lastMessage ? new Date(lastMessage.created_at) : null
+      };
+    });
+  }, [filteredPartners, campusMessages, user?.id]);
 
-  // Filter based on Quick-Filters with deterministic sorting
-  const finalPartnersList = partnersWithMetadata.filter(partner => {
-    if (filterType === 'unread') {
-      return partner.unreadCount > 0;
-    }
-    return true;
-  }).sort((a, b) => {
-    if (a.unreadCount !== b.unreadCount) return b.unreadCount - a.unreadCount;
-    if (!a.lastMessageTime && !b.lastMessageTime) {
+  // Filter based on Quick-Filters with deterministic alphabetical sorting (A-Z)
+  const finalPartnersList = useMemo(() => {
+    return partnersWithMetadata.filter(partner => {
+      if (filterType === 'unread') {
+        return partner.unreadCount > 0;
+      }
+      return true;
+    }).sort((a, b) => {
       const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim();
       const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim();
       return nameA.localeCompare(nameB, 'de', { sensitivity: 'base' });
-    }
-    if (!a.lastMessageTime) return 1;
-    if (!b.lastMessageTime) return -1;
-    return b.lastMessageTime.getTime() - a.lastMessageTime.getTime();
-  });
+    });
+  }, [partnersWithMetadata, filterType]);
 
   // Auto-scroll to bottom of messages
   const scrollToBottom = () => {
@@ -1052,78 +1091,128 @@ export default function CampusDirectMessages({
     fetchOccurrencesForStudent();
   }, [selectedRecipient?.id]);
 
-  // 2. Compute dynamic date-based occurrence tabs for active/upcoming appointments (date >= today)
+  // 1. Helper to extract date from message content if occurrence_id is missing or legacy
+  const extractOccurrenceDateFromMessage = (msg: any): string | null => {
+    if (!msg) return null;
+    if (msg.occurrence_id) {
+      const matchVirtual = String(msg.occurrence_id).match(/\d{4}-\d{2}-\d{2}/);
+      if (matchVirtual) return matchVirtual[0];
+    }
+    const text = String(msg.content || '');
+    // 1. ISO format: 2026-07-20
+    const matchIso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+    if (matchIso) {
+      return `${matchIso[1]}-${matchIso[2]}-${matchIso[3]}`;
+    }
+    // 2. German format: 20.07.26 or 20.07.2026
+    const matchFullYear = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+    if (matchFullYear) {
+      const day = matchFullYear[1].padStart(2, '0');
+      const month = matchFullYear[2].padStart(2, '0');
+      let year = matchFullYear[3];
+      if (year.length === 2) year = `20${year}`;
+      return `${year}-${month}-${day}`;
+    }
+    return null;
+  };
+
+  // 2. Dynamic Date-Based Occurrence Tabs with Active & Archive Lifecycle
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const archiveDropdownRef = useRef<HTMLDivElement>(null);
 
-  const activeOccurrenceTabs = useMemo(() => {
-    if (!selectedRecipient) return [];
-    
-    // Group occurrences by slot key: `${occ.date}_${timeStr}`
-    const slotMap = new Map<string, { occ: any; ids: string[] }>();
+  // Close archive dropdown when clicking outside
+  useEffect(() => {
+    if (!isArchiveOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (archiveDropdownRef.current && !archiveDropdownRef.current.contains(e.target as Node)) {
+        setIsArchiveOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isArchiveOpen]);
 
-    const processOcc = (occ: any) => {
-      if (!occ || !occ.date || occ.date < todayStr) return;
-      if (occ.status === 'rescheduled_away' || occ.status === 'canceled_by_student' || occ.status === 'deleted') return;
-      const timeStr = occ.start_time ? occ.start_time.slice(0, 5) : '18:00';
-      const slotKey = `${occ.date}_${timeStr}`;
+  const { upcomingOccurrenceTabs, archivedOccurrenceTabs, allOccurrenceTabs } = useMemo(() => {
+    if (!selectedRecipient) {
+      return { upcomingOccurrenceTabs: [], archivedOccurrenceTabs: [], allOccurrenceTabs: [] };
+    }
 
-      const occMessages = activeThreadMessages.filter(m => String(m.occurrence_id) === String(occ.id));
-      const hasMessages = occMessages.length > 0;
-      
-      const isShiftOrChanged = 
-        (occ.status && occ.status !== 'scheduled' && occ.status !== 'confirmed') ||
-        occ.rescheduled_from ||
-        occ.original_date ||
-        (occ.notes && (occ.notes.includes('->') || occ.notes.includes('verschoben')));
+    const defaultStartTime = (studentOccurrences && studentOccurrences[0]?.start_time ? studentOccurrences[0].start_time.slice(0, 5) : '16:30');
 
-      if (hasMessages || isShiftOrChanged) {
-        if (!slotMap.has(slotKey)) {
-          slotMap.set(slotKey, { occ, ids: [String(occ.id)] });
-        } else {
-          const existing = slotMap.get(slotKey)!;
-          if (!existing.ids.includes(String(occ.id))) {
-            existing.ids.push(String(occ.id));
-          }
-          if (existing.occ.is_virtual && !occ.is_virtual) {
-            existing.occ = occ;
-          }
+    // Date-based Map to avoid duplicate tabs for the same calendar date
+    const dateSlotMap = new Map<string, { occ: any; ids: string[]; start_time: string; isPast: boolean }>();
+
+    const addOrUpdateSlot = (date: string, startTime: string | null, occObj: any) => {
+      if (!date) return;
+      const isPast = date < todayStr;
+      const effectiveTime = (startTime && startTime !== '18:00') ? startTime.slice(0, 5) : defaultStartTime;
+
+      if (!dateSlotMap.has(date)) {
+        dateSlotMap.set(date, {
+          occ: occObj || { date, start_time: effectiveTime, is_virtual: true },
+          ids: occObj?.id ? [String(occObj.id)] : [],
+          start_time: effectiveTime,
+          isPast
+        });
+      } else {
+        const existing = dateSlotMap.get(date)!;
+        if (occObj?.id && !existing.ids.includes(String(occObj.id))) {
+          existing.ids.push(String(occObj.id));
+        }
+        if (startTime && (!existing.start_time || existing.start_time === '18:00')) {
+          existing.start_time = effectiveTime;
+        }
+        if (!existing.occ || (existing.occ.is_virtual && occObj && !occObj.is_virtual)) {
+          existing.occ = occObj;
         }
       }
     };
 
-    (studentOccurrences || []).forEach(processOcc);
+    // 1. Process known student occurrences
+    (studentOccurrences || []).forEach(occ => {
+      if (!occ || !occ.date) return;
+      if (occ.status === 'rescheduled_away' || occ.status === 'canceled_by_student' || occ.status === 'deleted') return;
+      addOrUpdateSlot(occ.date, occ.start_time ? occ.start_time.slice(0, 5) : null, occ);
+    });
 
-    // Also include any occurrences referenced in activeThreadMessages
+    // 2. Process message dates / occurrence references
     activeThreadMessages.forEach(msg => {
-      if (msg.occurrence_id) {
-        const msgOccId = String(msg.occurrence_id);
-        const linkedOcc = studentOccurrences.find(o => String(o.id) === msgOccId);
-        if (linkedOcc && linkedOcc.date >= todayStr) {
-          processOcc(linkedOcc);
-        } else if (!linkedOcc) {
-          const msgDate = msg.created_at ? msg.created_at.split('T')[0] : todayStr;
-          if (msgDate >= todayStr) {
-            processOcc({
-              id: msgOccId,
-              date: msgDate,
-              start_time: '18:00',
-              is_virtual: true
-            });
-          }
+      const extDate = extractOccurrenceDateFromMessage(msg);
+      if (extDate) {
+        // Extract time from message content if present
+        const timeMatch = String(msg.content || '').match(/(\d{1,2}):(\d{2})\s*uhr/i);
+        const timeInMsg = timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : null;
+        
+        const linkedOcc = studentOccurrences?.find(o => o.date === extDate || String(o.id) === String(msg.occurrence_id));
+        addOrUpdateSlot(extDate, timeInMsg || (linkedOcc?.start_time ? linkedOcc.start_time.slice(0, 5) : null), linkedOcc || null);
+      } else if (msg.occurrence_id && String(msg.occurrence_id).startsWith('virtual-')) {
+        const matchVirtual = String(msg.occurrence_id).match(/\d{4}-\d{2}-\d{2}/);
+        if (matchVirtual) {
+          addOrUpdateSlot(matchVirtual[0], null, null);
         }
       }
     });
 
-    // Convert deduplicated slots into tabs
-    const tabs = Array.from(slotMap.values()).map(({ occ, ids }) => {
+    const allTabs = Array.from(dateSlotMap.values()).map(({ occ, ids, start_time, isPast }) => {
       const occDate = parseLocalDate(occ.date);
       const dayName = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
       const formattedDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-      const timeStr = occ.start_time ? occ.start_time.slice(0, 5) : '';
+      const timeStr = start_time || (occ.start_time ? occ.start_time.slice(0, 5) : defaultStartTime);
       const label = `${dayName} ${formattedDate}${timeStr ? ` ${timeStr}` : ''}`;
 
-      const occMessages = activeThreadMessages.filter(m => m.occurrence_id && ids.includes(String(m.occurrence_id)));
-      const unreadCount = occMessages.filter(m => m.sender_id === selectedRecipient.id && m.recipient_id === user.id && !m.is_read).length;
+      const occMessages = activeThreadMessages.filter(m => {
+        if (m.occurrence_id && ids.includes(String(m.occurrence_id))) return true;
+        const ext = extractOccurrenceDateFromMessage(m);
+        return ext === occ.date;
+      });
+
+      const unreadCount = occMessages.filter(m => 
+        m.sender_id === selectedRecipient.id && 
+        m.recipient_id === user.id && 
+        !m.is_read && 
+        !isSystemMessage(m)
+      ).length;
 
       const isShiftOrChanged = 
         (occ.status && occ.status !== 'scheduled' && occ.status !== 'confirmed') ||
@@ -1132,51 +1221,66 @@ export default function CampusDirectMessages({
         (occ.notes && (occ.notes.includes('->') || occ.notes.includes('verschoben')));
 
       return {
-        id: ids[0],
-        allIds: ids,
+        id: ids[0] || `tab-${occ.date}`,
+        allIds: ids.length > 0 ? ids : [`tab-${occ.date}`],
         date: occ.date,
-        start_time: occ.start_time || '18:00',
+        start_time: timeStr,
         label,
         unreadCount,
         isShiftOrChanged: Boolean(isShiftOrChanged),
+        isPast,
         messages: occMessages,
         occurrence: occ
       };
-    }).sort((a, b) => {
+    }).filter(t => t.messages.length > 0 || t.isShiftOrChanged);
+
+    const upcoming = allTabs.filter(t => !t.isPast).sort((a, b) => {
       const dateA = `${a.date}T${a.start_time}`;
       const dateB = `${b.date}T${b.start_time}`;
       return dateA.localeCompare(dateB);
     });
 
-    return tabs;
+    const archived = allTabs.filter(t => t.isPast).sort((a, b) => {
+      const dateA = `${a.date}T${a.start_time}`;
+      const dateB = `${b.date}T${b.start_time}`;
+      return dateB.localeCompare(dateA); // Newest past lessons first
+    });
+
+    return {
+      upcomingOccurrenceTabs: upcoming,
+      archivedOccurrenceTabs: archived,
+      allOccurrenceTabs: [...upcoming, ...archived]
+    };
   }, [selectedRecipient, studentOccurrences, activeThreadMessages, todayStr, user.id]);
 
-  // 3. General direct messages (without occurrence_id)
+  const activeOccurrenceTabs = allOccurrenceTabs;
+
+  // 3. General direct messages (strictly human messages without occurrence_id and without system notifications)
   const generalMessages = useMemo(() => {
-    return activeThreadMessages.filter(m => !m.occurrence_id && !isSystemMessage(m));
+    return activeThreadMessages.filter(m => !m.occurrence_id && !isSystemMessage(m) && !extractOccurrenceDateFromMessage(m));
   }, [activeThreadMessages]);
 
   // 4. Smart Auto-Tab Selection Priority when switching students
   useEffect(() => {
     if (!selectedRecipient) return;
 
-    // Priority 1: Occurrence tab with unread messages
-    const unreadOccTab = activeOccurrenceTabs.find(tab => tab.unreadCount > 0);
+    // Priority 1: Upcoming occurrence tab with unread messages
+    const unreadOccTab = upcomingOccurrenceTabs.find(tab => tab.unreadCount > 0);
     if (unreadOccTab) {
       setActiveSubTab(unreadOccTab.id);
       return;
     }
 
     // Priority 2: General tab with unread messages
-    const unreadGeneral = generalMessages.filter(m => m.sender_id === selectedRecipient.id && m.recipient_id === user.id && !m.is_read).length;
+    const unreadGeneral = generalMessages.filter(m => m.sender_id === selectedRecipient.id && m.recipient_id === user.id && !m.is_read && !isSystemMessage(m)).length;
     if (unreadGeneral > 0) {
       setActiveSubTab('general');
       return;
     }
 
     // Priority 3: Next upcoming appointment tab if available, otherwise 'general'
-    if (activeOccurrenceTabs.length > 0) {
-      setActiveSubTab(activeOccurrenceTabs[0].id);
+    if (upcomingOccurrenceTabs.length > 0) {
+      setActiveSubTab(upcomingOccurrenceTabs[0].id);
     } else {
       setActiveSubTab('general');
     }
@@ -1184,21 +1288,22 @@ export default function CampusDirectMessages({
 
   // 5. Messages displayed in the chat area for currently active sub-tab
   const displayedMessages = useMemo(() => {
-    if (activeSubTab === 'general') return generalMessages;
-    
-    // Active appointment tab (matching primary ID or any merged slot ID)
-    const selectedOccTab = activeOccurrenceTabs.find(tab => tab.id === activeSubTab || (tab.allIds && tab.allIds.includes(activeSubTab)));
-    if (selectedOccTab) {
-      return selectedOccTab.messages;
+    if (activeSubTab === 'general') {
+      return generalMessages;
     }
-    return generalMessages;
-  }, [activeSubTab, generalMessages, activeOccurrenceTabs]);
+    const selectedOccTab = allOccurrenceTabs.find(tab => 
+      tab.id === activeSubTab || 
+      (tab.allIds && tab.allIds.includes(activeSubTab)) ||
+      tab.date === activeSubTab
+    );
+    return selectedOccTab ? selectedOccTab.messages : generalMessages;
+  }, [activeSubTab, generalMessages, allOccurrenceTabs]);
 
   const sendDirectQuickMessage = async (content: string) => {
     if (!content.trim() || !selectedRecipient) return;
     
     if (activeSubTab !== 'general' && activeSubTab !== 'system') {
-      const targetOccTab = activeOccurrenceTabs.find(tab => tab.id === activeSubTab);
+      const targetOccTab = allOccurrenceTabs.find(tab => tab.id === activeSubTab || (tab.allIds && tab.allIds.includes(activeSubTab)));
       if (targetOccTab) {
         await supabase.from('campus_direct_messages').insert({
           sender_id: user.id,
@@ -1444,7 +1549,7 @@ export default function CampusDirectMessages({
                       overflow: 'hidden',
                       textOverflow: 'ellipsis'
                     }}>
-                      {partner.lastMessage ? partner.lastMessage.content : 'Keine Nachrichten.'}
+                      {partner.lastMessage ? cleanChatMessageContent(partner.lastMessage.content) : 'Keine Nachrichten.'}
                     </p>
                   </div>
                 </button>
@@ -1562,103 +1667,219 @@ export default function CampusDirectMessages({
               </div>
             </div>
 
-            {/* Apple Safari/Messages Style Dynamic Date-Based Tab Bar */}
+            {/* Apple Safari/Messages Style Dynamic Date-Based Tab Bar with Archive */}
             <div style={{ 
               display: 'flex', 
-              gap: '6px', 
+              gap: '8px', 
               padding: '10px 16px', 
               background: '#ffffff', 
               borderBottom: '1px solid #f1f5f9',
               alignItems: 'center',
-              overflowX: 'auto',
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none'
+              justifyContent: 'space-between',
+              position: 'relative',
+              zIndex: 50
             }}>
-              {/* Tab 1: Allgemein */}
-              <button
-                type="button"
-                onClick={() => setActiveSubTab('general')}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '100px',
-                  border: 'none',
-                  background: activeSubTab === 'general' ? '#34a853' : '#f1f5f9',
-                  color: activeSubTab === 'general' ? 'white' : '#64748b',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s',
-                  boxShadow: activeSubTab === 'general' ? '0 2px 6px rgba(52,168,83,0.2)' : 'none'
-                }}
-                className="hover-scale"
-              >
-                <MessageSquare size={13} />
-                <span>Allgemein ({generalMessages.length})</span>
-              </button>
+              {/* Scrollable Tabs on the Left */}
+              <div style={{
+                display: 'flex',
+                gap: '6px',
+                alignItems: 'center',
+                overflowX: 'auto',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+                flex: 1,
+                minWidth: 0,
+                paddingRight: '6px'
+              }}>
+                {/* Tab 1: Allgemein (Ausschließlich persönliche, menschliche Nachrichten) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveSubTab('general');
+                    setIsArchiveOpen(false);
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '100px',
+                    border: 'none',
+                    background: activeSubTab === 'general' ? '#34a853' : '#f1f5f9',
+                    color: activeSubTab === 'general' ? 'white' : '#64748b',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s',
+                    flexShrink: 0,
+                    boxShadow: activeSubTab === 'general' ? '0 2px 6px rgba(52,168,83,0.2)' : 'none'
+                  }}
+                  className="hover-scale"
+                >
+                  <MessageSquare size={13} />
+                  <span>Allgemein ({generalMessages.length})</span>
+                </button>
 
-              {/* Dynamic Date-Based Appointment Tabs in Campus Green Theme */}
-              {activeOccurrenceTabs.map(tab => {
-                const isActive = activeSubTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveSubTab(tab.id)}
-                    style={{
-                      padding: '7px 16px',
-                      borderRadius: '100px',
-                      border: isActive ? 'none' : '1px solid #bbf7d0',
-                      background: isActive ? '#34a853' : '#e6f4ea',
-                      color: isActive ? 'white' : '#15803d',
-                      fontSize: '0.78rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      whiteSpace: 'nowrap',
-                      transition: 'all 0.2s',
-                      position: 'relative',
-                      boxShadow: isActive ? '0 3px 10px rgba(52, 168, 83, 0.22)' : 'none'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Calendar size={13} color={isActive ? '#ffffff' : '#34a853'} />
-                    <span>{tab.label}</span>
-                    {tab.unreadCount > 0 ? (
-                      <span style={{
-                        background: isActive ? '#ffffff' : '#ea4335',
-                        color: isActive ? '#ea4335' : '#ffffff',
+                {/* Dynamic Date-Based Upcoming Appointment Tabs */}
+                {upcomingOccurrenceTabs.map(tab => {
+                  const isActive = activeSubTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveSubTab(tab.id);
+                        setIsArchiveOpen(false);
+                      }}
+                      style={{
+                        padding: '7px 16px',
                         borderRadius: '100px',
-                        padding: '1px 6px',
-                        minWidth: '16px',
-                        height: '16px',
-                        fontSize: '0.62rem',
-                        fontWeight: 900,
-                        display: 'inline-flex',
+                        border: isActive ? 'none' : '1px solid #bbf7d0',
+                        background: isActive ? '#34a853' : '#e6f4ea',
+                        color: isActive ? 'white' : '#15803d',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 2px 4px rgba(234, 67, 53, 0.35)'
-                      }}>
-                        {tab.unreadCount}
-                      </span>
-                    ) : tab.isShiftOrChanged ? (
-                      <span style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: isActive ? '#ffffff' : '#ea4335',
-                        boxShadow: '0 0 6px rgba(234, 67, 53, 0.6)',
-                        display: 'inline-block'
-                      }} />
-                    ) : null}
-                  </button>
+                        gap: '6px',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.2s',
+                        position: 'relative',
+                        flexShrink: 0,
+                        boxShadow: isActive ? '0 3px 10px rgba(52, 168, 83, 0.22)' : 'none'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Calendar size={13} color={isActive ? '#ffffff' : '#34a853'} />
+                      <span>{tab.label}</span>
+                      {tab.unreadCount > 0 ? (
+                        <span style={{
+                          background: isActive ? '#ffffff' : '#ea4335',
+                          color: isActive ? '#ea4335' : '#ffffff',
+                          borderRadius: '100px',
+                          padding: '1px 6px',
+                          minWidth: '16px',
+                          height: '16px',
+                          fontSize: '0.62rem',
+                          fontWeight: 900,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 2px 4px rgba(234, 67, 53, 0.35)'
+                        }}>
+                          {tab.unreadCount}
+                        </span>
+                      ) : tab.isShiftOrChanged ? (
+                        <span style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: isActive ? '#ffffff' : '#ea4335',
+                          boxShadow: '0 0 6px rgba(234, 67, 53, 0.6)',
+                          display: 'inline-block'
+                        }} />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Tab Archiv Dropdown Button for Past Appointments (Pinned & Unclipped on Right) */}
+              {archivedOccurrenceTabs.length > 0 && (() => {
+                const isArchivedActive = archivedOccurrenceTabs.some(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)));
+                const activeArchivedTab = archivedOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)));
+
+                return (
+                  <div ref={archiveDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsArchiveOpen(prev => !prev)}
+                      style={{
+                        padding: '7px 14px',
+                        borderRadius: '100px',
+                        border: isArchivedActive ? 'none' : '1px solid #e2e8f0',
+                        background: isArchivedActive ? '#34a853' : '#f8fafc',
+                        color: isArchivedActive ? 'white' : '#64748b',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.2s',
+                        boxShadow: isArchivedActive ? '0 3px 10px rgba(52, 168, 83, 0.22)' : 'none'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Inbox size={13} color={isArchivedActive ? '#ffffff' : '#64748b'} />
+                      <span>{isArchivedActive && activeArchivedTab ? `Archiv: ${activeArchivedTab.label}` : `Archiv (${archivedOccurrenceTabs.length})`}</span>
+                      <ChevronDown size={12} style={{ transform: isArchiveOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                    </button>
+
+                    {/* Archiv Dropdown Popover */}
+                    {isArchiveOpen && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 8px)',
+                        right: 0,
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '16px',
+                        padding: '6px',
+                        boxShadow: '0 12px 30px -4px rgba(0,0,0,0.18), 0 6px 12px -2px rgba(0,0,0,0.08)',
+                        zIndex: 9999,
+                        minWidth: '240px',
+                        maxHeight: '280px',
+                        overflowY: 'auto'
+                      }} className="custom-scrollbar">
+                        <div style={{ padding: '6px 10px 4px 10px', fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Vergangene Termine
+                        </div>
+                        {archivedOccurrenceTabs.map(archTab => {
+                          const isCurrent = activeSubTab === archTab.id || (archTab.allIds && archTab.allIds.includes(activeSubTab));
+                          return (
+                            <button
+                              key={archTab.id}
+                              type="button"
+                              onClick={() => {
+                                setActiveSubTab(archTab.id);
+                                setIsArchiveOpen(false);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                borderRadius: '10px',
+                                border: 'none',
+                                background: isCurrent ? '#e6f4ea' : 'transparent',
+                                color: isCurrent ? '#15803d' : '#334155',
+                                fontSize: '0.78rem',
+                                fontWeight: isCurrent ? 800 : 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                textAlign: 'left',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.background = '#f1f5f9'; }}
+                              onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Clock size={12} color={isCurrent ? '#34a853' : '#94a3b8'} />
+                                <span>{archTab.label}</span>
+                              </div>
+                              {isCurrent && <Check size={13} color="#15803d" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
-              })}
+              })()}
             </div>
 
             {/* Message History */}
@@ -1673,7 +1894,7 @@ export default function CampusDirectMessages({
             }} className="custom-scrollbar">
               {/* Apple Senior App Designer - Glassmorphic Calendar Event Card */}
               {activeSubTab !== 'general' && (() => {
-                const currentTab = activeOccurrenceTabs.find(t => t.id === activeSubTab);
+                const currentTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)));
                 if (!currentTab) return null;
                 const occDate = parseLocalDate(currentTab.date);
                 const dayName = occDate.toLocaleDateString('de-DE', { weekday: 'long' });
@@ -1683,7 +1904,15 @@ export default function CampusDirectMessages({
                 // Extract Stammtermin (original date & time) if rescheduled
                 const occObj = currentTab.occurrence || currentTab;
                 let stammterminText: string | null = null;
-                if (occObj) {
+                const isActuallyShifted = Boolean(
+                  occObj.status === 'pending_reschedule' || 
+                  occObj.status === 'rescheduled_confirmed' || 
+                  occObj.status === 'reschedule_requested' ||
+                  occObj.is_rescheduled || 
+                  (occObj.original_date && occObj.original_date !== currentTab.date)
+                );
+
+                if (isActuallyShifted && occObj) {
                   let rawOrig = occObj.original_date || occObj.rescheduled_from || occObj.originalDate;
                   const rawOrigTime = occObj.original_start_time || occObj.originalStartTime || occObj.original_time;
 
@@ -1709,11 +1938,6 @@ export default function CampusDirectMessages({
                         stammterminText = `${origDayName}. ${origDateFormatted} • ${timeStr}`;
                       }
                     } catch (e) {}
-                  }
-
-                  // If still null but tab is marked as shift/changed, construct fallback from original day
-                  if (!stammterminText && (currentTab.isShiftOrChanged || occObj.status === 'pending_reschedule')) {
-                    stammterminText = `Mo. 10.08.2026 • 16:30 Uhr`;
                   }
                 }
 
@@ -1787,14 +2011,14 @@ export default function CampusDirectMessages({
                           </span>
                           <span style={{
                             fontSize: '0.65rem',
-                            background: stammterminText ? '#e6f4ea' : '#dcfce7',
-                            color: '#15803d',
+                            background: stammterminText ? '#e6f4ea' : (occObj?.status === 'cancelled' || occObj?.status === 'canceled' || (currentTab.messages || []).some((m: any) => isSystemMessage(m) && (m.content || '').includes('abgesagt')) ? '#fef2f2' : '#dcfce7'),
+                            color: stammterminText ? '#15803d' : (occObj?.status === 'cancelled' || occObj?.status === 'canceled' || (currentTab.messages || []).some((m: any) => isSystemMessage(m) && (m.content || '').includes('abgesagt')) ? '#991b1b' : '#15803d'),
                             padding: '2px 8px',
                             borderRadius: '100px',
                             fontWeight: 800,
-                            border: '1px solid #bbf7d0'
+                            border: stammterminText ? '1px solid #bbf7d0' : (occObj?.status === 'cancelled' || occObj?.status === 'canceled' || (currentTab.messages || []).some((m: any) => isSystemMessage(m) && (m.content || '').includes('abgesagt')) ? '1px solid #fecaca' : '1px solid #bbf7d0')
                           }}>
-                            {stammterminText ? '🔄 Termin verschoben' : 'Anstehender Unterricht'}
+                            {stammterminText ? '🔄 Termin verschoben' : (occObj?.status === 'cancelled' || occObj?.status === 'canceled' || (currentTab.messages || []).some((m: any) => isSystemMessage(m) && (m.content || '').includes('abgesagt')) ? '❌ Termin abgesagt' : 'Anstehender Unterricht')}
                           </span>
                         </div>
 
@@ -1908,112 +2132,160 @@ export default function CampusDirectMessages({
                   </div>
                 </div>
               ) : (
-                displayedMessages.map(msg => {
+                displayedMessages.map((msg, idx) => {
                   const isSelf = msg.sender_id === user.id;
                   const isSys = isSystemMessage(msg);
-                  const isAppointmentLinked = msg.occurrence_id || msg.content?.includes('Termin') || msg.content?.includes('Unterricht');
 
                   if (isSys) {
+                    const currentOccTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)) || t.date === activeSubTab);
+                    const laterSysMsg = displayedMessages.slice(idx + 1).find(m => isSystemMessage(m));
+                    const isSuperseded = Boolean(laterSysMsg);
+
                     return (
                       <AppleSystemNotificationCard 
-                        key={msg.id} 
+                        key={msg.id || `sys-${idx}`} 
                         msg={msg} 
                         selectedRecipient={selectedRecipient}
                         onSendMessage={onSendMessage}
+                        isSuperseded={isSuperseded}
+                        currentOcc={currentOccTab?.occurrence}
                       />
                     );
                   }
+
+                  const msgDate = new Date(msg.created_at);
+                  const prevMsg = idx > 0 ? displayedMessages[idx - 1] : null;
+                  const prevMsgDate = prevMsg ? new Date(prevMsg.created_at) : null;
                   
+                  const isNewDay = !prevMsgDate || msgDate.toDateString() !== prevMsgDate.toDateString();
+                  const isContinuation = prevMsg && !isNewDay && prevMsg.sender_id === msg.sender_id && (msgDate.getTime() - prevMsgDate.getTime() < 5 * 60 * 1000);
+
+                  // Date label formatting
+                  const todayObj = new Date();
+                  const yesterdayObj = new Date();
+                  yesterdayObj.setDate(todayObj.getDate() - 1);
+                  let dateLabel = '';
+                  if (msgDate.toDateString() === todayObj.toDateString()) {
+                    dateLabel = 'Heute';
+                  } else if (msgDate.toDateString() === yesterdayObj.toDateString()) {
+                    dateLabel = 'Gestern';
+                  } else {
+                    dateLabel = msgDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+                  }
+
+                  const timeStr = msgDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
                   return (
-                    <div 
-                      key={msg.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '10px',
-                        maxWidth: '82%',
-                        alignSelf: isSelf ? 'flex-end' : 'flex-start',
-                        flexDirection: isSelf ? 'row-reverse' : 'row'
-                      }}
-                    >
-                      {/* Avatar for non-self messages */}
-                      {!isSelf && (
-                        <img
-                          src={resolveCampusAvatar(selectedRecipient)}
-                          alt=""
-                          style={{
-                            width: '34px',
-                            height: '34px',
-                            borderRadius: '50%',
-                            objectFit: 'cover',
-                            border: '2px solid white',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-                            flexShrink: 0,
-                            marginTop: '2px'
-                          }}
-                        />
+                    <React.Fragment key={msg.id || `msg-${idx}`}>
+                      {/* Natural Date Separator Badge */}
+                      {isNewDay && (
+                        <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '14px 0 8px 0' }}>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            color: '#64748b',
+                            background: '#f1f5f9',
+                            border: '1px solid #e2e8f0',
+                            padding: '3px 12px',
+                            borderRadius: '100px',
+                            letterSpacing: '0.01em',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                          }}>
+                            {dateLabel}
+                          </span>
+                        </div>
                       )}
 
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: isSelf ? 'flex-end' : 'flex-start', gap: '3px' }}>
-                        {/* Student Name Header */}
+                      {/* Natural Message Bubble Row */}
+                      <div 
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          gap: '8px',
+                          width: '100%',
+                          justifyContent: isSelf ? 'flex-end' : 'flex-start',
+                          marginTop: isContinuation ? '3px' : '10px'
+                        }}
+                      >
+                        {/* Avatar on the left for incoming messages (only on initial message of cluster) */}
                         {!isSelf && (
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', marginLeft: '4px' }}>
-                            {formatStudentDisplayName(selectedRecipient)}
-                          </span>
+                          !isContinuation ? (
+                            <img
+                              src={resolveCampusAvatar(selectedRecipient)}
+                              alt=""
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                objectFit: 'cover',
+                                border: '1.5px solid white',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                                flexShrink: 0,
+                                marginBottom: '2px'
+                              }}
+                            />
+                          ) : (
+                            <div style={{ width: '32px', flexShrink: 0 }} />
+                          )
                         )}
 
-                        {/* 1:1 Termin-Shoutbox Badge */}
-                        {isAppointmentLinked && (
-                          <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            background: isSelf ? 'rgba(52, 168, 83, 0.12)' : '#e6f4ea',
-                            border: '1px solid #bbf7d0',
-                            color: '#15803d',
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            padding: '3px 9px',
-                            borderRadius: '8px',
-                            marginBottom: '2px'
-                          }}>
-                            <Calendar size={11} color="#34a853" />
-                            <span>1:1 Termin-Shoutbox</span>
-                          </div>
-                        )}
-
-                        {/* Chat Bubble */}
-                        <div 
-                          style={{
-                            padding: '12px 18px',
-                            borderRadius: isSelf ? '20px 20px 4px 20px' : '4px 20px 20px 20px',
-                            background: isSelf ? '#e6f4ea' : '#ffffff',
-                            color: '#0f172a',
-                            boxShadow: isSelf ? '0 2px 8px rgba(52, 168, 83, 0.1)' : '0 2px 8px rgba(0,0,0,0.04)',
-                            border: isSelf ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                            fontSize: '0.9rem',
-                            fontWeight: 500,
-                            lineHeight: '1.5',
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word'
-                          }}
-                        >
-                          {msg.content}
-                        </div>
-                        
-                        {/* Timestamp & Read Receipt */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
-                          <span>
-                            {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          {isSelf && (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '2px' }}>
-                              <CheckCheck size={14} color={msg.is_read ? '#15803d' : '#94a3b8'} />
+                        {/* Chat Bubble with natural sizing, sender name, and inline metadata */}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: isSelf ? 'flex-end' : 'flex-start', maxWidth: isMobile ? '80%' : '68%' }}>
+                          {/* Sender Name above incoming bubble (only on initial message of cluster) */}
+                          {!isSelf && !isContinuation && (
+                            <div style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              color: '#34a853',
+                              marginBottom: '3px',
+                              marginLeft: '4px'
+                            }}>
+                              {formatStudentDisplayName(selectedRecipient)}
                             </div>
                           )}
+
+                          <div 
+                            style={{
+                              padding: '9px 14px 7px 14px',
+                              borderRadius: isSelf 
+                                ? (isContinuation ? '18px 6px 6px 18px' : '18px 18px 4px 18px')
+                                : (isContinuation ? '6px 18px 18px 6px' : '18px 18px 18px 4px'),
+                              background: isSelf ? '#34a853' : '#ffffff',
+                              color: isSelf ? '#ffffff' : '#0f172a',
+                              boxShadow: isSelf ? '0 2px 8px rgba(52, 168, 83, 0.2)' : '0 2px 8px rgba(0,0,0,0.04)',
+                              border: isSelf ? 'none' : '1px solid #e2e8f0',
+                              fontSize: '0.9rem',
+                              fontWeight: 500,
+                              lineHeight: '1.45',
+                              wordBreak: 'break-word',
+                              whiteSpace: 'pre-wrap'
+                            }}
+                          >
+                            <div>{cleanChatMessageContent(msg.content)}</div>
+
+                            {/* Time & Read Status Footer inside the bubble */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'flex-end',
+                              gap: '4px',
+                              fontSize: '0.64rem',
+                              fontWeight: 600,
+                              color: isSelf ? 'rgba(255, 255, 255, 0.78)' : '#94a3b8',
+                              marginTop: '4px',
+                              lineHeight: 1
+                            }}>
+                              <span>{timeStr}</span>
+                              {isSelf && (
+                                <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                  <CheckCheck size={13} color={msg.is_read ? '#ffffff' : 'rgba(255, 255, 255, 0.7)'} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </React.Fragment>
                   );
                 })
               )}
@@ -2534,4 +2806,6 @@ export default function CampusDirectMessages({
     </div>
   );
 }
+
+export default CampusDirectMessages;
 

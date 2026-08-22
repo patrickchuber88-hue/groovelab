@@ -225,7 +225,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       if (userData.role !== finalAdminRole) {
         await supabase.from('users').update({ role: finalAdminRole }).eq('id', userData.id);
       }
-      localStorage.setItem('groovelab_active_workspace', 'secretary');
+      sessionStorage.setItem('groovelab_active_workspace', 'secretary');
     }
 
     // Force check out from active sessions on Campus login to prevent automatic check-in visibility
@@ -238,7 +238,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     // Register profile locally for Netflix family profile selector
     registerProfileLocally(userData);
 
-    localStorage.setItem('groovelab_user_id', userData.id);
     sessionStorage.setItem('groovelab_user_id', userData.id);
 
     const schoolObj = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
@@ -250,16 +249,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     if (isCampusActive) {
       // 1. Campus Modul -> Briefing Board
-      localStorage.setItem('groovelab_active_platform', 'campus');
-      localStorage.setItem('campus_active_tab', 'briefing');
+      sessionStorage.setItem('groovelab_active_platform', 'campus');
+      sessionStorage.setItem('campus_active_tab', 'briefing');
     } else if (isGroovelabActive) {
       // 2. GrooveLab Modul -> Live Lab Board
-      localStorage.setItem('groovelab_active_platform', 'groovelab');
-      localStorage.setItem('groovelab_active_tab', 'live');
+      sessionStorage.setItem('groovelab_active_platform', 'groovelab');
+      sessionStorage.setItem('groovelab_active_tab', 'live');
     } else {
       // 3. Gar kein Modul aktiviert -> QR Landingpage
-      localStorage.setItem('groovelab_active_platform', 'campus');
-      localStorage.setItem('campus_active_tab', 'qr_landing');
+      sessionStorage.setItem('groovelab_active_platform', 'campus');
+      sessionStorage.setItem('campus_active_tab', 'qr_landing');
     }
 
     window.location.replace('/');
@@ -2631,6 +2630,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const currentStreak = currentStats?.streak_flame || 0;
       let newStreak = 1;
       let usedJokerThisSession = false;
+      let shieldsUsedCount = 0;
 
       let lastSecuredDate = currentStats?.last_practice_date || null;
       if (profile?.joker_used_at) {
@@ -2667,9 +2667,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           let unprotectedMissedDays = totalMissedDays;
           if (availableShields > 0 && currentStreak > 0) {
-            const shieldsToUse = Math.min(availableShields, totalMissedDays);
-            unprotectedMissedDays = Math.max(0, totalMissedDays - shieldsToUse);
-            usedJokerThisSession = true;
+            shieldsUsedCount = Math.min(availableShields, totalMissedDays);
+            unprotectedMissedDays = Math.max(0, totalMissedDays - shieldsUsedCount);
+            if (shieldsUsedCount > 0) {
+              usedJokerThisSession = true;
+            }
           }
 
           const decayedStreak = Math.max(0, currentStreak - unprotectedMissedDays);
@@ -2757,7 +2759,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         const lastJokerWeek = profile?.joker_used_at ? getISOWeekLocal(new Date(profile.joker_used_at)) : null;
         const currentWeek = getISOWeekLocal(new Date());
         const prevUsed = lastJokerWeek === currentWeek ? ((profile as any)?.weekly_jokers_used || 1) : 0;
-        const newWeeklyUsed = Math.min(3, prevUsed + 1);
+        const newWeeklyUsed = Math.min(3, prevUsed + (shieldsUsedCount || 1));
 
         await supabase.from('users').update({
           joker_used_at: new Date().toISOString(),
@@ -4183,8 +4185,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
                 const isPendingReview = occ.schedule?.status === 'ready_for_admin_review' && !occ.room_name && !occ.schedule?.room_id;
                 const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date);
-                const hasMessages = activeChatOccIds.has(occ.id);
-                const isUnread = unreadMessageOccurrences.includes(occ.id);
+                const hasMessages = activeChatOccIds.has(occ.id) || Boolean(occ.schedule_id && occ.date && activeChatOccIds.has(`virtual-${occ.schedule_id}-${occ.date}`)) || Boolean(occ.occurrence_id && activeChatOccIds.has(occ.occurrence_id));
+                const isUnread = unreadMessageOccurrences.includes(occ.id) || Boolean(occ.schedule_id && occ.date && unreadMessageOccurrences.includes(`virtual-${occ.schedule_id}-${occ.date}`));
 
                 let rowBg = '#ffffff';
                 let rowBorder = '1px solid #e2e8f0';

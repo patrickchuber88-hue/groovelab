@@ -270,7 +270,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
           // Automatically log the new user in
           sessionStorage.setItem('groovelab_user_id', adminId);
-          localStorage.setItem('groovelab_active_platform', 'campus');
+          sessionStorage.setItem('groovelab_location_mode', 'home');
+          sessionStorage.setItem('groovelab_active_platform', 'campus');
           
           setCreatedUser({
             id: adminId,

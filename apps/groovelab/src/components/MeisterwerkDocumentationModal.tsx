@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors } from 'lucide-react';
 import Confetti from 'react-confetti';
@@ -14,6 +14,7 @@ import { storeBlob, getBlob } from '../utils/blobStorage';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 import { AudioEditorModal } from './campus/AudioEditorModal';
+import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
 
 
 const getSimulatedNow = (): Date => {
@@ -1563,7 +1564,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // 📅 KW Week Navigation Offset (0 = Current Week, -1 = Previous Week, etc.)
   const [viewingWeekOffset, setViewingWeekOffset] = useState<number>(0);
 
-  // 🔊 Enterprise+ Sequential Phrase-Queue TTS Engine (Kristallklar & Natürliche Pausen)
+  // 🔊 Enterprise+ Sequential Phrase-Queue TTS Engine mit 4 wählbaren Varianten
+  // 'neural_thorsten' = Option A: Neuronale KI-Stimme (Piper WASM Studio-Hörbuch)
+  // 'neural_kerstin'  = Option A: Neuronale KI-Frauenstimme (Piper WASM)
+  // 'cheerful'        = Option B: Fröhlich & Motivierend (Native Acoustic Tuning + Chime)
+  // 'classic'         = Option C: Klassisch & Sachlich (Native Pitch 1.0)
+  const [ttsMode, setTtsMode] = useState<'neural_thorsten' | 'neural_kerstin' | 'cheerful' | 'classic'>(() => {
+    try {
+      const saved = localStorage.getItem('campus_tts_mode');
+      if (saved === 'neural_thorsten' || saved === 'neural_kerstin' || saved === 'cheerful' || saved === 'classic') {
+        return saved;
+      }
+      return 'neural_thorsten';
+    } catch {
+      return 'neural_thorsten';
+    }
+  });
+
+  const [ttsStatusText, setTtsStatusText] = useState<string | null>(null);
+
+  const handleSetTtsMode = useCallback((mode: 'neural_thorsten' | 'neural_kerstin' | 'cheerful' | 'classic') => {
+    setTtsMode(mode);
+    try {
+      localStorage.setItem('campus_tts_mode', mode);
+    } catch {}
+  }, []);
+
   const [isTtsSpeaking, setIsTtsSpeaking] = useState<boolean>(false);
   const [activeTtsKey, setActiveTtsKey] = useState<string | null>(null);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -1575,6 +1601,53 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   });
   const ttsSessionIdRef = useRef<number>(0);
+
+  // 🎵 Web Audio API Motivational Intro Chime (100% Kostenlos, 0kb Netzwerklast, DSGVO-konform)
+  const playMotivationalTtsIntroChime = useCallback((mode: string) => {
+    if (mode === 'classic') return; // Kein Chime in Variante classic
+    try {
+      if (typeof window === 'undefined') return;
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const now = ctx.currentTime;
+
+      // Fröhlicher 4-Ton-Aufgang (C5, E5, G5, C6)
+      const notes = [
+        { freq: 523.25, time: 0.00, dur: 0.10 },
+        { freq: 659.25, time: 0.07, dur: 0.12 },
+        { freq: 783.99, time: 0.14, dur: 0.14 },
+        { freq: 1046.50, time: 0.21, dur: 0.24 }
+      ];
+
+      notes.forEach(({ freq, time, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + time);
+        gain.gain.setValueAtTime(0.001, now + time);
+        gain.gain.exponentialRampToValueAtTime(0.15, now + time + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + time + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + time);
+        osc.stop(now + time + dur + 0.04);
+      });
+
+      setTimeout(() => {
+        try {
+          ctx.close();
+        } catch {
+          // ignore
+        }
+      }, 700);
+    } catch (e) {
+      console.warn('[TTS] Audio chime failed gracefully:', e);
+    }
+  }, []);
 
   // Pre-load and listen to dynamic browser voice registry
   useEffect(() => {
@@ -1611,16 +1684,42 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       return voices[0] || null;
     }
 
-    // 🌟 Primäre Wunschstimme: Anna (Enhanced / Premium / Standard)
+    // 1. Moderne Microsoft Edge / Azure Neural Voices
+    const msNatural = germanVoices.find(v => 
+      v.name.includes('Online (Natural)') || 
+      (v.name.includes('Natural') && (v.name.includes('Katja') || v.name.includes('Amira') || v.name.includes('Conrad') || v.name.includes('Killian')))
+    );
+    if (msNatural) return msNatural;
+
+    // 2. Apple Siri & Enhanced/Premium Stimmen
+    const siriOrPremium = germanVoices.find(v => 
+      v.name.toLowerCase().includes('siri') || 
+      v.name.toLowerCase().includes('premium') || 
+      v.name.toLowerCase().includes('enhanced') || 
+      v.name.toLowerCase().includes('erweitert')
+    );
+    if (siriOrPremium) return siriOrPremium;
+
+    // 3. Apple Anna / Helena / Martin
     const annaVoice = germanVoices.find(v => v.name.toLowerCase().includes('anna'));
     if (annaVoice) return annaVoice;
+    const helenaVoice = germanVoices.find(v => v.name.toLowerCase().includes('helena'));
+    if (helenaVoice) return helenaVoice;
+    const martinVoice = germanVoices.find(v => v.name.toLowerCase().includes('martin'));
+    if (martinVoice) return martinVoice;
 
-    // Fallbacks für Nicht-Mac-Geräte (Windows / Android)
-    const googleVoice = germanVoices.find(v => v.name.includes('Google'));
+    // 4. Google Neural / Android Stimmen
+    const googleVoice = germanVoices.find(v => v.name.includes('Google') || v.name.includes('deg-network'));
     if (googleVoice) return googleVoice;
 
-    const naturalVoice = germanVoices.find(v => v.name.toLowerCase().includes('natural') || v.name.includes('Katja'));
-    if (naturalVoice) return naturalVoice;
+    // 5. Beliebte Synthesizer
+    const friendlyVoice = germanVoices.find(v => 
+      v.name.toLowerCase().includes('katja') || 
+      v.name.toLowerCase().includes('amira') || 
+      v.name.toLowerCase().includes('marlene') || 
+      v.name.toLowerCase().includes('vicki')
+    );
+    if (friendlyVoice) return friendlyVoice;
 
     return germanVoices[0] || null;
   };
@@ -1628,41 +1727,64 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const cleanTextForTts = (text: string): string => {
     if (!text) return '';
     return text
+      // Kalenderwochen & Termine
       .replace(/KW\s*(\d+)/gi, 'Kalenderwoche $1')
+      // Takte & Seiten mit Bindestrichen
       .replace(/Takt\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Takt $1 bis $2')
       .replace(/S\.\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Seite $1 bis $2')
       .replace(/S\.\s*(\d+)/gi, 'Seite $1')
-      .replace(/z\.\s*B\./gi, 'zum Beispiel')
-      .replace(/bzw\./gi, 'beziehungsweise')
+      .replace(/Seite\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Seite $1 bis $2')
+      // Musikalische Taktarten
+      .replace(/\b4\/4\s*(?:-?\s*Takt)?/gi, 'Vier-Viertel-Takt')
+      .replace(/\b3\/4\s*(?:-?\s*Takt)?/gi, 'Drei-Viertel-Takt')
+      .replace(/\b2\/4\s*(?:-?\s*Takt)?/gi, 'Zwei-Viertel-Takt')
+      .replace(/\b6\/8\s*(?:-?\s*Takt)?/gi, 'Sechs-Achtel-Takt')
+      .replace(/\b12\/8\s*(?:-?\s*Takt)?/gi, 'Zwölf-Achtel-Takt')
+      // Dynamik & Spielanweisungen
+      .replace(/\bp\/f\b|\bp \/ f\b/gi, 'piano und forte')
+      .replace(/\bfff\b/gi, 'sehr sehr laut, fortississimo')
+      .replace(/\bff\b/gi, 'fortissimo, sehr kräftig')
+      .replace(/\bpp\b/gi, 'pianissimo, sehr leise')
+      // Metronom & Einheiten
       .replace(/(\d+)\s*BPM/gi, '$1 Schläge pro Minute')
       .replace(/BPM/gi, 'Schläge pro Minute')
-      .replace(/(\d+)\s*min/gi, '$1 Minuten')
+      .replace(/(\d+)\s*min\b/gi, '$1 Minuten')
+      .replace(/(\d+)\s*sek\b/gi, '$1 Sekunden')
       .replace(/(\d+)\s*x\b/gi, '$1 mal')
-      .replace(/Übe-Timer/gi, 'Übe Timer')
+      // Begrifflichkeiten
+      .replace(/z\.\s*B\./gi, 'zum Beispiel')
+      .replace(/bzw\./gi, 'beziehungsweise')
+      .replace(/inkl\./gi, 'inklusive')
+      .replace(/evtl\./gi, 'eventuell')
+      .replace(/Übe-Timer/gi, 'Übe-Timer')
       .replace(/Play-Along/gi, 'Play Along')
       .replace(/•/g, ', ')
       .replace(/#/g, 'Nummer ')
-      .replace(/p\/f/gi, 'piano und forte')
-      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Keine Emojis buchstabieren
+      // Keine Emojis buchstabieren
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
       .replace(/[\u{2600}-\u{27BF}]/gu, '')
-      .replace(/\s*[-–—]\s*/g, ', ') // Bindestriche zu sanften Sprechpausen machen
+      // Bindestriche zu sanften Sprechpausen machen
+      .replace(/\s*[-–—]\s*/g, ', ')
       .replace(/\s+/g, ' ')
       .trim();
   };
 
   const handleStopSpeaking = () => {
     ttsSessionIdRef.current += 1;
+    stopNeuralSpeech();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
     setIsTtsSpeaking(false);
     setActiveTtsKey(null);
+    setTtsStatusText(null);
   };
 
   // Ensure speech is cancelled on component unmount
   useEffect(() => {
     return () => {
       ttsSessionIdRef.current += 1;
+      stopNeuralSpeech();
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
@@ -1670,11 +1792,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   }, []);
 
   const handleSpeakText = async (textOrPhrases: string | string[], elementKey: string = 'global') => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      alert('Sprachausgabe wird in diesem Browser nicht unterstützt.');
-      return;
-    }
-
     if (isTtsSpeaking && activeTtsKey === elementKey) {
       handleStopSpeaking();
       return;
@@ -1684,7 +1801,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     // Raw phrase extraction
     const rawPhrases = Array.isArray(textOrPhrases)
-      ? textOrPhrases
+      ? [...textOrPhrases]
       : textOrPhrases
           .split(/(?<=[.!?])\s+/)
           .filter(p => p.trim().length > 0);
@@ -1699,7 +1816,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setIsTtsSpeaking(true);
     setActiveTtsKey(elementKey);
 
+    // 🌟 Native Fallback / Native Tuning Engine (Web Speech API)
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      alert('Sprachausgabe wird in diesem Browser nicht unterstützt.');
+      setIsTtsSpeaking(false);
+      setActiveTtsKey(null);
+      return;
+    }
+
     const bestVoice = selectBestGermanVoice();
+
+    // 🎵 Fröhlicher Chime
+    playMotivationalTtsIntroChime('cheerful');
+    await new Promise((r) => setTimeout(r, 220));
 
     for (let i = 0; i < phrases.length; i++) {
       if (ttsSessionIdRef.current !== currentSessionId) {
@@ -1710,7 +1839,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       await new Promise<void>((resolve) => {
         const utterance = new SpeechSynthesisUtterance(phrase);
         utterance.lang = 'de-DE';
-        // 🌟 100% Pure Native OS Audio Pipeline: Zero artificial DSP manipulation / rate / pitch modification
+        
+        utterance.pitch = 1.04;
+        utterance.rate = 0.91;
+        utterance.volume = 0.65;
 
         if (bestVoice) {
           utterance.voice = bestVoice;
@@ -1732,15 +1864,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         break; // Cancelled during utterance
       }
 
-      // 🌟 Natürliche Atempause zwischen Sätzen (380 ms)
       if (i < phrases.length - 1) {
-        await new Promise((r) => setTimeout(r, 380));
+        await new Promise((r) => setTimeout(r, 260));
       }
     }
 
     if (ttsSessionIdRef.current === currentSessionId) {
       setIsTtsSpeaking(false);
       setActiveTtsKey(null);
+      setTtsStatusText(null);
     }
   };
 
@@ -1751,57 +1883,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     audioNotes: { label?: string }[],
     generalNoteText: string
   ): string[] => {
-    const phrases: string[] = [];
-    phrases.push(`Hallo!`);
-    phrases.push(`Hier ist deine Hausaufgabe für die Kalenderwoche ${weekNumber}.`);
-
-    if (lehrwerkeList.length > 0) {
-      lehrwerkeList.forEach(book => {
-        const cleanBookTitle = book.title.replace(/\s*[-–—]\s*/g, ' ');
-        const pagesStr = book.pages.length === 1 
-          ? `auf Seite ${book.pages[0]}` 
-          : book.pages.length > 1 
-            ? `auf Seite ${book.pages.slice(0, -1).join(', Seite ')} und Seite ${book.pages[book.pages.length - 1]}`
-            : '';
-        
-        phrases.push(`Im Lehrwerk ${cleanBookTitle} übst du ${pagesStr}.`);
-
-        if (book.notes && book.notes.length > 0) {
-          book.notes.forEach(n => {
-            phrases.push(`Dein Hinweis dazu lautet: ${n}.`);
-          });
-        }
-      });
-    }
-
-    if (songList.length > 0) {
-      songList.forEach(song => {
-        const cleanSongTitle = song.title.replace(/\s*[-–—]\s*/g, ' mit ');
-        phrases.push(`Als Song übst du: ${cleanSongTitle}.`);
-        if (song.note && song.note.trim()) {
-          phrases.push(`Dein Fahrplan dazu lautet: ${song.note.trim()}.`);
-        }
-      });
-    }
-
-    if (audioNotes && audioNotes.length > 0) {
-      const audioCount = audioNotes.length;
-      phrases.push(`Deine Lehrkraft hat dir ${audioCount === 1 ? 'eine Aufnahme' : `${audioCount} Aufnahmen`} zum Mitspielen angehängt.`);
-    }
-
-    if (generalNoteText && generalNoteText.trim()) {
-      phrases.push(`Zusätzlicher Hinweis von deiner Lehrkraft: ${generalNoteText.trim()}.`);
-    }
-
     if (lehrwerkeList.length === 0 && songList.length === 0 && (!audioNotes || audioNotes.length === 0) && (!generalNoteText || !generalNoteText.trim())) {
-      phrases.push(`Für diese Woche sind noch keine Hausaufgaben eingetragen.`);
-    } else {
-      phrases.push(`Schnapp dir dein Instrument und starte deinen Übe-Timer.`);
-      phrases.push(`Viel Spaß beim Musizieren!`);
+      return ['Für diese Woche sind noch keine Hausaufgaben eingetragen.'];
     }
 
-    return phrases;
+    const narrative = buildContinuousHomeworkNarrative({
+      teacherName: (student as any)?.teacher_name || (student as any)?.teacher?.name,
+      instrument: (student as any)?.instrument || (student as any)?.instrument_type,
+      books: lehrwerkeList.map(b => ({
+        title: b.title,
+        pageNums: b.pages,
+        notes: b.notes
+      })),
+      songs: songList.map(s => ({
+        title: s.title,
+        note: s.note
+      })),
+      audioCount: audioNotes ? audioNotes.length : 0,
+      generalNotes: generalNoteText
+    });
+
+    return [narrative];
   };
+
   const generateSmartAudioTitle = (isTeacher: boolean, customLabel?: string): string => {
     if (customLabel && customLabel.trim()) return customLabel.trim();
 
@@ -1924,7 +2028,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       if (!targetSchoolId) {
         try {
-          const currentUid = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id');
+          const currentUid = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
           if (currentUid) {
             const { data: uRec } = await supabase
               .from('users')
@@ -16048,20 +16152,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               100% { background-position: 0% 0%; }
             }
             @keyframes stickerGlow {
-              0%, 100% { box-shadow: 0 0 20px rgba(52, 168, 83, 0.3); }
-              50% { box-shadow: 0 0 35px rgba(52, 168, 83, 0.7); }
+              0%, 100% { box-shadow: 0 0 15px rgba(52, 168, 83, 0.25); }
+              50% { box-shadow: 0 0 28px rgba(52, 168, 83, 0.5); }
             }
             @keyframes peelIn {
-              0% { transform: scale(0.6) rotate(-10deg); opacity: 0; }
-              70% { transform: scale(1.08) rotate(3deg); }
+              0% { transform: scale(0.7) rotate(-6deg); opacity: 0; }
+              70% { transform: scale(1.04) rotate(2deg); }
               100% { transform: scale(1) rotate(0deg); opacity: 1; }
             }
             .panini-sticker-card {
-              transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+              transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease;
               transform-style: preserve-3d;
             }
             .panini-sticker-card:hover {
-              transform: translateY(-8px) scale(1.02);
+              transform: translateY(-4px);
             }
             .holo-foil-overlay {
               background: linear-gradient(135deg, 
@@ -16075,11 +16179,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               mix-blend-mode: color-dodge;
               animation: holoShimmer 4s ease infinite;
             }
-            .panini-grid {
+            .panini-row-grid {
               display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-              gap: 24px;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 16px;
               width: 100%;
+            }
+            @media (max-width: 1100px) {
+              .panini-row-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 14px;
+              }
+            }
+            @media (max-width: 580px) {
+              .panini-row-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+              }
             }
           `}} />
 
@@ -16095,13 +16211,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 background: '#ffffff',
                 border: '1.5px solid #e2e8f0',
                 color: '#334155',
-                padding: '8px 16px',
+                padding: '7px 14px',
                 borderRadius: '20px',
-                fontSize: '0.76rem',
+                fontSize: '0.75rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 width: 'fit-content',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.03)',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
                 transition: 'all 0.15s ease'
               }}
               className="hover-scale"
@@ -16114,26 +16230,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           {!readOnly && (
             <div style={{
               background: 'white',
-              borderRadius: '20px',
-              padding: '12px 20px',
+              borderRadius: '16px',
+              padding: '10px 18px',
               border: '1.5px solid #e2e8f0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
               zIndex: 20,
               flexShrink: 0
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={15} color="#64748b" />
-                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
+                <Sliders size={14} color="#64748b" />
+                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>
                   Entwickler-Modus (Simulation)
                 </span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>
                   <input
                     type="checkbox"
                     checked={isDevSimulationActive}
@@ -16150,15 +16266,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
                     border: '1px solid #ca8a04',
                     color: '#0f172a',
-                    fontSize: '0.74rem',
+                    fontSize: '0.72rem',
                     fontWeight: 900,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '4px',
-                    padding: '5px 12px',
-                    borderRadius: '12px',
-                    boxShadow: '0 2px 6px rgba(234, 179, 8, 0.3)',
+                    padding: '4px 10px',
+                    borderRadius: '10px',
+                    boxShadow: '0 2px 4px rgba(234, 179, 8, 0.25)',
                     transition: 'all 0.15s ease'
                   }}
                   className="hover-scale"
@@ -16173,7 +16289,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     background: 'none',
                     border: 'none',
                     color: '#ef4444',
-                    fontSize: '0.74rem',
+                    fontSize: '0.72rem',
                     fontWeight: 800,
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -16193,7 +16309,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
           )}
 
-          {/* ALBUM HEADER & PROGRESS TRACKER HERO BANNER */}
+          {/* ALBUM HEADER & PROGRESS TRACKER HERO BANNER (APPLE SQUIRCLE WHITE STAGE) */}
           {(() => {
             const activeStickerSource = selectedSchoolYear === currentSchoolYear 
               ? collectedStickers 
@@ -16206,54 +16322,45 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             if (selectedSchoolYear !== currentSchoolYear) {
               return (
                 <div style={{
-                  background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #0f172a 100%)',
-                  borderRadius: '28px',
-                  padding: '28px 32px',
-                  color: 'white',
-                  boxShadow: '0 20px 50px -10px rgba(49, 46, 129, 0.5)',
+                  background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 40%, #ffffff 100%)',
+                  borderRadius: '20px',
+                  padding: isMobileOrSim ? '16px' : '20px 24px',
+                  color: '#1e293b',
+                  boxShadow: '0 8px 24px -4px rgba(245, 158, 11, 0.12), 0 1px 3px rgba(0,0,0,0.02)',
                   position: 'relative',
                   overflow: 'hidden',
-                  border: '2px solid #facc15',
+                  border: '1.5px solid #fde68a',
                   flexShrink: 0,
                   width: '100%',
                   boxSizing: 'border-box'
                 }}>
-                  {/* Gold Glow */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 0, right: 0, bottom: 0, left: 0,
-                    background: 'radial-gradient(circle at 80% 20%, rgba(250, 204, 21, 0.25) 0%, transparent 60%)',
-                    pointerEvents: 'none'
-                  }} />
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', position: 'relative', zIndex: 2 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', position: 'relative', zIndex: 2 }}>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '2rem' }}>🏛️</span>
-                        <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 900, letterSpacing: '-0.5px', color: '#facc15' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '1.5rem' }}>🏛️</span>
+                        <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, letterSpacing: '-0.4px', color: '#92400e' }}>
                           Schuljahr-Ehrentafel {selectedSchoolYear}
                         </h2>
                         {renderSchoolYearSelector()}
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.86rem', color: '#c7d2fe', fontWeight: 600, maxWidth: '580px' }}>
+                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#78350f', fontWeight: 600, maxWidth: '580px', lineHeight: '1.4' }}>
                         Abgeheftete Meilensteine aus dem Schuljahr {selectedSchoolYear}. Alle gelernten Songs & Lehrwerke bleiben lebenslang im Repertoire!
                       </p>
                     </div>
 
                     <div style={{
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      backdropFilter: 'blur(12px)',
-                      border: '1.5px solid rgba(250, 204, 21, 0.4)',
-                      borderRadius: '20px',
-                      padding: '14px 22px',
+                      background: '#ffffff',
+                      border: '1.5px solid #fcd34d',
+                      borderRadius: '16px',
+                      padding: '10px 18px',
                       textAlign: 'right',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                      boxShadow: '0 2px 8px rgba(245, 158, 11, 0.1)',
                       flexShrink: 0
                     }}>
-                      <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, color: '#facc15' }}>
+                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 900, color: '#d97706' }}>
                         SIEGEL {selectedSchoolYear}
                       </span>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '2px' }}>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#92400e', marginTop: '2px' }}>
                         {collectedCount} Trophäen ✓
                       </div>
                     </div>
@@ -16270,77 +16377,76 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
             return (
               <div style={{
-                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                borderRadius: '28px',
-                padding: '26px 32px',
-                color: 'white',
-                boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.4)',
+                background: '#ffffff',
+                borderRadius: '20px',
+                padding: isMobileOrSim ? '16px 18px' : '20px 26px',
+                color: '#0f172a',
+                boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.02)',
                 position: 'relative',
                 overflow: 'hidden',
-                border: '1.5px solid rgba(255, 255, 255, 0.08)',
+                border: '1px solid #e2e8f0',
                 flexShrink: 0,
                 width: '100%',
                 boxSizing: 'border-box'
               }}>
-                {/* Glow splash background */}
+                {/* Subtle soft green aura */}
                 <div style={{
                   position: 'absolute',
-                  top: '-80px',
-                  right: '-80px',
-                  width: '300px',
-                  height: '300px',
-                  background: 'radial-gradient(circle, rgba(52, 168, 83, 0.25) 0%, transparent 70%)',
+                  top: '-40px',
+                  right: '-40px',
+                  width: '220px',
+                  height: '220px',
+                  background: 'radial-gradient(circle, rgba(52, 168, 83, 0.08) 0%, transparent 70%)',
                   pointerEvents: 'none',
                   borderRadius: '50%'
                 }} />
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', position: 'relative', zIndex: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', position: 'relative', zIndex: 2 }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '1.6rem' }}>🏆</span>
-                      <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.5px', color: '#ffffff' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '1.4rem' }}>🏆</span>
+                      <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, letterSpacing: '-0.4px', color: '#0f172a' }}>
                         Sticker Sammelalbum
                       </h2>
                       <span style={{
-                        background: 'rgba(52, 168, 83, 0.2)',
-                        border: '1px solid #34a853',
-                        color: '#4ade80',
+                        background: '#e6f4ea',
+                        border: '1px solid #a7f3d0',
+                        color: '#137333',
                         fontSize: '0.72rem',
                         fontWeight: 800,
-                        padding: '4px 12px',
+                        padding: '3px 10px',
                         borderRadius: '20px',
-                        letterSpacing: '0.04em'
+                        letterSpacing: '0.02em'
                       }}>
                         {rankTitle}
                       </span>
                       {renderSchoolYearSelector()}
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.84rem', color: '#94a3b8', fontWeight: 600, maxWidth: '520px' }}>
-                      Sammle XP, erstelle Streaks & meistere Songs, um alle haptischen Sammel-Sticker für dein virtuelles Musik-Album freizuschalten.
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 600, maxWidth: '520px', lineHeight: '1.4' }}>
+                      Sammle XP, erstelle Streaks & meistere Songs, um alle haptischen Sammel-Sticker für dein Musik-Album freizuschalten.
                     </p>
                   </div>
 
                   {/* Score pill */}
                   <div style={{
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '20px',
-                    padding: '14px 24px',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '10px 18px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'flex-end',
-                    gap: '4px',
+                    gap: '2px',
                     flexShrink: 0
                   }}>
-                    <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800, color: '#94a3b8' }}>
+                    <span style={{ fontSize: '0.64rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, color: '#64748b' }}>
                       Sammelfortschritt
                     </span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                      <strong style={{ fontSize: '1.8rem', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+                      <strong style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>
                         {collectedCount}
                       </strong>
-                      <span style={{ fontSize: '1rem', color: '#64748b', fontWeight: 800 }}>
+                      <span style={{ fontSize: '0.86rem', color: '#64748b', fontWeight: 700 }}>
                         / {totalCount} Sticker ({percentage}%)
                       </span>
                     </div>
@@ -16348,8 +16454,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </div>
 
                 {/* Progress bar */}
-                <div style={{ marginTop: '20px', position: 'relative', zIndex: 2 }}>
-                  <div style={{ width: '100%', height: '10px', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', overflow: 'hidden' }}>
+                <div style={{ marginTop: '14px', position: 'relative', zIndex: 2 }}>
+                  <div style={{ width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden' }}>
                     <div style={{
                       width: `${percentage}%`,
                       height: '100%',
@@ -16366,8 +16472,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           {/* XP LEGENDE TOGGLEABLE PANEL */}
           <div style={{
             background: 'white',
-            borderRadius: '20px',
-            border: '1.5px solid #e2e8f0',
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
             overflow: 'hidden',
             boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
             flexShrink: 0
@@ -16375,7 +16481,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             <div 
               onClick={() => setIsXpLegendOpen(!isXpLegendOpen)}
               style={{
-                padding: '14px 20px',
+                padding: '12px 18px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -16385,16 +16491,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '1.2rem' }}>🎮</span>
-                <strong style={{ fontSize: '0.86rem', fontWeight: 800, color: '#1e293b' }}>
+                <span style={{ fontSize: '1.1rem' }}>🎮</span>
+                <strong style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
                   XP-Legende & Punkte-Guide
                 </strong>
-                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                   (Wie du Punkte & Sticker sammelst)
                 </span>
               </div>
               <ChevronRight 
-                size={18} 
+                size={16} 
                 color="#64748b" 
                 style={{ 
                   transform: isXpLegendOpen ? 'rotate(90deg)' : 'rotate(0deg)',
@@ -16405,39 +16511,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
             {isXpLegendOpen && (
               <div style={{
-                padding: '16px 20px 20px 20px',
+                padding: '14px 18px 18px 18px',
                 borderTop: '1px solid #e2e8f0',
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '14px',
+                gap: '12px',
                 animation: 'fadeIn 0.2s ease-out'
               }}>
-                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '1.4rem' }}>⏱️</span>
+                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '1.3rem' }}>⏱️</span>
                   <div>
-                    <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Übe-Fokus</strong>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Pro absolvierte Minute Übezeit erhältst du <strong>1 XP</strong>.</span>
+                    <strong style={{ fontSize: '0.78rem', display: 'block', color: '#1e293b' }}>Übe-Fokus</strong>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: '1.3' }}>Pro absolvierte Minute Übezeit erhältst du <strong>1 XP</strong>.</span>
                   </div>
                 </div>
-                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '1.4rem' }}>🎯</span>
+                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '1.3rem' }}>🎯</span>
                   <div>
-                    <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Tägliches Fokus-Ziel</strong>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Tägliches Fokus-Ziel erreicht = <strong>+10 XP</strong> Bonus <em>(z.B. 3m Timer + 1m Extra = 4 XP Übezeit + 10 XP Bonus = 14 XP total)</em>.</span>
+                    <strong style={{ fontSize: '0.78rem', display: 'block', color: '#1e293b' }}>Tägliches Fokus-Ziel</strong>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: '1.3' }}>Tägliches Fokus-Ziel erreicht = <strong>+10 XP</strong> Bonus <em>(z.B. 3m Timer + 1m Extra = 4 XP Übezeit + 10 XP Bonus = 14 XP total)</em>.</span>
                   </div>
                 </div>
-                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '1.4rem' }}>🏆</span>
+                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '1.3rem' }}>🏆</span>
                   <div>
-                    <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Song meistern</strong>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Lied auf 100% oder Stage-Ready = <strong>+50 XP</strong> Bonus.</span>
+                    <strong style={{ fontSize: '0.78rem', display: 'block', color: '#1e293b' }}>Song meistern</strong>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: '1.3' }}>Lied auf 100% oder Stage-Ready = <strong>+50 XP</strong> Bonus.</span>
                   </div>
                 </div>
-                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '1.4rem' }}>🔥</span>
+                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '1.3rem' }}>🔥</span>
                   <div>
-                    <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Streak-Bonus</strong>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Disziplin-Bonus: 7 Tage = <strong>+25 XP</strong>, 14 Tage = <strong>+50 XP</strong>, 30 Tage = <strong>+100 XP</strong>.</span>
+                    <strong style={{ fontSize: '0.78rem', display: 'block', color: '#1e293b' }}>Streak-Bonus</strong>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: '1.3' }}>Disziplin-Bonus: 7 Tage = <strong>+25 XP</strong>, 14 Tage = <strong>+50 XP</strong>, 30 Tage = <strong>+100 XP</strong>.</span>
                   </div>
                 </div>
               </div>
@@ -16450,9 +16556,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             alignItems: 'center',
             gap: '8px',
             overflowX: 'auto',
-            padding: '4px 2px 8px 2px',
+            padding: '2px 2px 4px 2px',
             flexShrink: 0,
-            minHeight: '48px'
+            minHeight: '44px'
           }}>
             {[
               { id: 'all', label: `Alle (${ALL_STICKERS.length})` },
@@ -16469,12 +16575,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   type="button"
                   onClick={() => setStickerCategoryFilter(tab.id as any)}
                   style={{
-                    background: isActive ? '#0f172a' : 'white',
-                    color: isActive ? 'white' : '#475569',
+                    background: isActive ? '#0f172a' : '#ffffff',
+                    color: isActive ? '#ffffff' : '#475569',
                     border: isActive ? '1.5px solid #0f172a' : '1.5px solid #e2e8f0',
                     borderRadius: '20px',
-                    padding: '9px 18px',
-                    fontSize: '0.78rem',
+                    padding: '8px 16px',
+                    fontSize: '0.76rem',
                     fontWeight: 800,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
@@ -16482,7 +16588,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    boxShadow: isActive ? '0 4px 12px rgba(15, 23, 42, 0.15)' : 'none',
+                    boxShadow: isActive ? '0 4px 12px rgba(15, 23, 42, 0.12)' : '0 1px 3px rgba(0,0,0,0.02)',
                     transition: 'all 0.15s ease'
                   }}
                   className="hover-scale"
@@ -16493,277 +16599,339 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             })}
           </div>
 
-          {/* 3D PANINI STICKER ALBUM GRID */}
-          <div className="panini-grid">
-            {ALL_STICKERS
-              .filter(st => stickerCategoryFilter === 'all' || st.category === stickerCategoryFilter)
-              .map((st, idx) => {
+          {/* 3D PANINI STICKER ALBUM ROWS (GENAU 4 STICKER PRO REIHE • JEDE KATEGORIE EINE REIHE) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%' }}>
+            {[
+              { id: 'ueben', title: 'Übe-Fleiß & Zeiterfolge', icon: '⏱️', desc: 'Fokussierte Übezeit am Instrument sammeln' },
+              { id: 'xp', title: 'XP & Meilensteine', icon: '⭐', desc: 'Erfahrungspunkte durch Unterricht und Fleiß aufbauen' },
+              { id: 'streaks', title: 'Übe-Streaks & Kontinuität', icon: '🔥', desc: 'Tägliche Spielroutine und Beständigkeit meistern' },
+              { id: 'songs', title: 'Repertoire & Meisterwerke', icon: '🎵', desc: 'Songs bühnenreif erlernen und Repertoire erweitern' },
+              { id: 'spezial', title: 'Spezial-Auszeichnungen & Bühnenreife', icon: '🏆', desc: 'Live-Auftritte, Kreativität und besondere Leistungen' }
+            ]
+              .filter(cat => stickerCategoryFilter === 'all' || cat.id === stickerCategoryFilter)
+              .map(cat => {
+                const categoryStickers = ALL_STICKERS.filter(st => st.category === cat.id);
                 const activeStickerSource = selectedSchoolYear === currentSchoolYear 
                   ? collectedStickers 
                   : (simulatedSchoolYearData[selectedSchoolYear] || {});
-                const info = activeStickerSource[st.id] || { count: 0, details: [] };
-                const isCollected = info.count > 0;
-                const isLegendary = st.rarity === 'legendary';
-                const isEpic = st.rarity === 'epic';
-
-                // Organic tilt angle offset per position
-                const organicAngle = (idx % 3 - 1) * 2;
+                const catCollectedCount = categoryStickers.filter(st => (activeStickerSource[st.id]?.count || 0) > 0).length;
+                const isCatComplete = catCollectedCount === categoryStickers.length;
 
                 return (
-                  <div
-                    key={st.id}
-                    className="panini-sticker-card"
-                    onClick={() => {
-                      if (!readOnly && isDevSimulationActive) {
-                        awardSticker(st.id, "Simulation");
-                      } else {
-                        setSelectedPreviewSticker(st);
-                      }
-                    }}
-                    style={{
-                      background: isCollected ? 'white' : '#f8fafc',
-                      border: isCollected 
-                        ? (isLegendary ? '2.5px solid #eab308' : isEpic ? '2.5px solid #af52de' : `2px solid ${st.color}`) 
-                        : '2px dashed #cbd5e1',
-                      borderRadius: '28px',
-                      padding: '24px 20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      textAlign: 'center',
-                      gap: '14px',
-                      position: 'relative',
-                      boxShadow: isCollected 
-                        ? (isLegendary ? '0 12px 30px rgba(234, 179, 8, 0.2)' : '0 10px 25px rgba(0,0,0,0.06)') 
-                        : 'inset 0 2px 8px rgba(0,0,0,0.02)',
-                      cursor: 'pointer',
-                      transform: `rotate(${organicAngle}deg)`
-                    }}
-                  >
-                    {/* Holographic foil overlay for legendary/epic stickers */}
-                    {isCollected && (isLegendary || isEpic) && (
-                      <div 
-                        className="holo-foil-overlay" 
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          borderRadius: '26px',
-                          pointerEvents: 'none',
-                          opacity: isLegendary ? 0.35 : 0.2,
-                          zIndex: 1
-                        }} 
-                      />
-                    )}
-
-                    {/* Manual Award Button for Teachers ONLY */}
-                    {!readOnly && st.id !== 'song-master' && !st.auto && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const context = prompt(`Beschreibung für den Sticker "${st.title}" eingeben (z.B. Name des Auftritts):`);
-                          if (context !== null) {
-                            awardSticker(st.id, context || undefined);
-                          }
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: '14px',
-                          left: '14px',
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          background: st.color,
-                          color: 'white',
-                          border: 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 3px 8px rgba(0,0,0,0.2)',
-                          zIndex: 10,
-                          fontWeight: 'bold',
-                          fontSize: '1rem'
-                        }}
-                        title="Sticker manuell vergeben (Nur für Lehrer)"
-                        className="hover-scale"
-                      >
-                        +
-                      </button>
-                    )}
-
-                    {/* Rarity Pill Badge */}
+                  <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+                    {/* Category Header Row */}
                     <div style={{
-                      position: 'absolute',
-                      top: '14px',
-                      right: '14px',
-                      zIndex: 5,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '4px'
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      padding: '0 4px'
                     }}>
-                      {isCollected && st.multi && info.count > 1 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.2rem' }}>{cat.icon}</span>
+                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
+                          {cat.title}
+                        </h3>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, display: isMobileOrSim ? 'none' : 'inline' }}>
+                          • {cat.desc}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{
-                          background: st.color,
-                          color: 'white',
-                          fontWeight: 900,
-                          fontSize: '0.72rem',
-                          padding: '3px 8px',
-                          borderRadius: '12px',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                          background: isCatComplete ? '#e6f4ea' : '#f1f5f9',
+                          border: isCatComplete ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
+                          color: isCatComplete ? '#137333' : '#64748b',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          padding: '3px 9px',
+                          borderRadius: '12px'
                         }}>
-                          x{info.count}
+                          {catCollectedCount} / {categoryStickers.length} gesammelt {isCatComplete ? '✓' : ''}
                         </span>
-                      )}
-
-                      <span style={{
-                        background: isCollected 
-                          ? (isLegendary ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : isEpic ? '#af52de' : '#e2e8f0') 
-                          : '#f1f5f9',
-                        color: isCollected && (isLegendary || isEpic) ? 'white' : '#64748b',
-                        fontSize: '0.64rem',
-                        fontWeight: 900,
-                        padding: '3px 8px',
-                        borderRadius: '10px',
-                        letterSpacing: '0.04em',
-                        textTransform: 'uppercase'
-                      }}>
-                        {st.rarityLabel || 'Standard'}
-                      </span>
-                    </div>
-
-                    {/* LARGE HIGH-IMPACT DIE-CUT STICKER GRAPHIC (135px Diameter) */}
-                    <div style={{
-                      width: '135px',
-                      height: '135px',
-                      marginTop: '8px',
-                      borderRadius: '50%',
-                      background: isCollected ? st.bg : '#f1f5f9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
-                      border: isCollected ? '4px solid #ffffff' : '2px dashed #cbd5e1',
-                      boxShadow: isCollected 
-                        ? '0 10px 22px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0,0,0,0.06)' 
-                        : 'inset 0 2px 6px rgba(0,0,0,0.05)',
-                      transition: 'all 0.3s ease',
-                      zIndex: 2
-                    }}>
-                      <div style={{
-                        position: 'relative',
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '50%',
-                        overflow: 'hidden'
-                      }}>
-                        {/* Instant Emoji Fallback (renders with 0ms latency) */}
-                        <span style={{ 
-                          fontSize: isCollected ? '3.5rem' : '3.2rem', 
-                          zIndex: 1, 
-                          filter: isCollected ? 'none' : 'grayscale(100%) opacity(0.35)',
-                          userSelect: 'none'
-                        }}>
-                          {st.emoji}
-                        </span>
-
-                        {/* High-Res PNG Image with smooth async decoding */}
-                        <img 
-                          src={`/stickers/${st.id}.png?v=1`} 
-                          alt={st.title} 
-                          loading="eager"
-                          decoding="async"
-                          style={{ 
-                            position: 'absolute',
-                            inset: 0,
-                            width: '100%', 
-                            height: '100%', 
-                            objectFit: 'cover',
-                            borderRadius: '50%',
-                            zIndex: 2,
-                            filter: isCollected ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.12))' : 'grayscale(100%) opacity(0.35) blur(1px)',
-                            transition: 'opacity 0.2s ease-in-out'
-                          }}
-                          onError={(e) => {
-                            e.currentTarget.style.opacity = '0';
-                          }}
-                        />
                       </div>
-
-                      {!isCollected && (
-                        <div style={{
-                          position: 'absolute',
-                          inset: 0,
-                          borderRadius: '50%',
-                          background: 'rgba(241, 245, 249, 0.75)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#94a3b8',
-                          fontSize: '1.4rem'
-                        }}>
-                          🔒
-                        </div>
-                      )}
                     </div>
 
-                    {/* STICKER TITLE & DESCRIPTION */}
-                    <div style={{ position: 'relative', zIndex: 2, width: '100%' }}>
-                      <h4 style={{ 
-                        margin: '0 0 4px 0', 
-                        fontSize: '0.96rem', 
-                        fontWeight: 900, 
-                        color: isCollected ? '#0f172a' : '#64748b' 
-                      }}>
-                        {st.title}
-                      </h4>
-                      <p style={{ 
-                        margin: 0, 
-                        fontSize: '0.75rem', 
-                        color: isCollected ? '#64748b' : '#94a3b8', 
-                        fontWeight: 600, 
-                        lineHeight: '1.35' 
-                      }}>
-                        {st.desc}
-                      </p>
-                    </div>
+                    {/* 4-Column Grid for this category row */}
+                    <div className="panini-row-grid">
+                      {categoryStickers.map(st => {
+                        const info = activeStickerSource[st.id] || { count: 0, details: [] };
+                        const isCollected = info.count > 0;
+                        const isLegendary = st.rarity === 'legendary';
+                        const isEpic = st.rarity === 'epic';
+                        const isRare = st.rarity === 'rare';
 
-                    {/* COLLECTION HISTORY LOG PREVIEW */}
-                    {isCollected && (
-                      <div style={{
-                        width: '100%',
-                        borderTop: '1px solid #f1f5f9',
-                        paddingTop: '10px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        alignItems: 'flex-start',
-                        maxHeight: '75px',
-                        overflowY: 'auto',
-                        position: 'relative',
-                        zIndex: 2
-                      }}>
-                        <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>
-                          {st.multi ? `Historie (${info.count}x):` : 'Freigeschaltet:'}
-                        </span>
-                        {st.multi ? (
-                          info.details.slice(0, 2).map((dt, dIdx) => (
-                            <div key={dIdx} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.68rem', color: '#475569', fontWeight: 650 }}>
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>{dt.topic}</span>
-                              <span style={{ color: '#94a3b8' }}>{dt.date}</span>
+                        return (
+                          <div
+                            key={st.id}
+                            className="panini-sticker-card"
+                            onClick={() => {
+                              if (!readOnly && isDevSimulationActive) {
+                                awardSticker(st.id, "Simulation");
+                              } else {
+                                setSelectedPreviewSticker(st);
+                              }
+                            }}
+                            style={{
+                              background: isCollected ? '#ffffff' : '#f8fafc',
+                              border: isCollected 
+                                ? (isLegendary ? '2px solid #eab308' : isEpic ? '2px solid #af52de' : isRare ? '2px solid #3b82f6' : '2px solid #34a853') 
+                                : '1.5px dashed #cbd5e1',
+                              borderRadius: '20px',
+                              padding: '18px 14px 14px 14px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              textAlign: 'center',
+                              gap: '10px',
+                              position: 'relative',
+                              boxShadow: isCollected 
+                                ? (isLegendary ? '0 8px 24px -4px rgba(234, 179, 8, 0.22), 0 1px 3px rgba(0,0,0,0.02)' : '0 6px 18px -4px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.02)') 
+                                : 'inset 0 1px 4px rgba(0,0,0,0.02)',
+                              cursor: 'pointer',
+                              boxSizing: 'border-box',
+                              minHeight: '260px',
+                              justifyContent: 'space-between'
+                            }}
+                          >
+                            {/* Holographic foil overlay for legendary/epic stickers */}
+                            {isCollected && (isLegendary || isEpic) && (
+                              <div 
+                                className="holo-foil-overlay" 
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  borderRadius: '18px',
+                                  pointerEvents: 'none',
+                                  opacity: isLegendary ? 0.35 : 0.2,
+                                  zIndex: 1
+                                }} 
+                              />
+                            )}
+
+                            {/* Manual Award Button for Teachers ONLY */}
+                            {!readOnly && st.id !== 'song-master' && !st.auto && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const context = prompt(`Beschreibung für den Sticker "${st.title}" eingeben (z.B. Name des Auftritts):`);
+                                  if (context !== null) {
+                                    awardSticker(st.id, context || undefined);
+                                  }
+                                }}
+                                style={{
+                                  position: 'absolute',
+                                  top: '12px',
+                                  left: '12px',
+                                  width: '26px',
+                                  height: '26px',
+                                  borderRadius: '50%',
+                                  background: st.color,
+                                  color: 'white',
+                                  border: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                  zIndex: 10,
+                                  fontWeight: 'bold',
+                                  fontSize: '0.9rem'
+                                }}
+                                title="Sticker manuell vergeben (Nur für Lehrer)"
+                                className="hover-scale"
+                              >
+                                +
+                              </button>
+                            )}
+
+                            {/* Rarity Pill Badge */}
+                            <div style={{
+                              position: 'absolute',
+                              top: '12px',
+                              right: '12px',
+                              zIndex: 5,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              {isCollected && st.multi && info.count > 1 && (
+                                <span style={{
+                                  background: st.color,
+                                  color: 'white',
+                                  fontWeight: 900,
+                                  fontSize: '0.66rem',
+                                  padding: '2px 6px',
+                                  borderRadius: '10px',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}>
+                                  x{info.count}
+                                </span>
+                              )}
+
+                              <span style={{
+                                background: isCollected 
+                                  ? (isLegendary ? '#fef3c7' : isEpic ? '#f3e8ff' : isRare ? '#eff6ff' : '#e6f4ea') 
+                                  : '#f1f5f9',
+                                color: isCollected 
+                                  ? (isLegendary ? '#b45309' : isEpic ? '#7e22ce' : isRare ? '#1d4ed8' : '#137333') 
+                                  : '#94a3b8',
+                                border: isCollected 
+                                  ? (isLegendary ? '1px solid #fde68a' : isEpic ? '1px solid #e9d5ff' : isRare ? '1px solid #bfdbfe' : '1px solid #a7f3d0') 
+                                  : '1px solid #e2e8f0',
+                                fontSize: '0.62rem',
+                                fontWeight: 800,
+                                padding: '2px 7px',
+                                borderRadius: '8px',
+                                letterSpacing: '0.02em',
+                                textTransform: 'uppercase'
+                              }}>
+                                {st.rarityLabel || 'Standard'}
+                              </span>
                             </div>
-                          ))
-                        ) : (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.68rem', color: '#34a853', fontWeight: 700 }}>
-                            <span>✓ Freigeschaltet</span>
-                            <span style={{ color: '#64748b' }}>{info.details[0]?.date || 'Aktiv'}</span>
+
+                            {/* Top info section: Graphic Badge */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: '8px', marginTop: '10px' }}>
+                              {/* BALANCED DIE-CUT STICKER GRAPHIC (100px Diameter) */}
+                              <div style={{
+                                width: '100px',
+                                height: '100px',
+                                borderRadius: '50%',
+                                background: isCollected ? st.bg : '#f1f5f9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                position: 'relative',
+                                border: isCollected ? '3.5px solid #ffffff' : '1.5px dashed #cbd5e1',
+                                boxShadow: isCollected 
+                                  ? '0 6px 16px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0,0,0,0.04)' 
+                                  : 'inset 0 2px 4px rgba(0,0,0,0.03)',
+                                transition: 'all 0.25s ease',
+                                zIndex: 2
+                              }}>
+                                <div style={{
+                                  position: 'relative',
+                                  width: '100%',
+                                  height: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderRadius: '50%',
+                                  overflow: 'hidden'
+                                }}>
+                                  {/* Emoji Fallback */}
+                                  <span style={{ 
+                                    fontSize: isCollected ? '2.7rem' : '2.4rem', 
+                                    zIndex: 1, 
+                                    filter: isCollected ? 'none' : 'grayscale(100%) opacity(0.3)',
+                                    userSelect: 'none'
+                                  }}>
+                                    {st.emoji}
+                                  </span>
+
+                                  {/* High-Res PNG Image */}
+                                  <img 
+                                    src={`/stickers/${st.id}.png?v=1`} 
+                                    alt={st.title} 
+                                    loading="eager"
+                                    decoding="async"
+                                    style={{ 
+                                      position: 'absolute',
+                                      inset: 0,
+                                      width: '100%', 
+                                      height: '100%', 
+                                      objectFit: 'cover',
+                                      borderRadius: '50%',
+                                      zIndex: 2,
+                                      filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.1))' : 'grayscale(100%) opacity(0.3) blur(1px)',
+                                      transition: 'opacity 0.2s ease-in-out'
+                                    }}
+                                    onError={(e) => {
+                                      e.currentTarget.style.opacity = '0';
+                                    }}
+                                  />
+                                </div>
+
+                                {!isCollected && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    borderRadius: '50%',
+                                    background: 'rgba(241, 245, 249, 0.75)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#94a3b8',
+                                    fontSize: '1.2rem'
+                                  }}>
+                                    🔒
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* STICKER TITLE & DESCRIPTION */}
+                              <div style={{ position: 'relative', zIndex: 2, width: '100%' }}>
+                                <h4 style={{ 
+                                  margin: '0 0 3px 0', 
+                                  fontSize: '0.9rem', 
+                                  fontWeight: 900, 
+                                  color: isCollected ? '#0f172a' : '#64748b' 
+                                }}>
+                                  {st.title}
+                                </h4>
+                                <p style={{ 
+                                  margin: 0, 
+                                  fontSize: '0.72rem', 
+                                  color: isCollected ? '#64748b' : '#94a3b8', 
+                                  fontWeight: 600, 
+                                  lineHeight: '1.3' 
+                                }}>
+                                  {st.desc}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Bottom status / history preview */}
+                            <div style={{ width: '100%', zIndex: 2, paddingTop: '6px' }}>
+                              {isCollected ? (
+                                <div style={{
+                                  width: '100%',
+                                  borderTop: '1px solid #f1f5f9',
+                                  paddingTop: '6px',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  fontSize: '0.66rem',
+                                  color: '#34a853',
+                                  fontWeight: 750
+                                }}>
+                                  <span>✓ Freigeschaltet</span>
+                                  <span style={{ color: '#94a3b8', fontWeight: 600 }}>
+                                    {st.multi ? `${info.count}x` : (info.details[0]?.date || 'Aktiv')}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div style={{
+                                  width: '100%',
+                                  borderTop: '1px solid #f1f5f9',
+                                  paddingTop: '6px',
+                                  display: 'flex',
+                                  justifyContent: 'center',
+                                  alignItems: 'center',
+                                  fontSize: '0.66rem',
+                                  color: '#94a3b8',
+                                  fontWeight: 600
+                                }}>
+                                  <span>🔒 Noch gesperrt</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    )}
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })}

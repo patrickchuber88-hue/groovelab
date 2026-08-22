@@ -1,34 +1,29 @@
-# Walkthrough: Schritt-für-Schritt Flow für „🎁 Mein Musik-Geschenk“
+# Walkthrough: Geschlechtsneutrale, Warme & Moderne Farbgestaltung
 
-## 🌟 Übersicht des implementierten Ablaufs
+## 🌟 Übersicht der Farbharmonisierung
 
-Für den Meilenstein **Stufe 4: „🎁 Mein Musik-Geschenk“** wird der Schüler nun nahtlos und kindgerecht durch einen **2-Schritte-Erlebnis-Flow** geführt:
-
----
-
-### 1️⃣ Schritt 1: Das Musik-Geschenk einspielen & veredeln
-* **Auslöser im Meilenstein-Pfad:**
-  * Wenn der Meilenstein noch offen ist, lautet der Aktions-Button: `[ 🎁 Geschenk aufnehmen ✨ +50 XP ]`.
-  * Ein Klick öffnet direkt den **Junior-Aufnahme-Assistenten** im vorausgewählten **Geschenk-Modus**.
-* **Im Assistenten:**
-  * **Empfänger-Wahl:** Der Schüler wählt aus, für wen das Geschenk ist (*🌸 Für Mama, 🧢 Für Papa, 👵 Für Oma, 👴 Für Opa, 🎂 Geburtstagskind, 💖 Familie*).
-  * **Songtitel / Widmung:** z. B. *„Mein Musik-Geschenk für Mama 🎁“*.
-  * **Aufnahme:** 3-Sekunden-Einzähler $\rightarrow$ Schüler spielt sein Stück auf seinem Instrument ein $\rightarrow$ `[ 🛑 Fertig gespielt! ]`.
-  * **Studio-Veredelung:** Automatischer Studio-Raumklang wird erzeugt. Der Schüler kann sein Lied direkt vorhören.
+Alle Pink- und Magenta-Töne für Musik-Geschenke, Sticker und Meilensteine wurden durch ein **modernes, warmes und 100% geschlechtsneutrales Farbschema** (Sunset-Orange / Warm Amber & Clean Slate) ersetzt.
 
 ---
 
-### 2️⃣ Schritt 2: Geschenk sichern & direkt an die Familie verschicken
-* **Direkt im Abschluss-Schritt (Schritt 4 des Assistenten):**
-  * Vorhören mit Veredelungs-Badge.
-  * **WhatsApp-1-Click-Button:** `[ 🎁 Jetzt per WhatsApp an [Name] senden ]` mit vorformuliertem, herzlichem Text und Direkt-Hörlink.
-  * **Link kopieren:** Schneller Teilen-Link für weitere Familienmitglieder.
-  * **Speichern & XP:** `[ Geschenk sichern & bereitstellen! 🎁 ]` schließt den Meilenstein **Stufe 4** ab, vergibt **+50 Campus XP** und speichert den Track gleichzeitig in der Playlist **„🎁 Meine Geschenke“**.
-* **Im Meilenstein-Pfad (nach Fertigstellung):**
-  * Der Meilenstein zeigt das grüne Häkchen & Geschenk-Badge.
-  * Buttons: `[ ▶️ Anhören ]`, `[ 🎁 Verschicken / Teilen ]` (öffnet das Teilen-Modal für erneutes Senden) und `[ 🎙️ Neu aufnehmen (+25 XP) ]`.
+### 🎨 Farb-Harmonie im Überblick
+
+| Element | Vorher (Pink/Magenta) | Jetzt (Warm, Neutral & Universell) |
+| :--- | :--- | :--- |
+| **Option 3: Musik-Geschenk** | `#ec4899` / `#fdf2f8` (Pink) | **`#f97316` / `#fff7ed`** (Warmer Sunset-Orange Gradient) |
+| **Stufe 4 (Meilenstein)** | `#ec4899` / `#fbcfe8` (Pink) | **`#f97316` / `#fed7aa`** (Warmer Amber-Sunset Akzent) |
+| **WhatsApp / Geschenk-Card** | `#ec4899` Rahmen | **`#f97316`** (Edles, warmes Orange mit weichen Schatten) |
+| **Sticker-Belohnung** | 💖 *Herz-Melodie (Pink)* | **🔥 *Feuer-Solo* / 🌟 *Goldstern* / 👑 *Krone*** |
+| **Empfänger-Buttons** | Rosa/Pinke Akzentrahmen | **Neutrale, saubere Karten mit thematischen Emojis** |
+
+---
+
+### 🏆 Das 3er-Haupttrio im Aufnahme-Assistenten
+1. **Meilenstein einspielen:** 🏆 *Emerald Green* (`#10b981`)
+2. **Pro-Alben & Playlists:** 🎵 *Royal Purple / Indigo* (`#8b5cf6`)
+3. **Musik-Geschenk für Familie:** 🎁 *Warm Sunset Orange* (`#f97316`)
 
 ---
 
 ### 🛡️ Build-Verifikation
-* `tsc && vite build` erfolgreich abgeschlossen (`✓ built in 11.57s` mit 0 Fehlern).
+* `tsc && vite build` fehlerfrei kompiliert (`✓ built in 12.28s`).

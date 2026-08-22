@@ -35,7 +35,7 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
         // Log in student immediately (Netflix 1-click mode)
         sessionStorage.setItem('groovelab_user_id', profile.id);
         sessionStorage.setItem('groovelab_location_mode', 'home');
-        localStorage.setItem('groovelab_active_platform', isCampusPlatform ? 'campus' : (profile.is_campus_active ? 'campus' : 'groovelab'));
+        sessionStorage.setItem('groovelab_active_platform', isCampusPlatform ? 'campus' : (profile.is_campus_active ? 'campus' : 'groovelab'));
 
         // Update local cache registry
         const registry = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
@@ -151,7 +151,7 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
         const nextPlat = user.role === 'student' 
           ? (user.is_campus_active ? 'campus' : 'groovelab') 
           : 'campus';
-        localStorage.setItem('groovelab_active_platform', nextPlat);
+        sessionStorage.setItem('groovelab_active_platform', nextPlat);
 
         // Update local cache
         const registry = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');

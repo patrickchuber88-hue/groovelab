@@ -130,6 +130,7 @@ export function formatCombinedStudentNames(
 
 /**
  * Requirement 1: Format array of student objects into "Vorname1 N1. & Vorname2 N2."
+ * Intelligently deduplicates composite name strings (e.g. "Fabian & Greta" with concrete records)
  */
 export function formatGroupStudentsAnonymized(
   studentsOrOccurrences: any[],
@@ -139,20 +140,41 @@ export function formatGroupStudentsAnonymized(
     return '';
   }
 
-  const formattedNames: string[] = [];
+  const nameMap = new Map<string, { formatted: string; hasRealLastName: boolean }>();
 
   studentsOrOccurrences.forEach((item, idx) => {
     if (!item) return;
-    const fn = item.first_name || item.student?.first_name || item.student_first_name || item.firstName || item.name || '';
-    const ln = item.last_name || item.student?.last_name || item.student_last_name || item.lastName || '';
+    const fn = String(item.first_name || item.student?.first_name || item.student_first_name || item.firstName || item.name || '').trim();
+    const ln = String(item.last_name || item.student?.last_name || item.student_last_name || item.lastName || '').trim();
     const id = item.id || item.student_id || item.student?.id || `idx-${idx}`;
 
+    if (!fn) return;
+
+    // Handle composite strings with & or comma or "und"/"and"
+    if (fn.includes('&') || fn.includes(',') || /\b(and|und)\b/i.test(fn)) {
+      const tokens = fn.split(/&|,|\bund\b|\band\b/i).map(s => s.trim()).filter(Boolean);
+      tokens.forEach((token, tIdx) => {
+        const key = token.toLowerCase();
+        const formatted = formatSingleStudentAnonymized(token, ln, `${id}-${tIdx}`, privacyMode);
+        if (formatted && formatted !== 'Schüler') {
+          if (!nameMap.has(key) || (!nameMap.get(key)!.hasRealLastName && ln.length > 0)) {
+            nameMap.set(key, { formatted, hasRealLastName: ln.length > 0 });
+          }
+        }
+      });
+      return;
+    }
+
+    const key = fn.toLowerCase();
     const formatted = formatSingleStudentAnonymized(fn, ln, id, privacyMode);
-    if (formatted && formatted !== 'Schüler' && !formattedNames.includes(formatted)) {
-      formattedNames.push(formatted);
+    if (formatted && formatted !== 'Schüler') {
+      if (!nameMap.has(key) || (!nameMap.get(key)!.hasRealLastName && ln.length > 0)) {
+        nameMap.set(key, { formatted, hasRealLastName: ln.length > 0 });
+      }
     }
   });
 
+  const formattedNames = Array.from(nameMap.values()).map(v => v.formatted);
   if (formattedNames.length === 0) return 'Schüler';
   return formattedNames.join(' & ');
 }
@@ -328,7 +350,7 @@ export function formatDisplaySubjectOrInstrument(
   item?: any,
   teacher?: any
 ): string {
-  const rawItemInst = (
+  let rawItemInst = (
     item?.instrument ||
     item?.student?.instrument ||
     item?.subject ||
@@ -340,8 +362,37 @@ export function formatDisplaySubjectOrInstrument(
     ''
   ).trim();
 
+  // If raw string contains slash or comma like "Gitarre/Musiker" or "Gitarre / Musiker"
+  if (rawItemInst.includes('/') || rawItemInst.includes(',')) {
+    const parts = rawItemInst
+      .split(/[/,]/)
+      .map((p: string) => p.trim())
+      .filter((p: string) => !isInvalidInstrument(p));
+    
+    if (parts.length > 0) {
+      // Deduplicate parts (e.g. Gitarre & Gitarre -> Gitarre)
+      const uniqueParts: string[] = Array.from(new Set(parts.map((p: string) => p.charAt(0).toUpperCase() + p.slice(1))));
+      if (uniqueParts.length === 1) {
+        return uniqueParts[0];
+      }
+      return uniqueParts.join(', ');
+    }
+  }
+
   if (!isInvalidInstrument(rawItemInst)) {
     return rawItemInst;
+  }
+
+  // Check group students if available (e.g. in multi-student group occurrence)
+  if (item?.students && Array.isArray(item.students)) {
+    const validGroupInsts = item.students
+      .map((s: any) => s?.instrument)
+      .filter((inst: any) => !isInvalidInstrument(inst));
+    if (validGroupInsts.length > 0) {
+      const unique: string[] = Array.from(new Set(validGroupInsts.map((p: any) => String(p).trim())));
+      if (unique.length === 1) return unique[0];
+      return unique.join(', ');
+    }
   }
 
   // Fallback to teacher's instrument / subject

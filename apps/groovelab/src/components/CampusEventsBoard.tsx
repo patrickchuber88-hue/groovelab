@@ -39,7 +39,9 @@ import {
   Star,
   History,
   DoorClosed,
-  Sparkles
+  Sparkles,
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
 import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument } from '../utils/nameHelper';
 
@@ -156,7 +158,7 @@ export function CampusEventsBoard({
   parentAllowAbsences
 }: CampusEventsBoardProps) {
   // Dynamic Theme calculations
-  const activePlatformStored = typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
+  const activePlatformStored = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform') || 'campus') : 'campus';
   const isGroovelab = passedBrandColor === '#eab308' || activePlatformStored === 'groovelab';
   const isAdminPlatform = passedBrandColor === '#ea4335' || activePlatformStored === 'admin';
   const isCampus = !isGroovelab && !isAdminPlatform; // Default to Campus
@@ -446,6 +448,14 @@ export function CampusEventsBoard({
   const [pinGateError, setPinGateError] = useState('');
   const [pinGatePendingAction, setPinGatePendingAction] = useState<(() => void) | null>(null);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+
+  // Collision Conflict Resolution State
+  const [collisionConflictData, setCollisionConflictData] = useState<{
+    occ: any;
+    conflictingDetails?: string;
+  } | null>(null);
+  const [collisionRequestSent, setCollisionRequestSent] = useState(false);
+  const [collisionRequestLoading, setCollisionRequestLoading] = useState(false);
 
   const handleVerifyParentPin = async (inputPin: string) => {
     if (!inputPin || inputPin.length < 4) {
@@ -2215,7 +2225,29 @@ export function CampusEventsBoard({
     return occ.id;
   };
 
-  const fetchChat = async (studentId: string, occurrenceId: string) => {
+  const extractOccurrenceDateFromMessage = (msg: any): string | null => {
+    if (!msg) return null;
+    if (msg.occurrence_id) {
+      const matchVirtual = String(msg.occurrence_id).match(/\d{4}-\d{2}-\d{2}/);
+      if (matchVirtual) return matchVirtual[0];
+    }
+    const text = String(msg.content || '');
+    const matchIso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+    if (matchIso) {
+      return `${matchIso[1]}-${matchIso[2]}-${matchIso[3]}`;
+    }
+    const matchFullYear = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+    if (matchFullYear) {
+      const day = matchFullYear[1].padStart(2, '0');
+      const month = matchFullYear[2].padStart(2, '0');
+      let year = matchFullYear[3];
+      if (year.length === 2) year = `20${year}`;
+      return `${year}-${month}-${day}`;
+    }
+    return null;
+  };
+
+  const fetchChat = async (otherUserId: string, occurrenceId: string, occDate?: string, scheduleId?: string) => {
     if (!occurrenceId || !userId) return;
     try {
       let query = supabase
@@ -2223,16 +2255,25 @@ export function CampusEventsBoard({
         .select('*')
         .order('created_at', { ascending: true });
 
-      if (isUUID(occurrenceId)) {
-        query = query.or(`occurrence_id.eq.${occurrenceId},and(sender_id.eq.${userId},recipient_id.eq.${studentId}),and(sender_id.eq.${studentId},recipient_id.eq.${userId})`);
-      } else {
-        query = query.or(`and(sender_id.eq.${userId},recipient_id.eq.${studentId}),and(sender_id.eq.${studentId},recipient_id.eq.${userId})`);
-      }
+      query = query.or(`and(sender_id.eq.${userId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${userId})`);
 
       const { data, error } = await query;
       if (error) throw error;
       if (data) {
-        setChatMessages(data);
+        // Filter messages strictly for this appointment's occurrence ID or date
+        const filtered = data.filter((m: any) => {
+          if (m.occurrence_id) {
+            if (String(m.occurrence_id) === String(occurrenceId)) return true;
+            if (scheduleId && occDate && String(m.occurrence_id) === `virtual-${scheduleId}-${occDate}`) return true;
+          }
+          if (occDate) {
+            const extDate = extractOccurrenceDateFromMessage(m);
+            if (extDate === occDate) return true;
+          }
+          return false;
+        });
+
+        setChatMessages(filtered);
         setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
       }
     } catch (err) {
@@ -2245,10 +2286,11 @@ export function CampusEventsBoard({
       setChatMessages([]);
       return;
     }
-    const studentId = role === 'student' ? userId : activeChatOcc.student_id;
-    if (!studentId) return;
+    const otherUserId = role === 'student' ? (activeChatOcc.teacher_id || (activeChatOcc.teacher as any)?.id) : activeChatOcc.student_id;
+    if (!otherUserId) return;
 
-    fetchChat(studentId, activeChatOcc.id);
+    const sId = activeChatOcc.schedule_id || activeChatOcc.schedule?.id;
+    fetchChat(otherUserId, activeChatOcc.id, activeChatOcc.date, sId);
 
     const channel = supabase
       .channel(`chat_occ_board_${activeChatOcc.id}`)
@@ -2257,7 +2299,7 @@ export function CampusEventsBoard({
         event: '*', 
         table: 'campus_direct_messages'
       }, () => {
-        fetchChat(studentId, activeChatOcc.id);
+        fetchChat(otherUserId, activeChatOcc.id, activeChatOcc.date, sId);
         setActiveChatOccIds(prev => {
           const newSet = new Set(prev);
           newSet.add(activeChatOcc.id);
@@ -2275,7 +2317,7 @@ export function CampusEventsBoard({
     if (!contentToSend.trim() || !activeChatOcc) return;
 
     const studentId = role === 'student' ? userId : activeChatOcc.student_id;
-    const recipientId = role === 'student' ? activeChatOcc.teacher_id : activeChatOcc.student_id;
+    const recipientId = role === 'student' ? (activeChatOcc.teacher_id || (activeChatOcc.teacher as any)?.id) : activeChatOcc.student_id;
     if (!studentId || !recipientId) return;
 
     const messageContent = contentToSend.trim();
@@ -2311,7 +2353,16 @@ export function CampusEventsBoard({
 
       setActiveChatOccIds(prev => {
         const newSet = new Set(prev);
-        newSet.add(targetOccId);
+        if (targetOccId) newSet.add(String(targetOccId));
+        if (activeChatOcc.id) newSet.add(String(activeChatOcc.id));
+        if (activeChatOcc.occurrence_id) newSet.add(String(activeChatOcc.occurrence_id));
+        const sId = activeChatOcc.schedule_id || activeChatOcc.schedule?.id;
+        if (sId && activeChatOcc.date) {
+          newSet.add(`virtual-${sId}-${activeChatOcc.date}`);
+        }
+        if (activeChatOcc.student_id && activeChatOcc.date) {
+          newSet.add(`${activeChatOcc.student_id}_${activeChatOcc.date}`);
+        }
         return newSet;
       });
       setActiveChatStudentIds(prev => {
@@ -3147,7 +3198,7 @@ export function CampusEventsBoard({
         let loadedSubmittedDraftId = '';
 
         // Priority 1: Check localStorage active teacher draft state (matches ScheduleBoard.tsx)
-        const activePlatform = (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : null) || 'campus';
+        const activePlatform = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : null) || 'campus';
         const keysToTry = [
           `groovelab_teacher_draft_state_${activePlatform}_${userId}`,
           `groovelab_teacher_draft_state_campus_${userId}`,
@@ -3565,13 +3616,11 @@ export function CampusEventsBoard({
                 (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
               );
 
-              // Check if occurrence for this schedule was moved away or modified on dateStr
+              // Check if occurrence for this schedule was moved away from dateStr to a different date
               const actualMovedAway = !actual && occurrences?.some((occ: any) =>
                 isSameScheduleOrStudent(occ, sch) &&
-                (occ.is_moved ||
-                 ['pending_reschedule', 'rescheduled', 'cancelled', 'canceled_by_student', 'teacher_sick'].includes(occ.status) ||
-                 (occ.original_date && occ.original_date === dateStr && occ.date !== dateStr) ||
-                 (occ.date !== dateStr && occ.start_time && sch.time_slot && occ.start_time.substring(0, 5) !== sch.time_slot.substring(0, 5)))
+                occ.original_date === dateStr &&
+                occ.date !== dateStr
               );
 
               if (actual) {
@@ -3669,51 +3718,36 @@ export function CampusEventsBoard({
 
       setLessons(allMergedOccurrences);
 
-      // Fetch active conversations (only human messages written by teacher or student, excluding system messages)
-      const { data: activeChats } = await supabase
+      // Fetch active conversations (occurrence_ids that have 1:1 shoutbox messages)
+      let chatQuery = supabase
         .from('campus_direct_messages')
-        .select('occurrence_id, sender_id, recipient_id, content, is_system, message_type')
-        .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`);
+        .select('occurrence_id, sender_id, recipient_id, content');
+
+      if (userId && (role === 'student' || role === 'teacher')) {
+        chatQuery = chatQuery.or(`sender_id.eq.${userId},recipient_id.eq.${userId}`);
+      }
+
+      const { data: activeChats } = await chatQuery;
 
       if (activeChats) {
         const occIds = new Set<string>();
         const studentIds = new Set<string>();
-
-        const isHumanChatMessage = (c: any) => {
-          if (!c) return false;
-          if (c.is_system === true) return false;
-          if (c.message_type === 'system' || c.message_type === 'reschedule_request' || c.message_type === 'notification' || c.message_type === 'cancellation') return false;
-
-          const text = (c.content || '').trim();
-          if (!text) return false;
-
-          // Ignore system automated notifications (e.g. Terminverschiebung)
-          if (
-            text.startsWith('🗓️') ||
-            text.startsWith('❌') ||
-            text.startsWith('🔄') ||
-            text.startsWith('✨') ||
-            text.toLowerCase().startsWith('system:') ||
-            text.toLowerCase().includes('terminverschiebung') ||
-            text.toLowerCase().includes('termin verschoben') ||
-            text.toLowerCase().includes('termin abgesagt') ||
-            text.toLowerCase().includes('stundenplanänderung') ||
-            text.toLowerCase().includes('anfrage auf terminverschiebung')
-          ) {
-            return false;
-          }
-
-          return true;
-        };
-
         activeChats.forEach((c: any) => {
-          if (!isHumanChatMessage(c)) return; // Ignore system messages
+          const text = (c.content || '').trim();
+          if (text.length > 0) {
+            if (c.occurrence_id) {
+              occIds.add(String(c.occurrence_id));
+            }
+            if (c.sender_id) studentIds.add(String(c.sender_id));
+            if (c.recipient_id) studentIds.add(String(c.recipient_id));
 
-          if (c.occurrence_id) occIds.add(c.occurrence_id);
-          if (c.sender_id && c.sender_id !== userId) studentIds.add(c.sender_id);
-          if (c.recipient_id && c.recipient_id !== userId) studentIds.add(c.recipient_id);
+            const extDate = extractOccurrenceDateFromMessage(c);
+            if (extDate) {
+              if (c.sender_id) occIds.add(`${c.sender_id}_${extDate}`);
+              if (c.recipient_id) occIds.add(`${c.recipient_id}_${extDate}`);
+            }
+          }
         });
-
         setActiveChatOccIds(occIds);
         setActiveChatStudentIds(studentIds);
       }
@@ -4056,9 +4090,107 @@ export function CampusEventsBoard({
     }
   };
 
+  // Pre-Flight Conflict Check: Is the slot at the teacher still available?
+  const checkSlotConflict = async (occ: any): Promise<{ hasConflict: boolean; conflictingLabel?: string }> => {
+    try {
+      const teacherId = occ.teacher_id || (occ.teacher as any)?.id;
+      const studentId = occ.student_id || (occ.student as any)?.id || (role === 'student' ? userId : null);
+      const targetDate = occ.date;
+      const targetStartTime = occ.start_time || '16:30';
+      const targetDuration = Number(occ.duration || 30);
+
+      if (!teacherId || !targetDate) return { hasConflict: false };
+
+      const parseMinutes = (t: string) => {
+        const [h, m] = t.split(':').map(Number);
+        return (h || 0) * 60 + (m || 0);
+      };
+      const candStart = parseMinutes(targetStartTime);
+      const candEnd = candStart + targetDuration;
+
+      // 1. Check occurrences in database for teacher on that date
+      const { data: dbOccs } = await supabase
+        .from('schedule_occurrences')
+        .select('id, student_id, start_time, duration, status, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
+        .eq('teacher_id', teacherId)
+        .eq('date', targetDate);
+
+      if (dbOccs && dbOccs.length > 0) {
+        for (const o of dbOccs) {
+          if (o.id === occ.id) continue;
+          const isCanceled = o.status === 'cancelled' || o.status === 'canceled_by_student' || o.status === 'teacher_sick' || o.status === 'canceled_by_teacher_sick';
+          if (isCanceled) continue;
+
+          const oStart = parseMinutes(o.start_time || '00:00');
+          const oEnd = oStart + Number(o.duration || 30);
+
+          // Check overlap
+          if (Math.max(candStart, oStart) < Math.min(candEnd, oEnd)) {
+            if (o.student_id && o.student_id !== studentId) {
+              const sObj = o.student as any;
+              const studentName = sObj?.first_name ? `${sObj.first_name} ${sObj.last_name ? sObj.last_name[0] + '.' : ''}` : 'Anderer Schüler';
+              return {
+                hasConflict: true,
+                conflictingLabel: `Belegt durch ${studentName}`
+              };
+            }
+          }
+        }
+      }
+
+      // 2. Check recurring schedule templates on this day of week
+      const [y, m, d] = String(targetDate).split('-').map(Number);
+      const dObj = (y && m && d) ? new Date(y, m - 1, d) : new Date(targetDate);
+      const dayOfWeek = dObj.getDay();
+      const { data: dbSchedules } = await supabase
+        .from('schedules')
+        .select('id, student_id, start_time, duration, status, student:users!schedules_student_id_fkey(first_name, last_name)')
+        .eq('teacher_id', teacherId)
+        .eq('day_of_week', dayOfWeek)
+        .neq('status', 'canceled_by_teacher_sick');
+
+      if (dbSchedules && dbSchedules.length > 0) {
+        for (const sch of dbSchedules) {
+          if (sch.student_id === studentId) continue;
+          // Check if there is an occurrence cancelling this template on that date
+          const isTemplateCancelled = dbOccs?.some((o: any) => o.schedule_id === sch.id && (o.status === 'cancelled' || o.status === 'canceled_by_student'));
+          if (isTemplateCancelled) continue;
+
+          const schStart = parseMinutes(sch.start_time || '00:00');
+          const schEnd = schStart + Number(sch.duration || 30);
+
+          if (Math.max(candStart, schStart) < Math.min(candEnd, schEnd)) {
+            const sObj = sch.student as any;
+            const studentName = sObj?.first_name ? `${sObj.first_name} ${sObj.last_name ? sObj.last_name[0] + '.' : ''}` : 'Anderer Schüler';
+            return {
+              hasConflict: true,
+              conflictingLabel: `Regulär belegt durch ${studentName}`
+            };
+          }
+        }
+      }
+
+      return { hasConflict: false };
+    } catch (err) {
+      console.error('Error during collision pre-flight check:', err);
+      return { hasConflict: false };
+    }
+  };
+
   // Undo cancellation handler for students/teachers
   const handleUndoCancel = async (occ: any) => {
-    if (!confirm('Möchtest du diese Absage wirklich rückgängig machen?')) return;
+    // 1. Enterprise Pre-Flight Collision Check
+    const conflictResult = await checkSlotConflict(occ);
+    if (conflictResult.hasConflict) {
+      setCollisionConflictData({
+        occ,
+        conflictingDetails: conflictResult.conflictingLabel
+      });
+      setCollisionRequestSent(false);
+      return;
+    }
+
+    if (!confirm('Möchtest du diese Absage wirklich rückgängig machen? Der Termin findet dann wieder regulär statt.')) return;
     try {
       if (!occ.id) return;
 
@@ -4091,6 +4223,33 @@ export function CampusEventsBoard({
         if (updErr) throw updErr;
       }
 
+      // Dispatch system notification that appointment is restored to regular status
+      try {
+        const studentId = occ.student_id || (occ.student as any)?.id || occ.board_student_id;
+        const recipientId = role === 'student' ? (occ.teacher_id || (occ.teacher as any)?.id) : studentId;
+        const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
+        
+        if (userId && recipientId && occ.date) {
+          const [y, m, d] = String(occ.date).split('-').map(Number);
+          const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
+          const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+          const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+          const timeLabel = (occ.start_time || '16:30').slice(0, 5);
+          const notificationMessage = `Der verschobene oder abgesagte Termin wurde auf den regulären Termin zurückgesetzt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr.`;
+
+          await supabase.from('campus_direct_messages').insert({
+            sender_id: userId,
+            recipient_id: recipientId,
+            content: notificationMessage,
+            occurrence_id: targetOccId,
+            is_system: true,
+            message_type: 'reschedule_notification'
+          });
+        }
+      } catch (notifErr) {
+        console.error('Error creating restore notification message:', notifErr);
+      }
+
       // Refresh local schedule state
       await fetchLessons();
     } catch (err: any) {
@@ -4103,9 +4262,7 @@ export function CampusEventsBoard({
     e.stopPropagation();
     const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
     if (isCanceled) {
-      if (confirm('Möchtest du diesen abgesagten Termin wieder reaktivieren?')) {
-        handleUndoCancel(occ);
-      }
+      handleUndoCancel(occ);
       return;
     }
 
@@ -5120,39 +5277,17 @@ export function CampusEventsBoard({
     // 1. Deduplicate by student and date: ensure each student appears at most once per date
     const studentDateMap = new Map<string, any>();
 
-    const getStudentKey = (item: any) => {
-      let fn = (
-        item.student?.first_name || 
-        item.student_first_name || 
-        item.first_name || 
-        item.firstName || 
-        item.studentName || 
-        item.student_name || 
-        ''
-      ).trim().toLowerCase().split(' ')[0];
-
-      if (!fn || fn === 'schüler' || fn === 'pause' || fn === 'vacant') {
-        const idStr = String(item.id || item.student_id || item.board_student_id || '');
-        if (idStr) {
-          const cleaned = idStr
-            .replace(/^virtual-student-/i, '')
-            .replace(/^board-[^-]+-/i, '')
-            .replace(/^mock-[^-]+-/i, '')
-            .replace(/^sched-proj-[^-]+-/i, '')
-            .split('-')[0]
-            .trim()
-            .toLowerCase();
-          if (cleaned && cleaned.length >= 2 && !/^[0-9a-f]{8}$/i.test(cleaned) && cleaned !== 'student' && cleaned !== 'vacant') {
-            fn = cleaned;
-          }
-        }
+    const getStudentKey = (item: any): string => {
+      const rawId = item.student_id || item.student?.id || item.board_student_id || (item.id && !String(item.id).startsWith('virt_') ? item.id : null);
+      if (rawId && rawId !== 'vacant') {
+        return String(rawId).trim().toLowerCase();
       }
-
-      if (fn && fn !== 'schüler' && fn !== 'pause' && fn !== 'vacant') {
-        return fn;
+      const fn = item.student?.first_name || item.student_first_name || item.first_name || '';
+      const ln = item.student?.last_name || item.student_last_name || item.last_name || '';
+      if (fn || ln) {
+        return `${fn.trim().toLowerCase()}_${ln.trim().toLowerCase()}`;
       }
-      const rawId = item.student_id || item.student?.id || item.board_student_id || item.id || '';
-      return String(rawId).trim().toLowerCase();
+      return String(item.id || crypto.randomUUID()).trim().toLowerCase();
     };
 
     const getItemPriorityScore = (o: any): number => {
@@ -5219,15 +5354,39 @@ export function CampusEventsBoard({
 
     slotMap.forEach((slotOccs) => {
       if (slotOccs.length > 1) {
-        const uniqueStudentIds = new Set(slotOccs.map(o => o.student_id).filter(Boolean));
-        if (uniqueStudentIds.size > 1) {
+        // Collect all distinct student identities in this slot
+        const uniqueStudentMap = new Map<string, any>();
+        
+        slotOccs.forEach(o => {
+          const st = o.student || { id: o.student_id, first_name: o.student_first_name || o.first_name, last_name: o.student_last_name || o.last_name };
+          const rawName = String(st.first_name || st.name || '').trim();
+          
+          if (rawName.includes('&') || rawName.includes(',') || /\b(and|und)\b/i.test(rawName)) {
+            const tokens = rawName.split(/&|,|\bund\b|\band\b/i).map((s: string) => s.trim()).filter(Boolean);
+            tokens.forEach((t: string) => {
+              const key = t.toLowerCase();
+              if (!uniqueStudentMap.has(key)) {
+                uniqueStudentMap.set(key, { first_name: t, last_name: '' });
+              }
+            });
+          } else if (rawName) {
+            const key = rawName.toLowerCase();
+            if (!uniqueStudentMap.has(key) || (!uniqueStudentMap.get(key).last_name && st.last_name)) {
+              uniqueStudentMap.set(key, st);
+            }
+          } else if (st.id) {
+            uniqueStudentMap.set(String(st.id), st);
+          }
+        });
+
+        const uniqueStudents = Array.from(uniqueStudentMap.values());
+        if (uniqueStudents.length > 1) {
           const primary = slotOccs[0];
-          const groupStudents = slotOccs.map(o => o.student).filter(Boolean);
           groupedSlotItems.push({
             ...primary,
             id: `group-slot-${primary.date}-${primary.start_time}`,
             isGroupOcc: true,
-            students: groupStudents,
+            students: uniqueStudents,
             group_occurrences: slotOccs
           });
         } else {
@@ -5276,10 +5435,38 @@ export function CampusEventsBoard({
         (occ.original_date && occ.original_date !== occ.date) ||
         (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5))
       );
+
+      const hasOccurrenceMessages = (o: any): boolean => {
+        if (!o) return false;
+        const occIdStr = String(o.id || '');
+        if (occIdStr && activeChatOccIds.has(occIdStr)) return true;
+        if (o.occurrence_id && activeChatOccIds.has(String(o.occurrence_id))) return true;
         
-      const hasMessages = activeChatOccIds.has(occ.id) ||
-         (occ.student_id && activeChatStudentIds.has(occ.student_id)) ||
-         (occ.teacher_id && activeChatStudentIds.has(occ.teacher_id));
+        const sId = o.schedule_id || o.schedule?.id || o.schedules?.id;
+        if (sId && o.date) {
+          if (activeChatOccIds.has(`virtual-${sId}-${o.date}`)) return true;
+        }
+
+        const stId = o.student_id || o.student?.id || o.board_student_id;
+        if (stId && o.date) {
+          const stIdStr = String(stId);
+          if (activeChatOccIds.has(`${stIdStr}_${o.date}`)) return true;
+        }
+
+        if (Array.isArray(o.students) && o.date) {
+          if (o.students.some((st: any) => {
+            const sid = String(st.id || st.student_id || '');
+            return sid && activeChatOccIds.has(`${sid}_${o.date}`);
+          })) return true;
+        }
+
+        if (Array.isArray(o.group_occurrences)) {
+          return o.group_occurrences.some((g: any) => hasOccurrenceMessages(g));
+        }
+        return false;
+      };
+
+      const hasMessages = hasOccurrenceMessages(occ);
       
       const groupFirstNames = (occ.students || occ.group_occurrences)
         ? formatGroupStudentsAnonymized(occ.students || occ.group_occurrences)
@@ -5302,8 +5489,29 @@ export function CampusEventsBoard({
         (opponentName && (opponentName.includes(',') || opponentName.includes('&')))
       );
 
-      const studentCount = (occ.students || occ.group_occurrences)?.length || (opponentName.includes('&') ? opponentName.split('&').length : 2);
-      const isFixedGroup = Boolean(occ.group_id || occ.is_db_group || occ.is_stammtermin || (!occ.is_virtual && !String(occ.id).startsWith('virt_') && !occ.is_ensemble));
+      const nameParts = opponentName ? (opponentName.includes('&') ? opponentName.split('&') : (opponentName.includes(',') ? opponentName.split(',') : [opponentName])) : [];
+      const studentCount = Math.max(
+        (occ.students || occ.group_occurrences)?.length || 0,
+        nameParts.length,
+        2
+      );
+      
+      // Regular group vs. merged individual lessons
+      const isExplicitMergedEnsemble = Boolean(
+        occ.is_merged || 
+        occ.is_merged_group || 
+        occ.is_ensemble || 
+        occ.is_merged_appointment || 
+        occ.merged_from_individual ||
+        occ.ensemble_name ||
+        (occ.group_occurrences && occ.group_occurrences.length > 1 && occ.group_occurrences.some((o: any) => 
+          o.is_merged || 
+          o.is_ensemble ||
+          (o.is_moved && o.original_start_time && o.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5)) ||
+          (o.is_moved && o.original_date && o.original_date !== occ.date)
+        ))
+      );
+      const isFixedGroup = !isExplicitMergedEnsemble;
       const groupBadgeLabel = getGroupTypeLabel(studentCount, isFixedGroup, occ.group_name || occ.ensemble_name);
 
       const isConfirmedOcc = Boolean(
@@ -5637,25 +5845,27 @@ export function CampusEventsBoard({
                 e.stopPropagation();
                 setActiveChatOcc(occ);
               }}
-              title="1:1 Shoutbox öffnen"
+              title={hasMessages ? "1:1 Shoutbox (Nachrichten vorhanden)" : "1:1 Shoutbox öffnen"}
               style={{
-                border: 'none',
-                background: 'none',
+                border: hasMessages ? '1px solid #fde047' : 'none',
+                background: hasMessages ? '#fefce8' : 'none',
                 padding: '6px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: hasMessages ? '#eab308' : '#94a3b8',
+                color: hasMessages ? '#ca8a04' : '#94a3b8',
                 transition: 'all 0.2s',
                 borderRadius: '50%',
-                flexShrink: 0
+                flexShrink: 0,
+                boxShadow: hasMessages ? '0 1px 4px rgba(202, 138, 4, 0.15)' : 'none'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+              onMouseEnter={(e) => e.currentTarget.style.background = hasMessages ? '#fef08a' : 'rgba(0,0,0,0.06)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = hasMessages ? '#fefce8' : 'none'}
             >
               <MessageSquare 
                 size={16} 
+                color={hasMessages ? '#ca8a04' : '#94a3b8'}
                 fill={hasMessages ? '#eab308' : 'none'} 
                 style={{
                   animation: hasMessages ? 'pulse 2s infinite' : 'none'
@@ -13462,6 +13672,34 @@ export function CampusEventsBoard({
                 ) : (
                   chatMessages.map((msg, idx) => {
                     const isMe = msg.sender_id === userId;
+                    const cleanContent = String(msg.content || '').replace(/^\[Termin[^\]]+\]\s*/i, '').trim();
+
+                    // Deterministic Sender Name Computation based on msg.sender_id and participants
+                    let senderName = '';
+                    if (!isMe) {
+                      const teacherId = activeChatOcc.teacher_id || (activeChatOcc.teacher as any)?.id;
+                      const studentId = activeChatOcc.student_id || (activeChatOcc.student as any)?.id;
+
+                      const studentObj = (activeChatOcc.student || (activeChatOcc as any).student_user || studentUser);
+                      const studentDisplayName = studentObj
+                        ? formatSingleStudentAnonymized(studentObj.first_name || (typeof studentObj === 'string' ? studentObj : ''), studentObj.last_name, studentObj.id)
+                        : 'Schüler';
+
+                      const teacherObj = (activeChatOcc.teacher || currentTeacherProfile);
+                      const teacherDisplayName = formatTeacherFullName(teacherObj) || 'Lehrkraft';
+
+                      const isStudentRole = (role as string) === 'student';
+                      if (msg.sender_id === studentId || (!isStudentRole && msg.sender_id !== teacherId)) {
+                        senderName = studentDisplayName;
+                      } else if (msg.sender_id === teacherId || isStudentRole) {
+                        senderName = teacherDisplayName;
+                      } else {
+                        senderName = isStudentRole ? teacherDisplayName : studentDisplayName;
+                      }
+                    }
+
+                    const isStudentSender = senderName && senderName !== formatTeacherFullName(activeChatOcc.teacher || currentTeacherProfile);
+
                     return (
                       <div key={msg.id || idx} style={{
                         display: 'flex',
@@ -13471,6 +13709,17 @@ export function CampusEventsBoard({
                         alignItems: isMe ? 'flex-end' : 'flex-start',
                         gap: '2px'
                       }}>
+                        {!isMe && senderName && (
+                          <span style={{ 
+                            fontSize: '0.68rem', 
+                            fontWeight: 800, 
+                            color: isStudentSender ? '#2563eb' : '#34a853', 
+                            marginBottom: '1px', 
+                            marginLeft: '6px' 
+                          }}>
+                            {senderName}
+                          </span>
+                        )}
                         <div style={{
                           background: isMe ? '#e6f4ea' : '#ffffff',
                           color: '#0f172a',
@@ -13482,7 +13731,7 @@ export function CampusEventsBoard({
                           border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
                           boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
                         }}>
-                          {msg.content}
+                          {cleanContent}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '4px' }}>
                             <span style={{ fontSize: '0.62rem', color: isMe ? '#15803d' : '#64748b', fontWeight: 600 }}>
                               {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
@@ -13964,6 +14213,226 @@ export function CampusEventsBoard({
             >
               Abbrechen
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Enterprise+ Collision Conflict Modal */}
+      {collisionConflictData && (
+        <div 
+          onClick={() => setCollisionConflictData(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.15s ease'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '28px',
+              maxWidth: '440px',
+              width: '100%',
+              padding: '30px 24px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}
+          >
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '20px',
+              background: '#fffbeb',
+              color: '#d97706',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid #fde68a'
+            }}>
+              <AlertTriangle size={28} color="#d97706" />
+            </div>
+
+            <div>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                Terminplatz inzwischen belegt
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b', lineHeight: 1.5, fontWeight: 500 }}>
+                Dein regulärer Termin ({new Date(collisionConflictData.occ.date).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })} um {collisionConflictData.occ.start_time?.slice(0, 5)} Uhr) wurde nach deiner Absage von deiner Lehrkraft bereits anderweitig verplant.
+              </p>
+              {collisionConflictData.conflictingDetails && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  color: '#64748b'
+                }}>
+                  {collisionConflictData.conflictingDetails}
+                </div>
+              )}
+            </div>
+
+            {collisionRequestSent ? (
+              <div style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '16px',
+                background: '#e6f4ea',
+                border: '1px solid #bbf7d0',
+                color: '#15803d',
+                fontSize: '0.84rem',
+                fontWeight: 700,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <CheckCircle2 size={24} color="#15803d" />
+                <span>Anfrage erfolgreich gesendet!</span>
+                <span style={{ fontSize: '0.74rem', fontWeight: 500, color: '#166534' }}>
+                  Deine Lehrkraft wurde benachrichtigt und wird sich bei dir melden.
+                </span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '4px' }}>
+                {/* Button 1: Anfrage an Lehrkraft senden */}
+                <button
+                  type="button"
+                  disabled={collisionRequestLoading}
+                  onClick={async () => {
+                    try {
+                      setCollisionRequestLoading(true);
+                      const occ = collisionConflictData.occ;
+                      const teacherId = occ.teacher_id || (occ.teacher as any)?.id;
+                      const [y, m, d] = String(occ.date).split('-').map(Number);
+                      const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
+                      const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+                      const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                      const timeLabel = (occ.start_time || '16:30').slice(0, 5);
+                      const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
+
+                      const msgContent = `Reaktivierungs-Anfrage: Ich würde den abgesagten Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr gerne doch wahrnehmen. Finden wir eine gemeinsame Lösung?`;
+
+                      await supabase.from('campus_direct_messages').insert({
+                        sender_id: userId,
+                        recipient_id: teacherId,
+                        content: msgContent,
+                        occurrence_id: targetOccId,
+                        is_system: true,
+                        message_type: 'reactivation_request'
+                      });
+
+                      setCollisionRequestSent(true);
+                    } catch (err) {
+                      console.error('Error sending reactivation request:', err);
+                      alert('Fehler beim Senden der Anfrage.');
+                    } finally {
+                      setCollisionRequestLoading(false);
+                    }
+                  }}
+                  style={{
+                    padding: '12px 18px',
+                    borderRadius: '14px',
+                    border: 'none',
+                    background: '#34a853',
+                    color: '#ffffff',
+                    fontSize: '0.84rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)'
+                  }}
+                  className="hover-scale"
+                >
+                  <Send size={15} color="#ffffff" />
+                  <span>{collisionRequestLoading ? 'Sende Anfrage...' : 'Anfrage an Lehrkraft senden'}</span>
+                </button>
+
+                {/* Button 2: Ausweichtermin anfragen */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const occ = collisionConflictData.occ;
+                    setCollisionConflictData(null);
+                    setActiveChatOcc(occ);
+                  }}
+                  style={{
+                    padding: '12px 18px',
+                    borderRadius: '14px',
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#334155',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                  className="hover-scale"
+                >
+                  <Calendar size={15} color="#64748b" />
+                  <span>Ausweichtermin in Shoutbox anfragen</span>
+                </button>
+
+                {/* Button 3: Abbrechen / Schließen */}
+                <button
+                  type="button"
+                  onClick={() => setCollisionConflictData(null)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '14px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#94a3b8',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Abbrechen (Absage belassen)
+                </button>
+              </div>
+            )}
+
+            {collisionRequestSent && (
+              <button
+                type="button"
+                onClick={() => setCollisionConflictData(null)}
+                style={{
+                  marginTop: '8px',
+                  padding: '10px 24px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Schließen
+              </button>
+            )}
           </div>
         </div>
       )}

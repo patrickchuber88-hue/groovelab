@@ -1179,7 +1179,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       const targetSchoolId = latestUser?.school_id || student.school_id || student.schoolId || schoolIdFallback;
 
       const teacherIdToFilter = (currentUserRole === 'teacher' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_user_role') === 'teacher'))
-        ? (currentTeacherId || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null))
+        ? (currentTeacherId || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null))
         : null;
 
       const [usersRes, pendingRes, byTeacherUsers, byTeacherPending, schedsRes] = await Promise.all([

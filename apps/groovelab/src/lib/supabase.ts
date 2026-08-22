@@ -38,7 +38,7 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   let clientInfo = rawHeaders['x-client-info'] || 'supabase-js/2.39.3';
   
   // Dynamically inject security session tokens into x-client-info to avoid CORS preflight (OPTIONS) blocks
-  const userId = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id');
+  const userId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
   if (userId) {
     clientInfo += `;user_id=${userId}`;
   }
@@ -157,7 +157,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     fetch: customFetch
   },
   auth: {
-    lock: customAuthLock
+    lock: customAuthLock,
+    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
+    storageKey: 'groovelab-auth-token',
+    autoRefreshToken: true,
+    persistSession: true,
   }
 });
 
@@ -254,5 +258,8 @@ export const deleteUserStorageAssets = async (userIds: string[]) => {
     console.error('[GDPR/COPPA Cleanup] Unexpected error during asset deletion:', err);
   }
 };
+
+export { queryCache, cachedQuery, invalidateCacheKey, invalidateCachePrefix, clearQueryCache } from './queryCache';
+
 
 

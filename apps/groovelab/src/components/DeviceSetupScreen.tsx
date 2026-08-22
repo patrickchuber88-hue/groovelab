@@ -74,7 +74,7 @@ export function DeviceSetupScreen({
 
       // Finalize login (reload to activate Master Admin Dashboard)
       sessionStorage.setItem('groovelab_user_id', user.id);
-      localStorage.setItem('groovelab_location_mode', 'home');
+      sessionStorage.setItem('groovelab_location_mode', 'home');
       window.location.reload();
     } catch (err: any) {
       setLoginError(err.message);
@@ -143,7 +143,7 @@ export function DeviceSetupScreen({
       }
 
       if (!targetSchoolId) {
-        const storedUserId = sessionStorage.getItem('groovelab_user_id');
+        const storedUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
         if (storedUserId) {
           const { data: userInfo } = await supabase
             .from('users')

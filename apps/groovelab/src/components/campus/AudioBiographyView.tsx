@@ -4353,9 +4353,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                           ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                           : isFirstSongMs
                             ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                            : (isFamilyShareMs ? (isLight ? '#fdf2f8' : 'rgba(236, 72, 153, 0.15)') : (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.12)')),
-                        border: isDone ? 'none' : `1.5px solid ${isFirstSongMs ? '#fbbf24' : isFamilyShareMs ? '#fbcfe8' : (isLight ? '#86efac' : 'rgba(16, 185, 129, 0.3)')}`,
-                        color: isDone ? '#ffffff' : (isFirstSongMs ? '#ffffff' : isFamilyShareMs ? '#db2777' : (isLight ? '#047857' : '#86efac')),
+                            : (isFamilyShareMs ? (isLight ? '#fff7ed' : 'rgba(249, 115, 22, 0.15)') : (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.12)')),
+                        border: isDone ? 'none' : `1.5px solid ${isFirstSongMs ? '#fbbf24' : isFamilyShareMs ? '#fed7aa' : (isLight ? '#86efac' : 'rgba(16, 185, 129, 0.3)')}`,
+                        color: isDone ? '#ffffff' : (isFirstSongMs ? '#ffffff' : isFamilyShareMs ? '#ea580c' : (isLight ? '#047857' : '#86efac')),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -4376,7 +4376,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                           <span style={{
                             fontSize: '0.66rem',
                             fontWeight: 900,
-                            color: isDone ? '#059669' : isFirstSongMs ? '#b45309' : (isFamilyShareMs ? '#db2777' : '#047857'),
+                            color: isDone ? '#059669' : isFirstSongMs ? '#b45309' : (isFamilyShareMs ? '#c2410c' : '#047857'),
                             textTransform: 'uppercase',
                             letterSpacing: '0.04em'
                           }}>
@@ -4449,7 +4449,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                                 padding: '8px 16px',
                                 borderRadius: '100px',
                                 border: 'none',
-                                background: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
                                 color: '#ffffff',
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -4457,7 +4457,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                                 fontSize: '0.78rem',
                                 fontWeight: 900,
                                 cursor: 'pointer',
-                                boxShadow: '0 3px 10px rgba(236, 72, 153, 0.3)'
+                                boxShadow: '0 3px 10px rgba(249, 115, 22, 0.3)'
                               }}
                               className="hover-scale"
                             >
@@ -4505,7 +4505,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                             padding: '10px 20px',
                             borderRadius: '100px',
                             border: 'none',
-                            background: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                            background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
                             color: '#ffffff',
                             fontWeight: 900,
                             fontSize: '0.84rem',
@@ -4513,7 +4513,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: '0 4px 14px rgba(236, 72, 153, 0.35)'
+                            boxShadow: '0 4px 14px rgba(249, 115, 22, 0.35)'
                           }}
                           className="hover-scale"
                         >
@@ -4748,7 +4748,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               const preset = UNIVERSAL_PLAYLIST_COVERS.find((c: UniversalPlaylistCoverConfig) => c.id === pl.coverPresetId) || UNIVERSAL_PLAYLIST_COVERS[0];
               
               const coverGradient = isGiftPl 
-                ? 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)' 
+                ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' 
                 : isChristmasPl
                   ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)'
                   : isSummerPl
@@ -4757,7 +4757,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       ? 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)'
                       : (preset.gradient || 'linear-gradient(135deg, #10b981 0%, #059669 100%)');
 
-              const coverAccent = isGiftPl ? '#ec4899' : isChristmasPl ? '#dc2626' : isSummerPl ? '#f59e0b' : isFavoritesPl ? '#6366f1' : (preset.accentColor || '#10b981');
+              const coverAccent = isGiftPl ? '#f97316' : isChristmasPl ? '#dc2626' : isSummerPl ? '#f59e0b' : isFavoritesPl ? '#6366f1' : (preset.accentColor || '#10b981');
               const coverEmoji = isGiftPl ? '🎁' : isChristmasPl ? '🎄' : isSummerPl ? '☀️' : isFavoritesPl ? '⭐' : (preset.emoji || '🎵');
               const coverIconName = isGiftPl ? 'gift' : isChristmasPl ? 'gift' : isSummerPl ? 'sun' : isFavoritesPl ? 'heart' : (preset.iconName || 'music');
               
@@ -11351,7 +11351,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   height: '56px',
                   borderRadius: '18px',
                   background: selectedJuniorPlaylistForModal.id === 'pl_gifts'
-                    ? 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)'
+                    ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'
                     : (UNIVERSAL_PLAYLIST_COVERS.find((c: UniversalPlaylistCoverConfig) => c.id === selectedJuniorPlaylistForModal.coverPresetId)?.gradient || 'linear-gradient(135deg, #10b981 0%, #059669 100%)'),
                   color: 'white',
                   display: 'flex',
@@ -11364,7 +11364,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   {selectedJuniorPlaylistForModal.id === 'pl_gifts' ? '🎁' : (UNIVERSAL_PLAYLIST_COVERS.find((c: UniversalPlaylistCoverConfig) => c.id === selectedJuniorPlaylistForModal.coverPresetId)?.emoji || '🎵')}
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.70rem', fontWeight: 900, color: selectedJuniorPlaylistForModal.id === 'pl_gifts' ? '#db2777' : '#059669', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '0.70rem', fontWeight: 900, color: selectedJuniorPlaylistForModal.id === 'pl_gifts' ? '#ea580c' : '#059669', textTransform: 'uppercase' }}>
                     ALBUM • {selectedJuniorPlaylistForModal.tracks?.length || 0} {selectedJuniorPlaylistForModal.tracks?.length === 1 ? (selectedJuniorPlaylistForModal.id === 'pl_gifts' ? 'GESCHENK' : 'STÜCK') : (selectedJuniorPlaylistForModal.id === 'pl_gifts' ? 'GESCHENKE' : 'STÜCKE')}
                   </div>
                   <h2 style={{ margin: '2px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: colors.textPrimary }}>
@@ -11413,7 +11413,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   borderRadius: '16px',
                   border: 'none',
                   background: selectedJuniorPlaylistForModal.id === 'pl_gifts'
-                    ? 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)'
+                    ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'
                     : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   color: 'white',
                   fontWeight: 900,

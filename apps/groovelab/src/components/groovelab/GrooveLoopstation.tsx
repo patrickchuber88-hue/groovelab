@@ -565,7 +565,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
       if (!targetSchoolId) {
         try {
-          const currentUid = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id');
+          const currentUid = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
           if (currentUid) {
             const { data: uRec } = await supabase
               .from('users')

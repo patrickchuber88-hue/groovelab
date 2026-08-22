@@ -72,7 +72,7 @@ export function useTeacherAvailability(student: any) {
         // 2b. Try logged-in user in localStorage / session (safe fallback for teachers viewing their own students)
         if (!teacherId) {
           try {
-            const cachedUser = JSON.parse(localStorage.getItem('groovelab_cached_user') || '{}');
+            const cachedUser = JSON.parse(sessionStorage.getItem('groovelab_cached_user') || '{}');
             if (cachedUser?.id) {
               teacherId = cachedUser.id;
             }
@@ -81,7 +81,7 @@ export function useTeacherAvailability(student: any) {
         
         if (!teacherId) {
           try {
-            const uid = localStorage.getItem('groovelab_user_id');
+            const uid = sessionStorage.getItem('groovelab_user_id');
             if (uid) teacherId = uid;
           } catch (e) {}
         }

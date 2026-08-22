@@ -200,7 +200,7 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
     if (r === 'admin' || r === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
       return '/campus_login_hero.png';
     }
-    const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
+    const activePlat = activePlatform || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : 'groovelab');
     if (activePlat === 'groovelab') {
       const isTeacherAvatar = src && (
         src.includes('teacher_') ||
@@ -1240,12 +1240,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   // Navigation
   const [activeTab, setActiveTab] = useState<'secretary' | 'campus' | 'groovelab'>(() => {
-    const saved = localStorage.getItem('groovelab_active_workspace');
+    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
     if (saved === 'campus' || saved === 'groovelab' || saved === 'secretary') return saved as any;
     return 'secretary';
   });
   const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit' | 'duties'>(() => {
-    const saved = localStorage.getItem('groovelab_secretary_subtab');
+    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_secretary_subtab') || localStorage.getItem('groovelab_secretary_subtab')) : null;
     const valid = ['briefing', 'employees', 'licenses', 'setup', 'rooms', 'equipment', 'crisis', 'audit', 'duties'];
     if (saved && valid.includes(saved)) return saved as any;
     return 'briefing';
@@ -1581,15 +1581,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   // Persist navigation tabs and subtabs on change
   useEffect(() => {
-    localStorage.setItem('groovelab_active_workspace', activeTab);
+    sessionStorage.setItem('groovelab_active_workspace', activeTab);
   }, [activeTab]);
 
   useEffect(() => {
-    localStorage.setItem('groovelab_secretary_subtab', secretarySubTab);
+    sessionStorage.setItem('groovelab_secretary_subtab', secretarySubTab);
   }, [secretarySubTab]);
 
   useEffect(() => {
-    localStorage.setItem('groovelab_campus_subtab', campusSubTab);
+    sessionStorage.setItem('groovelab_campus_subtab', campusSubTab);
   }, [campusSubTab]);
 
   useEffect(() => {
@@ -14588,7 +14588,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             <div 
               onClick={() => {
                 setActiveTab('secretary');
-                localStorage.setItem('groovelab_active_workspace', 'secretary');
+                sessionStorage.setItem('groovelab_active_workspace', 'secretary');
               }}
               style={{
                 display: 'flex',
@@ -14623,7 +14623,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               <div 
                 onClick={() => {
                   setActiveTab('campus');
-                  localStorage.setItem('groovelab_active_workspace', 'campus');
+                  sessionStorage.setItem('groovelab_active_workspace', 'campus');
                 }}
                 style={{
                   display: 'flex',
@@ -14659,7 +14659,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               <div 
                 onClick={() => {
                   setActiveTab('groovelab');
-                  localStorage.setItem('groovelab_active_workspace', 'groovelab');
+                  sessionStorage.setItem('groovelab_active_workspace', 'groovelab');
                 }}
                 style={{
                   display: 'flex',
