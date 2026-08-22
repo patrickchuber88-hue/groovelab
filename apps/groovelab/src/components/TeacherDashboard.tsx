@@ -8952,6 +8952,46 @@ export function TeacherDashboard({
                     </div>
                   </div>
 
+                  {isCancelled && !b.teacher_acknowledged && b.teacherAcknowledged !== true && (
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          const occId = b.id || b.occurrence_id || b.ids?.[0];
+                          if (occId) {
+                            await supabase
+                              .from('schedule_occurrences')
+                              .update({ teacher_acknowledged: true })
+                              .eq('id', occId);
+                          }
+                          setMyChangedAppointments((prev: any[]) => prev.map((a: any) => (a.id === b.id || a.id === occId) ? { ...a, teacher_acknowledged: true, teacherAcknowledged: true } : a));
+                        } catch(err) {
+                          console.error(err);
+                        }
+                      }}
+                      title="Absage / Krankmeldung quittieren"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        padding: '4px 8px',
+                        borderRadius: '8px',
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        border: '1px solid #fca5a5',
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        flexShrink: 0
+                      }}
+                      className="hover-scale"
+                    >
+                      <Check size={11} strokeWidth={3} />
+                      <span>Quittieren</span>
+                    </button>
+                  )}
+
                   {b.isSchedule && (
                     <button
                       onClick={(e) => {
@@ -12733,7 +12773,47 @@ export function TeacherDashboard({
                             </div>
                           </div>
 
-                          {/* Shoutbox Chat Button */}
+                          {/* Cancellation Acknowledge & Shoutbox Chat Button */}
+                          {isCancelled && !b.teacher_acknowledged && b.teacherAcknowledged !== true && (
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const occId = b.id || b.occurrence_id || b.ids?.[0];
+                                  if (occId) {
+                                    await supabase
+                                      .from('schedule_occurrences')
+                                      .update({ teacher_acknowledged: true })
+                                      .eq('id', occId);
+                                  }
+                                  setMyChangedAppointments((prev: any[]) => prev.map((a: any) => (a.id === b.id || a.id === occId) ? { ...a, teacher_acknowledged: true, teacherAcknowledged: true } : a));
+                                } catch(err) {
+                                  console.error(err);
+                                }
+                              }}
+                              title="Absage / Krankmeldung quittieren"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                padding: '4px 8px',
+                                borderRadius: '8px',
+                                background: '#fee2e2',
+                                color: '#dc2626',
+                                border: '1px solid #fecaca',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                flexShrink: 0
+                              }}
+                              className="hover-scale"
+                            >
+                              <Check size={11} strokeWidth={3} />
+                              <span>Quittieren</span>
+                            </button>
+                          )}
+
                           {b.isSchedule && (
                             <button
                               onClick={(e) => {

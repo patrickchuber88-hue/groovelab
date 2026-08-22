@@ -4448,7 +4448,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       <span style={{ color: student.parent_allow_leaderboard !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
                         {student.parent_allow_leaderboard !== false ? '✓' : '✕'}
                       </span>
-                      <span>Schul-Bestenlisten-Sichtbarkeit</span>
+                      <span>Klassen-Highlights &amp; Team-Power</span>
                     </div>
 
                     <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>

@@ -20,11 +20,25 @@ import {
   sliceAudioBlobForPreview
 } from '../../utils/audioMasteringEngine';
 import { storeBlob, getBlob, deleteBlob } from '../../utils/blobStorage';
+import { broadcastPracticeUpdate } from '../../utils/studentProgressEngine';
+import { JuniorAudioBiographyWizard } from './JuniorAudioBiographyWizard';
 
+
+export interface AudioVersion {
+  id: string;
+  versionNumber: number;
+  recordedAt: string;
+  schoolYear?: string;
+  audioUrl?: string;
+  masteredAudioUrl?: string;
+  duration?: number;
+  stickerEmoji?: string;
+  personalNote?: string;
+}
 
 export interface MilestoneData {
   id: string;
-  type: 'first_tone' | 'first_scale' | 'first_song' | 'happy_birthday' | 'first_christmas_song' | 'first_solo' | 'first_own_song' | 'hardest_piece' | 'favorite_song';
+  type: 'first_tone' | 'first_scale' | 'first_song' | 'happy_birthday' | 'family_share' | 'first_christmas_song' | 'first_solo' | 'first_own_song' | 'hardest_piece' | 'favorite_song';
   title: string;
   subtitle: string;
   stepNumber: number;
@@ -42,6 +56,7 @@ export interface MilestoneData {
   preferredVersion?: 'master' | 'raw';
   reverbRoomType?: ReverbRoomType;
   reverbWetMix?: number;
+  history?: AudioVersion[]; // ⏳ Growth Time Capsule
 }
 
 export interface CustomPlaylistTrack {
@@ -400,6 +415,7 @@ interface AudioBiographyViewProps {
   isTeacher?: boolean;
   onBackToHub: () => void;
   isMobileOrSim?: boolean;
+  studentUiLevel?: 'junior' | 'teen' | 'pro' | null;
 }
 
 const VIBE_THEMES = [
@@ -592,11 +608,21 @@ export function computeActiveSchoolYears(createdAt?: string): SchoolYearLP[] {
 }
 
 
+export const formatStudentPossessive = (name?: string): string => {
+  if (!name) return 'Deine';
+  const trimmed = name.trim();
+  const lastChar = trimmed.slice(-1).toLowerCase();
+  if (['s', 'ß', 'z', 'x'].includes(lastChar)) {
+    return `${trimmed}’`;
+  }
+  return `${trimmed}s`;
+};
+
 const DEFAULT_MILESTONES: Omit<MilestoneData, 'id' | 'visibility' | 'version'>[] = [
   {
     type: 'first_tone',
     title: 'Mein erster Ton',
-    subtitle: 'Der allererste Klang auf deinem Instrument',
+    subtitle: 'Dein allererster Ton auf deinem Instrument',
     stepNumber: 1,
     iconName: 'sparkles',
     schoolYear: '2026/2027'
@@ -604,31 +630,31 @@ const DEFAULT_MILESTONES: Omit<MilestoneData, 'id' | 'visibility' | 'version'>[]
   {
     type: 'first_scale',
     title: 'Meine erste Tonleiter',
-    subtitle: 'Der erste Fingerfertigkeits-Meilenstein',
+    subtitle: 'Die ersten Töne flüssig rauf und runter gespielt',
     stepNumber: 2,
     iconName: 'sliders',
     schoolYear: '2026/2027'
   },
   {
-    type: 'first_song',
-    title: 'Mein erster Song',
-    subtitle: 'Dein erstes vollständig gemeistertes Lied',
+    type: 'happy_birthday',
+    title: 'Happy Birthday',
+    subtitle: 'Das bekannteste Geburtstagslied der Welt gespielt',
     stepNumber: 3,
-    iconName: 'music',
+    iconName: 'gift',
     schoolYear: '2026/2027'
   },
   {
-    type: 'happy_birthday',
-    title: 'Happy Birthday',
-    subtitle: 'Das persönliche Geschenk-Ständchen für Familie & Freunde',
+    type: 'family_share',
+    title: '🎁 Mein Musik-Geschenk',
+    subtitle: 'Ein Lied für deine Familie aufgenommen & verschickt',
     stepNumber: 4,
-    iconName: 'gift',
+    iconName: 'heart',
     schoolYear: '2026/2027'
   },
   {
     type: 'first_christmas_song',
     title: 'Mein erstes Weihnachtslied',
-    subtitle: 'Der festliche Meilenstein unterm Weihnachtsbaum',
+    subtitle: 'Dein erstes Lied unterm Weihnachtsbaum',
     stepNumber: 5,
     iconName: 'bell',
     schoolYear: '2026/2027'
@@ -636,33 +662,41 @@ const DEFAULT_MILESTONES: Omit<MilestoneData, 'id' | 'visibility' | 'version'>[]
   {
     type: 'first_solo',
     title: 'Mein erstes Solo',
-    subtitle: 'Der Moment freier Improvisation & Ausdruckskraft',
+    subtitle: 'Frei gespielt und eigene Töne ausprobiert – ganz ohne Noten',
     stepNumber: 6,
     iconName: 'zap',
     schoolYear: '2026/2027'
   },
   {
     type: 'first_own_song',
-    title: 'Mein erster eigener Song',
-    subtitle: 'Deine allererste eigene Melodie & Komposition',
+    title: 'Mein eigener Song',
+    subtitle: 'Deine allererste selbst ausgedachte Melodie',
     stepNumber: 7,
     iconName: 'lightbulb',
     schoolYear: '2026/2027'
   },
   {
-    type: 'hardest_piece',
-    title: 'Mein schwierigstes Stück',
-    subtitle: 'Deine persönliche Resilienz-Trophäe',
+    type: 'favorite_song',
+    title: 'Mein Lieblingssong',
+    subtitle: 'Das Stück, das du aktuell am allerliebsten spielst',
     stepNumber: 8,
+    iconName: 'heart',
+    schoolYear: '2026/2027'
+  },
+  {
+    type: 'hardest_piece',
+    title: '🔥 Mein schwerstes Stück',
+    subtitle: 'Ein Stück, das echt knifflig war – aber du hast es gemeistert!',
+    stepNumber: 9,
     iconName: 'flame',
     schoolYear: '2026/2027'
   },
   {
-    type: 'favorite_song',
-    title: 'Mein aktueller Lieblingssong',
-    subtitle: 'Dein musikalischer Herzens-Track des Schuljahres',
-    stepNumber: 9,
-    iconName: 'heart',
+    type: 'first_song',
+    title: '👑 Mein großes Meisterstück',
+    subtitle: 'Dein bühnenreifes Stück für das große Schulkonzert',
+    stepNumber: 10,
+    iconName: 'music',
     schoolYear: '2026/2027'
   }
 ];
@@ -672,9 +706,24 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   teacherId,
   isTeacher = false,
   onBackToHub,
-  isMobileOrSim = false
+  isMobileOrSim = false,
+  studentUiLevel
 }) => {
   const studentId = student?.id || student?.student_id || 'anonymous_student';
+
+  const isJunior = (
+    studentUiLevel === 'junior' ||
+    student?.campus_ui_level === 'junior' ||
+    localStorage.getItem('campus_ui_level') === 'junior'
+  );
+  const [showJuniorWizard, setShowJuniorWizard] = useState<boolean>(false);
+  const [juniorWizardMilestoneId, setJuniorWizardMilestoneId] = useState<string | null>(null);
+  const [juniorWizardPlaylistId, setJuniorWizardPlaylistId] = useState<string | null>(null);
+  const [selectedJuniorPlaylistForModal, setSelectedJuniorPlaylistForModal] = useState<CustomPlaylist | null>(null);
+  const [showJuniorCreatePlaylistModal, setShowJuniorCreatePlaylistModal] = useState<boolean>(false);
+  const [newJuniorPlaylistTitle, setNewJuniorPlaylistTitle] = useState<string>('');
+  const [newJuniorPlaylistCover, setNewJuniorPlaylistCover] = useState<string>('cov_first_songs');
+  const [showAdvancedShareOptions, setShowAdvancedShareOptions] = useState<boolean>(false);
 
   const STORAGE_KEY = `campus_audio_biography_${studentId}`;
   const PLAYLISTS_KEY = `campus_custom_playlists_${studentId}`;
@@ -848,6 +897,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   // Reflection Popover State
   const [activeReflectionMilestone, setActiveReflectionMilestone] = useState<MilestoneData | null>(null);
   const [reflectionText, setReflectionText] = useState<string>('');
+
+  // ⏳ Growth Capsule / Selected Milestone Version State (milestoneId -> versionId | 'latest')
+  const [selectedMilestoneVersions, setSelectedMilestoneVersions] = useState<Record<string, string>>({});
 
   // Stable deterministic PIN generator based on student ID & storage (Never re-rolls unless user clicks 'PIN neu würfeln')
   const getOrInitStableSharePin = (id: string, plId?: string | null): string => {
@@ -1105,22 +1157,23 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         let loadedMilestones: MilestoneData[] = [];
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
-          const parsed = JSON.parse(saved);
-          const updatedParsed = parsed.map((p: MilestoneData) => {
-            if (p.type === 'favorite_song') {
-              return {
-                ...p,
-                title: 'Mein aktueller Lieblingssong',
-                subtitle: 'Dein musikalischer Herzens-Track des Schuljahres'
-              };
-            }
-            return p;
-          });
-
-          if (updatedParsed.length < DEFAULT_MILESTONES.length) {
+          try {
+            const parsed = JSON.parse(saved);
             loadedMilestones = DEFAULT_MILESTONES.map((def, idx) => {
-              const existing = updatedParsed.find((p: any) => p.type === def.type);
-              return existing || {
+              const existing = Array.isArray(parsed) ? parsed.find((p: any) => p.type === def.type || p.id === `ms_${def.type}_${idx}` || p.id?.includes(def.type)) : null;
+              if (existing) {
+                return {
+                  ...existing,
+                  id: `ms_${def.type}_${idx}`,
+                  type: def.type,
+                  stepNumber: def.stepNumber,
+                  title: def.title, // 🌟 Strict canonical milestone title (never overwritten by test strings)
+                  subtitle: def.subtitle, // 🌟 Strict canonical milestone subtitle
+                  iconName: def.iconName,
+                  schoolYear: def.schoolYear || '2026/2027'
+                };
+              }
+              return {
                 ...def,
                 id: `ms_${def.type}_${idx}`,
                 visibility: 'private',
@@ -1130,8 +1183,15 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               };
             });
             localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedMilestones));
-          } else {
-            loadedMilestones = updatedParsed;
+          } catch (e) {
+            loadedMilestones = DEFAULT_MILESTONES.map((def, idx) => ({
+              ...def,
+              id: `ms_${def.type}_${idx}`,
+              visibility: 'private',
+              version: 1,
+              isUnerasable: false,
+              isVerified: false
+            }));
           }
         } else {
           loadedMilestones = DEFAULT_MILESTONES.map((def, idx) => ({
@@ -1144,7 +1204,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           }));
         }
 
-        // Hydrate Milestones Audio Blobs from IndexedDB
+        // Hydrate Milestones Audio Blobs from IndexedDB (including Growth Capsule historical versions)
         const hydratedMilestones = await Promise.all(
           loadedMilestones.map(async (m) => {
             const rawBlob = await getBlob(`campus_audio_${m.id}_raw`);
@@ -1160,10 +1220,35 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               masteredAudioUrl = URL.createObjectURL(masterBlob);
             }
 
+            // Hydrate historical versions in growth capsule
+            let hydratedHistory = m.history;
+            if (m.history && Array.isArray(m.history) && m.history.length > 0) {
+              hydratedHistory = await Promise.all(
+                m.history.map(async (ver) => {
+                  const vRawBlob = await getBlob(`campus_audio_${ver.id}_raw`);
+                  const vMasterBlob = await getBlob(`campus_audio_${ver.id}_master`);
+                  let vAudioUrl = ver.audioUrl;
+                  let vMasteredUrl = ver.masteredAudioUrl;
+                  if (vRawBlob && vRawBlob instanceof Blob) {
+                    vAudioUrl = URL.createObjectURL(vRawBlob);
+                  }
+                  if (vMasterBlob && vMasterBlob instanceof Blob) {
+                    vMasteredUrl = URL.createObjectURL(vMasterBlob);
+                  }
+                  return {
+                    ...ver,
+                    audioUrl: vAudioUrl || ver.audioUrl,
+                    masteredAudioUrl: vMasteredUrl || ver.masteredAudioUrl
+                  };
+                })
+              );
+            }
+
             return {
               ...m,
               audioUrl: audioUrl || m.audioUrl,
-              masteredAudioUrl: masteredAudioUrl || m.masteredAudioUrl
+              masteredAudioUrl: masteredAudioUrl || m.masteredAudioUrl,
+              history: hydratedHistory
             };
           })
         );
@@ -1319,6 +1404,48 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       }
     };
   }, [studentId]);
+
+  // 🌟 Real-Time Listener: Automatically unlock & complete family milestone upon share, family listen, or applause
+  useEffect(() => {
+    const handleFamilyEvent = () => {
+      setMilestones(prev => {
+        const familyMs = prev.find(m => m.type === 'family_share');
+        if (familyMs && !familyMs.audioUrl) {
+          const anyAudio = customPlaylists.find(pl => pl.id === 'pl_gifts')?.tracks[0] || prev.find(m => !!m.audioUrl);
+          if (anyAudio) {
+            const updated = prev.map(m => {
+              if (m.type === 'family_share') {
+                return {
+                  ...m,
+                  audioUrl: anyAudio.audioUrl,
+                  masteredAudioUrl: anyAudio.masteredAudioUrl,
+                  duration: anyAudio.duration || 60,
+                  recordedAt: 'Mit Familie geteilt',
+                  personalNote: 'Erfolgreich mit der Familie geteilt & angehört ❤️'
+                };
+              }
+              return m;
+            });
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+            } catch {}
+            return updated;
+          }
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener('campus_family_listen_received', handleFamilyEvent);
+    window.addEventListener('campus_family_shared_event', handleFamilyEvent);
+    window.addEventListener('campus_reaction_received', handleFamilyEvent);
+
+    return () => {
+      window.removeEventListener('campus_family_listen_received', handleFamilyEvent);
+      window.removeEventListener('campus_family_shared_event', handleFamilyEvent);
+      window.removeEventListener('campus_reaction_received', handleFamilyEvent);
+    };
+  }, [studentId, customPlaylists]);
 
 
   // Persist milestone state changes
@@ -1712,6 +1839,12 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   // Open Recording/Upload Modal
   const openUploadModal = (ms: MilestoneData) => {
+    if (isJunior) {
+      setJuniorWizardMilestoneId(ms.id);
+      setJuniorWizardPlaylistId(null);
+      setShowJuniorWizard(true);
+      return;
+    }
     setActiveUploadModalMilestone(ms);
     setRecordingPlaylistId(null);
     setUploadMode('mic');
@@ -1722,6 +1855,254 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     setTempNote(ms.personalNote || '');
     setTempVisibility(ms.visibility || 'private');
     setCountDown(null);
+  };
+
+  // Open Playlist Record Modal
+  const openPlaylistRecordModal = (playlistId: string) => {
+    if (isJunior) {
+      setJuniorWizardPlaylistId(playlistId);
+      setJuniorWizardMilestoneId(null);
+      setShowJuniorWizard(true);
+      return;
+    }
+    setActiveUploadModalMilestone(null);
+    setRecordingPlaylistId(playlistId);
+  };
+
+  // Open Playlist Creation
+  const handleOpenCreatePlaylist = () => {
+    if (isJunior) {
+      setJuniorWizardPlaylistId(null);
+      setJuniorWizardMilestoneId(null);
+      setShowJuniorWizard(true);
+      return;
+    }
+    setWizardStep(1);
+    setShowPlaylistWizard(true);
+  };
+
+  // 🌟 Junior Audio-Biografie Save Handler
+  const handleJuniorSaveCompleted = async (savedData: {
+    targetType: 'milestone' | 'playlist';
+    milestoneId?: string;
+    playlistId?: string;
+    newPlaylistTitle?: string;
+    newPlaylistCoverPreset?: string;
+    title: string;
+    personalNote?: string;
+    rawBlob: Blob;
+    masterBlob: Blob;
+    rawUrl: string;
+    masteredUrl: string;
+    duration: number;
+    stickerEmoji: string;
+  }) => {
+    const targetTrackId = savedData.milestoneId || `plt_${Date.now()}`;
+    let rawUrl = savedData.rawUrl;
+    let masteredUrl = savedData.masteredUrl;
+
+    // 1. 💾 Persist to IndexedDB
+    await Promise.allSettled([
+      storeBlob(`campus_audio_${targetTrackId}_raw`, savedData.rawBlob),
+      storeBlob(`campus_audio_${targetTrackId}_master`, savedData.masterBlob)
+    ]);
+
+    // 2. ☁️ Persist to Supabase Cloud Storage
+    try {
+      const sId = student?.id || studentId || 'student';
+      const rawPath = `audio_biography/${sId}_${targetTrackId}_raw.wav`;
+      const masterPath = `audio_biography/${sId}_${targetTrackId}_master.wav`;
+
+      const [rawUploadRes, masterUploadRes] = await Promise.all([
+        supabase.storage.from('campus-assets').upload(rawPath, savedData.rawBlob, { contentType: 'audio/wav', upsert: true }),
+        supabase.storage.from('campus-assets').upload(masterPath, savedData.masterBlob, { contentType: 'audio/wav', upsert: true })
+      ]);
+
+      if (!rawUploadRes.error) {
+        const { data: rawData } = supabase.storage.from('campus-assets').getPublicUrl(rawPath);
+        if (rawData?.publicUrl) rawUrl = rawData.publicUrl;
+      }
+
+      if (!masterUploadRes.error) {
+        const { data: masterData } = supabase.storage.from('campus-assets').getPublicUrl(masterPath);
+        if (masterData?.publicUrl) masteredUrl = masterData.publicUrl;
+      }
+    } catch (err) {
+      console.warn('[Storage] Cloud sync note:', err);
+    }
+
+    // 3. Update Milestones or Playlist
+    const isGift = savedData.playlistId === 'pl_gifts' || 
+                   savedData.personalNote?.includes('Geschenk') || 
+                   savedData.title.toLowerCase().includes('geschenk') ||
+                   milestones.find(m => m.id === savedData.milestoneId)?.type === 'family_share';
+
+    if (savedData.targetType === 'milestone' && savedData.milestoneId) {
+      const updated = milestones.map(m => {
+        if (m.id === savedData.milestoneId) {
+          // If milestone already had an audio recording, archive the old version to history growth capsule!
+          let newHistory = m.history ? [...m.history] : [];
+          if (m.audioUrl) {
+            const oldVersion: AudioVersion = {
+              id: `ver_${m.id}_${Date.now()}`,
+              versionNumber: newHistory.length + 1,
+              recordedAt: m.recordedAt || 'Früher',
+              schoolYear: m.schoolYear || '2025/2026',
+              audioUrl: m.audioUrl,
+              masteredAudioUrl: m.masteredAudioUrl,
+              duration: m.duration,
+              stickerEmoji: m.personalNote?.match(/[\p{Emoji}]/u)?.[0] || '🎵',
+              personalNote: m.personalNote
+            };
+            newHistory = [oldVersion, ...newHistory];
+          }
+
+          return {
+            ...m,
+            title: m.title, // 🌟 Preserve immutable canonical milestone title
+            audioUrl: rawUrl,
+            masteredAudioUrl: masteredUrl,
+            duration: savedData.duration || m.duration || 30,
+            recordedAt: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' }),
+            schoolYear: '2026/2027',
+            version: (m.version || 1) + 1,
+            isVerified: isTeacher ? true : m.isVerified,
+            isUnerasable: true,
+            visibility: 'private' as const,
+            personalNote: savedData.personalNote || m.personalNote,
+            preferredVersion: 'master' as const,
+            reverbRoomType: 'medium' as const,
+            reverbWetMix: 8.0,
+            history: newHistory
+          };
+        }
+        return m;
+      });
+      saveMilestones(updated);
+    }
+
+    if (isGift) {
+      const giftTrack: CustomPlaylistTrack = {
+        id: targetTrackId,
+        title: savedData.title,
+        subtitle: `${savedData.stickerEmoji || '🎁'} Studio Master`,
+        audioUrl: rawUrl,
+        masteredAudioUrl: masteredUrl,
+        duration: savedData.duration || 30,
+        recordedAt: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' }),
+        personalNote: savedData.personalNote,
+        preferredVersion: 'master',
+        reverbRoomType: 'medium',
+        reverbWetMix: 8.0
+      };
+
+      const existingGiftsPl = customPlaylists.find(pl => pl.id === 'pl_gifts');
+      if (existingGiftsPl) {
+        const updatedPlaylists = customPlaylists.map(pl => {
+          if (pl.id === 'pl_gifts') {
+            return {
+              ...pl,
+              tracks: [giftTrack, ...pl.tracks.filter(t => t.id !== giftTrack.id)]
+            };
+          }
+          return pl;
+        });
+        savePlaylists(updatedPlaylists);
+      } else {
+        const giftsPlaylist: CustomPlaylist = {
+          id: 'pl_gifts',
+          title: '🎁 Meine Geschenke',
+          description: 'Persönliche Musik-Geschenke für Familie & Freunde',
+          vibeTheme: 'vintage_tape',
+          iconName: 'heart',
+          coverPresetId: 'cov_favorites_heart',
+          schoolYear: '2026/2027',
+          tracks: [giftTrack],
+          createdAt: new Date().toISOString()
+        };
+        savePlaylists([giftsPlaylist, ...customPlaylists]);
+      }
+    } else if (savedData.targetType === 'playlist') {
+      const newTrack: CustomPlaylistTrack = {
+        id: targetTrackId,
+        title: savedData.title,
+        subtitle: `${savedData.stickerEmoji} Studio Master`,
+        audioUrl: rawUrl,
+        masteredAudioUrl: masteredUrl,
+        duration: savedData.duration || 30,
+        recordedAt: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' }),
+        personalNote: savedData.personalNote,
+        preferredVersion: 'master',
+        reverbRoomType: 'medium',
+        reverbWetMix: 8.0
+      };
+
+      if (savedData.newPlaylistTitle) {
+        // Create completely new playlist with custom title & cover
+        const newPlaylist: CustomPlaylist = {
+          id: `pl_${Date.now()}`,
+          title: savedData.newPlaylistTitle,
+          description: `Erstellt von ${student?.first_name || 'Schüler'}`,
+          vibeTheme: 'sunset_gold',
+          iconName: 'disc',
+          coverPresetId: (savedData.newPlaylistCoverPreset as any) || 'cov_first_songs',
+          schoolYear: '2026/2027',
+          tracks: [newTrack],
+          createdAt: new Date().toISOString()
+        };
+        savePlaylists([newPlaylist, ...customPlaylists]);
+      } else {
+        let targetPlId = savedData.playlistId || selectedCustomPlaylistId || customPlaylists[0]?.id;
+        if (targetPlId && customPlaylists.some(pl => pl.id === targetPlId)) {
+          const updatedPlaylists = customPlaylists.map(pl => {
+            if (pl.id === targetPlId) {
+              return {
+                ...pl,
+                tracks: [newTrack, ...pl.tracks]
+              };
+            }
+            return pl;
+          });
+          savePlaylists(updatedPlaylists);
+        } else {
+          const newPlaylist: CustomPlaylist = {
+            id: `pl_${Date.now()}`,
+            title: '⭐ Meine Lieblingslieder',
+            description: 'Meine persönlichen Lieblingsstücke',
+            vibeTheme: 'sunset_gold',
+            iconName: 'sparkles',
+            coverPresetId: 'cov_first_songs',
+            schoolYear: '2026/2027',
+            tracks: [newTrack],
+            createdAt: new Date().toISOString()
+          };
+          savePlaylists([newPlaylist, ...customPlaylists]);
+        }
+      }
+    }
+
+    // 4. 🌟 Campus XP Points Reward & Ground-Truth Synchronization
+    try {
+      const sId = student?.id || studentId || 'student';
+      const isMilestone = savedData.targetType === 'milestone';
+      const existingMs = isMilestone ? milestones.find(m => m.id === savedData.milestoneId) : null;
+      const isFirstRecording = isMilestone ? !existingMs?.audioUrl : true;
+      const isFirstSong = existingMs?.type === 'first_song';
+      const baseMsXp = isFirstSong ? 100 : 50;
+      const earnedXp = isMilestone ? (isFirstRecording ? baseMsXp : 25) : 30;
+
+      // Update offline stats in localStorage
+      const offlineStatsKey = `cg_offline_stats_${sId}`;
+      const currentStats = JSON.parse(localStorage.getItem(offlineStatsKey) || '{}');
+      const updatedXp = (currentStats.current_xp || 0) + earnedXp;
+      currentStats.current_xp = updatedXp;
+      localStorage.setItem(offlineStatsKey, JSON.stringify(currentStats));
+
+      // Broadcast update across the whole platform (< 5ms)
+      broadcastPracticeUpdate(sId, { xp: updatedXp, earnedXp, action: 'audio_biography_recorded' });
+    } catch (e) {
+      console.warn('[Campus XP] Broadcast note:', e);
+    }
   };
 
 
@@ -2310,7 +2691,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         if (m.id === msId) {
           return {
             ...m,
-            title: tempSongTitle.trim() || m.title,
+            title: m.title, // 🌟 Preserve immutable canonical milestone title
             audioUrl: rawUrl,
             masteredAudioUrl: masteredUrl,
             duration: pendingDurationSec || m.duration || 30,
@@ -3077,12 +3458,46 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   }, [studentId, shareTargetPlaylistId, shareAnonymously, shareAllowApplause, shareDesignTheme, sharePin]);
 
   const fullShareText = useMemo(() => {
-    return `🎵 Höre dir meine neuesten Songs aus der Musikschule an!\n\n1. Link öffnen: ${effectiveShareUrl}\n2. Familien-PIN eingeben: ${sharePin || '4829'}\n\n🔒 WICHTIGER RECHTSHINWEIS (§ 15 Abs. 3 UrhG):\nDieser Link & PIN sind ausschließlich für den privaten Familienkreis bestimmt. Ein öffentliches Teilen (z. B. auf Social Media, Instagram, TikTok oder Websites) ist urheberrechtlich strengstens untersagt.`;
-  }, [effectiveShareUrl, sharePin]);
+    const sName = student?.first_name || 'Linus';
+    const instr = student?.instrument || student?.main_instrument || 'Instrument';
+    return `*🎶 Hör mal rein! Neue Musik von ${sName} (${instr})*\n\nIch habe ein persönliches Stück für dich eingespielt! Du kannst es dir hier direkt im Browser anhören:\n👉 ${effectiveShareUrl}\n🔑 Dein Familien-PIN: *${sharePin || '4829'}*\n\n(Geschützter Familien-Link • Campus-Groovelab)`;
+  }, [effectiveShareUrl, sharePin, student]);
+
+  const completeFamilyMilestone = () => {
+    try {
+      localStorage.setItem(`campus_family_shared_${studentId}`, 'true');
+      window.dispatchEvent(new CustomEvent('campus_family_shared_event', { detail: { studentId } }));
+    } catch {}
+    setMilestones(prev => {
+      const familyMs = prev.find(m => m.type === 'family_share');
+      if (familyMs && !familyMs.audioUrl) {
+        const anyAudio = customPlaylists.find(pl => pl.id === 'pl_gifts')?.tracks[0] || prev.find(m => !!m.audioUrl);
+        if (anyAudio) {
+          const updated = prev.map(m => {
+            if (m.type === 'family_share') {
+              return {
+                ...m,
+                audioUrl: anyAudio.audioUrl,
+                masteredAudioUrl: anyAudio.masteredAudioUrl,
+                duration: anyAudio.duration || 60,
+                recordedAt: 'Mit Familie geteilt',
+                personalNote: 'Erfolgreich mit der Familie geteilt & angehört ❤️'
+              };
+            }
+            return m;
+          });
+          saveMilestones(updated);
+          return updated;
+        }
+      }
+      return prev;
+    });
+  };
 
   const handleShareLink = async () => {
     // Save current PIN for this student/playlist
     savePinToStorage(sharePin);
+    completeFamilyMilestone();
 
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
@@ -3100,6 +3515,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   const handleShareWhatsApp = () => {
     savePinToStorage(sharePin);
+    completeFamilyMilestone();
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullShareText)}`;
     window.open(waUrl, '_blank');
   };
@@ -3602,6 +4018,1020 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     );
   };
 
+  // 🌟 JUNIOR AUDIO-BIOGRAFIE: MINIMALISTISCHER ZAUBER-PFAD & SCHATZTRUHE (6–10 JAHRE)
+  const renderJuniorAudioHub = () => {
+    const completedMilestones = milestones.filter(m => !!m.audioUrl);
+    const studentFirstName = student?.first_name || 'Junger Musiker';
+    const possessiveName = formatStudentPossessive(studentFirstName);
+    const instrumentName = student?.instrument || student?.main_instrument || 'Gitarre';
+
+    // Ensure all gifts belong strictly to pl_gifts, and build sanitized custom playlists list
+    const allGifts: CustomPlaylistTrack[] = [];
+    customPlaylists.forEach(pl => {
+      pl.tracks.forEach(t => {
+        if (t.title.toLowerCase().includes('geschenk') || t.subtitle?.includes('🎁') || t.personalNote?.toLowerCase().includes('geschenk')) {
+          if (!allGifts.some(g => g.id === t.id)) {
+            allGifts.push(t);
+          }
+        }
+      });
+    });
+
+    // 🌟 Synchronize Meilensteine directly from the Zauberpfad (completed milestones)
+    const milestoneTracks: CustomPlaylistTrack[] = completedMilestones.map(m => ({
+      id: `track_${m.id}`,
+      title: m.title,
+      subtitle: m.subtitle,
+      audioUrl: m.audioUrl!,
+      masteredAudioUrl: m.masteredAudioUrl,
+      duration: m.duration || 60,
+      recordedAt: m.recordedAt || 'Meilenstein',
+      personalNote: m.personalNote,
+      albumTitle: '🌟 Meine Meilenstein-LP'
+    }));
+
+    let displayPlaylists: CustomPlaylist[] = customPlaylists.map(pl => {
+      if (pl.id === 'pl_meilenstein_lp' || pl.title.includes('Meilenstein')) {
+        return {
+          ...pl,
+          id: 'pl_meilenstein_lp',
+          title: '🌟 Meine Meilenstein-LP',
+          description: 'Mein musikalisches Lebenswerk – Die wichtigsten Meilensteine',
+          tracks: milestoneTracks
+        };
+      }
+      if (pl.id === 'pl_gifts') {
+        return {
+          ...pl,
+          tracks: Array.from(new Map([...allGifts, ...pl.tracks].map(t => [t.id, t])).values())
+        };
+      }
+      return {
+        ...pl,
+        tracks: pl.tracks.filter(t => !allGifts.some(g => g.id === t.id))
+      };
+    });
+
+    // Ensure pl_gifts exists if there are gifts
+    if (!displayPlaylists.some(pl => pl.id === 'pl_gifts') && allGifts.length > 0) {
+      const giftsPlaylist: CustomPlaylist = {
+        id: 'pl_gifts',
+        title: '🎁 Meine Geschenke',
+        description: 'Persönliche Geschenke für Familie & Freunde',
+        vibeTheme: 'vintage_tape',
+        iconName: 'gift',
+        coverPresetId: 'cov_favorites_heart',
+        schoolYear: '2026/2027',
+        tracks: allGifts,
+        createdAt: new Date().toISOString()
+      };
+      displayPlaylists = [giftsPlaylist, ...displayPlaylists];
+    }
+
+    // Ensure pl_meilenstein_lp exists if there are completed milestones
+    if (!displayPlaylists.some(pl => pl.id === 'pl_meilenstein_lp') && milestoneTracks.length > 0) {
+      const milestonePlaylist: CustomPlaylist = {
+        id: 'pl_meilenstein_lp',
+        title: '🌟 Meine Meilenstein-LP',
+        description: 'Mein musikalisches Lebenswerk – Die wichtigsten Meilensteine',
+        vibeTheme: 'sunset_gold',
+        iconName: 'star',
+        coverPresetId: 'cov_gaming_xp',
+        schoolYear: '2026/2027',
+        tracks: milestoneTracks,
+        createdAt: new Date().toISOString()
+      };
+      displayPlaylists = [milestonePlaylist, ...displayPlaylists];
+    }
+
+    // 🌟 STRIKTE REGEL 2: Zeige NUR Playlisten an, die tatsächlich mit Songs gefüllt sind!
+    displayPlaylists = displayPlaylists.filter(pl => pl.tracks && pl.tracks.length > 0);
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', maxWidth: '1040px', margin: '0 auto', width: '100%' }}>
+        
+        {/* 🌟 1. DIE HELDEN-BÜHNE (GENAU 1 ZENTRALE HAUPTAKTION) */}
+        <div style={{
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 60%, #047857 100%)',
+            borderRadius: '28px',
+            padding: isMobileOrSim ? '22px 18px' : '30px 36px',
+            color: '#ffffff',
+            boxShadow: '0 14px 40px rgba(16, 185, 129, 0.35)',
+            display: 'flex',
+            flexDirection: isMobileOrSim ? 'column' : 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '20px',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Glowing Watermark */}
+            <div style={{
+              position: 'absolute',
+              top: '-25px',
+              right: '-15px',
+              fontSize: '9rem',
+              opacity: 0.12,
+              pointerEvents: 'none',
+              userSelect: 'none'
+            }}>
+              🎙️
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', zIndex: 1 }}>
+              <div style={{
+                width: isMobileOrSim ? '64px' : '80px',
+                height: isMobileOrSim ? '64px' : '80px',
+                borderRadius: '24px',
+                background: 'rgba(255, 255, 255, 0.22)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '2.5px solid rgba(255, 255, 255, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: isMobileOrSim ? '2.2rem' : '2.8rem',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+                flexShrink: 0
+              }}>
+                ✨
+              </div>
+
+              <div>
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(255, 255, 255, 0.22)',
+                  padding: '4px 12px',
+                  borderRadius: '100px',
+                  fontSize: '0.74rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  marginBottom: '6px'
+                }}>
+                  <Sparkles size={13} />
+                  <span>DEINE MUSIKALISCHE AUDIO-BÜHNE</span>
+                </div>
+                <h2 style={{
+                  margin: '0 0 4px 0',
+                  fontSize: isMobileOrSim ? '1.35rem' : '1.85rem',
+                  fontWeight: 900,
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.2
+                }}>
+                  Was möchtest du heute aufnehmen?
+                </h2>
+                <p style={{
+                  margin: 0,
+                  fontSize: isMobileOrSim ? '0.84rem' : '0.94rem',
+                  color: '#d1fae5',
+                  fontWeight: 600,
+                  lineHeight: 1.4
+                }}>
+                  Nimm Meilensteine auf, fülle deine Playlisten oder erstelle ein Musik-Geschenk 🎶
+                </p>
+              </div>
+            </div>
+
+            {/* Der neutrale 60px Touch-Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setJuniorWizardMilestoneId(null);
+                setJuniorWizardPlaylistId(null);
+                setShowJuniorWizard(true);
+              }}
+              style={{
+                minHeight: '58px',
+                padding: isMobileOrSim ? '14px 22px' : '16px 32px',
+                borderRadius: '100px',
+                border: 'none',
+                background: '#ffffff',
+                color: '#047857',
+                fontWeight: 900,
+                fontSize: isMobileOrSim ? '0.95rem' : '1.05rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                boxShadow: '0 10px 28px rgba(0, 0, 0, 0.22)',
+                whiteSpace: 'nowrap',
+                zIndex: 1,
+                transition: 'all 0.2s ease'
+              }}
+              className="hover-scale"
+            >
+              <Mic size={22} color="#047857" strokeWidth={2.6} />
+              <span>Neues Stück aufnehmen ✨</span>
+            </button>
+          </div>
+
+        {/* 🌟 2. DER MUSIKALISCHE ZAUBER-PFAD (DIE 9 STUFEN DER SCHATZKARTE) */}
+        <div style={{
+          background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)',
+          borderRadius: '24px',
+          border: `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+          padding: '22px',
+          boxShadow: isLight ? '0 4px 18px rgba(0,0,0,0.04)' : 'none'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '12px',
+                background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.2)',
+                color: '#10b981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Trophy size={18} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 900, color: colors.textPrimary }}>
+                  Deine 10 Meilensteine
+                </h3>
+                <span style={{ fontSize: '0.74rem', color: colors.textSecondary, fontWeight: 600 }}>
+                  Stufe für Stufe zu deinem musikalischen Lebenswerk
+                </span>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid #86efac',
+              padding: '4px 14px',
+              borderRadius: '100px',
+              color: isLight ? '#166534' : '#86efac',
+              fontSize: '0.80rem',
+              fontWeight: 900
+            }}>
+              <Sparkles size={13} color="#10b981" />
+              <span>{completedMilestones.length} von {milestones.length} Gemeistert • {completedMilestones.reduce((acc, m) => acc + (m.type === 'first_song' ? 100 : 50), 0)} Campus XP</span>
+            </div>
+          </div>
+
+          {/* Der 100% offene Stepping-Stone-Pfad (Freie Reihenfolge & XP Belohnungen) */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            {milestones.map((ms, idx) => {
+              const isDone = !!ms.audioUrl;
+              const isFamilyShareMs = ms.type === 'family_share';
+              const isFirstSongMs = ms.type === 'first_song';
+              const xpAmount = isFirstSongMs ? 100 : 50;
+              
+              // ⏳ Resolve active version from growth capsule
+              const selectedVerId = selectedMilestoneVersions[ms.id] || 'latest';
+              let activeAudioUrl = ms.audioUrl;
+              let activeMasterUrl = ms.masteredAudioUrl;
+              let activePlayingTrackId = ms.id;
+              let activeVerLabel = `Heute (${ms.schoolYear || '2026/27'})`;
+
+              if (selectedVerId !== 'latest' && ms.history && ms.history.length > 0) {
+                const chosenVer = ms.history.find(v => v.id === selectedVerId);
+                if (chosenVer) {
+                  activeAudioUrl = chosenVer.audioUrl;
+                  activeMasterUrl = chosenVer.masteredAudioUrl;
+                  activePlayingTrackId = chosenVer.id;
+                  activeVerLabel = chosenVer.schoolYear ? `Schuljahr ${chosenVer.schoolYear}` : chosenVer.recordedAt || `Version ${chosenVer.versionNumber}`;
+                }
+              }
+
+              const isPlaying = activePlayingId === activePlayingTrackId;
+              const hasHistory = ms.history && ms.history.length > 0;
+              const totalVersions = 1 + (ms.history?.length || 0);
+
+              return (
+                <div
+                  key={ms.id || idx}
+                  style={{
+                    borderRadius: '20px',
+                    border: `1.5px solid ${
+                      isDone 
+                        ? '#86efac' 
+                        : isFirstSongMs
+                          ? '#f59e0b'
+                          : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)')
+                    }`,
+                    background: isDone
+                      ? (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.08)')
+                      : isFirstSongMs
+                        ? (isLight ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' : 'rgba(245, 158, 11, 0.08)')
+                        : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)'),
+                    padding: '16px 20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    boxShadow: isDone 
+                      ? 'none' 
+                      : isFirstSongMs
+                        ? '0 6px 20px rgba(245, 158, 11, 0.16)'
+                        : (isLight ? '0 2px 8px rgba(0,0,0,0.03)' : 'none'),
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {/* Obere Reihe: Icon, Titel, Aktionen */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px' }}>
+                    
+                    {/* Linker Bereich: Icon & Titel */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '14px',
+                        background: isDone
+                          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                          : isFirstSongMs
+                            ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                            : (isFamilyShareMs ? (isLight ? '#fdf2f8' : 'rgba(236, 72, 153, 0.15)') : (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.12)')),
+                        border: isDone ? 'none' : `1.5px solid ${isFirstSongMs ? '#fbbf24' : isFamilyShareMs ? '#fbcfe8' : (isLight ? '#86efac' : 'rgba(16, 185, 129, 0.3)')}`,
+                        color: isDone ? '#ffffff' : (isFirstSongMs ? '#ffffff' : isFamilyShareMs ? '#db2777' : (isLight ? '#047857' : '#86efac')),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1.2rem',
+                        fontWeight: 900,
+                        flexShrink: 0,
+                        boxShadow: isDone 
+                          ? '0 4px 12px rgba(16, 185, 129, 0.3)' 
+                          : isFirstSongMs
+                            ? '0 4px 12px rgba(245, 158, 11, 0.35)'
+                            : 'none'
+                      }}>
+                        {isDone ? (hasHistory ? '🏆' : (isFirstSongMs ? '👑' : isFamilyShareMs ? '🎁' : '⭐')) : (isFirstSongMs ? '👑' : ms.stepNumber)}
+                      </div>
+
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontSize: '0.66rem',
+                            fontWeight: 900,
+                            color: isDone ? '#059669' : isFirstSongMs ? '#b45309' : (isFamilyShareMs ? '#db2777' : '#047857'),
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em'
+                          }}>
+                            STUFE {ms.stepNumber} {isFirstSongMs ? `• 👑 MEISTER-MEILENSTEIN • +${xpAmount} XP` : (isDone ? (hasHistory ? `• ${totalVersions} ZEITKAPSELN • +${xpAmount} XP` : `• GEMEISTERT • +${xpAmount} XP`) : `• JETZT OFFEN • +${xpAmount} XP`)}
+                          </span>
+                          {ms.recordedAt && (
+                            <span style={{ fontSize: '0.66rem', color: colors.textSecondary }}>
+                              ({ms.recordedAt})
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{
+                          fontSize: '0.98rem',
+                          fontWeight: 900,
+                          color: colors.textPrimary,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {ms.title}
+                        </div>
+
+                        <div style={{
+                          fontSize: '0.74rem',
+                          color: colors.textSecondary,
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {ms.subtitle}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Rechter Bereich: 1-Tap Aktion (Keine Locks mehr: Alle Stufen frei wählbar!) */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      {isDone ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handlePlayToggle(activeAudioUrl, activeMasterUrl, activePlayingTrackId)}
+                            style={{
+                              padding: '9px 18px',
+                              borderRadius: '100px',
+                              border: 'none',
+                              background: isPlaying ? '#ef4444' : '#10b981',
+                              color: '#ffffff',
+                              fontWeight: 900,
+                              fontSize: '0.82rem',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              boxShadow: isPlaying ? '0 3px 10px rgba(239, 68, 68, 0.35)' : '0 3px 10px rgba(16, 185, 129, 0.35)'
+                            }}
+                            className="hover-scale"
+                          >
+                            {isPlaying ? <Pause size={15} fill="#ffffff" /> : <Play size={15} fill="#ffffff" style={{ marginLeft: '1px' }} />}
+                            <span>{isPlaying ? 'Pause' : `Anhören (${activeVerLabel})`}</span>
+                          </button>
+
+                          {isFamilyShareMs ? (
+                            <button
+                              type="button"
+                              onClick={() => setShowShareModal(true)}
+                              title="Jetzt an Familie verschicken"
+                              style={{
+                                padding: '8px 16px',
+                                borderRadius: '100px',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                                color: '#ffffff',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '0.78rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                boxShadow: '0 3px 10px rgba(236, 72, 153, 0.3)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <Share2 size={14} />
+                              <span>Verschicken / Teilen</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setJuniorWizardMilestoneId(ms.id);
+                                setJuniorWizardPlaylistId(null);
+                                setShowJuniorWizard(true);
+                              }}
+                              title="Neue Zeitkapsel aufnehmen"
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: '100px',
+                                border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.18)'}`,
+                                background: isLight ? '#ffffff' : 'rgba(255,255,255,0.06)',
+                                color: colors.textSecondary,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                cursor: 'pointer'
+                              }}
+                              className="hover-scale"
+                            >
+                              <RotateCcw size={13} />
+                              <span>Neu aufnehmen (+25 XP)</span>
+                            </button>
+                          )}
+                        </>
+                      ) : isFamilyShareMs ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setJuniorWizardMilestoneId(ms.id);
+                            setJuniorWizardPlaylistId('pl_gifts');
+                            setShowJuniorWizard(true);
+                          }}
+                          style={{
+                            padding: '10px 20px',
+                            borderRadius: '100px',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                            color: '#ffffff',
+                            fontWeight: 900,
+                            fontSize: '0.84rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 14px rgba(236, 72, 153, 0.35)'
+                          }}
+                          className="hover-scale"
+                        >
+                          <Gift size={15} />
+                          <span>Geschenk aufnehmen ✨ +50 XP</span>
+                        </button>
+                      ) : isFirstSongMs ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setJuniorWizardMilestoneId(ms.id);
+                            setJuniorWizardPlaylistId(null);
+                            setShowJuniorWizard(true);
+                          }}
+                          style={{
+                            padding: '10px 20px',
+                            borderRadius: '100px',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            color: '#ffffff',
+                            fontWeight: 900,
+                            fontSize: '0.84rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)'
+                          }}
+                          className="hover-scale"
+                        >
+                          <Music size={15} />
+                          <span>Meisterstück einspielen 👑 +100 XP</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setJuniorWizardMilestoneId(ms.id);
+                            setJuniorWizardPlaylistId(null);
+                            setShowJuniorWizard(true);
+                          }}
+                          style={{
+                            padding: '10px 20px',
+                            borderRadius: '100px',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: '#ffffff',
+                            fontWeight: 900,
+                            fontSize: '0.84rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                          }}
+                          className="hover-scale"
+                        >
+                          <Mic size={15} />
+                          <span>Einspielen ✨ +50 XP</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ⏳ WACHSTUMS-SCHALTER / ZEITKAPSEL-ZEITLEISTE (WENN MEHRERE VERSIONEN VORLIEGEN) */}
+                  {hasHistory && (
+                    <div style={{
+                      marginTop: '4px',
+                      paddingTop: '10px',
+                      borderTop: `1px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)'}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '0.70rem',
+                        fontWeight: 900,
+                        color: isLight ? '#047857' : '#86efac'
+                      }}>
+                        <span>⏳ Wachstums-Reise:</span>
+                      </div>
+
+                      {/* 🌟 Aktuelle Version */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedMilestoneVersions(prev => ({ ...prev, [ms.id]: 'latest' }));
+                        }}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '100px',
+                          border: selectedVerId === 'latest' ? '1.5px solid #10b981' : `1px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.18)'}`,
+                          background: selectedVerId === 'latest' ? (isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.25)') : (isLight ? '#ffffff' : 'transparent'),
+                          color: selectedVerId === 'latest' ? '#047857' : colors.textSecondary,
+                          fontSize: '0.72rem',
+                          fontWeight: 900,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span>🌟 Heute ({ms.schoolYear || '2026/27'})</span>
+                      </button>
+
+                      {/* 📜 Historische Versionen (V1, V2, V3...) */}
+                      {ms.history!.map((ver, vIdx) => {
+                        const isVerSelected = selectedVerId === ver.id;
+                        const verAgeIcon = vIdx === 0 ? '🎈' : vIdx === ms.history!.length - 1 ? '👶' : '🌱';
+                        const verLabel = ver.schoolYear ? `${ver.schoolYear}` : ver.recordedAt || `V${ver.versionNumber}`;
+
+                        return (
+                          <button
+                            key={ver.id || vIdx}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedMilestoneVersions(prev => ({ ...prev, [ms.id]: ver.id }));
+                            }}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '100px',
+                              border: isVerSelected ? '1.5px solid #f59e0b' : `1px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.18)'}`,
+                              background: isVerSelected ? (isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.25)') : (isLight ? '#ffffff' : 'transparent'),
+                              color: isVerSelected ? '#b45309' : colors.textSecondary,
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <span>{verAgeIcon} {verLabel}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 🌟 3. LINUS' PLAYLISTEN (NUR ALBEN / PLAYLISTEN • KEINE EINZELSONGS) */}
+        <div style={{
+          background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)',
+          borderRadius: '24px',
+          border: `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+          padding: isMobileOrSim ? '18px 16px' : '24px',
+          boxShadow: isLight ? '0 4px 18px rgba(0,0,0,0.04)' : 'none'
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '14px',
+                background: isLight ? '#f5f3ff' : 'rgba(99, 102, 241, 0.15)',
+                border: '1.5px solid #c7d2fe',
+                color: '#6366f1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(99, 102, 241, 0.15)'
+              }}>
+                <Disc size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900, color: colors.textPrimary }}>
+                  {possessiveName} Playlisten
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: colors.textSecondary, fontWeight: 600 }}>
+                  Deine Alben & Musik-Geschenke ({displayPlaylists.length} {displayPlaylists.length === 1 ? 'Playliste' : 'Playlisten'})
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setNewJuniorPlaylistTitle('');
+                setNewJuniorPlaylistCover('cov_first_songs');
+                setShowJuniorCreatePlaylistModal(true);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                border: 'none',
+                color: '#ffffff',
+                padding: '9px 18px',
+                borderRadius: '100px',
+                fontSize: '0.82rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)'
+              }}
+              className="hover-scale"
+            >
+              <Plus size={15} strokeWidth={3} />
+              <span>+ Neue Playlist</span>
+            </button>
+          </div>
+
+          {/* 💽 Pro-Level 1:1 Square Album-Karten Raster (Kindgerecht & Vertikal) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobileOrSim ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(170px, 1fr))',
+            gap: '16px'
+          }}>
+            {displayPlaylists.map((pl, idx) => {
+              const isGiftPl = pl.id === 'pl_gifts';
+              const trackCount = pl.tracks?.length || 0;
+              const totalDurationMin = Math.ceil((pl.tracks || []).reduce((acc, t) => acc + (t.duration || 60), 0) / 60);
+              
+              const isChristmasPl = pl.id === 'pl_weihnachten' || pl.title.toLowerCase().includes('weihnacht');
+              const isSummerPl = pl.id === 'pl_sommerhits' || pl.id === 'pl_sommer_2026' || pl.title.toLowerCase().includes('sommer');
+              const isFavoritesPl = pl.id === 'pl_lieblingssongs' || pl.title.toLowerCase().includes('lieblings');
+
+              const preset = UNIVERSAL_PLAYLIST_COVERS.find((c: UniversalPlaylistCoverConfig) => c.id === pl.coverPresetId) || UNIVERSAL_PLAYLIST_COVERS[0];
+              
+              const coverGradient = isGiftPl 
+                ? 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)' 
+                : isChristmasPl
+                  ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)'
+                  : isSummerPl
+                    ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                    : isFavoritesPl
+                      ? 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)'
+                      : (preset.gradient || 'linear-gradient(135deg, #10b981 0%, #059669 100%)');
+
+              const coverAccent = isGiftPl ? '#ec4899' : isChristmasPl ? '#dc2626' : isSummerPl ? '#f59e0b' : isFavoritesPl ? '#6366f1' : (preset.accentColor || '#10b981');
+              const coverEmoji = isGiftPl ? '🎁' : isChristmasPl ? '🎄' : isSummerPl ? '☀️' : isFavoritesPl ? '⭐' : (preset.emoji || '🎵');
+              const coverIconName = isGiftPl ? 'gift' : isChristmasPl ? 'gift' : isSummerPl ? 'sun' : isFavoritesPl ? 'heart' : (preset.iconName || 'music');
+              
+              const badgeText = isGiftPl 
+                ? (trackCount === 1 ? '1 GESCHENK' : trackCount > 1 ? `${trackCount} GESCHENKE` : '0 GESCHENKE • BEREIT')
+                : isChristmasPl
+                  ? (trackCount > 0 ? `${trackCount} TRACKS` : '🎄 WEIHNACHTEN')
+                  : isSummerPl
+                    ? (trackCount > 0 ? `${trackCount} TRACKS` : '☀️ SOMMERHITS')
+                    : isFavoritesPl
+                      ? (trackCount > 0 ? `${trackCount} TRACKS` : '⭐ LIEBLINGSSONGS')
+                      : (trackCount > 0 ? `${trackCount} TRACKS` : (preset.badge || '0 TRACKS • BEREIT'));
+
+              const isSummerGlow = isSummerPl;
+              const isGiftGlow = isGiftPl && trackCount > 0;
+
+              return (
+                <div
+                  key={pl.id || idx}
+                  onClick={() => setSelectedJuniorPlaylistForModal(pl)}
+                  style={{
+                    borderRadius: '16px',
+                    background: isLight ? '#ffffff' : 'rgba(30, 41, 59, 0.6)',
+                    border: isGiftGlow 
+                      ? '2px solid #f472b6' 
+                      : isSummerGlow 
+                        ? '2px solid #f59e0b' 
+                        : `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+                    padding: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    boxShadow: isGiftGlow
+                      ? '0 8px 24px rgba(236, 72, 153, 0.22)'
+                      : isSummerGlow
+                        ? '0 8px 24px rgba(245, 158, 11, 0.22)'
+                        : (isLight ? '0 3px 10px rgba(0, 0, 0, 0.04)' : '0 4px 16px rgba(0, 0, 0, 0.25)'),
+                    position: 'relative',
+                    boxSizing: 'border-box',
+                    transition: 'all 0.2s ease'
+                  }}
+                  className="spotify-card-hover hover-scale"
+                >
+                  {/* 1:1 Square Artwork Container with Spotify / Pro Artwork */}
+                  <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    aspectRatio: '1 / 1',
+                    borderRadius: '12px',
+                    overflow: 'hidden'
+                  }}>
+                    {renderSpotifyCoverArtwork({
+                      gradient: coverGradient,
+                      accentColor: coverAccent,
+                      badge: badgeText,
+                      title: pl.title,
+                      subtitle: pl.description,
+                      iconName: coverIconName,
+                      emoji: coverEmoji,
+                      trackCount: trackCount,
+                      isEmpty: trackCount === 0,
+                      isSeasonFocus: isSummerPl || isChristmasPl,
+                      seasonBadgeText: isSummerPl ? '☀️ SOMMERHITS' : isChristmasPl ? '🎄 WEIHNACHTEN' : badgeText,
+                      seasonGlowColor: isSummerPl ? '#f59e0b' : isChristmasPl ? '#dc2626' : undefined
+                    })}
+
+                    {/* Floating Quick Action FAB: Green Mic / Play Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (trackCount === 0) {
+                          setJuniorWizardMilestoneId(null);
+                          setJuniorWizardPlaylistId(pl.id);
+                          setShowJuniorWizard(true);
+                        } else {
+                          setSelectedJuniorPlaylistForModal(pl);
+                        }
+                      }}
+                      title={trackCount === 0 ? "Erstes Stück aufnehmen" : "Album öffnen & anhören"}
+                      style={{
+                        position: 'absolute',
+                        bottom: '8px',
+                        right: '8px',
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        border: 'none',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 6px 16px rgba(0, 0, 0, 0.4)',
+                        zIndex: 10
+                      }}
+                      className="hover-scale"
+                    >
+                      {trackCount === 0 ? (
+                        <Mic size={16} fill="#ffffff" color="#ffffff" />
+                      ) : (
+                        <Play size={16} fill="#ffffff" color="#ffffff" style={{ marginLeft: '2px' }} />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Card Typography below Artwork */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                      <h4 style={{
+                        margin: 0,
+                        fontSize: '0.86rem',
+                        fontWeight: 900,
+                        color: colors.textPrimary,
+                        lineHeight: 1.25,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        flex: 1
+                      }} title={pl.title}>
+                        {pl.title}
+                      </h4>
+                      
+                      {trackCount > 0 && (
+                        <BookOpen size={12} color={colors.textSecondary} style={{ flexShrink: 0, opacity: 0.6 }} />
+                      )}
+                    </div>
+
+                    <div style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      color: trackCount > 0 ? (isGiftPl ? '#db2777' : '#059669') : '#059669',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {trackCount > 0 
+                        ? (isGiftPl ? `${trackCount} ${trackCount === 1 ? 'Geschenk' : 'Geschenke'} • Bereit` : `${trackCount} ${trackCount === 1 ? 'Track' : 'Tracks'} • ${totalDurationMin} Min.`)
+                        : '0 Tracks • Bereit'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* + Neue Playlist anlegen (Vertical Pro Style Card) */}
+            <div
+              onClick={() => {
+                setNewJuniorPlaylistTitle('');
+                setNewJuniorPlaylistCover('cov_first_songs');
+                setShowJuniorCreatePlaylistModal(true);
+              }}
+              style={{
+                borderRadius: '16px',
+                border: `2px dashed ${isLight ? '#c7d2fe' : 'rgba(99, 102, 241, 0.3)'}`,
+                background: isLight ? '#f5f3ff' : 'rgba(99, 102, 241, 0.04)',
+                padding: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                cursor: 'pointer',
+                boxSizing: 'border-box',
+                transition: 'all 0.2s ease'
+              }}
+              className="hover-scale"
+            >
+              {/* 1:1 Dashed Placeholder Artwork */}
+              <div style={{
+                position: 'relative',
+                width: '100%',
+                aspectRatio: '1 / 1',
+                borderRadius: '12px',
+                border: `1.5px dashed ${isLight ? '#c7d2fe' : 'rgba(99, 102, 241, 0.4)'}`,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}>
+                <div style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)'
+                }}>
+                  <Plus size={22} strokeWidth={2.8} />
+                </div>
+              </div>
+
+              {/* Typography */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#4338ca' }}>
+                  + Neue Playlist
+                </span>
+                <span style={{ fontSize: '0.70rem', color: colors.textSecondary }}>
+                  Cover & Songs wählen
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 🌟 4. MIT FAMILIE TEILEN */}
+        <div style={{
+          background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.1)',
+          border: '1.5px solid #86efac',
+          borderRadius: '24px',
+          padding: '18px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '14px',
+              background: '#10b981',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.3rem',
+              flexShrink: 0
+            }}>
+              🎁
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 900, color: colors.textPrimary }}>
+                Möchtest du deine Musik mit Mama, Papa oder Oma teilen?
+              </h4>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: colors.textSecondary }}>
+                Über den sicheren Familien-Link können deine Liebsten deine Stücke direkt im Browser anhören und dir Applaus schicken!
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowShareModal(true)}
+            style={{
+              padding: '11px 20px',
+              borderRadius: '100px',
+              border: 'none',
+              background: '#25D366',
+              color: '#ffffff',
+              fontWeight: 900,
+              fontSize: '0.84rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)'
+            }}
+            className="hover-scale"
+          >
+            <Share2 size={15} />
+            <span>Mit Familie teilen</span>
+          </button>
+        </div>
+
+      </div>
+    );
+  };
+
   // 🌟 1. TAB: MASTER ÜBERSICHT (SPOTIFY PLAYLIST HUB MIT NEBENEINANDER LIEGENDEN COVERN)
   const renderOverviewShelf = () => {
     const completedMilestones = milestones.filter(m => !!m.audioUrl);
@@ -3640,8 +5070,14 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedMilestoneId(nextMilestone.id);
-                  setActiveMainTab('milestones');
+                  if (isJunior) {
+                    setJuniorWizardMilestoneId(nextMilestone.id);
+                    setJuniorWizardPlaylistId(null);
+                    setShowJuniorWizard(true);
+                  } else {
+                    setSelectedMilestoneId(nextMilestone.id);
+                    setActiveMainTab('milestones');
+                  }
                 }}
                 style={{
                   display: 'inline-flex',
@@ -3679,10 +5115,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           }}>
             {/* Quick-Create Spotify Card */}
             <div
-              onClick={() => {
-                setWizardStep(1);
-                setShowPlaylistWizard(true);
-              }}
+              onClick={handleOpenCreatePlaylist}
               style={{
                 flex: '0 0 auto',
                 width: isMobileOrSim ? '150px' : '172px',
@@ -5665,290 +7098,17 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         }
       `}} />
 
-      {/* Top Bar: Clean Context-Aware 1-Row Navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        {activeMainTab === 'playlists' ? (
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('overview')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
-              border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
-              color: colors.textPrimary,
-              padding: '8px 16px',
-              borderRadius: '100px',
-              fontSize: '0.8rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-            className="hover-scale"
-          >
-            <ArrowLeft size={15} color="#10b981" />
-            <span>Zurück zur Übersicht</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onBackToHub}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
-              border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
-              color: colors.textPrimary,
-              padding: '8px 16px',
-              borderRadius: '100px',
-              fontSize: '0.8rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-            className="hover-scale"
-          >
-            <span>← Zurück zum Aufgabenheft</span>
-          </button>
-        )}
-
-        {/* Center: Switcher Tabs (Overview/Milestones/Playlists in overview mode OR Playlist Pills in playlist mode) */}
-        {activeMainTab === 'playlists' ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            overflowX: 'auto',
-            maxWidth: '100%',
-            padding: '2px'
-          }}>
-            {customPlaylists.map(otherPl => {
-              const isCur = activeCustomPlaylist ? otherPl.id === activeCustomPlaylist.id : otherPl.id === customPlaylists[0]?.id;
-              const otherTheme = VIBE_THEMES.find(v => v.id === otherPl.vibeTheme) || VIBE_THEMES[0];
-              return (
-                <button
-                  key={otherPl.id}
-                  type="button"
-                  onClick={() => setSelectedCustomPlaylistId(otherPl.id)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '100px',
-                    border: `1.5px solid ${isCur ? otherTheme.color : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)')}`,
-                    background: isCur ? `${otherTheme.color}22` : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.04)'),
-                    color: isCur ? otherTheme.color : colors.textSecondary,
-                    fontSize: '0.76rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {otherPl.title} ({otherPl.tracks.length})
-                </button>
-              );
-            })}
-
-            <button
-              type="button"
-              onClick={() => {
-                setWizardStep(1);
-                setShowPlaylistWizard(true);
-              }}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '100px',
-                border: `1.5px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-                background: 'transparent',
-                color: colors.textPrimary,
-                fontSize: '0.76rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                whiteSpace: 'nowrap'
-              }}
-              className="hover-scale"
-            >
-              <Plus size={13} color="#10b981" />
-              <span>Neue</span>
-            </button>
-          </div>
-        ) : (
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            background: isLight ? '#e2e8f0' : 'rgba(0, 0, 0, 0.4)',
-            border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)'}`,
-            borderRadius: '100px',
-            padding: '4px',
-            gap: '4px'
-          }}>
+      {/* Top Bar: Context-Aware Navigation (Hidden in Junior Mode for maximum vertical space and zero clutter) */}
+      {isJunior ? null : (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          {activeMainTab === 'playlists' ? (
             <button
               type="button"
               onClick={() => setActiveMainTab('overview')}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '100px',
-                border: 'none',
-                background: activeMainTab === 'overview' ? (isLight ? '#ffffff' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') : 'transparent',
-                color: activeMainTab === 'overview' ? (isLight ? '#0f172a' : '#ffffff') : colors.textSecondary,
-                fontSize: '0.78rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                boxShadow: activeMainTab === 'overview' && isLight ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Disc size={14} color={activeMainTab === 'overview' ? (isLight ? '#10b981' : '#ffffff') : undefined} />
-              <span>Übersicht</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('milestones')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '100px',
-                border: 'none',
-                background: activeMainTab === 'milestones' ? (isLight ? '#ffffff' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') : 'transparent',
-                color: activeMainTab === 'milestones' ? (isLight ? '#0f172a' : '#ffffff') : colors.textSecondary,
-                fontSize: '0.78rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                boxShadow: activeMainTab === 'milestones' && isLight ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Sparkles size={14} color={activeMainTab === 'milestones' ? '#f59e0b' : undefined} />
-              <span>Meilensteine (9)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('playlists')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '100px',
-                border: 'none',
-                background: 'transparent',
-                color: colors.textSecondary,
-                fontSize: '0.78rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <ListMusic size={14} color="#10b981" />
-              <span>Eigene Playlists ({customPlaylists.length})</span>
-            </button>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Quick-Create New Playlist Button in Top Bar */}
-          {activeMainTab === 'overview' && (
-            <button
-              type="button"
-              onClick={() => {
-                setWizardStep(1);
-                setShowPlaylistWizard(true);
-              }}
-              style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-                color: 'white',
-                padding: '8px 15px',
-                borderRadius: '100px',
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
-                transition: 'all 0.2s ease'
-              }}
-              className="hover-scale"
-            >
-              <Plus size={15} strokeWidth={2.8} />
-              <span>Neue Playlist</span>
-            </button>
-          )}
-
-          {/* Apple Segmented Theme Switcher */}
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            background: isLight ? '#e2e8f0' : 'rgba(0, 0, 0, 0.4)',
-            border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)'}`,
-            borderRadius: '100px',
-            padding: '3px',
-            gap: '2px'
-          }}>
-            <button
-              type="button"
-              onClick={() => toggleTheme('light')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '5px 10px',
-                borderRadius: '100px',
-                border: 'none',
-                background: isLight ? '#ffffff' : 'transparent',
-                color: isLight ? '#0f172a' : '#94a3b8',
-                fontSize: '0.72rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                boxShadow: isLight ? '0 2px 6px rgba(0,0,0,0.12)' : 'none'
-              }}
-            >
-              <Sun size={12} color={isLight ? '#f59e0b' : '#94a3b8'} />
-              <span>Hell</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => toggleTheme('dark')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '5px 10px',
-                borderRadius: '100px',
-                border: 'none',
-                background: !isLight ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
-                color: !isLight ? '#ffffff' : '#64748b',
-                fontSize: '0.72rem',
-                fontWeight: 900,
-                cursor: 'pointer'
-              }}
-            >
-              <Moon size={12} />
-              <span>Studio</span>
-            </button>
-          </div>
-
-          {activeMainTab !== 'playlists' && (
-            <button
-              onClick={() => setShowShareModal(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
                 background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
                 border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
                 color: colors.textPrimary,
@@ -5962,17 +7122,288 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               }}
               className="hover-scale"
             >
-              <Share2 size={14} />
-              <span>Teilen</span>
+              <ArrowLeft size={15} color="#10b981" />
+              <span>Zurück zur Übersicht</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onBackToHub}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
+                color: colors.textPrimary,
+                padding: '8px 16px',
+                borderRadius: '100px',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+              className="hover-scale"
+            >
+              <span>← Zurück zum Aufgabenheft</span>
             </button>
           )}
+
+          {/* Center: Switcher Tabs (Overview/Milestones/Playlists in overview mode OR Playlist Pills in playlist mode) */}
+          {activeMainTab === 'playlists' ? (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              overflowX: 'auto',
+              maxWidth: '100%',
+              padding: '2px'
+            }}>
+              {customPlaylists.map(otherPl => {
+                const isCur = activeCustomPlaylist ? otherPl.id === activeCustomPlaylist.id : otherPl.id === customPlaylists[0]?.id;
+                const otherTheme = VIBE_THEMES.find(v => v.id === otherPl.vibeTheme) || VIBE_THEMES[0];
+                return (
+                  <button
+                    key={otherPl.id}
+                    type="button"
+                    onClick={() => setSelectedCustomPlaylistId(otherPl.id)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '100px',
+                      border: `1.5px solid ${isCur ? otherTheme.color : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)')}`,
+                      background: isCur ? `${otherTheme.color}22` : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.04)'),
+                      color: isCur ? otherTheme.color : colors.textSecondary,
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {otherPl.title} ({otherPl.tracks.length})
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={handleOpenCreatePlaylist}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '100px',
+                  border: `1.5px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                  background: 'transparent',
+                  color: colors.textPrimary,
+                  fontSize: '0.76rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  whiteSpace: 'nowrap'
+                }}
+                className="hover-scale"
+              >
+                <Plus size={13} color="#10b981" />
+                <span>Neue</span>
+              </button>
+            </div>
+          ) : (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              background: isLight ? '#e2e8f0' : 'rgba(0, 0, 0, 0.4)',
+              border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)'}`,
+              borderRadius: '100px',
+              padding: '4px',
+              gap: '4px'
+            }}>
+              <button
+                type="button"
+                onClick={() => setActiveMainTab('overview')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  background: activeMainTab === 'overview' ? (isLight ? '#ffffff' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') : 'transparent',
+                  color: activeMainTab === 'overview' ? (isLight ? '#0f172a' : '#ffffff') : colors.textSecondary,
+                  fontSize: '0.78rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  boxShadow: activeMainTab === 'overview' && isLight ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Disc size={14} color={activeMainTab === 'overview' ? (isLight ? '#10b981' : '#ffffff') : undefined} />
+                <span>Übersicht</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveMainTab('milestones')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  background: activeMainTab === 'milestones' ? (isLight ? '#ffffff' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') : 'transparent',
+                  color: activeMainTab === 'milestones' ? (isLight ? '#0f172a' : '#ffffff') : colors.textSecondary,
+                  fontSize: '0.78rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  boxShadow: activeMainTab === 'milestones' && isLight ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Sparkles size={14} color={activeMainTab === 'milestones' ? '#f59e0b' : undefined} />
+                <span>Meilensteine (9)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveMainTab('playlists')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: colors.textSecondary,
+                  fontSize: '0.78rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <ListMusic size={14} color="#10b981" />
+                <span>Eigene Playlists ({customPlaylists.length})</span>
+              </button>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Quick-Create New Playlist Button in Top Bar */}
+            {activeMainTab === 'overview' && (
+              <button
+                type="button"
+                onClick={handleOpenCreatePlaylist}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  color: 'white',
+                  padding: '8px 15px',
+                  borderRadius: '100px',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                  transition: 'all 0.2s ease'
+                }}
+                className="hover-scale"
+              >
+                <Plus size={15} strokeWidth={2.8} />
+                <span>Neue Playlist</span>
+              </button>
+            )}
+
+            {/* Apple Segmented Theme Switcher */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              background: isLight ? '#e2e8f0' : 'rgba(0, 0, 0, 0.4)',
+              border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)'}`,
+              borderRadius: '100px',
+              padding: '3px',
+              gap: '2px'
+            }}>
+              <button
+                type="button"
+                onClick={() => toggleTheme('light')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 10px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  background: isLight ? '#ffffff' : 'transparent',
+                  color: isLight ? '#0f172a' : '#94a3b8',
+                  fontSize: '0.72rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  boxShadow: isLight ? '0 2px 6px rgba(0,0,0,0.12)' : 'none'
+                }}
+              >
+                <Sun size={12} color={isLight ? '#f59e0b' : '#94a3b8'} />
+                <span>Hell</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleTheme('dark')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 10px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  background: !isLight ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
+                  color: !isLight ? '#ffffff' : '#64748b',
+                  fontSize: '0.72rem',
+                  fontWeight: 900,
+                  cursor: 'pointer'
+                }}
+              >
+                <Moon size={12} />
+                <span>Studio</span>
+              </button>
+            </div>
+
+            {activeMainTab !== 'playlists' && (
+              <button
+                onClick={() => setShowShareModal(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                  border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
+                  color: colors.textPrimary,
+                  padding: '8px 16px',
+                  borderRadius: '100px',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}
+                className="hover-scale"
+              >
+                <Share2 size={14} />
+                <span>Teilen</span>
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
 
 
-      {/* TAB CONTENT: 1. OVERVIEW (DEFAULT), 2. MILESTONES, OR 3. CUSTOM PLAYLISTS */}
-      {activeMainTab === 'overview' ? (
+      {/* TAB CONTENT: JUNIOR HUB OR 1. OVERVIEW (DEFAULT), 2. MILESTONES, OR 3. CUSTOM PLAYLISTS */}
+      {isJunior ? (
+        renderJuniorAudioHub()
+      ) : activeMainTab === 'overview' ? (
         renderOverviewShelf()
       ) : activeMainTab === 'milestones' ? (
         <>
@@ -6701,8 +8132,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       type="button"
                       onClick={() => {
                         if (pl.tracks.length === 0) {
-                          setActiveUploadModalMilestone(null);
-                          setRecordingPlaylistId(pl.id);
+                          openPlaylistRecordModal(pl.id);
                         } else {
                           playAlbumQueue(pl.title, pl.description || 'Studio Album', pl.tracks, effectiveGradient, effectiveAccent);
                         }
@@ -6740,8 +8170,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveUploadModalMilestone(null);
-                        setRecordingPlaylistId(pl.id);
+                        openPlaylistRecordModal(pl.id);
                       }}
                       style={{
                         padding: '10px 18px',
@@ -6908,8 +8337,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveUploadModalMilestone(null);
-                        setRecordingPlaylistId(pl.id);
+                        openPlaylistRecordModal(pl.id);
                       }}
                       style={{
                         display: 'inline-flex',
@@ -7139,8 +8567,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveUploadModalMilestone(null);
-                        setRecordingPlaylistId(pl.id);
+                        openPlaylistRecordModal(pl.id);
                       }}
                       style={{
                         padding: '12px',
@@ -8716,7 +10143,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         </div>
       )}
 
-      {/* 🌟 6. SHARE MODAL (Apple Human Interface Guidelines Design) */}
+      {/* 🌟 6. MINIMALISTISCHES & KINDGERECHTES SHARE MODAL */}
       {showShareModal && (
         <div style={{
           position: 'fixed',
@@ -8724,55 +10151,55 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.65)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 9999,
+          zIndex: 99999,
           padding: '16px'
         }}>
           <div style={{
-            background: isLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(24, 24, 27, 0.98)',
-            border: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)'}`,
-            borderRadius: '24px',
-            padding: '24px',
-            maxWidth: '460px',
+            background: '#ffffff',
+            borderRadius: '28px',
+            maxWidth: '430px',
             width: '100%',
             maxHeight: '90vh',
             overflowY: 'auto',
-            color: colors.textPrimary,
+            color: '#0f172a',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px',
-            boxShadow: isLight
-              ? '0 24px 48px -12px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04)'
-              : '0 24px 60px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08)',
+            gap: '18px',
+            padding: '24px',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
+            border: '1px solid #e2e8f0',
             boxSizing: 'border-box'
           }}>
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '12px',
-                  background: isLight ? '#e6f4ea' : 'rgba(16, 185, 129, 0.15)',
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '14px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#10b981',
+                  color: '#ffffff',
+                  fontSize: '1.3rem',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
                   flexShrink: 0
                 }}>
-                  <Share2 size={20} strokeWidth={2.2} />
+                  🎁
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.12rem', fontWeight: 800, letterSpacing: '-0.02em', color: colors.textPrimary }}>
-                    Audio-Biografie sicher teilen
+                  <h3 style={{ margin: 0, fontSize: '1.14rem', fontWeight: 900, color: '#0f172a' }}>
+                    Musik sicher teilen
                   </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: colors.textSecondary, fontWeight: 500, lineHeight: 1.35 }}>
-                    Geschützter Familien-Link ohne Empfänger-Registrierung
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                    Für Mama, Papa & Oma • Kein Login nötig
                   </p>
                 </div>
               </div>
@@ -8780,35 +10207,55 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 type="button"
                 onClick={() => setShowShareModal(false)}
                 style={{
-                  width: '30px',
-                  height: '30px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '50%',
-                  background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.1)',
+                  background: '#f1f5f9',
                   border: 'none',
-                  color: colors.textSecondary,
-                  fontSize: '0.9rem',
+                  color: '#64748b',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexShrink: 0,
-                  transition: 'background 0.15s ease'
+                  flexShrink: 0
                 }}
+                className="hover-scale"
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* Target Content Selection (if custom playlists exist) */}
+            {/* Kindgerechte Vorschau-Karte mit Applaus-Erklärung */}
+            <div style={{
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+              border: '1.5px solid #86efac',
+              borderRadius: '20px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.4rem' }}>👏 ❤️ ⭐</span>
+                <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#166534' }}>
+                  Live-Applaus für {student?.first_name || 'dich'}
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.76rem', color: '#15803d', lineHeight: 1.4 }}>
+                Deine Familie kann deine Stücke sofort im Browser auf jedem Handy oder Tablet anhören und dir mit 1 Klick Applaus schicken!
+              </p>
+            </div>
+
+            {/* Target Selection: Einfaches Dropdown, wenn Playlists vorhanden */}
             {customPlaylists.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.74rem', color: colors.textSecondary, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Inhalt auswählen
+              <div>
+                <label style={{ display: 'block', fontSize: '0.74rem', color: '#475569', fontWeight: 800, marginBottom: '6px' }}>
+                  Was möchtest du teilen?
                 </label>
                 <div style={{
                   position: 'relative',
-                  background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.05)',
-                  border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
+                  background: '#f8fafc',
+                  border: '1.5px solid #cbd5e1',
                   borderRadius: '14px',
                   display: 'flex',
                   alignItems: 'center'
@@ -8822,332 +10269,117 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       borderRadius: '14px',
                       border: 'none',
                       background: 'transparent',
-                      color: colors.textPrimary,
+                      color: '#0f172a',
                       fontSize: '0.86rem',
-                      fontWeight: 700,
+                      fontWeight: 800,
                       outline: 'none',
                       cursor: 'pointer',
                       appearance: 'none',
                       WebkitAppearance: 'none'
                     }}
                   >
-                    <option value="" style={{ background: isLight ? '#ffffff' : '#1e293b', color: colors.textPrimary }}>
-                      Komplette Audio-Biografie (Alle Meilensteine)
-                    </option>
+                    <option value="">💽 Alle Meilensteine & Stücke</option>
                     {customPlaylists.map(pl => (
-                      <option key={pl.id} value={pl.id} style={{ background: isLight ? '#ffffff' : '#1e293b', color: colors.textPrimary }}>
-                        Playlist: {pl.title} ({pl.tracks.length} Songs)
+                      <option key={pl.id} value={pl.id}>
+                        {pl.title} ({pl.tracks?.length || 0} Stücke)
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={16} color={colors.textSecondary} style={{ position: 'absolute', right: '14px', pointerEvents: 'none' }} />
+                  <ChevronDown size={16} color="#64748b" style={{ position: 'absolute', right: '14px', pointerEvents: 'none' }} />
                 </div>
               </div>
             )}
 
-            {/* 🎨 Design-Auswahl für die geteilte Playlist: Spotify Dark vs. Apple Music Light */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.74rem', color: colors.textSecondary, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Design der Playlist wählen
-              </label>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '8px',
-                background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.05)',
-                padding: '4px',
-                borderRadius: '14px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setShareDesignTheme('dark')}
-                  style={{
-                    padding: '9px 12px',
-                    borderRadius: '10px',
-                    border: shareDesignTheme === 'dark' ? '1.5px solid #10b981' : '1px solid transparent',
-                    background: shareDesignTheme === 'dark' ? (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
-                    color: colors.textPrimary,
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    boxShadow: shareDesignTheme === 'dark' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <span>🌙 Dunkel</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShareDesignTheme('light')}
-                  style={{
-                    padding: '9px 12px',
-                    borderRadius: '10px',
-                    border: shareDesignTheme === 'light' ? '1.5px solid #10b981' : '1px solid transparent',
-                    background: shareDesignTheme === 'light' ? (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
-                    color: colors.textPrimary,
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    boxShadow: shareDesignTheme === 'light' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <span>☀️ Hell</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Apple PIN Passcode Widget */}
+            {/* Kompakte, intuitive PIN-Karte */}
             <div style={{
-              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
-              border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
               borderRadius: '18px',
-              padding: '14px 16px',
+              padding: '12px 14px',
               display: 'flex',
-              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'space-between',
               gap: '12px'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Lock size={14} color="#10b981" />
-                  <span style={{ fontSize: '0.78rem', color: colors.textPrimary, fontWeight: 800 }}>
-                    Feste Familien-PIN
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newPin = Math.floor(1000 + Math.random() * 9000).toString();
-                    savePinToStorage(newPin);
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#10b981',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px 6px',
-                    borderRadius: '6px'
-                  }}
-                >
-                  <RotateCcw size={12} strokeWidth={2.4} />
-                  <span>PIN neu würfeln</span>
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                {/* 4 Digit Interactive Passcode Input */}
-                <div style={{ position: 'relative', display: 'inline-flex' }}>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={4}
-                    value={sharePin}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                      savePinToStorage(val);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      opacity: 0,
-                      width: '100%',
-                      height: '100%',
-                      cursor: 'pointer',
-                      zIndex: 2
-                    }}
-                  />
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {[0, 1, 2, 3].map((idx) => {
-                      const digit = sharePin[idx] || '';
-                      return (
-                        <div
-                          key={idx}
-                          style={{
-                            width: '36px',
-                            height: '42px',
-                            borderRadius: '10px',
-                            border: `1.5px solid ${digit ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)')}`,
-                            background: isLight ? (digit ? '#f0fdf4' : '#ffffff') : (digit ? 'rgba(16, 185, 129, 0.12)' : 'rgba(0, 0, 0, 0.3)'),
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1.25rem',
-                            fontWeight: 800,
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif',
-                            color: colors.textPrimary,
-                            boxShadow: digit ? '0 2px 6px rgba(16, 185, 129, 0.12)' : 'none',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          {digit || <span style={{ opacity: 0.25, fontSize: '0.8rem' }}>-</span>}
-                        </div>
-                      );
-                    })}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Lock size={15} color="#10b981" />
+                <div>
+                  <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 700 }}>
+                    DEIN FAMILIEN-PIN
+                  </div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', letterSpacing: '0.18em' }}>
+                    {sharePin || '4829'}
                   </div>
                 </div>
-
-                <span style={{ fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.35, flex: 1, paddingLeft: '4px' }}>
-                  Oma & Familie müssen sich nur diesen 4-stelligen Code merken.
-                </span>
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const newPin = Math.floor(1000 + Math.random() * 9000).toString();
+                  savePinToStorage(newPin);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  color: '#047857',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '6px 10px',
+                  borderRadius: '100px'
+                }}
+                className="hover-scale"
+              >
+                <RotateCcw size={12} strokeWidth={2.4} />
+                <span>Neu würfeln</span>
+              </button>
             </div>
 
-            {/* Apple Inset Grouped Settings Box (iOS Switches) */}
-            <div style={{
-              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
-              border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
-              borderRadius: '18px',
-              overflow: 'hidden'
-            }}>
-              {/* Row 1: Reactions */}
-              <div style={{
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                borderBottom: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)'}`
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: colors.textPrimary }}>
-                    Reaktionen & Applaus erlauben
-                  </span>
-                  <span style={{ fontSize: '0.70rem', color: colors.textSecondary }}>
-                    Familie kann mit Bravo, Herz, Feuer & Stern reagieren
-                  </span>
-                </div>
-                <div
-                  role="switch"
-                  aria-checked={shareAllowApplause}
-                  onClick={() => setShareAllowApplause(!shareAllowApplause)}
-                  style={{
-                    width: '42px',
-                    height: '24px',
-                    borderRadius: '999px',
-                    backgroundColor: shareAllowApplause ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'),
-                    padding: '2px',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    position: 'relative',
-                    flexShrink: 0
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: '#ffffff',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                      transform: shareAllowApplause ? 'translateX(18px)' : 'translateX(0px)',
-                      transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Anonymize */}
-              <div style={{
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px'
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: colors.textPrimary }}>
-                    Name anonymisieren
-                  </span>
-                  <span style={{ fontSize: '0.70rem', color: colors.textSecondary }}>
-                    z. B. "Schülerin der Musikschule" statt Klarname
-                  </span>
-                </div>
-                <div
-                  role="switch"
-                  aria-checked={shareAnonymously}
-                  onClick={() => setShareAnonymously(!shareAnonymously)}
-                  style={{
-                    width: '42px',
-                    height: '24px',
-                    borderRadius: '999px',
-                    backgroundColor: shareAnonymously ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'),
-                    padding: '2px',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    position: 'relative',
-                    flexShrink: 0
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: '#ffffff',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                      transform: shareAnonymously ? 'translateX(18px)' : 'translateX(0px)',
-                      transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Sharing Action Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {/* 1. WhatsApp Button */}
+            {/* Große, taktile Haupt-Aktionen */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* 1. Haupt-Button: WhatsApp */}
               <button
                 type="button"
                 onClick={handleShareWhatsApp}
                 style={{
                   width: '100%',
-                  padding: '12px 18px',
-                  borderRadius: '14px',
+                  padding: '14px 18px',
+                  borderRadius: '16px',
                   border: 'none',
                   background: '#25D366',
                   color: '#ffffff',
-                  fontWeight: 800,
-                  fontSize: '0.90rem',
+                  fontWeight: 900,
+                  fontSize: '0.94rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 14px rgba(37, 211, 102, 0.3)',
+                  boxShadow: '0 4px 14px rgba(37, 211, 102, 0.4)',
                   transition: 'all 0.15s ease'
                 }}
                 className="hover-scale"
               >
-                <MessageCircle size={18} strokeWidth={2.4} />
+                <MessageCircle size={20} strokeWidth={2.4} />
                 <span>Per WhatsApp an Familie senden</span>
               </button>
 
-              {/* 2. Universal Copy & Share Button */}
+              {/* 2. Sekundär-Button: Link kopieren */}
               <button
                 type="button"
                 onClick={handleShareLink}
                 style={{
                   width: '100%',
-                  padding: '11px 18px',
-                  borderRadius: '14px',
-                  border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
-                  background: copySuccess ? '#10b981' : (isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.06)'),
-                  color: copySuccess ? '#ffffff' : colors.textPrimary,
-                  fontWeight: 700,
+                  padding: '12px 18px',
+                  borderRadius: '16px',
+                  border: '1.5px solid #cbd5e1',
+                  background: copySuccess ? '#10b981' : '#ffffff',
+                  color: copySuccess ? '#ffffff' : '#334155',
+                  fontWeight: 800,
                   fontSize: '0.84rem',
                   cursor: 'pointer',
                   display: 'flex',
@@ -9159,87 +10391,153 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 className="hover-scale"
               >
                 {copySuccess ? <Check size={16} strokeWidth={3} /> : <Copy size={16} />}
-                <span>{copySuccess ? 'Nachricht in Zwischenablage kopiert!' : 'Nachricht & Link kopieren'}</span>
+                <span>{copySuccess ? 'Nachricht & Link kopiert!' : 'Link & Nachricht kopieren'}</span>
               </button>
-
-              {/* 3. Auxiliary Actions: Test PIN Page & Text Preview Toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    savePinToStorage(sharePin);
-                    window.open(effectiveShareUrl, '_blank');
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: colors.textSecondary,
-                    fontWeight: 600,
-                    fontSize: '0.74rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px 4px'
-                  }}
-                >
-                  <ExternalLink size={12} color="#10b981" />
-                  <span>PIN-Seite testen</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowShareMessagePreview(!showShareMessagePreview)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: colors.textSecondary,
-                    fontWeight: 600,
-                    fontSize: '0.74rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px 4px'
-                  }}
-                >
-                  <FileText size={12} />
-                  <span>{showShareMessagePreview ? 'Text ausblenden' : 'Text anzeigen'}</span>
-                </button>
-              </div>
             </div>
 
-            {/* Collapsible Text Preview */}
-            {showShareMessagePreview && (
-              <div style={{
-                padding: '10px 12px',
-                borderRadius: '12px',
-                border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
-                background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.4)',
-                color: colors.textPrimary,
-                fontSize: '0.72rem',
-                fontFamily: 'monospace',
-                whiteSpace: 'pre-wrap',
-                lineHeight: 1.4,
-                userSelect: 'all'
-              }}>
-                {fullShareText}
-              </div>
-            )}
+            {/* Optionale Erweiterte Einstellungen (dezent aufklappbar) */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowAdvancedShareOptions(!showAdvancedShareOptions)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 4px'
+                }}
+              >
+                <span>⚙️ {showAdvancedShareOptions ? 'Weniger Optionen' : 'Erweiterte Einstellungen (Design & Name)'}</span>
+                <ChevronDown size={12} style={{ transform: showAdvancedShareOptions ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
+              </button>
 
-            {/* Apple Trust & Legal Security Badge */}
+              {showAdvancedShareOptions && (
+                <div style={{
+                  marginTop: '10px',
+                  padding: '12px',
+                  borderRadius: '16px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  {/* Design Toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>
+                      Design der Playlist:
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShareDesignTheme('light')}
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          border: shareDesignTheme === 'light' ? '1.5px solid #10b981' : '1px solid #cbd5e1',
+                          background: shareDesignTheme === 'light' ? '#f0fdf4' : '#ffffff',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ☀️ Hell
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShareDesignTheme('dark')}
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          border: shareDesignTheme === 'dark' ? '1.5px solid #10b981' : '1px solid #cbd5e1',
+                          background: shareDesignTheme === 'dark' ? '#f0fdf4' : '#ffffff',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🌙 Dunkel
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Anonymize Toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>
+                      Name anonymisieren
+                    </span>
+                    <div
+                      role="switch"
+                      aria-checked={shareAnonymously}
+                      onClick={() => setShareAnonymously(!shareAnonymously)}
+                      style={{
+                        width: '38px',
+                        height: '22px',
+                        borderRadius: '999px',
+                        backgroundColor: shareAnonymously ? '#10b981' : '#cbd5e1',
+                        padding: '2px',
+                        cursor: 'pointer',
+                        position: 'relative'
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          backgroundColor: '#ffffff',
+                          transform: shareAnonymously ? 'translateX(16px)' : 'translateX(0px)',
+                          transition: 'transform 0.2s ease'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        savePinToStorage(sharePin);
+                        window.open(effectiveShareUrl, '_blank');
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#059669',
+                        fontWeight: 700,
+                        fontSize: '0.72rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <ExternalLink size={12} />
+                      <span>PIN-Seite im Browser testen</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Dezenter Trust & Urheberrechts-Hinweis */}
             <div style={{
-              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
-              border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)'}`,
-              borderRadius: '14px',
-              padding: '10px 12px',
               display: 'flex',
-              alignItems: 'flex-start',
-              gap: '8px'
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 8px',
+              borderRadius: '10px',
+              background: '#f8fafc'
             }}>
-              <Shield size={14} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <span style={{ fontSize: '0.69rem', color: colors.textSecondary, lineHeight: 1.35 }}>
-                <strong>100% GEMA- & Urheberrechtsschutz:</strong> Reiner Web-Stream ohne Download (§§ 16, 19a UrhG). Ausschließlich für den privaten Familienkreis bestimmt (§ 15 Abs. 3 UrhG).
+              <Shield size={13} color="#10b981" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: '0.66rem', color: '#64748b', lineHeight: 1.3 }}>
+                Geschützter Web-Stream für den privaten Familienkreis (§ 15 Abs. 3 UrhG).
               </span>
             </div>
           </div>
@@ -9988,6 +11286,467 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
       {/* 📖 10. DIGITALES LINER-NOTES BOOKLET MODAL */}
       {renderLinerNotesModal()}
+
+      {/* 🌟 12. JUNIOR AUDIO-BIOGRAFIE ZAUBERER (6-10 JAHRE) */}
+      {showJuniorWizard && (
+        <JuniorAudioBiographyWizard
+          isOpen={showJuniorWizard}
+          onClose={() => {
+            setShowJuniorWizard(false);
+            setJuniorWizardMilestoneId(null);
+            setJuniorWizardPlaylistId(null);
+          }}
+          student={student}
+          milestones={milestones}
+          customPlaylists={customPlaylists}
+          initialMilestoneId={juniorWizardMilestoneId}
+          initialPlaylistId={juniorWizardPlaylistId}
+          onSaveCompleted={handleJuniorSaveCompleted}
+        />
+      )}
+
+      {/* 🌟 13. JUNIOR ALBUM MODAL */}
+      {selectedJuniorPlaylistForModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: isLight ? '#ffffff' : '#1e293b',
+            borderRadius: '28px',
+            maxWidth: '560px',
+            width: '100%',
+            maxHeight: '88vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            flexDirection: 'column',
+            border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '22px 26px',
+              borderBottom: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: selectedJuniorPlaylistForModal.id === 'pl_gifts'
+                ? (isLight ? '#fdf2f8' : 'rgba(236, 72, 153, 0.12)')
+                : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)')
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '18px',
+                  background: selectedJuniorPlaylistForModal.id === 'pl_gifts'
+                    ? 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)'
+                    : (UNIVERSAL_PLAYLIST_COVERS.find((c: UniversalPlaylistCoverConfig) => c.id === selectedJuniorPlaylistForModal.coverPresetId)?.gradient || 'linear-gradient(135deg, #10b981 0%, #059669 100%)'),
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.8rem',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                  flexShrink: 0
+                }}>
+                  {selectedJuniorPlaylistForModal.id === 'pl_gifts' ? '🎁' : (UNIVERSAL_PLAYLIST_COVERS.find((c: UniversalPlaylistCoverConfig) => c.id === selectedJuniorPlaylistForModal.coverPresetId)?.emoji || '🎵')}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.70rem', fontWeight: 900, color: selectedJuniorPlaylistForModal.id === 'pl_gifts' ? '#db2777' : '#059669', textTransform: 'uppercase' }}>
+                    ALBUM • {selectedJuniorPlaylistForModal.tracks?.length || 0} {selectedJuniorPlaylistForModal.tracks?.length === 1 ? (selectedJuniorPlaylistForModal.id === 'pl_gifts' ? 'GESCHENK' : 'STÜCK') : (selectedJuniorPlaylistForModal.id === 'pl_gifts' ? 'GESCHENKE' : 'STÜCKE')}
+                  </div>
+                  <h2 style={{ margin: '2px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: colors.textPrimary }}>
+                    {selectedJuniorPlaylistForModal.title}
+                  </h2>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedJuniorPlaylistForModal(null)}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.1)',
+                  color: colors.textSecondary,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                className="hover-scale"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '22px 26px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              
+              {/* Record Action Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const plId = selectedJuniorPlaylistForModal.id;
+                  setSelectedJuniorPlaylistForModal(null);
+                  setJuniorWizardMilestoneId(null);
+                  setJuniorWizardPlaylistId(plId);
+                  setShowJuniorWizard(true);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '13px',
+                  borderRadius: '16px',
+                  border: 'none',
+                  background: selectedJuniorPlaylistForModal.id === 'pl_gifts'
+                    ? 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)'
+                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  fontWeight: 900,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: selectedJuniorPlaylistForModal.id === 'pl_gifts'
+                    ? '0 6px 18px rgba(236, 72, 153, 0.35)'
+                    : '0 6px 18px rgba(16, 185, 129, 0.35)'
+                }}
+                className="hover-scale"
+              >
+                <Mic size={18} />
+                <span>{selectedJuniorPlaylistForModal.id === 'pl_gifts' ? 'Neues Musik-Geschenk aufnehmen 🎁' : 'Neues Stück für dieses Album aufnehmen ✨'}</span>
+              </button>
+
+              {/* Tracks List */}
+              {(!selectedJuniorPlaylistForModal.tracks || selectedJuniorPlaylistForModal.tracks.length === 0) ? (
+                <div style={{
+                  background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+                  borderRadius: '18px',
+                  padding: '28px 18px',
+                  textAlign: 'center',
+                  border: `1.5px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`
+                }}>
+                  <span style={{ fontSize: '2rem' }}>
+                    {selectedJuniorPlaylistForModal.id === 'pl_gifts' ? '🎁' : '🎶'}
+                  </span>
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: colors.textPrimary, marginTop: '8px' }}>
+                    Dieses Album ist noch leer
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: colors.textSecondary, marginTop: '4px' }}>
+                    Klicke auf den Button oben, um dein erstes Stück aufzunehmen!
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {selectedJuniorPlaylistForModal.tracks.map((t, tIdx) => {
+                    const isPlaying = activePlayingId === t.id;
+                    const isGift = selectedJuniorPlaylistForModal.id === 'pl_gifts' || t.title.toLowerCase().includes('geschenk') || t.subtitle?.includes('🎁');
+
+                    return (
+                      <div
+                        key={t.id || tIdx}
+                        style={{
+                          borderRadius: '16px',
+                          background: isGift 
+                            ? (isLight ? '#fff5f7' : 'rgba(236, 72, 153, 0.08)')
+                            : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)'),
+                          border: `1.5px solid ${isGift ? '#fbcfe8' : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)')}`,
+                          padding: '12px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                          <div style={{
+                            width: '34px',
+                            height: '34px',
+                            borderRadius: '10px',
+                            background: isGift ? '#fce7f3' : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'),
+                            color: isGift ? '#be185d' : colors.textPrimary,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.82rem',
+                            fontWeight: 900,
+                            flexShrink: 0
+                          }}>
+                            {isGift ? '🎁' : `${tIdx + 1}`}
+                          </div>
+
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{
+                              fontSize: '0.90rem',
+                              fontWeight: 900,
+                              color: colors.textPrimary,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {t.title}
+                            </div>
+                            <div style={{ fontSize: '0.70rem', color: colors.textSecondary, marginTop: '2px' }}>
+                              {t.recordedAt || 'Aufnahme'} • {Math.floor((t.duration || 30) / 60)}:{(t.duration || 30) % 60 < 10 ? '0' : ''}{(t.duration || 30) % 60} Min.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          {/* WhatsApp Share Button */}
+                          {isGift && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const sName = student?.first_name || 'Junger Musiker';
+                                const origin = typeof window !== 'undefined' ? window.location.origin : 'https://campus-groovelab.de';
+                                const shareUrl = `${origin}/share/audio-bio?student_id=${studentId}`;
+                                const msg = `*Ein Musik-Geschenk von ${sName}!* 🎶🎁\n\nIch habe ein persönliches Stück für dich eingespielt:\n${shareUrl}`;
+                                window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+                              }}
+                              title="Per WhatsApp an Familie senden"
+                              style={{
+                                padding: '7px 12px',
+                                borderRadius: '100px',
+                                border: 'none',
+                                background: '#25D366',
+                                color: 'white',
+                                fontSize: '0.74rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                boxShadow: '0 2px 8px rgba(37, 211, 102, 0.35)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <Share2 size={13} />
+                              <span>WhatsApp</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handlePlayToggle(t.audioUrl, t.masteredAudioUrl, t.id)}
+                            style={{
+                              width: '38px',
+                              height: '38px',
+                              borderRadius: '50%',
+                              border: 'none',
+                              background: isPlaying ? '#ef4444' : '#10b981',
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              boxShadow: isPlaying ? '0 2px 8px rgba(239, 68, 68, 0.35)' : '0 2px 8px rgba(16, 185, 129, 0.35)'
+                            }}
+                            className="hover-scale"
+                          >
+                            {isPlaying ? <Pause size={16} fill="#ffffff" /> : <Play size={16} fill="#ffffff" style={{ marginLeft: '2px' }} />}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 14. JUNIOR NEUE PLAYLIST ANLEGEN MODAL */}
+      {showJuniorCreatePlaylistModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: isLight ? '#ffffff' : '#1e293b',
+            borderRadius: '26px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '24px',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.5rem' }}>💽</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: colors.textPrimary }}>
+                    Neue Playlist anlegen
+                  </h3>
+                  <span style={{ fontSize: '0.72rem', color: colors.textSecondary }}>
+                    Erstelle ein neues Album für deine Stücke
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowJuniorCreatePlaylistModal(false)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.1)',
+                  color: colors.textSecondary,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: colors.textPrimary, marginBottom: '6px' }}>
+                Wie soll deine Playlist heißen?
+              </label>
+              <input
+                type="text"
+                value={newJuniorPlaylistTitle}
+                onChange={(e) => setNewJuniorPlaylistTitle(e.target.value)}
+                placeholder="z. B. Meine Lieblings-Hits, Sommerfest..."
+                style={{
+                  width: '100%',
+                  padding: '11px 13px',
+                  borderRadius: '14px',
+                  border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                  background: isLight ? '#ffffff' : 'rgba(0, 0, 0, 0.2)',
+                  color: colors.textPrimary,
+                  fontSize: '0.90rem',
+                  fontWeight: 700,
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: colors.textPrimary, marginBottom: '6px' }}>
+                Wähle ein Album-Cover:
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                {UNIVERSAL_PLAYLIST_COVERS.filter((cov: UniversalPlaylistCoverConfig) => cov.category === 'kids' || ['cov_first_songs', 'cov_gaming_xp', 'cov_comic_pop', 'cov_magic_sounds', 'cov_chart_hits', 'cov_rock_garage'].includes(cov.id)).map((cov: UniversalPlaylistCoverConfig) => {
+                  const isChosen = newJuniorPlaylistCover === cov.id;
+                  return (
+                    <button
+                      key={cov.id}
+                      type="button"
+                      onClick={() => setNewJuniorPlaylistCover(cov.id)}
+                      style={{
+                        padding: '9px 10px',
+                        borderRadius: '12px',
+                        border: isChosen ? '2.5px solid #10b981' : `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
+                        background: isChosen ? (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.15)') : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.02)'),
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.76rem',
+                        fontWeight: 800,
+                        color: isChosen ? '#047857' : colors.textPrimary
+                      }}
+                    >
+                      <span style={{ fontSize: '1.15rem' }}>{cov.emoji}</span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cov.defaultTitle}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setShowJuniorCreatePlaylistModal(false)}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  borderRadius: '12px',
+                  border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                  background: 'transparent',
+                  color: colors.textSecondary,
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                disabled={!newJuniorPlaylistTitle.trim()}
+                onClick={() => {
+                  if (!newJuniorPlaylistTitle.trim()) return;
+                  const newPl: CustomPlaylist = {
+                    id: `pl_${Date.now()}`,
+                    title: newJuniorPlaylistTitle.trim(),
+                    description: `Erstellt von ${student?.first_name || 'Schüler'}`,
+                    vibeTheme: 'sunset_gold',
+                    iconName: 'disc',
+                    coverPresetId: (newJuniorPlaylistCover as any) || 'cov_first_songs',
+                    schoolYear: '2026/2027',
+                    tracks: [],
+                    createdAt: new Date().toISOString()
+                  };
+                  savePlaylists([newPl, ...customPlaylists]);
+                  setShowJuniorCreatePlaylistModal(false);
+                  setNewJuniorPlaylistTitle('');
+                }}
+                style={{
+                  flex: 1.5,
+                  padding: '11px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  fontWeight: 900,
+                  cursor: newJuniorPlaylistTitle.trim() ? 'pointer' : 'not-allowed',
+                  opacity: newJuniorPlaylistTitle.trim() ? 1 : 0.5,
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                }}
+              >
+                Erstellen ✨
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 💽 11. PERSISTENT FLOATING BOTTOM MINI-PLAYER */}
       {renderFloatingMiniPlayer()}

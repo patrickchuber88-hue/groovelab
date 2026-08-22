@@ -37,7 +37,9 @@ import {
   Send,
   Landmark,
   Star,
-  History
+  History,
+  DoorClosed,
+  Sparkles
 } from 'lucide-react';
 import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument } from '../utils/nameHelper';
 
@@ -47,6 +49,9 @@ interface CampusEventsBoardProps {
   schoolId: string;
   supabase: any;
   brandColor: string;
+  studentUser?: any;
+  parentAllowChat?: boolean;
+  parentAllowAbsences?: boolean;
 }
 
 interface LessonOccurrence {
@@ -140,7 +145,16 @@ const formatToLocalDatetime = (isoString: string | null | undefined): string => 
   return `${yyyy}-${MM}-${dd}T${hh}:${mm}`;
 };
 
-export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor: passedBrandColor }: CampusEventsBoardProps) {
+export function CampusEventsBoard({
+  userId,
+  role,
+  schoolId,
+  supabase,
+  brandColor: passedBrandColor,
+  studentUser,
+  parentAllowChat,
+  parentAllowAbsences
+}: CampusEventsBoardProps) {
   // Dynamic Theme calculations
   const activePlatformStored = typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
   const isGroovelab = passedBrandColor === '#eab308' || activePlatformStored === 'groovelab';
@@ -396,6 +410,130 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
   const [activeChatStudentIds, setActiveChatStudentIds] = useState<Set<string>>(new Set());
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Master PIN & Parent Permissions
+  const checkIsParentUnlocked = () => {
+    if (typeof window === 'undefined') return false;
+    const globalUnlocked = sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
+    const userSession = sessionStorage.getItem(`groovelab_parent_session_${userId}`);
+    return globalUnlocked || (userSession !== null && Number(userSession) > Date.now());
+  };
+
+  const isChatAllowed = useMemo(() => {
+    if (role !== 'student') return true;
+    if (checkIsParentUnlocked()) return true;
+    if (parentAllowChat !== undefined) return parentAllowChat;
+    const localSetting = typeof window !== 'undefined' ? localStorage.getItem('campus_allow_chat') : null;
+    if (localSetting !== null) return localSetting === 'true';
+    const localUserSetting = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_chat_${userId}`) : null;
+    if (localUserSetting !== null) return localUserSetting === 'true';
+    return studentUser?.parent_allow_chat ?? false;
+  }, [role, parentAllowChat, studentUser, userId]);
+
+  const isAbsenceAllowed = useMemo(() => {
+    if (role !== 'student') return true;
+    if (checkIsParentUnlocked()) return true;
+    if (parentAllowAbsences !== undefined) return parentAllowAbsences;
+    const localSetting = typeof window !== 'undefined' ? localStorage.getItem('campus_allow_absences') : null;
+    if (localSetting !== null) return localSetting === 'true';
+    const localUserSetting = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_absences_${userId}`) : null;
+    if (localUserSetting !== null) return localUserSetting === 'true';
+    return studentUser?.parent_allow_absences ?? false;
+  }, [role, parentAllowAbsences, studentUser, userId]);
+
+  const [showPinGateModal, setShowPinGateModal] = useState(false);
+  const [pinGateInput, setPinGateInput] = useState('');
+  const [pinGateError, setPinGateError] = useState('');
+  const [pinGatePendingAction, setPinGatePendingAction] = useState<(() => void) | null>(null);
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+
+  const handleVerifyParentPin = async (inputPin: string) => {
+    if (!inputPin || inputPin.length < 4) {
+      setPinGateError('Bitte gib mindestens 4 Ziffern ein.');
+      return;
+    }
+    setIsVerifyingPin(true);
+    setPinGateError('');
+    try {
+      const cleanInput = inputPin.trim();
+      let isMatch = false;
+
+      // 1. LocalStorage cached PINs
+      const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${userId}`);
+      const cachedUserPin = localStorage.getItem(`groovelab_user_pin_${userId}`);
+      const cachedStudentPin = localStorage.getItem(`groovelab_student_pin_${userId}`);
+      if ((cachedParentPin && cachedParentPin === cleanInput) ||
+          (cachedUserPin && cachedUserPin === cleanInput) ||
+          (cachedStudentPin && cachedStudentPin === cleanInput)) {
+        isMatch = true;
+      }
+
+      // 2. Direct studentUser prop check
+      if (!isMatch && studentUser) {
+        if (studentUser.parent_pin && String(studentUser.parent_pin).trim() === cleanInput) {
+          isMatch = true;
+        } else if (studentUser.personal_pin && String(studentUser.personal_pin).trim() === cleanInput) {
+          isMatch = true;
+        }
+      }
+
+      // 3. Supabase RPC verify_parent_pin or verify_personal_pin
+      if (!isMatch) {
+        try {
+          const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+            student_id: userId,
+            input_pin: cleanInput
+          });
+          if (parentOk === true) isMatch = true;
+        } catch (e) {}
+      }
+
+      if (!isMatch) {
+        try {
+          const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
+            user_uuid: userId,
+            input_pin: cleanInput
+          });
+          if (personalOk === true) isMatch = true;
+        } catch (e) {}
+      }
+
+      // 4. Fallback users table query
+      if (!isMatch) {
+        const { data: uData } = await supabase
+          .from('users')
+          .select('parent_pin, personal_pin, onboarding_pin')
+          .eq('id', userId)
+          .maybeSingle();
+        if (uData) {
+          if (String(uData.parent_pin || '').trim() === cleanInput || 
+              String(uData.personal_pin || '').trim() === cleanInput ||
+              String(uData.onboarding_pin || '').trim() === cleanInput) {
+            isMatch = true;
+          }
+        }
+      }
+
+      if (isMatch) {
+        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+        sessionStorage.setItem(`groovelab_parent_session_${userId}`, String(Date.now() + 60 * 60 * 1000));
+        setShowPinGateModal(false);
+        setPinGateInput('');
+        if (pinGatePendingAction) {
+          const action = pinGatePendingAction;
+          setPinGatePendingAction(null);
+          action();
+        }
+      } else {
+        setPinGateError('Falsche Master-PIN. Bitte versuche es erneut.');
+        setPinGateInput('');
+      }
+    } catch (err: any) {
+      setPinGateError('Fehler bei der PIN-Prüfung: ' + (err?.message || 'Unbekannt'));
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
 
   const handleCancelOccWithDoubleConfirm = async (occ: LessonOccurrence) => {
     try {
@@ -3961,7 +4099,35 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     }
   };
 
+  const handleCancelClick = (occ: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+    if (isCanceled) {
+      if (confirm('Möchtest du diesen abgesagten Termin wieder reaktivieren?')) {
+        handleUndoCancel(occ);
+      }
+      return;
+    }
+
+    if (role === 'student' && !isAbsenceAllowed && !checkIsParentUnlocked()) {
+      setPinGatePendingAction(() => () => handleCancelOccurrence(occ));
+      setPinGateInput('');
+      setPinGateError('');
+      setShowPinGateModal(true);
+      return;
+    }
+    handleCancelOccurrence(occ);
+  };
+
   const handleCancelOccurrence = async (occ: any) => {
+    if (role === 'student' && !isAbsenceAllowed && !checkIsParentUnlocked()) {
+      setPinGatePendingAction(() => () => handleCancelOccurrence(occ));
+      setPinGateInput('');
+      setPinGateError('');
+      setShowPinGateModal(true);
+      return;
+    }
+
     const formattedDate = new Date(occ.date).toLocaleDateString('de-DE');
     if (!confirm(`Möchtest du den Termin am ${formattedDate} um ${occ.start_time?.substring(0, 5)} Uhr wirklich absagen?`)) return;
 
@@ -4949,6 +5115,586 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     printWindow.document.close();
   };
 
+  // Helper to render deduplicated and slot-grouped occurrence cards
+  const renderOccurrenceItems = (itemsList: any[]) => {
+    // 1. Deduplicate by student and date: ensure each student appears at most once per date
+    const studentDateMap = new Map<string, any>();
+
+    const getStudentKey = (item: any) => {
+      let fn = (
+        item.student?.first_name || 
+        item.student_first_name || 
+        item.first_name || 
+        item.firstName || 
+        item.studentName || 
+        item.student_name || 
+        ''
+      ).trim().toLowerCase().split(' ')[0];
+
+      if (!fn || fn === 'schüler' || fn === 'pause' || fn === 'vacant') {
+        const idStr = String(item.id || item.student_id || item.board_student_id || '');
+        if (idStr) {
+          const cleaned = idStr
+            .replace(/^virtual-student-/i, '')
+            .replace(/^board-[^-]+-/i, '')
+            .replace(/^mock-[^-]+-/i, '')
+            .replace(/^sched-proj-[^-]+-/i, '')
+            .split('-')[0]
+            .trim()
+            .toLowerCase();
+          if (cleaned && cleaned.length >= 2 && !/^[0-9a-f]{8}$/i.test(cleaned) && cleaned !== 'student' && cleaned !== 'vacant') {
+            fn = cleaned;
+          }
+        }
+      }
+
+      if (fn && fn !== 'schüler' && fn !== 'pause' && fn !== 'vacant') {
+        return fn;
+      }
+      const rawId = item.student_id || item.student?.id || item.board_student_id || item.id || '';
+      return String(rawId).trim().toLowerCase();
+    };
+
+    const getItemPriorityScore = (o: any): number => {
+      if (!o) return 0;
+      const status = String(o.status || '').toLowerCase();
+      const idStr = String(o.id || '');
+      const schedIdStr = String(o.schedule_id || o.schedule?.id || '');
+
+      // 1. Explicit cancellation has highest priority (must show red dashed card)
+      if (['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(status)) {
+        return 100;
+      }
+      // 2. Rescheduled / moved appointment has 2nd highest priority (must show yellow dashed card)
+      if (o.is_moved || ['pending_reschedule', 'rescheduled', 'rescheduled_confirmed', 'reschedule_requested'].includes(status)) {
+        return 80;
+      }
+      // 3. Designer board card (Stundenplan-Designer layout created by teacher)
+      if (idStr.includes('board-') || schedIdStr.includes('board-')) {
+        return 60;
+      }
+      // 4. Saved DB occurrence in schedule_occurrences
+      if (!o.is_virtual) {
+        return 50;
+      }
+      // 5. Virtual Stammtermin fallback from old schedules DB table
+      return 10;
+    };
+
+    itemsList.forEach(item => {
+      const stKey = getStudentKey(item);
+      if (!stKey) return;
+
+      const key = `${item.date}_${stKey}`;
+      const existing = studentDateMap.get(key);
+
+      if (!existing) {
+        studentDateMap.set(key, item);
+      } else {
+        const itemScore = getItemPriorityScore(item);
+        const existingScore = getItemPriorityScore(existing);
+
+        if (itemScore > existingScore) {
+          studentDateMap.set(key, item);
+        } else if (itemScore === existingScore) {
+          const itemIdStr = String(item.id || '');
+          if (itemIdStr.includes('board-') || item.is_moved) {
+            studentDateMap.set(key, item);
+          }
+        }
+      }
+    });
+
+    const deduplicatedItems = Array.from(studentDateMap.values());
+    const groupedSlotItems: any[] = [];
+    const slotMap = new Map<string, any[]>();
+
+    deduplicatedItems.forEach(occ => {
+      const slotKey = `${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
+      if (!slotMap.has(slotKey)) {
+        slotMap.set(slotKey, []);
+      }
+      slotMap.get(slotKey)!.push(occ);
+    });
+
+    slotMap.forEach((slotOccs) => {
+      if (slotOccs.length > 1) {
+        const uniqueStudentIds = new Set(slotOccs.map(o => o.student_id).filter(Boolean));
+        if (uniqueStudentIds.size > 1) {
+          const primary = slotOccs[0];
+          const groupStudents = slotOccs.map(o => o.student).filter(Boolean);
+          groupedSlotItems.push({
+            ...primary,
+            id: `group-slot-${primary.date}-${primary.start_time}`,
+            isGroupOcc: true,
+            students: groupStudents,
+            group_occurrences: slotOccs
+          });
+        } else {
+          const cancelledOrActual = slotOccs.find(o => ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(o.status)) || slotOccs.find(o => o.is_moved || !o.is_virtual) || slotOccs[0];
+          groupedSlotItems.push(cancelledOrActual);
+        }
+      } else {
+        groupedSlotItems.push(slotOccs[0]);
+      }
+    });
+
+    // Sort chronologically by date and start_time
+    groupedSlotItems.sort((a, b) => {
+      const dateComp = a.date.localeCompare(b.date);
+      if (dateComp !== 0) return dateComp;
+      return (a.start_time || '').localeCompare(b.start_time || '');
+    });
+
+    const roomCounts = new Map<string, number>();
+    groupedSlotItems.forEach(it => {
+      const rm = it.room_override_name || it.roomOverrideName || it.schedules?.rooms?.name || it.schedules?.room?.name || it.roomName || it.room_name || it.room || it.raum;
+      if (rm && rm !== 'Raum') {
+        roomCounts.set(rm, (roomCounts.get(rm) || 0) + 1);
+      }
+    });
+    let dominantRoomName = '';
+    let maxRoomCount = 0;
+    roomCounts.forEach((count, rm) => {
+      if (count > maxRoomCount) {
+        maxRoomCount = count;
+        dominantRoomName = rm;
+      }
+    });
+
+    return groupedSlotItems.map(occ => {
+      const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
+      const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'canceled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick' || occ.status === 'absent';
+      const isRescheduled = Boolean(
+        occ.status === 'pending_reschedule' || 
+        occ.status === 'rescheduled_confirmed' ||
+        occ.status === 'rescheduled' ||
+        occ.status === 'reschedule_requested' ||
+        occ.status === 'pending_student_approval' ||
+        occ.is_moved === true ||
+        occ.is_rescheduled === true ||
+        (occ.original_date && occ.original_date !== occ.date) ||
+        (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5))
+      );
+        
+      const hasMessages = activeChatOccIds.has(occ.id) ||
+         (occ.student_id && activeChatStudentIds.has(occ.student_id)) ||
+         (occ.teacher_id && activeChatStudentIds.has(occ.teacher_id));
+      
+      const groupFirstNames = (occ.students || occ.group_occurrences)
+        ? formatGroupStudentsAnonymized(occ.students || occ.group_occurrences)
+        : null;
+
+      const opponentName = groupFirstNames || (role === 'student'
+        ? `Lehrkraft: ${occ.teacher ? formatTeacherFullName(occ.teacher) : (occ.teacher_name || 'Lehrkraft')}`
+        : (() => {
+            const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || occ.student_name || occ.studentName || occ.name || occ.purpose || '';
+            const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
+            const id = occ.student_id || occ.student?.id || occ.id;
+            return formatSingleStudentAnonymized(fn, ln, id);
+          })());
+
+      const isGroupOcc = Boolean(
+        occ.isGroupOcc || occ.isGroup || occ.is_group ||
+        (occ.students && occ.students.length > 1) ||
+        (occ.group_occurrences && occ.group_occurrences.length > 1) ||
+        !!occ.group_id ||
+        (opponentName && (opponentName.includes(',') || opponentName.includes('&')))
+      );
+
+      const studentCount = (occ.students || occ.group_occurrences)?.length || (opponentName.includes('&') ? opponentName.split('&').length : 2);
+      const isFixedGroup = Boolean(occ.group_id || occ.is_db_group || occ.is_stammtermin || (!occ.is_virtual && !String(occ.id).startsWith('virt_') && !occ.is_ensemble));
+      const groupBadgeLabel = getGroupTypeLabel(studentCount, isFixedGroup, occ.group_name || occ.ensemble_name);
+
+      const isConfirmedOcc = Boolean(
+        occ.status === 'rescheduled_confirmed' ||
+        occ.student_acknowledged === true ||
+        occ.studentAcknowledged === true
+      );
+
+      const rName = (
+        occ.room_override_name || 
+        occ.roomOverrideName || 
+        occ.room_name || 
+        occ.roomName || 
+        (typeof occ.room === 'string' && occ.room) ||
+        occ.room?.name || 
+        (typeof occ.rooms === 'string' && occ.rooms) ||
+        occ.rooms?.name || 
+        (Array.isArray(occ.rooms) ? occ.rooms[0]?.name : null) ||
+        occ.schedule?.room_name || 
+        occ.schedule?.roomName || 
+        (typeof occ.schedule?.room === 'string' && occ.schedule.room) ||
+        occ.schedule?.room?.name || 
+        (typeof occ.schedule?.rooms === 'string' && occ.schedule.rooms) ||
+        occ.schedule?.rooms?.name || 
+        (Array.isArray(occ.schedule?.rooms) ? occ.schedule?.rooms[0]?.name : null) ||
+        occ.schedules?.rooms?.name || 
+        occ.schedules?.room?.name || 
+        occ.raum
+      );
+      const defaultRoomName = (
+        occ.schedules?.rooms?.name || 
+        occ.schedules?.room?.name || 
+        occ.schedule?.rooms?.name || 
+        occ.schedule?.room?.name || 
+        occ.original_room_name || 
+        occ.originalRoomName || 
+        occ.template_room_name || 
+        (maxRoomCount > 1 ? dominantRoomName : null)
+      );
+      const isRoomChanged = Boolean(
+        occ.room_override_id || 
+        occ.roomOverrideId || 
+        occ.room_override_name || 
+        occ.roomOverrideName || 
+        occ.is_room_changed || 
+        occ.isRoomChanged || 
+        occ.is_room_booking || 
+        occ.isRoomBooking || 
+        occ.is_extra_room || 
+        occ.isExtraRoom || 
+        occ.room_booking_required ||
+        (defaultRoomName && rName && defaultRoomName !== rName) || 
+        (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id))
+      );
+
+      let dateBlockBg = '#f8fafc';
+      let dateBlockBorder = '1px solid rgba(0,0,0,0.03)';
+      let rowBg = '#ffffff';
+      let rowBorder = '1px solid #e2e8f0';
+      let textColor = '#0f172a';
+      let subColor = '#64748b';
+
+      if (isCanceled) {
+        textColor = '#991b1b';
+        subColor = '#ef4444';
+        dateBlockBg = '#fee2e2';
+        
+        if (isConfirmedOcc) {
+          rowBg = '#fee2e2';
+          rowBorder = '2px solid #ef4444';
+          dateBlockBorder = '1.5px solid #ef4444';
+        } else {
+          rowBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
+          rowBorder = '2px dashed #ef4444';
+          dateBlockBorder = '1.5px dashed #ef4444';
+        }
+      } else if (isRoomChanged) {
+        textColor = '#6b21a8';
+        subColor = '#7c3aed';
+        dateBlockBg = '#f3e8ff';
+
+        if (isConfirmedOcc) {
+          rowBg = 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)';
+          rowBorder = '2px solid #7c3aed';
+          dateBlockBorder = '1.5px solid #7c3aed';
+        } else {
+          rowBg = 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
+          rowBorder = '2px dashed #7c3aed';
+          dateBlockBorder = '1.5px dashed #7c3aed';
+        }
+      } else if (isRescheduled) {
+        if (isGroupOcc) {
+          textColor = '#0369a1';
+          subColor = '#0284c7';
+          dateBlockBg = '#e0f2fe';
+
+          if (isConfirmedOcc) {
+            rowBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
+            rowBorder = '2px solid #0284c7';
+            dateBlockBorder = '1.5px solid #0284c7';
+          } else {
+            rowBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
+            rowBorder = '2px dashed #0284c7';
+            dateBlockBorder = '1.5px dashed #0284c7';
+          }
+        } else {
+          textColor = '#854d0e';
+          subColor = '#d97706';
+          dateBlockBg = '#fef3c7';
+
+          if (isConfirmedOcc) {
+            rowBg = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
+            rowBorder = '2px solid #eab308';
+            dateBlockBorder = '1.5px solid #eab308';
+          } else {
+            rowBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
+            rowBorder = '2px dashed #eab308';
+            dateBlockBorder = '1.5px dashed #eab308';
+          }
+        }
+      } else if (isPendingReview) {
+        rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
+        rowBorder = '1px dashed #eab308';
+        textColor = '#713f12';
+        subColor = '#ca8a04';
+        dateBlockBg = '#fefebc';
+        dateBlockBorder = '1px dashed #eab308';
+      }
+
+      return (
+        <div 
+          key={occ.id}
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 12px',
+            borderRadius: '12px',
+            background: rowBg,
+            border: rowBorder,
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
+            transition: 'all 0.2s',
+            gap: '10px',
+            boxSizing: 'border-box'
+          }}
+          className="hover-scale-subtle"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+            {/* Date Block */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: dateBlockBg,
+              borderRadius: '6px',
+              padding: '2px',
+              width: '34px',
+              height: '34px',
+              border: dateBlockBorder,
+              flexShrink: 0
+            }}>
+              <span style={{ fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', color: subColor }}>
+                {formatWeekday(occ.date)}
+              </span>
+              <span style={{ fontSize: '12px', fontWeight: 900, color: textColor, marginTop: '-2px' }}>
+                {occ.date.substring(8, 10)}
+              </span>
+            </div>
+
+            {/* Details */}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ 
+                  fontSize: '12px', 
+                  fontWeight: 800, 
+                  color: textColor, 
+                  textDecoration: 'none',
+                  overflow: 'hidden', 
+                  textOverflow: 'ellipsis', 
+                  whiteSpace: 'nowrap' 
+                }}>
+                  {opponentName}
+                </span>
+
+                {isGroupOcc && (
+                  <span style={{
+                    fontSize: '9.5px',
+                    fontWeight: 800,
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    border: '1px solid #bfdbfe',
+                    padding: '1px 6px',
+                    borderRadius: '6px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}>
+                    👥 {groupBadgeLabel}
+                  </span>
+                )}
+
+                {/* Minimalist Monochrome Room Display without heavy border */}
+                {(() => {
+                  if (!rName || rName === 'Raum') return null;
+                  
+                  if (isRoomChanged) {
+                    return (
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#7c3aed',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }} title={`Raum geändert zu ${rName}`}>
+                        <DoorClosed size={12} color="#7c3aed" style={{ flexShrink: 0 }} />
+                        {rName}
+                        <span 
+                          style={{
+                            width: '5px',
+                            height: '5px',
+                            borderRadius: '50%',
+                            background: '#7c3aed',
+                            display: 'inline-block',
+                            flexShrink: 0,
+                            boxShadow: '0 0 6px rgba(124, 58, 237, 0.4)'
+                          }} 
+                        />
+                      </span>
+                    );
+                  }
+                  
+                  if (role === 'teacher') return null;
+
+                  return (
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: '#64748b',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <DoorClosed size={12} color="#94a3b8" style={{ flexShrink: 0 }} />
+                      {rName}
+                    </span>
+                  );
+                })()}
+
+                {isPendingReview && (
+                  <span style={{
+                    fontSize: '7px',
+                    fontWeight: 800,
+                    background: '#fffbeb',
+                    color: '#b45309',
+                    border: '1px solid #fef3c7',
+                    padding: '1px 4px',
+                    borderRadius: '4px',
+                    textTransform: 'uppercase',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '2px'
+                  }} title="Stundenplan befindet sich in der Zuteilung durch das Sekretariat.">
+                    ⏳ In Prüfung
+                  </span>
+                )}
+                {isRescheduled && (
+                  <span style={{
+                    fontSize: '7.5px',
+                    fontWeight: 800,
+                    background: isGroupOcc ? '#e0f2fe' : '#fef3c7',
+                    color: isGroupOcc ? '#0369a1' : '#b45309',
+                    border: isGroupOcc ? '1.5px dashed #0284c7' : '1.5px dashed #eab308',
+                    padding: '1px 5px',
+                    borderRadius: '5px',
+                    textTransform: 'uppercase'
+                  }}>
+                    Verschoben
+                  </span>
+                )}
+                {isCanceled && (
+                  <span style={{
+                    fontSize: '7.5px',
+                    fontWeight: 800,
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    border: '1.5px dashed #ef4444',
+                    padding: '1px 5px',
+                    borderRadius: '5px',
+                    textTransform: 'uppercase'
+                  }}>
+                    Abgesagt
+                  </span>
+                )}
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: subColor, fontWeight: 700, marginTop: '2px', flexWrap: 'wrap' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <Calendar size={10} /> {formatDateGerman(occ.date)}
+                </span>
+                <span>•</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <Clock size={10} /> {occ.start_time.substring(0, 5)} Uhr
+                </span>
+                <span>•</span>
+                <span>{occ.duration} Min</span>
+                {(() => {
+                  const displaySubject = formatDisplaySubjectOrInstrument(occ, occ.teacher || currentTeacherProfile);
+                  if (!displaySubject) return null;
+                  return (
+                    <>
+                      <span>•</span>
+                      <span style={{ color: brandColor, fontWeight: 800 }}>
+                        {displaySubject}
+                      </span>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Status */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+            {/* 1:1 Shoutbox Icon */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveChatOcc(occ);
+              }}
+              title="1:1 Shoutbox öffnen"
+              style={{
+                border: 'none',
+                background: 'none',
+                padding: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: hasMessages ? '#eab308' : '#94a3b8',
+                transition: 'all 0.2s',
+                borderRadius: '50%',
+                flexShrink: 0
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            >
+              <MessageSquare 
+                size={16} 
+                fill={hasMessages ? '#eab308' : 'none'} 
+                style={{
+                  animation: hasMessages ? 'pulse 2s infinite' : 'none'
+                }}
+              />
+            </button>
+
+            {/* Absagen Icon (Immer sichtbar, geschützt via Master-PIN) */}
+            <button
+              type="button"
+              onClick={(e) => handleCancelClick(occ, e)}
+              title={isCanceled ? "Termin ist abgesagt (Klicken zum Reaktivieren)" : "Termin absagen (Krankmeldung)"}
+              style={{
+                border: 'none',
+                background: 'none',
+                padding: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: isCanceled ? '#94a3b8' : '#ef4444',
+                transition: 'all 0.2s',
+                borderRadius: '50%',
+                flexShrink: 0
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = isCanceled ? 'rgba(0,0,0,0.06)' : 'rgba(239, 68, 68, 0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            >
+              <CalendarX 
+                size={16} 
+                color={isCanceled ? '#94a3b8' : '#ef4444'} 
+              />
+            </button>
+          </div>
+        </div>
+      );
+    });
+  };
+
   const renderLessonsColumn = () => {
     return (
       <div id="tour-lessons-column" style={{
@@ -5156,639 +5902,96 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     </span>
                   </div>
 
-                  {/* Month Events List */}
+                  {/* Month Events List: DIRECT without KW for students, grouped by week for teachers/admins */}
                   {isExpanded && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '2px' }}>
-                      {(() => {
-                        const weekGroups: Record<string, { weekNum: number; rangeStr: string; items: any[] }> = {};
-                        
-                        occs.forEach(occ => {
-                          const d = new Date(occ.date);
-                          // ISO Week calculation
-                          const tempDate = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-                          tempDate.setUTCDate(tempDate.getUTCDate() + 4 - (tempDate.getUTCDay() || 7));
-                          const yearStart = new Date(Date.UTC(tempDate.getUTCFullYear(), 0, 1));
-                          const weekNum = Math.ceil((((tempDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-
-                          // Date range (Monday to Sunday) of that week
-                          const day = d.getDay();
-                          const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-                          const monday = new Date(d.getFullYear(), d.getMonth(), diff);
-                          const sunday = new Date(monday);
-                          sunday.setDate(monday.getDate() + 6);
+                    role === 'student' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', boxSizing: 'border-box', paddingLeft: '2px' }}>
+                        {renderOccurrenceItems(occs)}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '2px' }}>
+                        {(() => {
+                          const weekGroups: Record<string, { weekNum: number; rangeStr: string; items: any[] }> = {};
                           
-                          const formatDate = (date: Date) => {
-                            const dd = String(date.getDate()).padStart(2, '0');
-                            const mm = String(date.getMonth() + 1).padStart(2, '0');
-                            return `${dd}.${mm}.`;
-                          };
-                          
-                          const rangeStr = `${formatDate(monday)} - ${formatDate(sunday)}`;
-                          const weekKey = `${monthKey}-W${String(weekNum).padStart(2, '0')}`;
-                          
-                          if (!weekGroups[weekKey]) {
-                            weekGroups[weekKey] = { weekNum, rangeStr, items: [] };
-                          }
-                          weekGroups[weekKey].items.push(occ);
-                        });
+                          occs.forEach(occ => {
+                            const d = new Date(occ.date);
+                            // ISO Week calculation
+                            const tempDate = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                            tempDate.setUTCDate(tempDate.getUTCDate() + 4 - (tempDate.getUTCDay() || 7));
+                            const yearStart = new Date(Date.UTC(tempDate.getUTCFullYear(), 0, 1));
+                            const weekNum = Math.ceil((((tempDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 
-                        const sortedWeekKeys = Object.keys(weekGroups).sort((a, b) => a.localeCompare(b));
-                        const todayStr = new Date().toISOString().substring(0, 10);
+                            // Date range (Monday to Sunday) of that week
+                            const day = d.getDay();
+                            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                            const monday = new Date(d.getFullYear(), d.getMonth(), diff);
+                            const sunday = new Date(monday);
+                            sunday.setDate(monday.getDate() + 6);
+                            
+                            const formatDate = (date: Date) => {
+                              const dd = String(date.getDate()).padStart(2, '0');
+                              const mm = String(date.getMonth() + 1).padStart(2, '0');
+                              return `${dd}.${mm}.`;
+                            };
+                            
+                            const rangeStr = `${formatDate(monday)} - ${formatDate(sunday)}`;
+                            const weekKey = `${monthKey}-W${String(weekNum).padStart(2, '0')}`;
+                            
+                            if (!weekGroups[weekKey]) {
+                              weekGroups[weekKey] = { weekNum, rangeStr, items: [] };
+                            }
+                            weekGroups[weekKey].items.push(occ);
+                          });
 
-                        return sortedWeekKeys.map((weekKey, weekIdx) => {
-                          const wGroup = weekGroups[weekKey];
-                          const isWeekExpanded = expandedWeeks[weekKey] !== undefined
-                            ? expandedWeeks[weekKey]
-                            : (wGroup.items.some(item => item.date === todayStr) || weekIdx === 0);
+                          const sortedWeekKeys = Object.keys(weekGroups).sort((a, b) => a.localeCompare(b));
+                          const todayStr = new Date().toISOString().substring(0, 10);
 
-                          return (
-                            <div key={weekKey} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              {/* Collapsible Week Header */}
-                              <div
-                                onClick={() => setExpandedWeeks(prev => ({ ...prev, [weekKey]: !isWeekExpanded }))}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '8px 12px',
-                                  background: '#ffffff',
-                                  border: '1px solid #f1f5f9',
-                                  borderRadius: '10px',
-                                  cursor: 'pointer',
-                                  userSelect: 'none',
-                                  transition: 'all 0.2s',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.01)'
-                                }}
-                              >
-                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  {isWeekExpanded ? <ChevronDown size={13} color="#94a3b8" /> : <ChevronRight size={13} color="#94a3b8" />}
-                                  KW {wGroup.weekNum} ({wGroup.rangeStr})
-                                </span>
-                                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '5px' }}>
-                                  {wGroup.items.length} {wGroup.items.length === 1 ? 'Termin' : 'Termine'}
-                                </span>
-                              </div>
+                          return sortedWeekKeys.map((weekKey, weekIdx) => {
+                            const wGroup = weekGroups[weekKey];
+                            const isWeekExpanded = expandedWeeks[weekKey] !== undefined
+                              ? expandedWeeks[weekKey]
+                              : (wGroup.items.some(item => item.date === todayStr) || weekIdx === 0);
 
-                              {/* Week Items List */}
-                              {isWeekExpanded && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', boxSizing: 'border-box', marginTop: '2px' }}>
-                                  {(() => {
-                                    // 1. Deduplicate by student and date: ensure each student appears at most once per date
-                                    const studentDateMap = new Map<string, any>();
-
-                                    const getStudentKey = (item: any) => {
-                                      let fn = (
-                                        item.student?.first_name || 
-                                        item.student_first_name || 
-                                        item.first_name || 
-                                        item.firstName || 
-                                        item.studentName || 
-                                        item.student_name || 
-                                        ''
-                                      ).trim().toLowerCase().split(' ')[0];
-
-                                      if (!fn || fn === 'schüler' || fn === 'pause' || fn === 'vacant') {
-                                        const idStr = String(item.id || item.student_id || item.board_student_id || '');
-                                        if (idStr) {
-                                          const cleaned = idStr
-                                            .replace(/^virtual-student-/i, '')
-                                            .replace(/^board-[^-]+-/i, '')
-                                            .replace(/^mock-[^-]+-/i, '')
-                                            .replace(/^sched-proj-[^-]+-/i, '')
-                                            .split('-')[0]
-                                            .trim()
-                                            .toLowerCase();
-                                          if (cleaned && cleaned.length >= 2 && !/^[0-9a-f]{8}$/i.test(cleaned) && cleaned !== 'student' && cleaned !== 'vacant') {
-                                            fn = cleaned;
-                                          }
-                                        }
-                                      }
-
-                                      if (fn && fn !== 'schüler' && fn !== 'pause' && fn !== 'vacant') {
-                                        return fn;
-                                      }
-                                      const rawId = item.student_id || item.student?.id || item.board_student_id || item.id || '';
-                                      return String(rawId).trim().toLowerCase();
-                                    };
-
-                                    const getItemPriorityScore = (o: any): number => {
-                                      if (!o) return 0;
-                                      const status = String(o.status || '').toLowerCase();
-                                      const idStr = String(o.id || '');
-                                      const schedIdStr = String(o.schedule_id || o.schedule?.id || '');
-
-                                      // 1. Explicit cancellation has highest priority (must show red dashed card)
-                                      if (['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(status)) {
-                                        return 100;
-                                      }
-                                      // 2. Rescheduled / moved appointment has 2nd highest priority (must show yellow dashed card)
-                                      if (o.is_moved || ['pending_reschedule', 'rescheduled', 'rescheduled_confirmed', 'reschedule_requested'].includes(status)) {
-                                        return 80;
-                                      }
-                                      // 3. Designer board card (Stundenplan-Designer layout created by teacher)
-                                      if (idStr.includes('board-') || schedIdStr.includes('board-')) {
-                                        return 60;
-                                      }
-                                      // 4. Saved DB occurrence in schedule_occurrences
-                                      if (!o.is_virtual) {
-                                        return 50;
-                                      }
-                                      // 5. Virtual Stammtermin fallback from old schedules DB table
-                                      return 10;
-                                    };
-
-                                    wGroup.items.forEach(item => {
-                                      const stKey = getStudentKey(item);
-                                      if (!stKey) return;
-
-                                      const key = `${item.date}_${stKey}`;
-                                      const existing = studentDateMap.get(key);
-
-                                      if (!existing) {
-                                        studentDateMap.set(key, item);
-                                      } else {
-                                        const itemScore = getItemPriorityScore(item);
-                                        const existingScore = getItemPriorityScore(existing);
-
-                                        if (itemScore > existingScore) {
-                                          studentDateMap.set(key, item);
-                                        } else if (itemScore === existingScore) {
-                                          const itemIdStr = String(item.id || '');
-                                          if (itemIdStr.includes('board-') || item.is_moved) {
-                                            studentDateMap.set(key, item);
-                                          }
-                                        }
-                                      }
-                                    });
-
-                                    const deduplicatedItems = Array.from(studentDateMap.values());
-                                    const groupedSlotItems: any[] = [];
-                                    const slotMap = new Map<string, any[]>();
-
-                                    deduplicatedItems.forEach(occ => {
-                                      const slotKey = `${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
-                                      if (!slotMap.has(slotKey)) {
-                                        slotMap.set(slotKey, []);
-                                      }
-                                      slotMap.get(slotKey)!.push(occ);
-                                    });
-
-                                    slotMap.forEach((slotOccs) => {
-                                      if (slotOccs.length > 1) {
-                                        const uniqueStudentIds = new Set(slotOccs.map(o => o.student_id).filter(Boolean));
-                                        if (uniqueStudentIds.size > 1) {
-                                          const primary = slotOccs[0];
-                                          const groupStudents = slotOccs.map(o => o.student).filter(Boolean);
-                                          groupedSlotItems.push({
-                                            ...primary,
-                                            id: `group-slot-${primary.date}-${primary.start_time}`,
-                                            isGroupOcc: true,
-                                            students: groupStudents,
-                                            group_occurrences: slotOccs
-                                          });
-                                        } else {
-                                          const cancelledOrActual = slotOccs.find(o => ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(o.status)) || slotOccs.find(o => o.is_moved || !o.is_virtual) || slotOccs[0];
-                                          groupedSlotItems.push(cancelledOrActual);
-                                        }
-                                      } else {
-                                        groupedSlotItems.push(slotOccs[0]);
-                                      }
-                                    });
-
-                                    const roomCounts = new Map<string, number>();
-                                    groupedSlotItems.forEach(it => {
-                                      const rm = it.room_override_name || it.roomOverrideName || it.schedules?.rooms?.name || it.schedules?.room?.name || it.roomName || it.room_name || it.room || it.raum;
-                                      if (rm && rm !== 'Raum') {
-                                        roomCounts.set(rm, (roomCounts.get(rm) || 0) + 1);
-                                      }
-                                    });
-                                    let dominantRoomName = '';
-                                    let maxRoomCount = 0;
-                                    roomCounts.forEach((count, rm) => {
-                                      if (count > maxRoomCount) {
-                                        maxRoomCount = count;
-                                        dominantRoomName = rm;
-                                      }
-                                    });
-
-                                    return groupedSlotItems.map(occ => {
-                                      const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
-                                      const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'canceled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick' || occ.status === 'absent';
-                                      const isRescheduled = Boolean(
-                                        occ.status === 'pending_reschedule' || 
-                                        occ.status === 'rescheduled_confirmed' ||
-                                        occ.status === 'rescheduled' ||
-                                        occ.status === 'reschedule_requested' ||
-                                        occ.status === 'pending_student_approval' ||
-                                        occ.is_moved === true ||
-                                        occ.is_rescheduled === true ||
-                                        (occ.original_date && occ.original_date !== occ.date) ||
-                                        (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5))
-                                      );
-                                        
-                                      const hasMessages = activeChatOccIds.has(occ.id) ||
-                                         (occ.student_id && activeChatStudentIds.has(occ.student_id)) ||
-                                         (occ.teacher_id && activeChatStudentIds.has(occ.teacher_id));
-                                      
-                                        const groupFirstNames = (occ.students || occ.group_occurrences)
-                                          ? formatGroupStudentsAnonymized(occ.students || occ.group_occurrences)
-                                          : null;
-
-                                        const opponentName = groupFirstNames || (role === 'student'
-                                          ? `Lehrkraft: ${occ.teacher ? formatTeacherFullName(occ.teacher) : (occ.teacher_name || 'Lehrkraft')}`
-                                          : (() => {
-                                              const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || occ.student_name || occ.studentName || occ.name || occ.purpose || '';
-                                              const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
-                                              const id = occ.student_id || occ.student?.id || occ.id;
-                                              return formatSingleStudentAnonymized(fn, ln, id);
-                                            })());
-
-                                       const isGroupOcc = Boolean(
-                                         occ.isGroupOcc || occ.isGroup || occ.is_group ||
-                                         (occ.students && occ.students.length > 1) ||
-                                         (occ.group_occurrences && occ.group_occurrences.length > 1) ||
-                                         !!occ.group_id ||
-                                         (opponentName && (opponentName.includes(',') || opponentName.includes('&')))
-                                       );
-
-                                       const studentCount = (occ.students || occ.group_occurrences)?.length || (opponentName.includes('&') ? opponentName.split('&').length : 2);
-                                       const isFixedGroup = Boolean(occ.group_id || occ.is_db_group || occ.is_stammtermin || (!occ.is_virtual && !String(occ.id).startsWith('virt_') && !occ.is_ensemble));
-                                       const groupBadgeLabel = getGroupTypeLabel(studentCount, isFixedGroup, occ.group_name || occ.ensemble_name);
-
-                                      const isConfirmedOcc = Boolean(
-                                        occ.status === 'rescheduled_confirmed' ||
-                                        occ.student_acknowledged === true ||
-                                        occ.studentAcknowledged === true
-                                      );
-
-                                       const rName = (
-                                         occ.room_override_name || 
-                                         occ.roomOverrideName || 
-                                         occ.room_name || 
-                                         occ.roomName || 
-                                         (typeof occ.room === 'string' && occ.room) ||
-                                         occ.room?.name ||
-                                         (typeof occ.rooms === 'string' && occ.rooms) ||
-                                         occ.rooms?.name ||
-                                         (Array.isArray(occ.rooms) ? occ.rooms[0]?.name : null) ||
-                                         occ.schedule?.room_name || 
-                                         occ.schedule?.roomName || 
-                                         (typeof occ.schedule?.room === 'string' && occ.schedule.room) ||
-                                         occ.schedule?.room?.name || 
-                                         (typeof occ.schedule?.rooms === 'string' && occ.schedule.rooms) ||
-                                         occ.schedule?.rooms?.name || 
-                                         (Array.isArray(occ.schedule?.rooms) ? occ.schedule?.rooms[0]?.name : null) ||
-                                         occ.schedules?.rooms?.name || 
-                                         occ.schedules?.room?.name || 
-                                         occ.raum
-                                       );
-                                       const defaultRoomName = (
-                                         occ.schedules?.rooms?.name || 
-                                         occ.schedules?.room?.name || 
-                                         occ.schedule?.rooms?.name || 
-                                         occ.schedule?.room?.name || 
-                                         occ.original_room_name || 
-                                         occ.originalRoomName || 
-                                         occ.template_room_name || 
-                                         (maxRoomCount > 1 ? dominantRoomName : null)
-                                       );
-                                       const isRoomChanged = Boolean(
-                                         occ.room_override_id || 
-                                         occ.roomOverrideId || 
-                                         occ.room_override_name || 
-                                         occ.roomOverrideName || 
-                                         occ.is_room_changed || 
-                                         occ.isRoomChanged || 
-                                         occ.is_room_booking || 
-                                         occ.isRoomBooking || 
-                                         occ.is_extra_room ||
-                                         occ.isExtraRoom ||
-                                         occ.room_booking_required ||
-                                         (defaultRoomName && rName && defaultRoomName !== rName) || 
-                                         (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id))
-                                       );
-
-                                      let dateBlockBg = '#f8fafc';
-                                      let dateBlockBorder = '1px solid rgba(0,0,0,0.03)';
-                                      let rowBg = '#ffffff';
-                                      let rowBorder = '1px solid #e2e8f0';
-                                      let textColor = '#0f172a';
-                                      let subColor = '#64748b';
-
-                                      if (isCanceled) {
-                                        textColor = '#991b1b';
-                                        subColor = '#ef4444';
-                                        dateBlockBg = '#fee2e2';
-                                        
-                                        if (isConfirmedOcc) {
-                                          rowBg = '#fee2e2';
-                                          rowBorder = '2px solid #ef4444';
-                                          dateBlockBorder = '1.5px solid #ef4444';
-                                        } else {
-                                          rowBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
-                                          rowBorder = '2px dashed #ef4444';
-                                          dateBlockBorder = '1.5px dashed #ef4444';
-                                        }
-                                      } else if (isRoomChanged) {
-                                        // LILA THEME FÜR RAUMBUCHUNGEN / RAUMWECHSEL (Identisch zum Stundenplan-Board!)
-                                        textColor = '#6b21a8';
-                                        subColor = '#7c3aed';
-                                        dateBlockBg = '#f3e8ff';
-
-                                        if (isConfirmedOcc) {
-                                          rowBg = 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)';
-                                          rowBorder = '2px solid #7c3aed';
-                                          dateBlockBorder = '1.5px solid #7c3aed';
-                                        } else {
-                                          rowBg = 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
-                                          rowBorder = '2px dashed #7c3aed';
-                                          dateBlockBorder = '1.5px dashed #7c3aed';
-                                        }
-                                      } else if (isRescheduled) {
-                                        if (isGroupOcc) {
-                                          // BLAU THEME FÜR GRUPPEN-TERMINVERSCHIEBUNGEN
-                                          textColor = '#0369a1';
-                                          subColor = '#0284c7';
-                                          dateBlockBg = '#e0f2fe';
-
-                                          if (isConfirmedOcc) {
-                                            rowBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
-                                            rowBorder = '2px solid #0284c7';
-                                            dateBlockBorder = '1.5px solid #0284c7';
-                                          } else {
-                                            rowBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
-                                            rowBorder = '2px dashed #0284c7';
-                                            dateBlockBorder = '1.5px dashed #0284c7';
-                                          }
-                                        } else {
-                                          // GELB THEME FÜR EINZEL-TERMINVERSCHIEBUNGEN
-                                          textColor = '#854d0e';
-                                          subColor = '#d97706';
-                                          dateBlockBg = '#fef3c7';
-
-                                          if (isConfirmedOcc) {
-                                            rowBg = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
-                                            rowBorder = '2px solid #eab308';
-                                            dateBlockBorder = '1.5px solid #eab308';
-                                          } else {
-                                            rowBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-                                            rowBorder = '2px dashed #eab308';
-                                            dateBlockBorder = '1.5px dashed #eab308';
-                                          }
-                                        }
-                                      } else if (isPendingReview) {
-                                        rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
-                                        rowBorder = '1px dashed #eab308';
-                                        textColor = '#713f12';
-                                        subColor = '#ca8a04';
-                                        dateBlockBg = '#fefebc';
-                                        dateBlockBorder = '1px dashed #eab308';
-                                      }
-
-                                    return (
-                                      <div 
-                                        key={occ.id}
-                                        style={{
-                                          display: 'flex',
-                                          flexDirection: 'row',
-                                          alignItems: 'center',
-                                          justifyContent: 'space-between',
-                                          padding: '10px 12px',
-                                          borderRadius: '12px',
-                                          background: rowBg,
-                                          border: rowBorder,
-                                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)',
-                                          transition: 'all 0.2s',
-                                          gap: '10px',
-                                          boxSizing: 'border-box'
-                                        }}
-                                        className="hover-scale-subtle"
-                                      >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                                          {/* Date Block */}
-                                          <div style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            background: dateBlockBg,
-                                            borderRadius: '6px',
-                                            padding: '2px',
-                                            width: '34px',
-                                            height: '34px',
-                                            border: dateBlockBorder,
-                                            flexShrink: 0
-                                          }}>
-                                            <span style={{ fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', color: subColor }}>
-                                              {formatWeekday(occ.date)}
-                                            </span>
-                                            <span style={{ fontSize: '12px', fontWeight: 900, color: textColor, marginTop: '-2px' }}>
-                                              {occ.date.substring(8, 10)}
-                                            </span>
-                                          </div>
-
-                                          {/* Details */}
-                                          <div style={{ minWidth: 0, flex: 1 }}>
-                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                              <span style={{ 
-                                                fontSize: '12px', 
-                                                fontWeight: 800, 
-                                                color: textColor, 
-                                                textDecoration: 'none',
-                                                overflow: 'hidden', 
-                                                textOverflow: 'ellipsis', 
-                                                whiteSpace: 'nowrap' 
-                                              }}>
-                                                {opponentName}
-                                              </span>
-
-                                              {isGroupOcc && (
-                                                <span style={{
-                                                  fontSize: '9.5px',
-                                                  fontWeight: 800,
-                                                  background: '#eff6ff',
-                                                  color: '#1d4ed8',
-                                                  border: '1px solid #bfdbfe',
-                                                  padding: '1px 6px',
-                                                  borderRadius: '6px',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  gap: '3px'
-                                                }}>
-                                                  👥 {groupBadgeLabel}
-                                                </span>
-                                              )}
-
-                                              {(() => {
-                                                if (!rName || rName === 'Raum') return null;
-                                                
-                                                if (isRoomChanged) {
-                                                  return (
-                                                    <span style={{
-                                                      fontSize: '9.5px',
-                                                      fontWeight: 800,
-                                                      background: '#f3e8ff',
-                                                      color: '#7c3aed',
-                                                      border: '1px solid #ddd6fe',
-                                                      padding: '1px 6px',
-                                                      borderRadius: '6px',
-                                                      display: 'inline-flex',
-                                                      alignItems: 'center',
-                                                      gap: '3px'
-                                                    }} title={`Raum geändert zu ${rName}`}>
-                                                      🚪 {rName}
-                                                      <span 
-                                                        style={{
-                                                          width: '6px',
-                                                          height: '6px',
-                                                          borderRadius: '50%',
-                                                          background: '#7c3aed',
-                                                          display: 'inline-block',
-                                                          flexShrink: 0,
-                                                          boxShadow: '0 0 6px rgba(124, 58, 237, 0.4)'
-                                                        }} 
-                                                      />
-                                                    </span>
-                                                  );
-                                                }
-                                                
-                                                if (role === 'teacher') return null;
-
-                                                return (
-                                                  <span style={{
-                                                    fontSize: '9.5px',
-                                                    fontWeight: 800,
-                                                    background: '#f1f5f9',
-                                                    color: '#475569',
-                                                    border: '1px solid #e2e8f0',
-                                                    padding: '1px 6px',
-                                                    borderRadius: '6px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px'
-                                                  }}>
-                                                    🚪 {rName}
-                                                  </span>
-                                                );
-                                              })()}
-                                              {isPendingReview && (
-                                                <span style={{
-                                                  fontSize: '7px',
-                                                  fontWeight: 800,
-                                                  background: '#fffbeb',
-                                                  color: '#b45309',
-                                                  border: '1px solid #fef3c7',
-                                                  padding: '1px 4px',
-                                                  borderRadius: '4px',
-                                                  textTransform: 'uppercase',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  gap: '2px'
-                                                }} title="Stundenplan befindet sich in der Zuteilung durch das Sekretariat.">
-                                                  ⏳ In Prüfung
-                                                </span>
-                                              )}
-                                              {isRescheduled && (
-                                                <span style={{
-                                                  fontSize: '7.5px',
-                                                  fontWeight: 800,
-                                                  background: isGroupOcc ? '#e0f2fe' : '#fef3c7',
-                                                  color: isGroupOcc ? '#0369a1' : '#b45309',
-                                                  border: isGroupOcc ? '1.5px dashed #0284c7' : '1.5px dashed #eab308',
-                                                  padding: '1px 5px',
-                                                  borderRadius: '5px',
-                                                  textTransform: 'uppercase'
-                                                }}>
-                                                  Verschoben
-                                                </span>
-                                              )}
-                                              {isCanceled && (
-                                                <span style={{
-                                                  fontSize: '7.5px',
-                                                  fontWeight: 800,
-                                                  background: '#fee2e2',
-                                                  color: '#dc2626',
-                                                  border: '1.5px dashed #ef4444',
-                                                  padding: '1px 5px',
-                                                  borderRadius: '5px',
-                                                  textTransform: 'uppercase'
-                                                }}>
-                                                  Abgesagt
-                                                </span>
-                                              )}
-                                            </div>
-                                            
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: subColor, fontWeight: 700, marginTop: '2px', flexWrap: 'wrap' }}>
-                                              <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                <Calendar size={10} /> {formatDateGerman(occ.date)}
-                                              </span>
-                                              <span>•</span>
-                                              <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                <Clock size={10} /> {occ.start_time.substring(0, 5)} Uhr
-                                              </span>
-                                              <span>•</span>
-                                              <span>{occ.duration} Min</span>
-                                              {(() => {
-                                                const displaySubject = formatDisplaySubjectOrInstrument(occ, occ.teacher || currentTeacherProfile);
-                                                if (!displaySubject) return null;
-                                                return (
-                                                  <>
-                                                    <span>•</span>
-                                                    <span style={{ color: brandColor, fontWeight: 800 }}>
-                                                      {displaySubject}
-                                                    </span>
-                                                  </>
-                                                );
-                                              })()}
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        {/* Right Status */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setActiveChatOcc(occ);
-                                            }}
-                                            title="1:1 Shoutbox öffnen"
-                                            style={{
-                                              border: 'none',
-                                              background: 'none',
-                                              padding: '6px',
-                                              cursor: 'pointer',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              color: hasMessages ? '#eab308' : '#94a3b8',
-                                              transition: 'all 0.2s',
-                                              borderRadius: '50%',
-                                              flexShrink: 0
-                                            }}
-                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
-                                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-                                          >
-                                            <MessageSquare 
-                                              size={16} 
-                                              fill={hasMessages ? '#eab308' : 'none'} 
-                                              style={{
-                                                animation: hasMessages ? 'pulse 2s infinite' : 'none'
-                                              }}
-                                            />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    );
-                                  });
-                                })()}
+                            return (
+                              <div key={weekKey} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {/* Collapsible Week Header */}
+                                <div
+                                  onClick={() => setExpandedWeeks(prev => ({ ...prev, [weekKey]: !isWeekExpanded }))}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '8px 12px',
+                                    background: '#ffffff',
+                                    border: '1px solid #f1f5f9',
+                                    borderRadius: '10px',
+                                    cursor: 'pointer',
+                                    userSelect: 'none',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.01)'
+                                  }}
+                                >
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {isWeekExpanded ? <ChevronDown size={13} color="#94a3b8" /> : <ChevronRight size={13} color="#94a3b8" />}
+                                    KW {wGroup.weekNum} ({wGroup.rangeStr})
+                                  </span>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '5px' }}>
+                                    {wGroup.items.length} {wGroup.items.length === 1 ? 'Termin' : 'Termine'}
+                                  </span>
                                 </div>
-                              )}
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
+
+                                {/* Week Items List */}
+                                {isWeekExpanded && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', boxSizing: 'border-box', marginTop: '2px' }}>
+                                    {renderOccurrenceItems(wGroup.items)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    )
                   )}
                 </div>
               );
@@ -5959,6 +6162,121 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               );
             })
           )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderFeatureComingSoonColumn = (isForStudent: boolean) => {
+    return (
+      <div id="tour-student-events" style={{
+        background: '#ffffff',
+        border: '1px solid rgba(0, 0, 0, 0.05)',
+        borderRadius: '24px',
+        padding: '24px 20px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        height: 'calc(100vh - 120px)',
+        overflowY: 'auto'
+      }}>
+        {/* Header */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={18} color={brandColor} /> Meine Events &amp; Mitwirkungen
+            </h3>
+            <span style={{
+              fontSize: '0.66rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              background: '#f1f5f9',
+              color: '#475569',
+              padding: '3px 8px',
+              borderRadius: '100px'
+            }}>
+              In Vorbereitung
+            </span>
+          </div>
+          <p style={{ color: '#64748b', fontSize: '0.74rem', margin: '4px 0 0 0', fontWeight: 550, lineHeight: 1.4 }}>
+            Bühnenauftritte, Soundchecks &amp; Mitwirkenden-Abläufe
+          </p>
+        </div>
+
+        {/* Hero Card */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          padding: '36px 20px',
+          background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
+          border: '1.5px dashed #cbd5e1',
+          borderRadius: '20px',
+          gap: '16px'
+        }}>
+          {/* Subtle Icon Squircle */}
+          <div style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '18px',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.04)'
+          }}>
+            <Sparkles size={26} color="#64748b" />
+          </div>
+
+          <div style={{ maxWidth: '340px' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
+              Hier entsteht eine neue Funktion
+            </h4>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.55, fontWeight: 550 }}>
+              {isForStudent 
+                ? 'Wir entwickeln deine zentrale Mitwirkungs- & Event-Zentrale. Sobald dich deine Lehrkraft für Konzerte, Schülervorspiele oder Ensemble-Projekte einteilt, findest du deine Soundcheck-Zeiten und deinen Ablaufplan direkt hier.'
+                : 'Wir entwickeln das zentrale Mitwirkungs- & Programmbegleit-Board. Zukünftig planst du hier Schülervorspiele, Konzertbeiträge und Bühnenabläufe nahtlos im Team mit dem Sekretariat.'}
+            </p>
+          </div>
+
+          {/* Feature Preview Checklist */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            textAlign: 'left',
+            background: '#ffffff',
+            border: '1px solid #f1f5f9',
+            borderRadius: '14px',
+            padding: '14px 16px',
+            width: '100%',
+            maxWidth: '310px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+          }}>
+            {[
+              'Automatische Benachrichtigung bei Mitwirkungen',
+              'Soundcheck- & Ablaufzeiten auf die Minute genau',
+              'Digitales Programmheft & Raum-Übersicht'
+            ].map((text, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 650 }}>
+                <Check size={13} color={brandColor} style={{ flexShrink: 0 }} />
+                <span>{text}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, marginTop: '4px' }}>
+            🚀 Campus-Groovelab Roadmap
+          </div>
         </div>
       </div>
     );
@@ -12027,14 +12345,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       return [
         { id: 0, label: 'Termine', icon: Calendar, render: renderLessonsColumn },
         { id: 1, label: 'Schultermine', icon: Landmark, render: renderTimelineColumn },
-        { id: 2, label: 'Planung', icon: Star, render: renderTeacherEventPlanningColumn }
+        { id: 2, label: 'Mitwirkung', icon: Sparkles, render: () => renderFeatureComingSoonColumn(false) }
       ];
     }
     if (role === 'student') {
       return [
         { id: 0, label: 'Termine', icon: Calendar, render: renderLessonsColumn },
         { id: 1, label: 'Schultermine', icon: Landmark, render: renderTimelineColumn },
-        { id: 2, label: 'Auftritte', icon: Star, render: renderStudentEventsColumn }
+        { id: 2, label: 'Events', icon: Sparkles, render: () => renderFeatureComingSoonColumn(true) }
       ];
     }
     // admin / secretary
@@ -12370,10 +12688,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
           {/* COLUMN 3 */}
           {role === 'student' 
-            ? renderStudentEventsColumn() 
-            : role === 'secretary'
-              ? renderAnnouncementsColumn()
-              : renderTeacherEventPlanningColumn()}
+            ? renderFeatureComingSoonColumn(true) 
+            : role === 'teacher'
+              ? renderFeatureComingSoonColumn(false)
+              : role === 'secretary'
+                ? renderAnnouncementsColumn()
+                : renderTeacherEventPlanningColumn()}
         </>
       )}
 
@@ -13195,7 +13515,16 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       <button
                         key={`event-emoji-${idx}`}
                         type="button"
-                        onClick={() => sendDirectChatMessage(emoji)}
+                        onClick={() => {
+                          if (role === 'student' && !isChatAllowed && !checkIsParentUnlocked()) {
+                            setPinGatePendingAction(() => () => sendDirectChatMessage(emoji));
+                            setPinGateInput('');
+                            setPinGateError('');
+                            setShowPinGateModal(true);
+                            return;
+                          }
+                          sendDirectChatMessage(emoji);
+                        }}
                         style={{
                           padding: '4px 9px',
                           borderRadius: '100px',
@@ -13231,7 +13560,16 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     <button
                       key={`event-phrase-${idx}`}
                       type="button"
-                      onClick={() => setChatTypedMessage(phrase.text)}
+                      onClick={() => {
+                        if (role === 'student' && !isChatAllowed && !checkIsParentUnlocked()) {
+                          setPinGatePendingAction(() => () => setChatTypedMessage(phrase.text));
+                          setPinGateInput('');
+                          setPinGateError('');
+                          setShowPinGateModal(true);
+                          return;
+                        }
+                        setChatTypedMessage(phrase.text);
+                      }}
                       style={{
                         padding: '5px 12px',
                         borderRadius: '100px',
@@ -13253,17 +13591,74 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 </div>
               )}
 
+              {/* Chat Protection Lock Banner */}
+              {role === 'student' && !isChatAllowed && !checkIsParentUnlocked() && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 14px',
+                  margin: '6px 20px 0 20px',
+                  borderRadius: '12px',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  color: '#1e40af',
+                  fontSize: '0.78rem',
+                  fontWeight: 700
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Lock size={14} color="#2563eb" />
+                    <span>Antworten durch Eltern geschützt (Lesen frei)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPinGatePendingAction(() => () => {});
+                      setPinGateInput('');
+                      setPinGateError('');
+                      setShowPinGateModal(true);
+                    }}
+                    style={{
+                      background: '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                    className="hover-scale"
+                  >
+                    Mit Eltern-PIN freischalten
+                  </button>
+                </div>
+              )}
+
                {(() => {
                  const isNoRecipient = role === 'student' ? !activeChatOcc.teacher_id : !activeChatOcc.student_id;
+                 const isChatLocked = role === 'student' && !isChatAllowed && !checkIsParentUnlocked();
                  const isDisabled = isFrozen || isNoRecipient;
                  const isCanceled = activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
                  const placeholderText = isFrozen 
                    ? "Eingefroren..." 
                    : isNoRecipient 
                      ? "Kein Chat-Teilnehmer..." 
-                     : "Nachricht schreiben...";
+                     : isChatLocked
+                       ? "🔒 Antworten durch Eltern geschützt..."
+                       : "Nachricht schreiben...";
                  return (
-                   <form onSubmit={handleSendChatMessage} style={{
+                   <form onSubmit={(e) => {
+                     e.preventDefault();
+                     if (isChatLocked) {
+                       setPinGatePendingAction(() => () => {});
+                       setPinGateInput('');
+                       setPinGateError('');
+                       setShowPinGateModal(true);
+                       return;
+                     }
+                     handleSendChatMessage(e);
+                   }} style={{
                      padding: '16px 20px',
                      borderTop: '1px solid #f1f5f9',
                      background: '#fafbfc',
@@ -13276,18 +13671,36 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                        placeholder={placeholderText}
                        disabled={isDisabled}
                        value={chatTypedMessage}
-                       onChange={e => setChatTypedMessage(e.target.value)}
+                       onClick={() => {
+                         if (isChatLocked) {
+                           setPinGatePendingAction(() => () => {});
+                           setPinGateInput('');
+                           setPinGateError('');
+                           setShowPinGateModal(true);
+                         }
+                       }}
+                       onChange={e => {
+                         if (isChatLocked) {
+                           setPinGatePendingAction(() => () => {});
+                           setPinGateInput('');
+                           setPinGateError('');
+                           setShowPinGateModal(true);
+                           return;
+                         }
+                         setChatTypedMessage(e.target.value);
+                       }}
                        style={{
                          flex: 1,
                          padding: '12px 20px',
                          borderRadius: '100px',
-                         border: '1.5px solid #cbd5e1',
-                         background: isDisabled ? '#f1f5f9' : '#ffffff',
+                         border: isChatLocked ? '1.5px dashed #93c5fd' : '1.5px solid #cbd5e1',
+                         background: isDisabled ? '#f1f5f9' : isChatLocked ? '#f8fafc' : '#ffffff',
                          fontSize: '0.88rem',
                          outline: 'none',
                          color: '#1e293b',
                          boxShadow: 'none',
-                         transition: 'all 0.2s'
+                         transition: 'all 0.2s',
+                         cursor: isChatLocked ? 'pointer' : 'text'
                        }}
                      />
                      {isCanceled ? (
@@ -13318,7 +13731,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                      ) : (
                        <button
                          type="button"
-                         onClick={() => handleCancelOccurrence(activeChatOcc)}
+                         onClick={() => {
+                           if (role === 'student' && !isAbsenceAllowed && !checkIsParentUnlocked()) {
+                             setPinGatePendingAction(() => () => {
+                               handleCancelOccurrence(activeChatOcc);
+                               setActiveChatOcc(null);
+                             });
+                             setPinGateInput('');
+                             setPinGateError('');
+                             setShowPinGateModal(true);
+                             return;
+                           }
+                           handleCancelOccurrence(activeChatOcc);
+                           setActiveChatOcc(null);
+                         }}
                          style={{
                            background: '#ef4444',
                            color: '#ffffff',
@@ -13370,6 +13796,178 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           </div>
         );
       })()}
+      
+      {/* Master PIN Gate Modal for Absagen & Chat Unlock */}
+      {showPinGateModal && (
+        <div
+          onClick={() => {
+            setShowPinGateModal(false);
+            setPinGatePendingAction(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.15s ease'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '28px',
+              maxWidth: '380px',
+              width: '100%',
+              padding: '30px 24px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}
+          >
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '20px',
+              background: '#e0f2fe',
+              color: '#0284c7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Lock size={28} />
+            </div>
+
+            <div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                Eltern Master-PIN
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
+                Diese Funktion ist durch den Elternbereich geschützt. Bitte gib deine 6-stellige Eltern-Master-PIN ein.
+              </p>
+            </div>
+
+            {pinGateError && (
+              <div style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                background: '#fee2e2',
+                color: '#dc2626',
+                fontSize: '0.78rem',
+                fontWeight: 700
+              }}>
+                {pinGateError}
+              </div>
+            )}
+
+            {/* PIN Display Dots (6-stellig) */}
+            <div style={{
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'center',
+              margin: '8px 0'
+            }}>
+              {[0, 1, 2, 3, 4, 5].map(idx => {
+                const isFilled = pinGateInput.length > idx;
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      background: isFilled ? '#0284c7' : '#e2e8f0',
+                      border: isFilled ? '2px solid #0284c7' : '2px solid #cbd5e1',
+                      transition: 'all 0.15s ease',
+                      transform: isFilled ? 'scale(1.15)' : 'scale(1)'
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Touch Keypad */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '10px',
+              width: '100%',
+              marginTop: '6px'
+            }}>
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((key) => {
+                const isClear = key === 'C';
+                const isBack = key === '⌫';
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setPinGateError('');
+                      if (isClear) {
+                        setPinGateInput('');
+                      } else if (isBack) {
+                        setPinGateInput(prev => prev.slice(0, -1));
+                      } else if (pinGateInput.length < 6) {
+                        const nextVal = pinGateInput + key;
+                        setPinGateInput(nextVal);
+                        if (nextVal.length === 6) {
+                          handleVerifyParentPin(nextVal);
+                        }
+                      }
+                    }}
+                    style={{
+                      padding: '14px',
+                      borderRadius: '16px',
+                      border: '1.5px solid #f1f5f9',
+                      background: isClear || isBack ? '#f8fafc' : '#ffffff',
+                      color: isClear ? '#ef4444' : isBack ? '#64748b' : '#0f172a',
+                      fontSize: isBack ? '1.1rem' : '1.25rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
+                      transition: 'all 0.12s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    {key}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowPinGateModal(false);
+                setPinGatePendingAction(null);
+              }}
+              style={{
+                marginTop: '6px',
+                padding: '10px 18px',
+                borderRadius: '100px',
+                background: '#f1f5f9',
+                color: '#64748b',
+                border: 'none',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div style={{
           position: 'fixed',

@@ -34,23 +34,23 @@ export const generateConsentPDF = async (
 
   // Determine pricing text based on the school's billing option
   let costTitle = '100% KOSTENLOS';
-  let costDesc = 'Die Musikschule übernimmt alle Aktivierungsgebühren.';
+  let costDesc = 'Die Musikschule übernimmt alle Cloud-Bereitstellungsgebühren.';
   let costDetailText = 'Die Nutzung dieser App ist für Sie und Ihr Kind vollständig kostenlos. Sämtliche Hosting- und Bereitstellungsgebühren werden im Rahmen des Schulbetriebs zu 100% von der Musikschule getragen. Es entstehen Ihnen keine versteckten Kosten.';
 
   if (studentBillingOption === 'student_full') {
     costTitle = '5,88 € / SCHULJAHR';
-    costDesc = 'Jahres-Einmalbeitrag für den App-Zugang (entspricht 0,49 € / Monat).';
-    costDetailText = 'Für die Nutzung der App fällt ein transparenter Jahresbeitrag von 5,88 € inkl. MwSt. für das gesamte Schuljahr an (entspricht 0,49 € / Monat). Die Abrechnung erfolgt als Einmalzahlung direkt mit den Erziehungsberechtigten gemäß den Vorgaben der Musikschule (keine automatische Verlängerung).';
+    costDesc = 'Jahres-Einmalbeitrag für die Cloud-Bereitstellung (entspricht 0,49 € / Monat; Software 100% kostenlos).';
+    costDetailText = 'Die Software Campus-Groovelab ist zu 100% kostenlos. Für die Cloud- und Datenbank-Bereitstellung fällt ein transparenter Jahresbeitrag von 5,88 € inkl. MwSt. für das gesamte Schuljahr an (entspricht 0,49 € / Monat). Die Abrechnung erfolgt als Einmalzahlung direkt mit den Erziehungsberechtigten gemäß den Vorgaben der Musikschule (keine automatische Verlängerung).';
   } else if (studentBillingOption === 'student_partial') {
     costTitle = '4,80 € / SCHULJAHR';
-    costDesc = 'Eigenanteil als Jahresbeitrag (entspricht 0,40 € / Monat; Schule bezuschusst).';
-    costDetailText = 'Für die Nutzung der App fällt für Sie ein reduzierter Jahresbeitrag von 4,80 € inkl. MwSt. für das gesamte Schuljahr an (entspricht 0,40 € / Monat; die verbleibenden 0,09 € monatlich übernimmt die Musikschule als Zuschuss). Die Abrechnung erfolgt als Einmalzahlung (keine automatische Verlängerung).';
+    costDesc = 'Eigenanteil für die Cloud-Bereitstellung (entspricht 0,40 € / Monat; Schule bezuschusst; Software 100% kostenlos).';
+    costDetailText = 'Die Software Campus-Groovelab ist zu 100% kostenlos. Für die Cloud-Bereitstellung fällt für Sie ein reduzierter Jahresbeitrag von 4,80 € inkl. MwSt. für das gesamte Schuljahr an (entspricht 0,40 € / Monat; die verbleibenden 0,09 € monatlich übernimmt die Musikschule als Zuschuss). Die Abrechnung erfolgt als Einmalzahlung (keine automatische Verlängerung).';
   }
 
   // GrooveLab is always covered by the school, override if platform is solely GrooveLab
   if (activePlatform === 'groovelab') {
     costTitle = '100% KOSTENLOS';
-    costDesc = 'Kosten für die Band-Aktivierung trägt die Schule.';
+    costDesc = 'Kosten für die Cloud-Bereitstellung trägt die Schule.';
     costDetailText = 'Die Nutzung des GrooveLab-Moduls ist für Sie und Ihr Kind vollständig kostenlos. Alle anfallenden Hosting- und Bereitstellungsgebühren werden zu 100% von der Musikschule übernommen.';
   }
 
@@ -999,5 +999,338 @@ export const generateResilienceAuditPDF = async (data: ResiliencePDFData) => {
   const dateStr = new Date().toISOString().split('T')[0];
   doc.save(`Campus_Groovelab_Resilienz_Gutachten_${cleanTierName}_${dateStr}.pdf`);
 };
+
+export interface GdprReportData {
+  reportId?: string;
+  studentName: string;
+  studentFullName?: string;
+  studentMaskedName?: string;
+  schoolName: string;
+  teacherName?: string;
+  instrument: string;
+  registeredAt?: string;
+  campusUiLevel: string;
+  parentPermissions: {
+    allowAbsences: boolean;
+    allowChat: boolean;
+    allowLeaderboard: boolean;
+    allowPracticeBoard: boolean;
+    allowMediathek: boolean;
+    bedtimeModeEnabled?: boolean;
+    bedtimeStart?: string;
+    bedtimeEnd?: string;
+  };
+  stats: {
+    totalPracticeMinutes: number;
+    streakDays: number;
+    currentXp?: number;
+    completedMissionsCount: number;
+    stickersUnlockedCount: number;
+    stickersTotalCount: number;
+    audioRecordingsCount?: number;
+    audioStorageBytes?: number;
+  };
+}
+
+export const generateGdprDataReportPDF = async (data: GdprReportData) => {
+  const { default: jsPDF } = await import('jspdf');
+  const doc = new jsPDF();
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const reportId = data.reportId || `CG-DSGVO-${Math.random().toString(16).substring(2, 8).toUpperCase()}-${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+
+  const displayNameForTitle = data.studentFullName || data.studentName;
+  doc.setProperties({
+    title: `DSGVO_Art15_Auskunftsbericht_${displayNameForTitle.replace(/\s+/g, '_')}`,
+    subject: 'DSGVO Art. 15 Transparenz- & Auskunftsbericht für Erziehungsberechtigte',
+    author: 'Campus-Groovelab Plattform',
+    creator: 'Campus-Groovelab Compliance Engine'
+  });
+
+  const primaryBlue = [2, 132, 199];     // Sky 600
+  const primaryGreen = [52, 168, 83];    // Campus Green
+  const slateDark = [15, 23, 42];        // Slate 900
+  const slateBody = [51, 65, 85];        // Slate 700
+  const slateMuted = [100, 116, 139];    // Slate 500
+  const cardBg = [248, 250, 252];        // Slate 50
+  const cardBorder = [226, 232, 240];    // Slate 200
+
+  // =========================================================================
+  // SEITE 1: AUSKUNFT ÜBER GESPEICHERTE DATEN & ÜBEAKTIVITÄT
+  // =========================================================================
+
+  // 1. Accent Top Bar
+  doc.setFillColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+  doc.rect(0, 0, 210, 6, 'F');
+
+  // 2. Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('CAMPUS-GROOVELAB', 20, 20);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11.5);
+  doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+  doc.text('DSGVO Art. 15 Transparenz- & Auskunftsbericht', 20, 27);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text(`Protokoll-ID: ${reportId} • Erstellt am: ${dateStr}, ${timeStr} Uhr • Gesetzliche Auskunft nach Art. 15 DSGVO`, 20, 33);
+
+  let y = 41;
+
+  // 3. Block 1: STAMMDATEN, SCHULZUORDNUNG & VERANTWORTLICHE
+  doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+  doc.setDrawColor(cardBorder[0], cardBorder[1], cardBorder[2]);
+  doc.roundedRect(20, y, 170, 48, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('1. STAMMDATEN, SCHULZUORDNUNG & VERANTWORTLICHE', 25, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  const fullName = data.studentFullName || data.studentName;
+  const maskedName = data.studentMaskedName || data.studentName;
+  doc.text(`• Gespeicherter Schülername: ${fullName} (Vollständiger Vor- & Nachname)`, 25, y + 15);
+  doc.text(`• Anzeige im Schulnetzwerk: ${maskedName} (DSGVO-Schutzmaskierung aktiv)`, 25, y + 21);
+  doc.text(`• Verantwortliche Musikschule (Art. 4 Nr. 7 DSGVO): ${data.schoolName || 'Campus-Groovelab Partner-Musikschule'}`, 25, y + 27);
+  doc.text(`• Zugeordnete Lehrkraft: ${data.teacherName || 'Fachliche Lehrkraft (Musikschule)'}`, 25, y + 33);
+  doc.text(`• Hauptinstrument & Design-Stufe: ${data.instrument || 'Instrumentalunterricht'} | Stufe: ${data.campusUiLevel.toUpperCase()}`, 25, y + 39);
+  doc.text(`• Auftragsverarbeiter (Art. 28 DSGVO): Campus-Groovelab Cloud Platform (ISO 27001)`, 25, y + 45);
+
+  y += 54;
+
+  // 4. Block 2: ELTERLICHE SCHUTZ- & FREIGABEEINSTELLUNGEN (Art. 7 DSGVO)
+  doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+  doc.setDrawColor(cardBorder[0], cardBorder[1], cardBorder[2]);
+  doc.roundedRect(20, y, 170, 52, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('2. ELTERLICHE SCHUTZ- & FREIGABEEINSTELLUNGEN (Art. 7 DSGVO)', 25, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  doc.text(`• Terminabsagen durch Schüler: ${data.parentPermissions.allowAbsences ? 'Freigegeben (Eigenständiges Absagen erlaubt)' : 'GESPERRT (Nur durch Eltern via Master-PIN)'}`, 25, y + 16);
+  doc.text(`• Direktnachrichten an Lehrkraft: ${data.parentPermissions.allowChat ? 'Freigegeben (Fachlicher 1:1 Austausch aktiv)' : 'GESPERRT (Schreibschutz aktiv)'}`, 25, y + 23);
+  doc.text(`• Klassen-Highlights & Team-Power: ${data.parentPermissions.allowLeaderboard ? 'Freigegeben (Sichtbarkeit mit Vorname + Initiale)' : 'ANONYMISIERT (Keine Namensanzeige)'}`, 25, y + 30);
+  doc.text(`• Audio-Tresor & Eigene Aufnahmen: ${data.parentPermissions.allowMediathek ? 'Freigegeben (Eigenes Übe-Studio aktiv)' : 'GESPERRT (Nur Lehrer-Audios)'}`, 25, y + 37);
+  doc.text(`• Nachtruhe-Schutz / Ruhezeiten: ${data.parentPermissions.bedtimeModeEnabled ? `AKTIV (${data.parentPermissions.bedtimeStart || '20:00'} bis ${data.parentPermissions.bedtimeEnd || '07:00'} Uhr)` : 'Deaktiviert (24h Übezugriff)'}`, 25, y + 44);
+
+  y += 58;
+
+  // 5. Block 3: PROTOKOLLIERTE ÜBEDATEN & LERNFORTSCHRITT (Art. 15 Abs. 1 lit. b DSGVO)
+  doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+  doc.setDrawColor(cardBorder[0], cardBorder[1], cardBorder[2]);
+  doc.roundedRect(20, y, 170, 58, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('3. LERNAKTIVITÄT & PROTOKOLLIERTE ÜBE-ZEITEN (Art. 15 Abs. 1 lit. b DSGVO)', 25, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  doc.text(`• Gesamte dokumentierte Fokus-Übezeit: ${data.stats.totalPracticeMinutes} Minuten`, 25, y + 16);
+  doc.text(`• Aktuelle Übe-Streak: ${data.stats.streakDays} Tage in Folge`, 25, y + 23);
+  doc.text(`• Gesammelte Erfahrungspunkte (XP): ${data.stats.currentXp || 0} Level-Punkte`, 25, y + 30);
+  doc.text(`• Gemeisterte Meisterwerke & Aufgaben: ${data.stats.completedMissionsCount} Aufgaben abgeschlossen`, 25, y + 37);
+  doc.text(`• Freigeschaltete Gamification-Sticker: ${data.stats.stickersUnlockedCount} von ${data.stats.stickersTotalCount} Abzeichen freigeschaltet`, 25, y + 44);
+  const audioCount = data.stats.audioRecordingsCount || 0;
+  const audioMb = ((data.stats.audioStorageBytes || 0) / (1024 * 1024)).toFixed(1);
+  doc.text(`• Gespeicherte Audioaufnahmen: ${audioCount} Aufnahme(n) im Audio-Tresor (${audioMb} MB belegt)`, 25, y + 51);
+
+  y += 65;
+
+  // 6. Infobox: Vertraulichkeit & Datenschutzstandard
+  doc.setFillColor(240, 253, 244); // Green 50
+  doc.setDrawColor(187, 247, 208); // Green 200
+  doc.roundedRect(20, y, 170, 32, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(21, 128, 61); // Green 700
+  doc.text('DATENSCHUTZ-GARANTIE & ZERO-PII-PRINZIP (Art. 5 DSGVO)', 25, y + 7);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(30, 41, 59);
+  const shortPrivacy = 'Die Plattform Campus-Groovelab speichert aus Gründen des maximalen Minderjährigenschutzes KEINE Bank- oder Zahlungsdaten, KEINE E-Mail-Adressen von Schülern und KEINE Werbetracker. Alle Server befinden sich in ISO 27001 zertifizierten deutschen Rechenzentren.';
+  const splitShortPrivacy = doc.splitTextToSize(shortPrivacy, 160);
+  doc.text(splitShortPrivacy, 25, y + 14);
+
+  // Footer Seite 1
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text('Campus-Groovelab • DSGVO-konforme Bildungsplattform • www.campus-groovelab.de', 20, 285);
+  doc.text('Seite 1 von 2', 175, 285);
+
+  // =========================================================================
+  // SEITE 2: GESETZLICHE PFLICHTBELEHRUNG NACH ART. 15 ABS. 1 & 2 DSGVO
+  // =========================================================================
+  doc.addPage();
+
+  // Accent Top Bar Seite 2
+  doc.setFillColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+  doc.rect(0, 0, 210, 6, 'F');
+
+  // Header Seite 2
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('CAMPUS-GROOVELAB • RECHTLICHE PFLICHTBELEHRUNG', 20, 20);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+  doc.text('Gesetzliche Auskunftspflichten nach Art. 15 Abs. 1 & 2 DSGVO', 20, 27);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text(`Auskunfts-Aktenzeichen: ${reportId} • Erziehungsberechtigten-Rechte`, 20, 33);
+
+  let y2 = 40;
+
+  // Block 4: GESETZLICHE INFORMATIONSPFLICHTEN (Art. 15 Abs. 1 lit. a–h DSGVO)
+  doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+  doc.setDrawColor(cardBorder[0], cardBorder[1], cardBorder[2]);
+  doc.roundedRect(20, y2, 170, 95, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('4. RECHTLICHE AUSKUNFTSPFLICHTEN NACH ART. 15 ABS. 1 DSGVO', 25, y2 + 8);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+
+  let subY = y2 + 15;
+
+  // a) Zwecke
+  doc.text('a) Verarbeitungszwecke (lit. a):', 25, subY);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  const zweckText = 'Bereitstellung des interaktiven Hausaufgabenhefts, Übe-Zeiterfassung, pädagogische Lernstandsdokumentation, 1:1 Fachkommunikation mit der Lehrkraft und Terminkoordination im Musikunterricht.';
+  doc.text(doc.splitTextToSize(zweckText, 158), 25, subY + 4);
+
+  subY += 16;
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('b) Kategorien personenbezogener Daten (lit. b):', 25, subY);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  const katText = 'Basis-Stammdaten (Vorname, maskierter Nachname, Instrument), elterliche Schutzschalter-Konfiguration, Übe-Timer-Telemetrie, Aufgabenstatus, Metadaten von Terminänderungen sowie Audio-Aufnahmen.';
+  doc.text(doc.splitTextToSize(katText, 158), 25, subY + 4);
+
+  subY += 16;
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('c) Empfänger & Kategorien von Empfängern (lit. c):', 25, subY);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  const empfText = 'Ausschließlich die beauftragte Musikschule, die zuständige Lehrkraft und Erziehungsberechtigte. Hosting: Hetzner Online GmbH (ISO 27001 Rechenzentren, Deutschland) via Auftragsverarbeitung (Art. 28 DSGVO). Keine Weitergabe an Werbedritte.';
+  doc.text(doc.splitTextToSize(empfText, 158), 25, subY + 4);
+
+  subY += 16;
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('d) Speicherdauer & Löschfristen (lit. d):', 25, subY);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  const dauerText = 'Für die Dauer des aktiven Unterrichtsvertrags. Automatische Deaktivierung nach 2 Monaten Inaktivität. Bei Vertragsende oder Löschungsantrag erfolgt die vollständige physische Löschung aller Profildaten und Cloud-Audios.';
+  doc.text(doc.splitTextToSize(dauerText, 158), 25, subY + 4);
+
+  subY += 16;
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('e) Automatisierte Entscheidungsfindung & Profiling (lit. h):', 25, subY);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  const profilText = 'Es findet ausdrücklich KEINE automatisierte Entscheidungsfindung und KEIN Profiling im Sinne von Art. 22 DSGVO statt.';
+  doc.text(doc.splitTextToSize(profilText, 158), 25, subY + 4);
+
+  y2 += 102;
+
+  // Block 5: BETROFFENENRECHTE & BESCHWERDERECHT
+  doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+  doc.setDrawColor(cardBorder[0], cardBorder[1], cardBorder[2]);
+  doc.roundedRect(20, y2, 170, 72, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('5. RECHTE DER BETROFFENEN PERSONEN (ART. 15 BIS 22 DSGVO)', 25, y2 + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+
+  let rightsY = y2 + 15;
+  doc.text('• Recht auf Berichtigung (Art. 16 DSGVO): Unverzügliche Korrektur unrichtiger Schüler- oder Stammdaten.', 25, rightsY);
+  doc.text('• Recht auf Löschung (Art. 17 DSGVO): Vollständige Entfernung des Profils und aller Aufnahmen („Vergessenwerden").', 25, rightsY + 6);
+  doc.text('• Recht auf Einschränkung der Verarbeitung (Art. 18 DSGVO) & Widerspruchsrecht (Art. 21 DSGVO).', 25, rightsY + 12);
+  doc.text('• Recht auf Datenübertragbarkeit (Art. 20 DSGVO): Bereitstellung aller eigenen Daten und Audioaufnahmen als 1-Click ZIP-Archiv.', 25, rightsY + 18);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('Beschwerderecht bei der Aufsichtsbehörde (Art. 77 DSGVO):', 25, rightsY + 27);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  const beschwerdeText = 'Sie haben das gesetzliche Recht, sich bei der zuständigen Datenschutzaufsichtsbehörde (z. B. Landesbeauftragte für den Datenschutz des jeweiligen Bundeslandes der Musikschule) über die Datenverarbeitung zu beschweren.';
+  doc.text(doc.splitTextToSize(beschwerdeText, 158), 25, rightsY + 32);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('Herkunft der Daten (Art. 14 / Art. 15 Abs. 1 lit. g DSGVO):', 25, rightsY + 44);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  const herkunftText = 'Die Stammdaten wurden von der Musikschule bei Unterrichtsbeginn angelegt und durch Übe-Eingaben des Schülers fortgeführt.';
+  doc.text(doc.splitTextToSize(herkunftText, 158), 25, rightsY + 49);
+
+  y2 += 78;
+
+  // Block 6: Revisionssicheres Prüfungssiegel
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(187, 247, 208);
+  doc.roundedRect(20, y2, 170, 26, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(21, 128, 61);
+  doc.text('REVISIONSSICHERE DSGVO-KONFORMITÄT & ZERTIFIZIERUNG', 25, y2 + 7);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(30, 41, 59);
+  const sealText = 'Dieser Auskunftsbericht wurde automatisch aus der Campus-Groovelab Datenbank generiert und entspricht allen Vorgaben des Art. 15 Abs. 1 und 2 DSGVO. Die Datenverarbeitung erfolgt ausschließlich in der Bundesrepublik Deutschland.';
+  doc.text(doc.splitTextToSize(sealText, 158), 25, y2 + 13);
+
+  // Footer Seite 2
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text('Campus-Groovelab • DSGVO-konforme Bildungsplattform • www.campus-groovelab.de', 20, 285);
+  doc.text('Seite 2 von 2', 175, 285);
+
+  // Save PDF
+  const cleanName = data.studentName.replace(/[^a-zA-Z0-9]/g, '_');
+  const dateFileStr = now.toISOString().split('T')[0];
+  doc.save(`Campus_Groovelab_DSGVO_Bericht_${cleanName}_${dateFileStr}.pdf`);
+};
+
+
 
 

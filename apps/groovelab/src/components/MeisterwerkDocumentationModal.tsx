@@ -695,7 +695,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const isInsideSimTabletLandscape = typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-tablet, .sim-viewport-landscape');
   const isInsideSim = isInsideSimMobile || isInsideSimTabletLandscape;
   const isMobileView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
-  const [mobileProtokollTab, setMobileProtokollTab] = useState<'repertoire' | 'homework'>('repertoire');
+  const [mobileProtokollTab, setMobileProtokollTab] = useState<'repertoire' | 'homework'>((readOnly && uiLevel === 'junior') ? 'homework' : 'repertoire');
   const [hubTab, setHubTab] = useState<'modules' | 'protocol'>('modules');
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -1560,9 +1560,248 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     });
   };
 
+  // 📅 KW Week Navigation Offset (0 = Current Week, -1 = Previous Week, etc.)
+  const [viewingWeekOffset, setViewingWeekOffset] = useState<number>(0);
 
+  // 🔊 Enterprise+ Sequential Phrase-Queue TTS Engine (Kristallklar & Natürliche Pausen)
+  const [isTtsSpeaking, setIsTtsSpeaking] = useState<boolean>(false);
+  const [activeTtsKey, setActiveTtsKey] = useState<string | null>(null);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>(() => {
+    try {
+      return localStorage.getItem('campus_tts_voice_uri') || '';
+    } catch {
+      return '';
+    }
+  });
+  const ttsSessionIdRef = useRef<number>(0);
 
-  // 🏷️ Smart Contextual Auto-Naming Generator
+  // Pre-load and listen to dynamic browser voice registry
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    const loadVoices = () => {
+      try {
+        const v = window.speechSynthesis.getVoices();
+        if (v && v.length > 0) {
+          setAvailableVoices(v);
+        }
+      } catch (e) {
+        console.warn('[TTS] Failed to load voices:', e);
+      }
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
+
+  const selectBestGermanVoice = (): SpeechSynthesisVoice | null => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+    const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return null;
+
+    const germanVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('de'));
+    if (germanVoices.length === 0) {
+      return voices[0] || null;
+    }
+
+    // 🌟 Primäre Wunschstimme: Anna (Enhanced / Premium / Standard)
+    const annaVoice = germanVoices.find(v => v.name.toLowerCase().includes('anna'));
+    if (annaVoice) return annaVoice;
+
+    // Fallbacks für Nicht-Mac-Geräte (Windows / Android)
+    const googleVoice = germanVoices.find(v => v.name.includes('Google'));
+    if (googleVoice) return googleVoice;
+
+    const naturalVoice = germanVoices.find(v => v.name.toLowerCase().includes('natural') || v.name.includes('Katja'));
+    if (naturalVoice) return naturalVoice;
+
+    return germanVoices[0] || null;
+  };
+
+  const cleanTextForTts = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/KW\s*(\d+)/gi, 'Kalenderwoche $1')
+      .replace(/Takt\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Takt $1 bis $2')
+      .replace(/S\.\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Seite $1 bis $2')
+      .replace(/S\.\s*(\d+)/gi, 'Seite $1')
+      .replace(/z\.\s*B\./gi, 'zum Beispiel')
+      .replace(/bzw\./gi, 'beziehungsweise')
+      .replace(/(\d+)\s*BPM/gi, '$1 Schläge pro Minute')
+      .replace(/BPM/gi, 'Schläge pro Minute')
+      .replace(/(\d+)\s*min/gi, '$1 Minuten')
+      .replace(/(\d+)\s*x\b/gi, '$1 mal')
+      .replace(/Übe-Timer/gi, 'Übe Timer')
+      .replace(/Play-Along/gi, 'Play Along')
+      .replace(/•/g, ', ')
+      .replace(/#/g, 'Nummer ')
+      .replace(/p\/f/gi, 'piano und forte')
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Keine Emojis buchstabieren
+      .replace(/[\u{2600}-\u{27BF}]/gu, '')
+      .replace(/\s*[-–—]\s*/g, ', ') // Bindestriche zu sanften Sprechpausen machen
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const handleStopSpeaking = () => {
+    ttsSessionIdRef.current += 1;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsTtsSpeaking(false);
+    setActiveTtsKey(null);
+  };
+
+  // Ensure speech is cancelled on component unmount
+  useEffect(() => {
+    return () => {
+      ttsSessionIdRef.current += 1;
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleSpeakText = async (textOrPhrases: string | string[], elementKey: string = 'global') => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      alert('Sprachausgabe wird in diesem Browser nicht unterstützt.');
+      return;
+    }
+
+    if (isTtsSpeaking && activeTtsKey === elementKey) {
+      handleStopSpeaking();
+      return;
+    }
+
+    handleStopSpeaking();
+
+    // Raw phrase extraction
+    const rawPhrases = Array.isArray(textOrPhrases)
+      ? textOrPhrases
+      : textOrPhrases
+          .split(/(?<=[.!?])\s+/)
+          .filter(p => p.trim().length > 0);
+
+    const phrases = rawPhrases
+      .map(p => cleanTextForTts(p))
+      .filter(p => p.length > 0);
+
+    if (phrases.length === 0) return;
+
+    const currentSessionId = ++ttsSessionIdRef.current;
+    setIsTtsSpeaking(true);
+    setActiveTtsKey(elementKey);
+
+    const bestVoice = selectBestGermanVoice();
+
+    for (let i = 0; i < phrases.length; i++) {
+      if (ttsSessionIdRef.current !== currentSessionId) {
+        break; // Cancelled
+      }
+
+      const phrase = phrases[i];
+      await new Promise<void>((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(phrase);
+        utterance.lang = 'de-DE';
+        // 🌟 100% Pure Native OS Audio Pipeline: Zero artificial DSP manipulation / rate / pitch modification
+
+        if (bestVoice) {
+          utterance.voice = bestVoice;
+        }
+
+        utterance.onend = () => {
+          resolve();
+        };
+
+        utterance.onerror = (e) => {
+          console.warn('[TTS] Phrase speech error:', e);
+          resolve();
+        };
+
+        window.speechSynthesis.speak(utterance);
+      });
+
+      if (ttsSessionIdRef.current !== currentSessionId) {
+        break; // Cancelled during utterance
+      }
+
+      // 🌟 Natürliche Atempause zwischen Sätzen (380 ms)
+      if (i < phrases.length - 1) {
+        await new Promise((r) => setTimeout(r, 380));
+      }
+    }
+
+    if (ttsSessionIdRef.current === currentSessionId) {
+      setIsTtsSpeaking(false);
+      setActiveTtsKey(null);
+    }
+  };
+
+  const buildCompleteWeeklyHomeworkSpeechPhrases = (
+    weekNumber: string,
+    lehrwerkeList: { title: string; pages: number[]; notes?: string[] }[],
+    songList: { title: string; note?: string }[],
+    audioNotes: { label?: string }[],
+    generalNoteText: string
+  ): string[] => {
+    const phrases: string[] = [];
+    phrases.push(`Hallo!`);
+    phrases.push(`Hier ist deine Hausaufgabe für die Kalenderwoche ${weekNumber}.`);
+
+    if (lehrwerkeList.length > 0) {
+      lehrwerkeList.forEach(book => {
+        const cleanBookTitle = book.title.replace(/\s*[-–—]\s*/g, ' ');
+        const pagesStr = book.pages.length === 1 
+          ? `auf Seite ${book.pages[0]}` 
+          : book.pages.length > 1 
+            ? `auf Seite ${book.pages.slice(0, -1).join(', Seite ')} und Seite ${book.pages[book.pages.length - 1]}`
+            : '';
+        
+        phrases.push(`Im Lehrwerk ${cleanBookTitle} übst du ${pagesStr}.`);
+
+        if (book.notes && book.notes.length > 0) {
+          book.notes.forEach(n => {
+            phrases.push(`Dein Hinweis dazu lautet: ${n}.`);
+          });
+        }
+      });
+    }
+
+    if (songList.length > 0) {
+      songList.forEach(song => {
+        const cleanSongTitle = song.title.replace(/\s*[-–—]\s*/g, ' mit ');
+        phrases.push(`Als Song übst du: ${cleanSongTitle}.`);
+        if (song.note && song.note.trim()) {
+          phrases.push(`Dein Fahrplan dazu lautet: ${song.note.trim()}.`);
+        }
+      });
+    }
+
+    if (audioNotes && audioNotes.length > 0) {
+      const audioCount = audioNotes.length;
+      phrases.push(`Deine Lehrkraft hat dir ${audioCount === 1 ? 'eine Aufnahme' : `${audioCount} Aufnahmen`} zum Mitspielen angehängt.`);
+    }
+
+    if (generalNoteText && generalNoteText.trim()) {
+      phrases.push(`Zusätzlicher Hinweis von deiner Lehrkraft: ${generalNoteText.trim()}.`);
+    }
+
+    if (lehrwerkeList.length === 0 && songList.length === 0 && (!audioNotes || audioNotes.length === 0) && (!generalNoteText || !generalNoteText.trim())) {
+      phrases.push(`Für diese Woche sind noch keine Hausaufgaben eingetragen.`);
+    } else {
+      phrases.push(`Schnapp dir dein Instrument und starte deinen Übe-Timer.`);
+      phrases.push(`Viel Spaß beim Musizieren!`);
+    }
+
+    return phrases;
+  };
   const generateSmartAudioTitle = (isTeacher: boolean, customLabel?: string): string => {
     if (customLabel && customLabel.trim()) return customLabel.trim();
 
@@ -1848,6 +2087,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Audio Recorder logic
   const startRecordingAudio = async () => {
+    const userRoleInSession = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
+    const isStudentActor = !isTeacherTools && userRoleInSession?.toLowerCase() === 'student';
+    if (isStudentActor) {
+      const isAudioAllowed = (student as any)?.parent_allow_audio !== false && 
+        (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' && localStorage.getItem('campus_allow_audio') !== 'false' : true);
+      if (!isAudioAllowed) {
+        alert('Die Aufnahme-Funktion ist im Eltern-Kontrollzentrum aktuell deaktiviert.');
+        return;
+      }
+    }
+
     const audioNotesCount = homeworkNotesList.filter(note => note.startsWith("AUDIO:")).length;
     if (!hasTresorStorage && audioNotesCount >= 12) {
       alert("Limit erreicht! Du hast bereits 12 Sprachaufnahmen in diesem Protokoll. Bitte lösche eine alte Sprachaufnahme, bevor du eine neue aufnimmst.");
@@ -8351,6 +8601,46 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       const effectiveTresorAvailable = hasTresorStorage && !isStorageOverCap;
                       const isLimitReached = !effectiveTresorAvailable && studentRecordingsTotalSec >= monthlyLimit;
 
+                      const isAudioAllowed = (student as any)?.parent_allow_audio !== false && 
+                        (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' && localStorage.getItem('campus_allow_audio') !== 'false' : true);
+
+                      if (!isAudioAllowed) {
+                        return (
+                          <div style={{
+                            padding: '14px 16px',
+                            background: '#f8fafc',
+                            border: '1.5px dashed #cbd5e1',
+                            borderRadius: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            textAlign: 'left'
+                          }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '10px',
+                              background: '#f1f5f9',
+                              color: '#64748b',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <Lock size={18} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 850, color: '#475569' }}>
+                                Eigene Aufnahmen im Elternbereich pausiert
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 550, lineHeight: 1.35 }}>
+                                Aufnahmen deiner Lehrkraft auf der linken Seite kannst du weiterhin jederzeit anhören. Eigene Mikrofonaufnahmen können im Eltern-Kontrollzentrum aktiviert werden.
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       return (
                         <>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -9456,8 +9746,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           
           {/* LEFT COLUMN: 🎯 FOKUS-ARBEITSPLATZ (Lehrwerke & Songs) */}
 
-          {/* MOBILE SEGMENTED CONTROL PILL-BAR FOR 2 SWIPE CARDS */}
-          {isMobileView && (
+          {/* MOBILE SEGMENTED CONTROL PILL-BAR FOR 2 SWIPE CARDS (Hidden for junior students for max focus) */}
+          {isMobileView && !(readOnly && uiLevel === 'junior') && (
             <div style={{
               width: '100%',
               display: 'flex',
@@ -9542,7 +9832,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             minHeight: '0',
             maxHeight: isMobileView ? 'none' : '100%',
             overflowY: isMobileView ? 'visible' : 'auto',
-            display: (uiLevel === 'junior' && readOnly) ? 'none' : (isMobileView ? (mobileProtokollTab === 'repertoire' ? 'flex' : 'none') : 'flex'),
+            display: isMobileView ? (mobileProtokollTab === 'repertoire' ? 'flex' : 'none') : 'flex',
             flexDirection: 'column',
             justifyContent: 'flex-start',
             gap: '16px',
@@ -11416,351 +11706,367 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   /* TAB 1: 🎧 MODULE (Kompaktes Apple Music / Spotify 7er-Raster)             */
                   /* ========================================================================= */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }} className="animation-fade-in">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Sliders size={15} style={{ color: '#34a853' }} />
-                          <span>Campus Studio Module</span>
-                        </span>
-                        <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 550 }}>
-                          Interaktive Werkzeuge für deinen Unterricht & deine Übe-Sessions
-                        </p>
-                      </div>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px' }}>
-                        7 Module aktiv
-                      </span>
-                    </div>
+                    {(() => {
+                      const activeModulesCount = uiLevel === 'junior' ? 3 : (uiLevel === 'teen' ? 5 : 6);
 
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: '14px 12px',
-                      padding: '2px 0 12px 0'
-                    }}>
-                      {/* 1. Protokoll (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
-                      <div
-                        onClick={() => {
-                          setHubTab('protocol');
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '16px',
-                          padding: '14px 8px 12px 8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{
-                          width: '62px',
-                          height: '62px',
-                          borderRadius: '14px',
-                          background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          border: '1px solid rgba(255, 255, 255, 0.25)'
-                        }}>
-                          <BookOpen size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                        </div>
-                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                            Protokoll
+                      return (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Sliders size={15} style={{ color: '#34a853' }} />
+                                <span>Campus Studio Module</span>
+                              </span>
+                              <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 550 }}>
+                                Interaktive Werkzeuge für deinen Unterricht &amp; deine Übe-Sessions
+                              </p>
+                            </div>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px' }}>
+                              {activeModulesCount} Module aktiv
+                            </span>
                           </div>
-                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                            Lehrwerke & Stücke
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* 2. Loopstation (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
-                      <div
-                        onClick={() => {
-                          setActiveModalTab('document');
-                          setActiveViewMode('loopstation');
-                          setActiveSubView('hub');
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '16px',
-                          padding: '14px 8px 12px 8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{
-                          width: '62px',
-                          height: '62px',
-                          borderRadius: '14px',
-                          background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(244, 63, 94, 0.40)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          border: '1px solid rgba(255, 255, 255, 0.25)'
-                        }}>
-                          <Sliders size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                        </div>
-                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                            Loopstation
-                          </div>
-                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                            Audio-Mehrspur
-                          </div>
-                        </div>
-                      </div>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: '14px 12px',
+                            padding: '2px 0 12px 0'
+                          }}>
+                            {/* 1. Protokoll (Ausgeblendet für Junior Schüler für maximale Übersicht & Fokus) */}
+                            {!(readOnly && uiLevel === 'junior') && (
+                              <div
+                                onClick={() => {
+                                  setHubTab('protocol');
+                                }}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #e2e8f0',
+                                  borderRadius: '16px',
+                                  padding: '14px 8px 12px 8px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  textAlign: 'center',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                                }}
+                                className="hover-scale"
+                              >
+                                <div style={{
+                                  width: '62px',
+                                  height: '62px',
+                                  borderRadius: '14px',
+                                  background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+                                  boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  border: '1px solid rgba(255, 255, 255, 0.25)'
+                                }}>
+                                  <BookOpen size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                </div>
+                                <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                                  <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                    Protokoll
+                                  </div>
+                                  <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                                    Lehrwerke &amp; Stücke
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
-                      {/* 3. Übe-Begleiter (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
-                      <div
-                        onClick={() => {
-                          setActiveModalTab('document');
-                          setActiveViewMode('practice');
-                          setActiveSubView('hub');
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '16px',
-                          padding: '14px 8px 12px 8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{
-                          width: '62px',
-                          height: '62px',
-                          borderRadius: '14px',
-                          background: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(245, 158, 11, 0.40)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          border: '1px solid rgba(255, 255, 255, 0.25)'
-                        }}>
-                          <Clock size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                        </div>
-                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                            Übe-Begleiter
-                          </div>
-                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                            Fokus & Metronom
-                          </div>
-                        </div>
-                      </div>
+                            {/* 2. Loopstation (Nur Teen & Pro) */}
+                            {uiLevel !== 'junior' && (
+                              <div
+                                onClick={() => {
+                                  setActiveModalTab('document');
+                                  setActiveViewMode('loopstation');
+                                  setActiveSubView('hub');
+                                }}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #e2e8f0',
+                                  borderRadius: '16px',
+                                  padding: '14px 8px 12px 8px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  textAlign: 'center',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                                }}
+                                className="hover-scale"
+                              >
+                                <div style={{
+                                  width: '62px',
+                                  height: '62px',
+                                  borderRadius: '14px',
+                                  background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)',
+                                  boxShadow: '0 6px 14px -2px rgba(244, 63, 94, 0.40)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  border: '1px solid rgba(255, 255, 255, 0.25)'
+                                }}>
+                                  <Sliders size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                </div>
+                                <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                                  <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                    Loopstation
+                                  </div>
+                                  <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                                    Audio-Mehrspur
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
-                      {/* 4. Aufnahmen (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
-                      <div
-                        onClick={() => {
-                          setActiveModalTab('document');
-                          setActiveViewMode('recordings');
-                          setActiveSubView('hub');
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '16px',
-                          padding: '14px 8px 12px 8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{
-                          width: '62px',
-                          height: '62px',
-                          borderRadius: '14px',
-                          background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(99, 102, 241, 0.40)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          border: '1px solid rgba(255, 255, 255, 0.25)'
-                        }}>
-                          <Mic size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                        </div>
-                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                            Aufnahmen
-                          </div>
-                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                            Unterrichts-Memos
-                          </div>
-                        </div>
-                      </div>
+                            {/* 3. Übe-Begleiter (Für alle) */}
+                            <div
+                              onClick={() => {
+                                setActiveModalTab('document');
+                                setActiveViewMode('practice');
+                                setActiveSubView('hub');
+                              }}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid #e2e8f0',
+                                borderRadius: '16px',
+                                padding: '14px 8px 12px 8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <div style={{
+                                width: '62px',
+                                height: '62px',
+                                borderRadius: '14px',
+                                background: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
+                                boxShadow: '0 6px 14px -2px rgba(245, 158, 11, 0.40)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                border: '1px solid rgba(255, 255, 255, 0.25)'
+                              }}>
+                                <Clock size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                              </div>
+                              <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                  Übe-Begleiter
+                                </div>
+                                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                                  Fokus &amp; Metronom
+                                </div>
+                              </div>
+                            </div>
 
-                      {/* 5. Stimmgerät (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
-                      <div
-                        onClick={() => {
-                          setActiveModalTab('document');
-                          setActiveViewMode('tuner');
-                          setActiveSubView('hub');
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '16px',
-                          padding: '14px 8px 12px 8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{
-                          width: '62px',
-                          height: '62px',
-                          borderRadius: '14px',
-                          background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(6, 182, 212, 0.40)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          border: '1px solid rgba(255, 255, 255, 0.25)'
-                        }}>
-                          <Radio size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                        </div>
-                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                            Stimmgerät
-                          </div>
-                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                            WebAudio Tuner
-                          </div>
-                        </div>
-                      </div>
+                            {/* 4. Aufnahmen (Für alle) */}
+                            <div
+                              onClick={() => {
+                                setActiveModalTab('document');
+                                setActiveViewMode('recordings');
+                                setActiveSubView('hub');
+                              }}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid #e2e8f0',
+                                borderRadius: '16px',
+                                padding: '14px 8px 12px 8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <div style={{
+                                width: '62px',
+                                height: '62px',
+                                borderRadius: '14px',
+                                background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+                                boxShadow: '0 6px 14px -2px rgba(99, 102, 241, 0.40)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                border: '1px solid rgba(255, 255, 255, 0.25)'
+                              }}>
+                                <Mic size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                              </div>
+                              <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                  Aufnahmen
+                                </div>
+                                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                                  Unterrichts-Memos
+                                </div>
+                              </div>
+                            </div>
 
-                      {/* 6. Skill-Radar (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
-                      <div
-                        onClick={() => {
-                          setActiveModalTab('skillradar');
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '16px',
-                          padding: '14px 8px 12px 8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{
-                          width: '62px',
-                          height: '62px',
-                          borderRadius: '14px',
-                          background: 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          border: '1px solid rgba(255, 255, 255, 0.25)'
-                        }}>
-                          <Activity size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                        </div>
-                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                            Skill-Radar
-                          </div>
-                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                            Kompetenz-Profil
-                          </div>
-                        </div>
-                      </div>
+                            {/* 5. Stimmgerät (Für alle) */}
+                            <div
+                              onClick={() => {
+                                setActiveModalTab('document');
+                                setActiveViewMode('tuner');
+                                setActiveSubView('hub');
+                              }}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid #e2e8f0',
+                                borderRadius: '16px',
+                                padding: '14px 8px 12px 8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <div style={{
+                                width: '62px',
+                                height: '62px',
+                                borderRadius: '14px',
+                                background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                                boxShadow: '0 6px 14px -2px rgba(6, 182, 212, 0.40)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                border: '1px solid rgba(255, 255, 255, 0.25)'
+                              }}>
+                                <Radio size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                              </div>
+                              <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                  Stimmgerät
+                                </div>
+                                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                                  WebAudio Tuner
+                                </div>
+                              </div>
+                            </div>
 
-                      {/* 7. Archiv (Kompaktes Cover-Artwork auf weißer Apple-Karte) */}
-                      <div
-                        onClick={() => {
-                          setActiveModalTab('document');
-                          setActiveSubView('history');
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '16px',
-                          padding: '14px 8px 12px 8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{
-                          width: '62px',
-                          height: '62px',
-                          borderRadius: '14px',
-                          background: 'linear-gradient(135deg, #64748b 0%, #334155 100%)',
-                          boxShadow: '0 6px 14px -2px rgba(100, 116, 139, 0.40)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          border: '1px solid rgba(255, 255, 255, 0.25)'
-                        }}>
-                          <History size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                        </div>
-                        <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                            Archiv
+                            {/* 6. Skill-Radar (Nur Teen & Pro) */}
+                            {uiLevel !== 'junior' && (
+                              <div
+                                onClick={() => {
+                                  setActiveModalTab('skillradar');
+                                }}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #e2e8f0',
+                                  borderRadius: '16px',
+                                  padding: '14px 8px 12px 8px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  textAlign: 'center',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                                }}
+                                className="hover-scale"
+                              >
+                                <div style={{
+                                  width: '62px',
+                                  height: '62px',
+                                  borderRadius: '14px',
+                                  background: 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
+                                  boxShadow: '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  border: '1px solid rgba(255, 255, 255, 0.25)'
+                                }}>
+                                  <Activity size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                </div>
+                                <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                                  <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                    Skill-Radar
+                                  </div>
+                                  <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                                    Kompetenz-Profil
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 7. Archiv (Nur Pro) */}
+                            {uiLevel === 'pro' && (
+                              <div
+                                onClick={() => {
+                                  setActiveModalTab('document');
+                                  setActiveSubView('history');
+                                }}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #e2e8f0',
+                                  borderRadius: '16px',
+                                  padding: '14px 8px 12px 8px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  textAlign: 'center',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                                }}
+                                className="hover-scale"
+                              >
+                                <div style={{
+                                  width: '62px',
+                                  height: '62px',
+                                  borderRadius: '14px',
+                                  background: 'linear-gradient(135deg, #64748b 0%, #334155 100%)',
+                                  boxShadow: '0 6px 14px -2px rgba(100, 116, 139, 0.40)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  border: '1px solid rgba(255, 255, 255, 0.25)'
+                                }}>
+                                  <History size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                </div>
+                                <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                                  <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                    Archiv
+                                  </div>
+                                  <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                                    Historie &amp; Jahre
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                            Historie & Jahre
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 ) : (
                   /* ========================================================================= */
@@ -12866,71 +13172,68 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           </form>
                         )}
                       </div>
-
                     </div>
                   </div>
                 )}
-                </div>
-                )}
-                </div>{/* close inner scrollable div */}
+              </div>
+            )}
+          </div>{/* close inner scrollable div */}
 
-                {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom (Trophy Dock) */}
-                {!(uiLevel === 'junior' && readOnly) && (
-                  <div style={{ padding: '8px 16px 14px 16px', display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', background: '#ffffff' }}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveModalTab('logbook')}
-                      style={{
-                        flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
-                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
-                        boxShadow: '0 3px 8px rgba(99, 102, 241, 0.25)',
-                        transition: 'all 0.15s ease',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Award size={14} />
-                      <span style={{ whiteSpace: 'nowrap' }}>Deine Meisterwerke</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
-                      style={{
-                        flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
-                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
-                        boxShadow: '0 3px 8px rgba(217, 119, 6, 0.25)',
-                        transition: 'all 0.15s ease',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Star size={14} fill="#fff" />
-                      <span style={{ whiteSpace: 'nowrap' }}>
-                        {uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setActiveModalTab('audiobiography'); setActiveSubView('hub'); }}
-                      style={{
-                        flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
-                        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
-                        boxShadow: '0 3px 8px rgba(16, 185, 129, 0.25)',
-                        transition: 'all 0.15s ease',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Disc size={14} />
-                      <span style={{ whiteSpace: 'nowrap' }}>Audio-Biografie</span>
-                    </button>
-                  </div>
-                )}
+          {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom (Trophy Dock) */}
+                <div style={{ padding: '8px 16px 14px 16px', display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', background: '#ffffff' }}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveModalTab('logbook')}
+                    style={{
+                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                      boxShadow: '0 3px 8px rgba(99, 102, 241, 0.25)',
+                      transition: 'all 0.15s ease',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Award size={14} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Deine Meisterwerke</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
+                    style={{
+                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                      boxShadow: '0 3px 8px rgba(217, 119, 6, 0.25)',
+                      transition: 'all 0.15s ease',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Star size={14} fill="#fff" />
+                    <span style={{ whiteSpace: 'nowrap' }}>
+                      {uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setActiveModalTab('audiobiography'); setActiveSubView('hub'); }}
+                    style={{
+                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
+                      background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                      boxShadow: '0 3px 8px rgba(16, 185, 129, 0.25)',
+                      transition: 'all 0.15s ease',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Disc size={14} />
+                    <span style={{ whiteSpace: 'nowrap' }}>Audio-Biografie</span>
+                  </button>
+                </div>
               </>
         )}
       </div>
 
-        {useNotebookLayout && !isMobileView && !(uiLevel === 'junior' && readOnly) && (
+        {useNotebookLayout && !isMobileView && (
           <div style={{
             width: '6px',
             background: '#18181b',
@@ -12963,10 +13266,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         {/* COLUMN 3: ✍️ DOKUMENTATION & HAUSAUFGABE (32%) */}
           
           <div style={{
-            flex: (uiLevel === 'junior' && readOnly) ? '1 1 100%' : (isMobileView ? 'none' : '1 1 0%'),
-            width: (uiLevel === 'junior' && readOnly) ? '100%' : 'auto',
-            maxWidth: (uiLevel === 'junior' && readOnly) ? '760px' : 'none',
-            margin: (uiLevel === 'junior' && readOnly) ? '0 auto' : '0',
+            flex: isMobileView ? 'none' : '1 1 0%',
+            width: 'auto',
+            maxWidth: 'none',
+            margin: '0',
             height: isMobileView ? 'auto' : '100%',
             minHeight: '0',
             maxHeight: isMobileView ? 'none' : '100%',
@@ -12978,7 +13281,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             gap: '20px',
             background: useNotebookLayout ? 'white' : '#f8fafc',
             backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
-            borderLeft: (uiLevel === 'junior' && readOnly) ? 'none' : (useNotebookLayout ? 'none' : '1px solid #e4e4e7'),
+            borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
             borderRadius: '0',
             boxShadow: 'none',
             position: 'relative',
@@ -14333,84 +14636,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         gap: '12px',
                         boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03)'
                       }}>
-                        {/* Preview Header Bar */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '7px',
-                              background: '#34a853',
-                              color: '#ffffff',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)'
-                            }}>
-                              <Calendar size={13} strokeWidth={2.5} />
-                            </div>
-                            <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                              {readOnly ? 'Deine Hausaufgabe' : 'Schülervorschau'} (KW {getISOWeek().split('-W')[1]})
-                            </span>
-                          </div>
-
-                          {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '') && !readOnly && (
-                            <button 
-                              type="button" 
-                              onClick={async () => {
-                                await handleResetAllCurrentHomework();
-                                setGeneralHomeworkNotes('');
-                              }}
-                              style={{ 
-                                border: 'none', 
-                                background: 'rgba(239, 68, 68, 0.08)', 
-                                color: '#dc2626', 
-                                fontSize: '0.72rem', 
-                                fontWeight: 800, 
-                                cursor: 'pointer', 
-                                padding: '3px 8px',
-                                borderRadius: '8px',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className="hover-scale-mini"
-                            >
-                              ✕ Zurücksetzen
-                            </button>
-                          )}
-                        </div>
-
-
-
-                        {/* Silent Mode Banner */}
+                        {/* ========================================================================= */}
+                        {/* HERO CARD CONTENT (100% SSOT: Single Source of Truth for Voice & UI)     */}
+                        {/* ========================================================================= */}
                         {(() => {
-                          const currentHour = getSimulatedNow().getHours();
-                          const isSilentTime = currentHour >= 20 || currentHour < 7;
-                          if (!isSilentTime) return null;
-                          return (
-                            <div style={{
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '10px',
-                              padding: '6px 10px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              color: '#64748b'
-                            }}>
-                              <span>🌙</span>
-                              <span>
-                                {readOnly
-                                  ? 'Nachtruhe aktiv: Keine störenden Benachrichtigungen bis 07:00 Uhr.'
-                                  : 'Silent-Modus aktiv: Der Schüler erhält die Aufgabe morgen früh ab 07:00 Uhr ohne Nacht-Störung.'}
-                              </span>
-                            </div>
-                          );
-                        })()}
+                          const getTargetWeekIso = (offset: number): string => {
+                            if (offset === 0) return getISOWeek();
+                            const d = new Date();
+                            d.setDate(d.getDate() + (offset * 7));
+                            return getISOWeek(d);
+                          };
 
-                        {/* Active Homework Items Section */}
-                        {(() => {
+                          const viewingWeekIso = getTargetWeekIso(viewingWeekOffset);
+                          const viewingWeekNum = viewingWeekIso.split('-W')[1] || '';
+                          const isPastWeek = viewingWeekOffset !== 0;
+
+                          // 1. Deduplicate progress items
                           const uniqueItemsMap = new Map<string, any>();
                           (progressItems || []).forEach(item => {
                             const canonicalKey = getCanonicalSongKey(item);
@@ -14422,7 +14663,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           });
                           const deduplicatedItems = Array.from(uniqueItemsMap.values());
 
-                          const currentWeek = getISOWeek();
                           const activeHWs = deduplicatedItems.filter(item => {
                             if (item.topic_name && item.topic_name.includes(' - Seite ')) {
                               const parts = item.topic_name.split(' - Seite ');
@@ -14437,6 +14677,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             }
                             return Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
                           });
+
                           const activeTheories = deduplicatedItems.filter(item => {
                             if (item.topic_name && item.topic_name.includes(' - Seite ')) {
                               const parts = item.topic_name.split(' - Seite ');
@@ -14451,13 +14692,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             }
                             return item.status === 'THEORY_DONE' && 
                                    item.updated_at && 
-                                   getISOWeek(item.updated_at) === currentWeek &&
+                                   getISOWeek(item.updated_at) === viewingWeekIso &&
                                    !item.topic_name?.startsWith('Hausaufgabe KW ');
                           });
 
-                          const groupedLehrwerke: Record<string, { pages: number[] }> = {};
+                          const groupedLehrwerke: Record<string, { pages: number[]; notes: string[] }> = {};
                           const otherHWs: any[] = [];
                           
+                          // Process assignedLehrwerke page states
                           (assignedLehrwerke || []).forEach(assignment => {
                             const book = globalLehrwerke.find(g => g.id === assignment.lehrwerkId);
                             if (!book || !assignment.pageStates) return;
@@ -14467,10 +14709,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 const pageNum = parseInt(pNumStr, 10);
                                 if (!isNaN(pageNum)) {
                                   if (!groupedLehrwerke[book.title]) {
-                                    groupedLehrwerke[book.title] = { pages: [] };
+                                    groupedLehrwerke[book.title] = { pages: [], notes: [] };
                                   }
                                   if (!groupedLehrwerke[book.title].pages.includes(pageNum)) {
                                     groupedLehrwerke[book.title].pages.push(pageNum);
+                                    const cleanNote = getCleanPageNotes(pState.homeworkNotes || pState.homework_notes);
+                                    if (cleanNote) {
+                                      groupedLehrwerke[book.title].notes.push(`Seite ${pageNum}: ${cleanNote}`);
+                                    }
                                   }
                                 }
                               }
@@ -14488,10 +14734,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                               const pageNum = parseInt(parts[1], 10);
                               if (!groupedLehrwerke[bookTitle]) {
-                                groupedLehrwerke[bookTitle] = { pages: [] };
+                                groupedLehrwerke[bookTitle] = { pages: [], notes: [] };
                               }
                               if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
                                 groupedLehrwerke[bookTitle].pages.push(pageNum);
+                                if (item.homework_notes) {
+                                  const cleanNote = getCleanPageNotes(item.homework_notes);
+                                  if (cleanNote && !groupedLehrwerke[bookTitle].notes.includes(`Seite ${pageNum}: ${cleanNote}`)) {
+                                    groupedLehrwerke[bookTitle].notes.push(`Seite ${pageNum}: ${cleanNote}`);
+                                  }
+                                }
                               }
                             } else {
                               const cleanTopic = getNormalizedSongTitle(item);
@@ -14538,35 +14790,297 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           
                           const lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => {
                             info.pages.sort((a: number, b: number) => a - b);
-                            return { title, pages: info.pages };
+                            return { title, pages: info.pages, notes: info.notes };
                           });
 
-                          const audioNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => item.note.startsWith("AUDIO:"));
-                          const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || generalHomeworkNotes.trim().length > 0;
+                          const audioNotes = homeworkNotesList
+                            .map((note, idx) => ({ note, idx }))
+                            .filter(item => item.note.startsWith("AUDIO:"))
+                            .map((item, index) => {
+                              const parts = item.note.substring(6).split('|');
+                              return {
+                                url: parts[0],
+                                duration: parseInt(parts[1] || '0', 10),
+                                label: parts[3] || `Play-Along #${index + 1}`,
+                                originalIdx: item.idx,
+                                idx: item.idx
+                              };
+                            });
 
-                          if (!hasActiveItems) {
-                            return (
-                              <div style={{
-                                padding: '16px 12px',
-                                background: '#ffffff',
-                                borderRadius: '14px',
-                                border: '1.5px dashed #cbd5e1',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                textAlign: 'center'
-                              }}>
-                                <span style={{ fontSize: '1.1rem' }}>📖</span>
-                                <span style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 650 }}>
-                                  Noch keine Aufgaben für KW {getISOWeek().split('-W')[1]} zugewiesen. Wähle links ein Lehrwerk oder einen Song.
-                                </span>
-                              </div>
-                            );
-                          }
+                          const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || generalHomeworkNotes.trim().length > 0;
+                          
+                          const currentHour = getSimulatedNow().getHours();
+                          const isSilentTime = currentHour >= 20 || currentHour < 7;
 
                           return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '2px 0' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {/* 1. Header Bar with KW Stepper & Enterprise+ TTS Vorlesen */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '7px',
+                                    background: '#34a853',
+                                    color: '#ffffff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)',
+                                    flexShrink: 0
+                                  }}>
+                                    <Calendar size={13} strokeWidth={2.5} />
+                                  </div>
+
+                                  {/* Title with KW Week Navigation Arrows */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingWeekOffset(prev => prev - 1)}
+                                      title="Vorherige Woche (KW)"
+                                      style={{
+                                        background: '#f1f5f9',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '7px',
+                                        width: '24px',
+                                        height: '24px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        color: '#334155',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      className="hover-scale-mini"
+                                    >
+                                      <ChevronLeft size={14} strokeWidth={2.5} />
+                                    </button>
+
+                                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                                      {readOnly ? 'Deine Hausaufgabe' : 'Schülervorschau'} (KW {viewingWeekNum})
+                                    </span>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingWeekOffset(prev => Math.min(1, prev + 1))}
+                                      title="Nächste Woche (KW)"
+                                      style={{
+                                        background: '#f1f5f9',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '7px',
+                                        width: '24px',
+                                        height: '24px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        color: '#334155',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      className="hover-scale-mini"
+                                    >
+                                      <ChevronRight size={14} strokeWidth={2.5} />
+                                    </button>
+
+                                    {viewingWeekOffset !== 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setViewingWeekOffset(0)}
+                                        style={{
+                                          background: '#e6f4ea',
+                                          border: '1px solid #bbf7d0',
+                                          color: '#15803d',
+                                          borderRadius: '7px',
+                                          padding: '3px 7px',
+                                          fontSize: '0.68rem',
+                                          fontWeight: 800,
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          marginLeft: '2px'
+                                        }}
+                                        className="hover-scale-mini"
+                                        title="Zurück zur aktuellen Woche"
+                                      >
+                                        <RotateCcw size={10} />
+                                        <span>Heute</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {/* 🔊 Global TTS Audio Assistant Vorlese-Button (100% SSOT Synchronisiert) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (isTtsSpeaking && activeTtsKey === 'global_homework') {
+                                        handleStopSpeaking();
+                                      } else {
+                                        const speechPhrases = buildCompleteWeeklyHomeworkSpeechPhrases(
+                                          viewingWeekNum,
+                                          lehrwerkeList,
+                                          otherHWs.map(s => ({
+                                            title: s.topic_name?.replace(/\s*\([^)]*\)\s*$/, '') || '',
+                                            note: getCleanPageNotes(s.homework_notes)
+                                          })),
+                                          audioNotes,
+                                          generalHomeworkNotes
+                                        );
+                                        handleSpeakText(speechPhrases, 'global_homework');
+                                      }
+                                    }}
+                                    style={{
+                                      background: (isTtsSpeaking && activeTtsKey === 'global_homework') 
+                                        ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                                        : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                      border: 'none',
+                                      color: '#ffffff',
+                                      borderRadius: '100px',
+                                      padding: '6px 14px',
+                                      fontSize: '0.80rem',
+                                      fontWeight: 950,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      boxShadow: (isTtsSpeaking && activeTtsKey === 'global_homework') 
+                                        ? '0 3px 0 #991b1b, 0 6px 14px rgba(239, 68, 68, 0.35)' 
+                                        : '0 3px 0 #15803d, 0 6px 14px rgba(34, 197, 94, 0.35)',
+                                      transform: (isTtsSpeaking && activeTtsKey === 'global_homework') ? 'translateY(1px)' : 'none',
+                                      transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.filter = 'brightness(1.06)';
+                                      e.currentTarget.style.transform = 'translateY(-1px)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.filter = 'none';
+                                      e.currentTarget.style.transform = (isTtsSpeaking && activeTtsKey === 'global_homework') ? 'translateY(1px)' : 'none';
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.currentTarget.style.transform = 'translateY(2px)';
+                                      e.currentTarget.style.boxShadow = (isTtsSpeaking && activeTtsKey === 'global_homework') ? '0 1px 0 #991b1b' : '0 1px 0 #15803d';
+                                    }}
+                                    onMouseUp={(e) => {
+                                      e.currentTarget.style.transform = 'translateY(-1px)';
+                                      e.currentTarget.style.boxShadow = (isTtsSpeaking && activeTtsKey === 'global_homework') 
+                                        ? '0 3px 0 #991b1b, 0 6px 14px rgba(239, 68, 68, 0.35)' 
+                                        : '0 3px 0 #15803d, 0 6px 14px rgba(34, 197, 94, 0.35)';
+                                    }}
+                                    title={isTtsSpeaking && activeTtsKey === 'global_homework' ? "Vorlesen stoppen" : "Gesamte Hausaufgabe vorlesen lassen"}
+                                  >
+                                    {isTtsSpeaking && activeTtsKey === 'global_homework' ? (
+                                      <>
+                                        <VolumeX size={15} color="#ffffff" strokeWidth={2.8} />
+                                        <span>Stopp ⏹</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Volume2 size={15} color="#ffffff" strokeWidth={2.8} />
+                                        <span>Hör zu! ✨</span>
+                                      </>
+                                    )}
+                                  </button>
+
+                                  {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '') && !readOnly && (
+                                    <button 
+                                      type="button" 
+                                      onClick={async () => {
+                                        await handleResetAllCurrentHomework();
+                                        setGeneralHomeworkNotes('');
+                                      }}
+                                      style={{ 
+                                        border: 'none', 
+                                        background: 'rgba(239, 68, 68, 0.08)', 
+                                        color: '#dc2626', 
+                                        fontSize: '0.72rem', 
+                                        fontWeight: 800, 
+                                        cursor: 'pointer', 
+                                        padding: '3px 8px',
+                                        borderRadius: '8px',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      className="hover-scale-mini"
+                                    >
+                                      ✕ Zurücksetzen
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 2. Silent Mode Banner (falls aktiv) */}
+                              {isSilentTime && (
+                                <div style={{
+                                  background: '#f8fafc',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '10px',
+                                  padding: '6px 10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  color: '#64748b'
+                                }}>
+                                  <span>🌙</span>
+                                  <span>
+                                    {readOnly
+                                      ? 'Nachtruhe aktiv: Keine störenden Benachrichtigungen bis 07:00 Uhr.'
+                                      : 'Silent-Modus aktiv: Der Schüler erhält die Aufgabe morgen früh ab 07:00 Uhr ohne Nacht-Störung.'}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* 3. Empty State oder Items */}
+                              {!hasActiveItems ? (
+                                <div style={{
+                                  padding: '20px 14px',
+                                  background: '#ffffff',
+                                  borderRadius: '14px',
+                                  border: '1.5px dashed #cbd5e1',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px',
+                                  textAlign: 'center'
+                                }}>
+                                  <span style={{ fontSize: '1.4rem' }}>{isPastWeek ? '🏖️' : '📖'}</span>
+                                  <span style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 750 }}>
+                                    {isPastWeek
+                                      ? `Keine Hausaufgaben für KW ${viewingWeekNum} eingetragen.`
+                                      : `Noch keine Aufgaben für KW ${viewingWeekNum} zugewiesen.`}
+                                  </span>
+                                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
+                                    {isPastWeek
+                                      ? 'Unterrichtsfreie Zeit, Ferien oder keine Notizen hinterlegt.'
+                                      : 'Wähle links im Protokoll ein Lehrwerk oder einen Song aus.'}
+                                  </span>
+                                  {isPastWeek && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingWeekOffset(0)}
+                                      style={{
+                                        marginTop: '4px',
+                                        padding: '5px 12px',
+                                        borderRadius: '8px',
+                                        background: '#34a853',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 800,
+                                        cursor: 'pointer'
+                                      }}
+                                      className="hover-scale"
+                                    >
+                                      Zurück zur aktuellen Woche
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '2px 0' }}>
                               {/* Lehrwerke Books */}
                               {lehrwerkeList.map((item, idx) => {
                                 const bookColor = getLehrwerkColor(item.title);
@@ -14683,7 +15197,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       </div>
                                     </div>
 
-                                    {/* Specific Page Notes (Frameless Editorial Flow) */}
+                                    {/* Specific Page Notes (Frameless Editorial Flow + Micro TTS Speaker Pill) */}
                                     {pagesWithNotes.map((p: number) => {
                                       const pState = assignedBook?.pageStates?.[p];
                                       let noteText = getCleanPageNotes(pState?.homeworkNotes || pState?.homework_notes);
@@ -14693,6 +15207,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           noteText = getCleanPageNotes(dbItem.homework_notes);
                                         }
                                       }
+                                      const isSpeakingThis = isTtsSpeaking && activeTtsKey === `book_note_${item.title}_${p}`;
 
                                       return (
                                         <div key={`p-note-${p}`} style={{
@@ -14701,33 +15216,61 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           justifyContent: 'space-between',
                                           gap: '8px',
                                           fontSize: '0.78rem',
-                                          padding: '2px 0',
-                                          marginLeft: '36px'
+                                          padding: '3px 6px',
+                                          marginLeft: '32px',
+                                          borderRadius: '6px',
+                                          background: isSpeakingThis ? '#dcfce7' : 'transparent',
+                                          transition: 'all 0.15s ease'
                                         }}>
                                           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
                                             <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0 }}>S. {p}:</span>
                                             <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{noteText}</span>
                                           </div>
-                                          {!readOnly && (
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                             <button
                                               type="button"
-                                              onClick={() => handleDeletePageNote(item.title, p)}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleSpeakText(`Seite ${p}: ${noteText}`, `book_note_${item.title}_${p}`);
+                                              }}
                                               style={{
                                                 border: 'none',
-                                                background: 'none',
-                                                color: '#94a3b8',
+                                                background: isSpeakingThis ? '#bbf7d0' : 'none',
+                                                color: isSpeakingThis ? '#15803d' : '#94a3b8',
                                                 cursor: 'pointer',
-                                                fontSize: '0.70rem',
-                                                fontWeight: 800,
-                                                padding: '2px',
-                                                flexShrink: 0
+                                                padding: '2px 4px',
+                                                borderRadius: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                transition: 'transform 0.15s ease'
                                               }}
-                                              className="hover-scale-mini"
-                                              title="Notiz löschen"
+                                              onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
+                                              onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+                                              title="Notiz vorlesen"
                                             >
-                                              ✕
+                                              <Volume2 size={12} strokeWidth={2.4} />
                                             </button>
-                                          )}
+
+                                            {!readOnly && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeletePageNote(item.title, p)}
+                                                style={{
+                                                  border: 'none',
+                                                  background: 'none',
+                                                  color: '#94a3b8',
+                                                  cursor: 'pointer',
+                                                  fontSize: '0.70rem',
+                                                  fontWeight: 800,
+                                                  padding: '2px'
+                                                }}
+                                                className="hover-scale-mini"
+                                                title="Notiz löschen"
+                                              >
+                                                ✕
+                                              </button>
+                                            )}
+                                          </div>
                                         </div>
                                       );
                                     })}
@@ -14740,6 +15283,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                   {otherHWs.map((item, idx) => {
                                     const songNote = getCleanPageNotes(item.homework_notes);
+                                    const isSpeakingThisSong = isTtsSpeaking && activeTtsKey === `song_note_${idx}`;
                                     return (
                                       <div key={`song-hw-${idx}`} style={{
                                         display: 'flex',
@@ -14798,18 +15342,48 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           )}
                                         </div>
 
-                                        {/* Specific Song Practice Note (Frameless Editorial Flow) */}
+                                        {/* Specific Song Practice Note (Frameless Editorial Flow + Micro TTS Speaker Pill) */}
                                         {songNote ? (
                                           <div style={{
                                             display: 'flex',
-                                            alignItems: 'baseline',
-                                            gap: '6px',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            gap: '8px',
                                             fontSize: '0.78rem',
-                                            padding: '2px 0',
-                                            marginLeft: '36px'
+                                            padding: '3px 6px',
+                                            marginLeft: '32px',
+                                            borderRadius: '6px',
+                                            background: isSpeakingThisSong ? '#e0e7ff' : 'transparent',
+                                            transition: 'all 0.15s ease'
                                           }}>
-                                            <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0 }}>📌 Fahrplan:</span>
-                                            <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{songNote}</span>
+                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
+                                              <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0 }}>📌 Fahrplan:</span>
+                                              <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{songNote}</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleSpeakText(`Fahrplan für ${item.topic_name.replace(/\s*\([^)]*\)\s*$/, '')}: ${songNote}`, `song_note_${idx}`);
+                                              }}
+                                              style={{
+                                                border: 'none',
+                                                background: isSpeakingThisSong ? '#c7d2fe' : 'none',
+                                                color: isSpeakingThisSong ? '#4338ca' : '#94a3b8',
+                                                cursor: 'pointer',
+                                                padding: '2px 4px',
+                                                borderRadius: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                flexShrink: 0,
+                                                transition: 'transform 0.15s ease'
+                                              }}
+                                              onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
+                                              onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+                                              title="Fahrplan vorlesen"
+                                            >
+                                              <Volume2 size={12} strokeWidth={2.4} />
+                                            </button>
                                           </div>
                                         ) : null}
                                       </div>
@@ -14822,43 +15396,66 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               {audioNotes.length > 0 && (
                                 <div style={{ paddingTop: '2px' }}>
                                   <AudioTrackCarousel
-                                    tracks={audioNotes.map((item, index) => {
-                                      const parts = item.note.substring(6).split('|');
-                                      return {
-                                        url: parts[0],
-                                        duration: parseInt(parts[1] || '0', 10),
-                                        label: parts[3] || `🎵 Play-Along #${index + 1}`,
-                                        originalIdx: item.idx,
-                                        idx: item.idx
-                                      };
-                                    })}
+                                    tracks={audioNotes}
                                     onDelete={!readOnly ? handleDeleteNote : undefined}
                                     readOnly={readOnly}
                                   />
                                 </div>
                               )}
 
-                              {/* Compact Note Indicator in Live Preview */}
+                              {/* Compact Note Indicator in Live Preview with Micro TTS */}
                               {generalHomeworkNotes.trim() && (
                                 <div style={{
                                   display: 'flex',
                                   alignItems: 'center',
+                                  justifyContent: 'space-between',
                                   gap: '8px',
-                                  padding: '6px 0 2px 0',
+                                  padding: '6px 6px 2px 6px',
                                   fontSize: '0.78rem',
-                                  borderTop: (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0) ? '1px dashed #e2e8f0' : 'none'
+                                  borderRadius: '6px',
+                                  background: (isTtsSpeaking && activeTtsKey === 'general_note_tts') ? '#dcfce7' : 'transparent',
+                                  borderTop: (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0) ? '1px dashed #e2e8f0' : 'none',
+                                  transition: 'all 0.15s ease'
                                 }}>
-                                  <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                  <span style={{ fontWeight: 850, color: '#15803d', flexShrink: 0 }}>Hinweis:</span>
-                                  <span style={{ color: '#334155', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                    {generalHomeworkNotes.trim()}
-                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                    <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                    <span style={{ fontWeight: 850, color: '#15803d', flexShrink: 0 }}>Hinweis:</span>
+                                    <span style={{ color: '#334155', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {generalHomeworkNotes.trim()}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSpeakText(`Zusätzlicher Hinweis: ${generalHomeworkNotes.trim()}`, 'general_note_tts');
+                                    }}
+                                    style={{
+                                      border: 'none',
+                                      background: (isTtsSpeaking && activeTtsKey === 'general_note_tts') ? '#bbf7d0' : 'none',
+                                      color: (isTtsSpeaking && activeTtsKey === 'general_note_tts') ? '#15803d' : '#94a3b8',
+                                      cursor: 'pointer',
+                                      padding: '2px 4px',
+                                      borderRadius: '4px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      flexShrink: 0,
+                                      transition: 'transform 0.15s ease'
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+                                    title="Hinweis vorlesen"
+                                  >
+                                    <Volume2 size={12} strokeWidth={2.4} />
+                                  </button>
                                 </div>
                               )}
                             </div>
-                          );
-                        })()}
-                      </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
 
                       {/* ========================================================================= */}
                       {/* ZONE 2: SEGMENTIERTE UNTERRICHTS-WERKZEUGE & EINGABE                     */}
@@ -15421,96 +16018,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       )}
                     </div>
                   </div>
-
-                  {/* In Junior mode: Render the 3 Trophy Dock Buttons directly on the right side */}
-                  {(uiLevel === 'junior' && readOnly) && (
-                    <div style={{
-                      display: 'flex',
-                      gap: '12px',
-                      marginTop: '8px',
-                      width: '100%',
-                      flexWrap: 'wrap'
-                    }}>
-                      <button
-                        type="button"
-                        onClick={() => setActiveModalTab('logbook')}
-                        style={{
-                          flex: '1 1 140px',
-                          padding: '12px 14px',
-                          borderRadius: '16px',
-                          border: 'none',
-                          background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                          color: 'white',
-                          fontWeight: 850,
-                          fontSize: '0.84rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 14px rgba(99, 102, 241, 0.25)',
-                          transition: 'all 0.15s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Award size={16} />
-                        <span style={{ whiteSpace: 'nowrap' }}>Deine Meisterwerke</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
-                        style={{
-                          flex: '1 1 140px',
-                          padding: '12px 14px',
-                          borderRadius: '16px',
-                          border: 'none',
-                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                          color: 'white',
-                          fontWeight: 850,
-                          fontSize: '0.84rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 14px rgba(217, 119, 6, 0.25)',
-                          transition: 'all 0.15s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Star size={16} fill="#fff" />
-                        <span style={{ whiteSpace: 'nowrap' }}>Sticker-Album</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => { setActiveModalTab('audiobiography'); setActiveSubView('hub'); }}
-                        style={{
-                          flex: '1 1 140px',
-                          padding: '12px 14px',
-                          borderRadius: '16px',
-                          border: 'none',
-                          background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                          color: 'white',
-                          fontWeight: 850,
-                          fontSize: '0.84rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
-                          transition: 'all 0.15s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Disc size={16} />
-                        <span style={{ whiteSpace: 'nowrap' }}>Audio-Biografie</span>
-                      </button>
-                    </div>
-                  )}
-
                   {/* Clean Bottom Spacing */}
                   <div style={{ paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '24px' : '8px' }} />
                 </form>
@@ -16878,6 +17385,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           isTeacher={isTeacherTools}
           onBackToHub={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}
           isMobileOrSim={isMobileOrSim}
+          studentUiLevel={uiLevel}
         />
       ) : (
         /* COLUMN 4: 🏆 MEISTERWERKE & LOGBUCH (Full Width in Swiss Modernist Style) */

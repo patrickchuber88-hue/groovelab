@@ -14481,7 +14481,7 @@ export function AdminDashboard({
           <IDBadgeCard 
             user={selectedQRUser} 
             activePlatform={activePlatform} 
-            qrValue={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} 
+            qrValue={`${window.location.origin}/qr/${(selectedQRUser.role === 'teacher' || selectedQRUser.role === 'admin') ? (selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || '') : (selectedQRUser.qr_token || selectedQRUser.ausweis_nummer || selectedQRUser.id || '')}`} 
             cardRef={qrCardRef}
           />
 
@@ -14580,7 +14580,10 @@ export function AdminDashboard({
           <button
             type="button"
             onClick={() => {
-              const qrUrl = `${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`;
+              const effectiveToken = (selectedQRUser.role === 'teacher' || selectedQRUser.role === 'admin')
+                ? (selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || '')
+                : (selectedQRUser.qr_token || selectedQRUser.ausweis_nummer || selectedQRUser.id || '');
+              const qrUrl = `${window.location.origin}/qr/${effectiveToken}`;
               window.open(qrUrl, '_blank');
             }}
             style={{

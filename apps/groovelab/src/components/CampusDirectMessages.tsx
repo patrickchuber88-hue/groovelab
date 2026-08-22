@@ -17,6 +17,7 @@ import {
   Sparkles,
   CheckCheck
 } from 'lucide-react';
+import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
 
 const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
   if (!instrument) return '/avatars/gitarre_avatar_new.png';
@@ -67,35 +68,30 @@ const resolveCampusAvatar = (u: any): string => {
 
 const formatStudentDisplayName = (u: any): string => {
   if (!u) return '';
-  const firstName = u.first_name || '';
-  let lastName = u.last_name || u.full_last_name || '';
   const role = (u.role || '').toLowerCase();
   const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
   const isTeacherRole = role === 'teacher' || roles.includes('teacher');
 
   if (isTeacherRole) {
-    if (u.full_last_name) {
-      lastName = u.full_last_name;
-    }
-    return `${firstName} ${lastName}`.trim();
+    return formatTeacherFullName(u);
+  }
+
+  const isAdminRole = role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary');
+  if (isAdminRole) {
+    const fn = (u.first_name || '').trim();
+    const ln = (u.full_last_name || u.last_name || '').trim();
+    return `${fn} ${ln}`.trim() || 'Schulverwaltung';
   }
 
   // Only abbreviate last name for STUDENTS (per AGENTS.md rule)
   if (role === 'student' || role === 'pupil') {
-    if (lastName.trim()) {
-      const trimmedLn = lastName.trim();
-      if (trimmedLn.length === 2 && trimmedLn.endsWith('.')) {
-        return `${firstName} ${trimmedLn}`;
-      }
-      return `${firstName} ${trimmedLn.charAt(0)}.`;
-    }
-    return firstName;
+    return formatSingleStudentAnonymized(u.first_name, u.full_last_name || u.last_name, u.id);
   }
 
-  if (u.full_last_name) {
-    lastName = u.full_last_name;
+  if (u.first_name && (u.full_last_name || u.last_name)) {
+    return `${u.first_name} ${u.full_last_name || u.last_name}`.trim();
   }
-  return `${firstName} ${lastName}`.trim();
+  return u.first_name || u.name || 'Benutzer';
 };
 
 const parseLocalDate = (dateStr: string): Date => {
@@ -463,14 +459,92 @@ export default function CampusDirectMessages({
     };
   }, []);
 
-  // Requirement 5: On smartphones, reliably start with contact list view
-  const isInitialMobileMountRef = useRef(true);
-  useEffect(() => {
-    if (isMobile && isInitialMobileMountRef.current) {
-      isInitialMobileMountRef.current = false;
-      setSelectedRecipient(null);
+  // Parent Protection & PIN Gate States
+  const [showParentPinModal, setShowParentPinModal] = useState(false);
+  const [parentPinInput, setParentPinInput] = useState('');
+  const [parentPinError, setParentPinError] = useState('');
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+  const [, setForceUpdateTick] = useState(0);
+
+  const handleVerifyParentPin = async (inputPin: string) => {
+    if (!inputPin || inputPin.length < 4) {
+      setParentPinError('Bitte gib die 6-stellige Eltern-Master-PIN ein.');
+      return;
     }
-  }, [isMobile, setSelectedRecipient]);
+    setIsVerifyingPin(true);
+    setParentPinError('');
+    try {
+      const cleanInput = inputPin.trim();
+      let isMatch = false;
+
+      const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${user?.id}`);
+      const cachedUserPin = localStorage.getItem(`groovelab_user_pin_${user?.id}`);
+      const cachedStudentPin = localStorage.getItem(`groovelab_student_pin_${user?.id}`);
+      if ((cachedParentPin && cachedParentPin === cleanInput) ||
+          (cachedUserPin && cachedUserPin === cleanInput) ||
+          (cachedStudentPin && cachedStudentPin === cleanInput)) {
+        isMatch = true;
+      }
+
+      if (!isMatch && user) {
+        if (user.parent_pin && String(user.parent_pin).trim() === cleanInput) {
+          isMatch = true;
+        } else if (user.personal_pin && String(user.personal_pin).trim() === cleanInput) {
+          isMatch = true;
+        }
+      }
+
+      if (!isMatch && user?.id) {
+        try {
+          const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+            student_id: user.id,
+            input_pin: cleanInput
+          });
+          if (parentOk === true) isMatch = true;
+        } catch (e) {}
+      }
+
+      if (!isMatch && user?.id) {
+        try {
+          const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
+            user_uuid: user.id,
+            input_pin: cleanInput
+          });
+          if (personalOk === true) isMatch = true;
+        } catch (e) {}
+      }
+
+      if (!isMatch && user?.id) {
+        const { data: uData } = await supabase
+          .from('users')
+          .select('parent_pin, personal_pin, onboarding_pin')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (uData) {
+          if (String(uData.parent_pin || '').trim() === cleanInput || 
+              String(uData.personal_pin || '').trim() === cleanInput ||
+              String(uData.onboarding_pin || '').trim() === cleanInput) {
+            isMatch = true;
+          }
+        }
+      }
+
+      if (isMatch) {
+        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+        sessionStorage.setItem(`groovelab_parent_session_${user?.id}`, String(Date.now() + 60 * 60 * 1000));
+        setShowParentPinModal(false);
+        setParentPinInput('');
+        setForceUpdateTick(prev => prev + 1);
+      } else {
+        setParentPinError('Falsche Master-PIN. Bitte versuche es erneut.');
+        setParentPinInput('');
+      }
+    } catch (err: any) {
+      setParentPinError('Fehler bei der PIN-Prüfung: ' + (err?.message || 'Unbekannt'));
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -1947,9 +2021,44 @@ export default function CampusDirectMessages({
             </div>
 
             {/* Input Composer with Quick Replies */}
-            {isStudent && user?.app_usage_mode === 'parent_hybrid' && !user?.parent_allow_chat ? (
-              <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', background: '#fef2f2', color: '#b91c1c', fontSize: '0.85rem', fontWeight: 700, textAlign: 'center' }}>
-                🔒 Eltern-Sperre: Das Senden von Chat-Nachrichten wurde von deinen Eltern deaktiviert.
+            {isStudent && (user?.parent_allow_chat === false || (typeof window !== 'undefined' && (localStorage.getItem('campus_allow_chat') === 'false' || localStorage.getItem(`groovelab_parent_allow_chat_${user?.id}`) === 'false'))) && (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_parent_unlocked_global') !== 'true') ? (
+              <div style={{
+                padding: '14px 20px',
+                borderTop: '1px solid #e2e8f0',
+                background: '#eff6ff',
+                color: '#1e40af',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Lock size={16} color="#2563eb" />
+                  <span>Antworten durch Eltern geschützt (Lesen frei)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setParentPinInput('');
+                    setParentPinError('');
+                    setShowParentPinModal(true);
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                  className="hover-scale"
+                >
+                  Mit Eltern-PIN freischalten
+                </button>
               </div>
             ) : (
               <div style={{ borderTop: '1px solid #f1f5f9', background: '#f8fafc', padding: isMobile ? '8px 12px 12px 12px' : '12px 24px' }}>
@@ -2252,6 +2361,175 @@ export default function CampusDirectMessages({
           </div>
         )}
       </div>
+
+      {/* Master PIN Gate Modal for Chat Unlock */}
+      {showParentPinModal && (
+        <div
+          onClick={() => {
+            setShowParentPinModal(false);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.15s ease'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '28px',
+              maxWidth: '380px',
+              width: '100%',
+              padding: '30px 24px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}
+          >
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '20px',
+              background: '#e0f2fe',
+              color: '#0284c7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Lock size={28} />
+            </div>
+
+            <div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                Eltern Master-PIN
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
+                Das Verfassen von Nachrichten ist durch den Elternbereich geschützt. Bitte gib deine 6-stellige Eltern-Master-PIN ein.
+              </p>
+            </div>
+
+            {parentPinError && (
+              <div style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                background: '#fee2e2',
+                color: '#dc2626',
+                fontSize: '0.78rem',
+                fontWeight: 700
+              }}>
+                {parentPinError}
+              </div>
+            )}
+
+            {/* PIN Display Dots (6-stellig) */}
+            <div style={{
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'center',
+              margin: '8px 0'
+            }}>
+              {[0, 1, 2, 3, 4, 5].map(idx => {
+                const isFilled = parentPinInput.length > idx;
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      background: isFilled ? '#0284c7' : '#e2e8f0',
+                      border: isFilled ? '2px solid #0284c7' : '2px solid #cbd5e1',
+                      transition: 'all 0.15s ease',
+                      transform: isFilled ? 'scale(1.15)' : 'scale(1)'
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Touch Keypad */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '10px',
+              width: '100%',
+              marginTop: '6px'
+            }}>
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((key) => {
+                const isClear = key === 'C';
+                const isBack = key === '⌫';
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setParentPinError('');
+                      if (isClear) {
+                        setParentPinInput('');
+                      } else if (isBack) {
+                        setParentPinInput(prev => prev.slice(0, -1));
+                      } else if (parentPinInput.length < 6) {
+                        const nextVal = parentPinInput + key;
+                        setParentPinInput(nextVal);
+                        if (nextVal.length === 6) {
+                          handleVerifyParentPin(nextVal);
+                        }
+                      }
+                    }}
+                    style={{
+                      padding: '14px',
+                      borderRadius: '16px',
+                      border: '1.5px solid #f1f5f9',
+                      background: isClear || isBack ? '#f8fafc' : '#ffffff',
+                      color: isClear ? '#ef4444' : isBack ? '#64748b' : '#0f172a',
+                      fontSize: isBack ? '1.1rem' : '1.25rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
+                      transition: 'all 0.12s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    {key}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowParentPinModal(false);
+              }}
+              style={{
+                marginTop: '6px',
+                padding: '10px 18px',
+                borderRadius: '100px',
+                background: '#f1f5f9',
+                color: '#64748b',
+                border: 'none',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

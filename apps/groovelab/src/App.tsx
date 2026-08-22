@@ -2369,12 +2369,31 @@ function App() {
     return 'junior';
   });
 
+  const [parentUnlocked, setParentUnlocked] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
+  });
+
+  const [, setParentPermissionsVersion] = useState<number>(0);
+
   useEffect(() => {
     const handleLevelChangeEvt = (e: any) => {
       if (e?.detail) setCampusStudentUiLevel(e.detail);
     };
+    const handleParentModeChange = (e: any) => {
+      if (typeof e?.detail === 'boolean') setParentUnlocked(e.detail);
+    };
+    const handlePermissionChange = () => {
+      setParentPermissionsVersion(v => v + 1);
+    };
     window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
-    return () => window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+    window.addEventListener('groovelab_parent_mode_changed', handleParentModeChange);
+    window.addEventListener('campus_board_permission_changed', handlePermissionChange);
+    return () => {
+      window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+      window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChange);
+      window.removeEventListener('campus_board_permission_changed', handlePermissionChange);
+    };
   }, []);
 
   // Effect to resolve the kiosk token on mount
@@ -8807,55 +8826,167 @@ function App() {
             activePlatform === 'campus' ? (() => {
               const campusSettings = user?.schools?.opening_hours?.campus_settings || {};
               const showLeaderboard = campusSettings.show_leaderboard !== false;
-              const showDetailedStats = campusSettings.show_detailed_stats !== false;
               const flamesActive = campusSettings.flames_active !== false;
+
+              const isBoardAllowedForChild = (boardId: string) => {
+                if (campusStudentUiLevel === 'pro') return true;
+
+                // Local override if parent configured it
+                if (typeof window !== 'undefined') {
+                  const override = localStorage.getItem(`campus_board_override_${boardId}`);
+                  if (override === 'true') return true;
+                  if (override === 'false') return false;
+                }
+
+                if (campusStudentUiLevel === 'junior') {
+                  const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings'];
+                  return juniorAllowed.includes(boardId);
+                }
+                return true;
+              };
+
+              const toggleBoardForChild = (boardId: string, e?: React.MouseEvent) => {
+                if (e) e.stopPropagation();
+                const current = isBoardAllowedForChild(boardId);
+                const next = !current;
+                localStorage.setItem(`campus_board_override_${boardId}`, String(next));
+                if (boardId === 'messages') {
+                  localStorage.setItem('campus_allow_chat', String(next));
+                }
+                if (boardId === 'campus_cup') {
+                  localStorage.setItem('campus_allow_leaderboard', String(next));
+                }
+                if (user?.id) {
+                  try {
+                    supabase.from('users').update({
+                      parent_permissions: {
+                        ...(user?.parent_permissions || {}),
+                        [`board_${boardId}`]: next
+                      }
+                    }).eq('id', user.id).then(() => {});
+                  } catch(err) {}
+                }
+                window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId, allowed: next } }));
+                setParentPermissionsVersion(v => v + 1);
+              };
+
+              const renderParentStatusPill = (boardId: string) => {
+                if (!parentUnlocked) return null;
+                const isAllowed = isBoardAllowedForChild(boardId);
+                return (
+                  <span
+                    onClick={(e) => toggleBoardForChild(boardId, e)}
+                    title={isAllowed ? 'Für Kind freigegeben (Klicken zum Sperren)' : 'Für Kind gesperrt (Klicken zum Freigeben)'}
+                    style={{
+                      marginLeft: 'auto',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '22px',
+                      height: '22px',
+                      minWidth: '22px',
+                      borderRadius: '8px',
+                      background: isAllowed ? '#dcfce7' : '#f1f5f9',
+                      color: isAllowed ? '#16a34a' : '#64748b',
+                      border: isAllowed ? '1px solid #86efac' : '1px solid #cbd5e1',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0,
+                      boxShadow: isAllowed ? '0 1px 3px rgba(22, 163, 74, 0.12)' : 'none'
+                    }}
+                    className="hover-scale"
+                  >
+                    {isAllowed ? <Check size={13} strokeWidth={3} /> : <Lock size={12} strokeWidth={2.5} />}
+                  </span>
+                );
+              };
+
               return (
                 <>
                   <button onClick={() => setActiveStudentTab('briefing')} className={`sidebar-item ${['briefing', 'profile'].includes(activeStudentTab) ? `active ${activePlatform}` : ''}`}>
-                    <Monitor size={20} /> Briefing
+                    <Monitor size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Briefing</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('homework_book')} className={`sidebar-item ${activeStudentTab === 'homework_book' ? `active ${activePlatform}` : ''}`}>
-                    <BookOpen size={22} /> Aufgaben
+                    <BookOpen size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Aufgaben</span>
                   </button>
-                  {flamesActive && (
-                    <button onClick={() => setActiveStudentTab('practice_board')} className={`sidebar-item ${activeStudentTab === 'practice_board' ? `active ${activePlatform}` : ''}`}>
-                      <Zap size={20} /> Übe-Pfad
+                  {(parentUnlocked || (flamesActive && isBoardAllowedForChild('practice_board'))) && (
+                    <button 
+                      onClick={() => setActiveStudentTab('practice_board')} 
+                      className={`sidebar-item ${activeStudentTab === 'practice_board' ? `active ${activePlatform}` : ''}`}
+                      style={{ opacity: parentUnlocked && !isBoardAllowedForChild('practice_board') ? 0.72 : 1 }}
+                    >
+                      <Zap size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Übe-Pfad</span>
+                      {renderParentStatusPill('practice_board')}
                     </button>
                   )}
-                  <button onClick={() => setActiveStudentTab('mediathek')} className={`sidebar-item ${activeStudentTab === 'mediathek' ? `active ${activePlatform}` : ''}`}>
-                    <Library size={20} /> Mediathek
-                  </button>
-                  <button onClick={() => setActiveStudentTab('events')} className={`sidebar-item ${activeStudentTab === 'events' ? `active ${activePlatform}` : ''}`}>
-                    <Calendar size={20} /> Termine
-                  </button>
-                  {showLeaderboard && (
-                    <button onClick={() => setActiveStudentTab('campus_cup')} className={`sidebar-item ${activeStudentTab === 'campus_cup' ? `active ${activePlatform}` : ''}`}>
-                      <Trophy size={20} /> Highlights & Fortschritt
+                  {(parentUnlocked || isBoardAllowedForChild('mediathek')) && (
+                    <button 
+                      onClick={() => setActiveStudentTab('mediathek')} 
+                      className={`sidebar-item ${activeStudentTab === 'mediathek' ? `active ${activePlatform}` : ''}`}
+                      style={{ opacity: parentUnlocked && !isBoardAllowedForChild('mediathek') ? 0.72 : 1 }}
+                    >
+                      <Library size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Mediathek</span>
+                      {renderParentStatusPill('mediathek')}
+                    </button>
+                  )}
+                  {(parentUnlocked || isBoardAllowedForChild('events')) && (
+                    <button 
+                      onClick={() => setActiveStudentTab('events')} 
+                      className={`sidebar-item ${activeStudentTab === 'events' ? `active ${activePlatform}` : ''}`}
+                      style={{ opacity: parentUnlocked && !isBoardAllowedForChild('events') ? 0.72 : 1 }}
+                    >
+                      <Calendar size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Termine</span>
+                      {renderParentStatusPill('events')}
+                    </button>
+                  )}
+                  {(parentUnlocked || (showLeaderboard && isBoardAllowedForChild('campus_cup'))) && (
+                    <button 
+                      onClick={() => setActiveStudentTab('campus_cup')} 
+                      className={`sidebar-item ${activeStudentTab === 'campus_cup' ? `active ${activePlatform}` : ''}`}
+                      style={{ opacity: parentUnlocked && !isBoardAllowedForChild('campus_cup') ? 0.72 : 1 }}
+                    >
+                      <Trophy size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Highlights &amp; Fortschritt</span>
+                      {renderParentStatusPill('campus_cup')}
                     </button>
                   )}
 
-                  <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
-                    <Mail size={20} /> Nachrichten
-                    {campusUnreadCount > 0 && (
-                      <div style={{ 
-                        background: '#ef4444', 
-                        color: 'white', 
-                        borderRadius: '50%', 
-                        minWidth: '18px', 
-                        height: '18px', 
-                        padding: '0 5px',
-                        fontSize: '0.65rem', 
-                        fontWeight: 900, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        marginLeft: 'auto',
-                        boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
-                      }}>{campusUnreadCount}</div>
-                    )}
-                  </button>
+                  {(parentUnlocked || isBoardAllowedForChild('messages')) && (
+                    <button 
+                      onClick={() => setActiveStudentTab('messages')} 
+                      className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`} 
+                      style={{ opacity: parentUnlocked && !isBoardAllowedForChild('messages') ? 0.72 : 1, position: 'relative' }}
+                    >
+                      <Mail size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Nachrichten</span>
+                      {campusUnreadCount > 0 && !parentUnlocked && (
+                        <div style={{ 
+                          background: '#ef4444', 
+                          color: 'white', 
+                          borderRadius: '50%', 
+                          minWidth: '18px', 
+                          height: '18px', 
+                          padding: '0 5px', 
+                          fontSize: '0.65rem', 
+                          fontWeight: 900, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          marginLeft: 'auto', 
+                          boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)' 
+                        }}>{campusUnreadCount}</div>
+                      )}
+                      {renderParentStatusPill('messages')}
+                    </button>
+                  )}
                   <button onClick={() => setActiveStudentTab('settings')} className={`sidebar-item ${activeStudentTab === 'settings' ? `active ${activePlatform}` : ''}`}>
-                    <Settings size={20} /> Einstellungen
+                    {(campusStudentUiLevel === 'junior' || campusStudentUiLevel === 'teen') && !parentUnlocked ? (
+                      <>
+                        <ShieldCheck size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Elternbereich</span>
+                      </>
+                    ) : (
+                      <>
+                        <Settings size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Einstellungen</span>
+                      </>
+                    )}
                   </button>
                 </>
               );
@@ -9949,6 +10080,138 @@ function App() {
         boxSizing: 'border-box',
         minWidth: 0
       }}>
+        {/* 🛡️ Persistent Sticky Safety Banner when Parent Mode is active */}
+        {parentUnlocked && user?.role?.toLowerCase() === 'student' && (
+          <div style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 999,
+            background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
+            color: '#ffffff',
+            padding: '8px 16px',
+            borderRadius: '14px',
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            boxShadow: '0 2px 10px rgba(2, 132, 199, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            flexWrap: 'wrap',
+            gap: '8px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ShieldCheck size={16} color="#ffffff" />
+                <span>Eltern-Vorschau aktiv</span>
+              </div>
+
+              {/* If active tab is a togglable board, show quick release toggle in the header */}
+              {['practice_board', 'mediathek', 'events', 'campus_cup', 'messages'].includes(activeStudentTab) && (() => {
+                const boardNames: Record<string, string> = {
+                  practice_board: 'Übe-Pfad',
+                  mediathek: 'Mediathek',
+                  events: 'Termine',
+                  campus_cup: 'Klassen-Highlights & Team-Power',
+                  messages: 'Nachrichten'
+                };
+                let allowed = true;
+                if (campusStudentUiLevel === 'junior') {
+                  const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings'];
+                  allowed = juniorAllowed.includes(activeStudentTab);
+                }
+                const override = typeof window !== 'undefined' ? localStorage.getItem(`campus_board_override_${activeStudentTab}`) : null;
+                if (override === 'true') allowed = true;
+                if (override === 'false') allowed = false;
+
+                const toggleActiveBoard = () => {
+                  const next = !allowed;
+                  localStorage.setItem(`campus_board_override_${activeStudentTab}`, String(next));
+                  if (activeStudentTab === 'messages') {
+                    localStorage.setItem('campus_allow_chat', String(next));
+                  }
+                  if (activeStudentTab === 'campus_cup') {
+                    localStorage.setItem('campus_allow_leaderboard', String(next));
+                  }
+                  if (user?.id) {
+                    try {
+                      supabase.from('users').update({
+                        parent_permissions: {
+                          ...(user?.parent_permissions || {}),
+                          [`board_${activeStudentTab}`]: next
+                        }
+                      }).eq('id', user.id).then(() => {});
+                    } catch(err) {}
+                  }
+                  window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: activeStudentTab, allowed: next } }));
+                  setParentPermissionsVersion(v => v + 1);
+                };
+
+                return (
+                  <button
+                    type="button"
+                    onClick={toggleActiveBoard}
+                    style={{
+                      background: allowed ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)',
+                      border: allowed ? '1px solid #86efac' : '1px solid #fca5a5',
+                      color: '#ffffff',
+                      padding: '3px 10px',
+                      borderRadius: '100px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="Klicken, um dieses Board für dein Kind freizugeben oder zu sperren"
+                    className="hover-scale-subtle"
+                  >
+                    <span>Board {boardNames[activeStudentTab]}:</span>
+                    <span style={{ fontWeight: 900, textDecoration: 'underline' }}>
+                      {allowed ? '✓ Für Kind freigegeben' : '🔒 Für Kind gesperrt'}
+                    </span>
+                  </button>
+                );
+              })()}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                sessionStorage.removeItem('groovelab_parent_unlocked_global');
+                if (user?.id) {
+                  sessionStorage.removeItem(`groovelab_parent_unlocked_${user.id}`);
+                  sessionStorage.removeItem(`groovelab_parent_session_${user.id}`);
+                }
+                setParentUnlocked(false);
+                window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
+                setActiveStudentTab('briefing');
+              }}
+              style={{
+                background: '#ffffff',
+                color: '#0369a1',
+                border: 'none',
+                borderRadius: '16px',
+                padding: '4px 12px',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+                whiteSpace: 'nowrap'
+              }}
+              title="Eltern-Modus beenden und zur geschützten Schüleransicht wechseln"
+            >
+              <User size={12} color="#0369a1" />
+              <span>Schüleransicht aktivieren</span>
+            </button>
+          </div>
+        )}
         {/* Ensemble & Bands Platform View */}
         {activePlatform === 'ensembles' && (
           <ErrorBoundary>

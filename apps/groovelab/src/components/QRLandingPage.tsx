@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText, formatTeacherFullName } from '../utils/nameHelper';
 import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
@@ -123,6 +123,48 @@ const registerProfileLocally = (userData: any) => {
   }
 };
 
+const computeSha256Hex = async (str: string): Promise<string> => {
+  try {
+    const msgBuffer = new TextEncoder().encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (e) {
+    return '';
+  }
+};
+
+const verifyParentPinClient = async (studentId: string, inputPin: string, profileParentPin?: string | null): Promise<boolean> => {
+  const cleanInput = inputPin.trim();
+  if (!cleanInput) return false;
+
+  // 1. Supabase RPC check (handles SHA-256 in users_raw on server)
+  try {
+    const { data: rpcRes, error } = await supabase.rpc('verify_parent_pin', {
+      student_id: studentId,
+      input_pin: cleanInput,
+    });
+    if (!error && rpcRes === true) {
+      return true;
+    }
+  } catch (e) {}
+
+  // 2. Client-side SHA-256 hash or plaintext check against in-memory profile
+  if (profileParentPin) {
+    const cleanProfilePin = profileParentPin.trim();
+    if (cleanProfilePin === cleanInput) return true;
+    const inputHash = await computeSha256Hex(cleanInput);
+    if (inputHash && cleanProfilePin.toLowerCase() === inputHash.toLowerCase()) return true;
+  }
+
+  // 3. LocalStorage parent PIN backup check
+  const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${studentId}`);
+  if (cachedParentPin && cachedParentPin.trim() === cleanInput) {
+    return true;
+  }
+
+  return false;
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 interface QRLandingPageProps {
   token: string;
@@ -155,11 +197,13 @@ interface ProfileData {
   onboarding_pin?: string | null;
   is_pin_activated?: boolean;
   pin_enforced_for_preview?: boolean;
+  parent_allow_absences?: boolean;
   parent_allow_chat?: boolean;
   parent_allow_timer?: boolean;
   parent_allow_leaderboard?: boolean;
   parent_allow_groups?: boolean;
   parent_allow_proposals?: boolean;
+  campus_ui_level?: 'junior' | 'teen' | 'pro' | string;
   streak_flame?: number;
   total_practice_minutes?: number;
 }
@@ -412,7 +456,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return [];
     }
   });
-  const [activeTab, setActiveTab] = useState<'action' | 'homework' | 'lessons'>('action');
+  const [activeTab, setActiveTab] = useState<'action' | 'homework' | 'lessons' | 'settings'>('action');
 
   // Auto-switch to Hausaufgaben tab if Campus module is not booked
   useEffect(() => {
@@ -447,6 +491,25 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [parentPinErrorMsg, setParentPinErrorMsg] = useState<string | null>(null);
   const [parentPinSuccessMsg, setParentPinSuccessMsg] = useState<string | null>(null);
   const [showForgotPinInfo, setShowForgotPinInfo] = useState(false);
+
+  // Dedicated 6-Digit Parent Master Gatekeeper States
+  const [isParentPinMode, setIsParentPinMode] = useState(false);
+  const [parentSetupStep, setParentSetupStep] = useState<'enter' | 'confirm'>('enter');
+  const [parentSetupPin, setParentSetupPin] = useState('');
+  const [parentSetupConfirm, setParentSetupConfirm] = useState('');
+  const [parentSetupError, setParentSetupError] = useState('');
+  const [parentUnlockInput, setParentUnlockInput] = useState('');
+  const [parentUnlockError, setParentUnlockError] = useState('');
+  // Step-Up PIN Confirmation for saving parent settings
+  const [draftUiLevel, setDraftUiLevel] = useState<string | null>(null);
+  const [draftAllowAbsences, setDraftAllowAbsences] = useState<boolean | null>(null);
+  const [draftAllowChat, setDraftAllowChat] = useState<boolean | null>(null);
+  const [draftAllowLeaderboard, setDraftAllowLeaderboard] = useState<boolean | null>(null);
+  const [showSavePinModal, setShowSavePinModal] = useState(false);
+  const [savePinInput, setSavePinInput] = useState('');
+  const [savePinError, setSavePinError] = useState<string | null>(null);
+  const [savePinLoading, setSavePinLoading] = useState(false);
+
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const showToastMsg = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -1177,7 +1240,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers/Lehrers/Admins holen
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
         const upperToken = token.toUpperCase();
-        const selectFields = 'id, first_name, last_name, role, roles, school_id, teacher_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, weekly_jokers_used, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals';
+        const selectFields = 'id, first_name, last_name, role, roles, school_id, teacher_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, weekly_jokers_used, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_absences, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals, campus_ui_level';
         const minimalFields = 'id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, is_pin_activated, has_parent_pin';
 
         let userData: any = null;
@@ -1380,11 +1443,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           parent_pin: userData.parent_pin || null,
           is_pin_activated: userData.is_pin_activated ?? false,
           pin_enforced_for_preview: userData.pin_enforced_for_preview ?? false,
+          parent_allow_absences: userData.parent_allow_absences ?? false,
           parent_allow_chat: userData.parent_allow_chat ?? true,
           parent_allow_timer: userData.parent_allow_timer ?? true,
           parent_allow_leaderboard: userData.parent_allow_leaderboard ?? true,
           parent_allow_groups: userData.parent_allow_groups ?? true,
-          parent_allow_proposals: userData.parent_allow_proposals ?? true
+          parent_allow_proposals: userData.parent_allow_proposals ?? true,
+          campus_ui_level: userData.campus_ui_level || localStorage.getItem('campus_student_ui_level') || 'junior'
         });
 
         // Check if session was previously unlocked in sessionStorage
@@ -1455,13 +1520,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Falls eine PIN existiert, aber dieses Gerät noch nicht im Cache freigeschaltet ist -> Zwingend 4-stellige PIN verlangen!
         if (userData.role === 'student' && hasPinCreated && !wasUnlocked) {
           sessionStorage.setItem('groovelab_qr_token', token);
-          setPinPurpose('unlock_app');
+          setPinPurpose('unlock_preview');
           setPageState('pin_required');
           return;
         }
 
         // Nahtlose Anzeige der QR-Landingpage nur auf freigeschalteten Geräten (aus dem Cache)
-        setParentUnlocked(true);
+        // Standardmäßig startet die App immer sicher im Junior-Modus (parentUnlocked = false)
+        setParentUnlocked(false);
         setLessonsUnlocked(true);
         sessionStorage.setItem('groovelab_qr_token', token);
         setPageState('profile');
@@ -2932,25 +2998,42 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   // ── PIN-Eingabe: Ziffern-Eingabe-Handler ─────────────────────────────────
   const handlePinDigit = (digit: string) => {
     if (pinLoading) return;
-    if (pinInput.length < 4) {
+    if (pinInput.length < 6) {
       const nextPin = pinInput + digit;
       setPinInput(nextPin);
-      if (nextPin.length === 4) {
+
+      // Auto-morph to parent mode if 5th digit is entered
+      if (nextPin.length === 5 && !isParentPinMode) {
+        setIsParentPinMode(true);
+      }
+
+      if (nextPin.length === 4 && !isParentPinMode && pinPurpose === 'setup_initial_pin') {
         setTimeout(() => {
           handlePinSubmit(nextPin);
         }, 100);
+      } else if (nextPin.length === 4 && !isParentPinMode) {
+        setTimeout(() => {
+          handlePinSubmit(nextPin);
+        }, 120);
+      } else if (nextPin.length === 6) {
+        setTimeout(() => {
+          handlePinSubmit(nextPin);
+        }, 120);
       }
     }
   };
 
   const handlePinDelete = () => {
     if (pinLoading) return;
-    setPinInput(prev => prev.slice(0, -1));
+    setPinInput(prev => {
+      const next = prev.slice(0, -1);
+      return next;
+    });
   };
 
   const handlePinSubmit = async (explicitPin?: string) => {
     const pinToVerify = typeof explicitPin === 'string' ? explicitPin : pinInput;
-    if (!pinToVerify || pinToVerify.length !== 4 || pinLoading || !profile) return;
+    if (!pinToVerify || (pinToVerify.length !== 4 && pinToVerify.length !== 6) || pinLoading || !profile) return;
 
     if (pinPurpose === 'setup_initial_pin') {
       const validation = validateNewPin(pinToVerify, (profile as any)?.day_of_birth);
@@ -2969,24 +3052,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Store local PIN backups immediately
         localStorage.setItem(`groovelab_user_pin_${profile.id}`, pinToVerify);
         localStorage.setItem(`groovelab_pin_${token}`, pinToVerify);
-        sessionStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
-        sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
         sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
         setLessonsUnlocked(true);
-        setParentUnlocked(true);
+        setParentUnlocked(false);
 
-        // Update in-memory profile PIN
+        // Update in-memory profile PIN (Student Personal PIN only)
         profile.personal_pin = pinToVerify;
-        profile.parent_pin = pinToVerify;
         profile.onboarding_pin = pinToVerify;
         profile.is_pin_activated = true;
-        profile.has_parent_pin = true;
         setProfile(prev => prev ? { 
           ...prev, 
-          has_parent_pin: true, 
           is_pin_activated: true, 
           personal_pin: pinToVerify, 
-          parent_pin: pinToVerify,
           onboarding_pin: pinToVerify
         } : null);
 
@@ -3010,7 +3087,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           try {
             await supabase.from('students').update({
               personal_pin: pinToVerify,
-              parent_pin: pinToVerify,
               onboarding_pin: pinToVerify,
               is_pin_activated: true,
               status: 'aktiv'
@@ -3019,7 +3095,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           const userUpdatePayload: any = {
             personal_pin: pinToVerify,
-            parent_pin: pinToVerify,
             onboarding_pin: pinToVerify,
             is_pin_activated: true,
             status: 'aktiv'
@@ -3077,23 +3152,35 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     try {
       let isCorrect = false;
-      // 1. Try verify_student_pin RPC
-      try {
-        const { data: rpcRes, error } = await supabase.rpc('verify_student_pin', {
-          p_student_id: profile.id,
-          p_pin: pinToVerify,
-        });
-        if (!error && rpcRes === true) {
-          isCorrect = true;
-        }
-      } catch (e) {}
+      let isParentMatch = false;
 
-      // 2. Try verify_parent_pin RPC
-      if (!isCorrect) {
+      // 1. Try parent PIN verification (6 digits or explicit parent PIN or parent mode)
+      if (pinToVerify.length === 6 || isParentPinMode || (profile && profile.parent_pin)) {
+        const hasParentPinConfigured = Boolean(
+          profile?.has_parent_pin === true ||
+          (profile?.parent_pin && String(profile.parent_pin).trim() !== '') ||
+          localStorage.getItem(`groovelab_parent_pin_${profile.id}`)
+        );
+
+        if (isParentPinMode && !hasParentPinConfigured) {
+          setPinError('Für dieses Profil wurde noch keine Eltern-Master-PIN eingerichtet. Bitte melde dich zuerst mit der Schüler-PIN an und richte sie im Eltern-Bereich ein.');
+          setPinInput('');
+          return;
+        }
+
+        const parentOk = await verifyParentPinClient(profile.id, pinToVerify, profile.parent_pin);
+        if (parentOk) {
+          isCorrect = true;
+          isParentMatch = true;
+        }
+      }
+
+      // 2. Try verify_student_pin RPC (4 digits)
+      if (!isCorrect && pinToVerify.length === 4) {
         try {
-          const { data: rpcRes, error } = await supabase.rpc('verify_parent_pin', {
-            student_id: profile.id,
-            input_pin: pinToVerify,
+          const { data: rpcRes, error } = await supabase.rpc('verify_student_pin', {
+            p_student_id: profile.id,
+            p_pin: pinToVerify,
           });
           if (!error && rpcRes === true) {
             isCorrect = true;
@@ -3101,12 +3188,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         } catch (e) {}
       }
 
-      // 3. Fallback comparison
+      // 3. Fallback comparison for student PIN
       if (!isCorrect && profile) {
         const savedPin = localStorage.getItem(`groovelab_user_pin_${profile.id}`) || localStorage.getItem(`groovelab_pin_${token}`);
         if (
           (profile.personal_pin && String(profile.personal_pin).trim() === pinToVerify.trim()) ||
-          (profile.parent_pin && String(profile.parent_pin).trim() === pinToVerify.trim()) ||
           (profile.onboarding_pin && String(profile.onboarding_pin).trim() === pinToVerify.trim()) ||
           (savedPin && savedPin.trim() === pinToVerify.trim())
         ) {
@@ -3116,20 +3202,27 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       if (isCorrect === true) {
         setPinAttempts(0);
-        sessionStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
-        sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
+        if (isParentMatch) {
+          sessionStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
+          sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
+          sessionStorage.setItem(`groovelab_parent_session_${profile.id}`, String(Date.now() + 15 * 60 * 1000));
+          setParentUnlocked(true);
+        } else {
+          setParentUnlocked(false);
+        }
         sessionStorage.setItem(`groovelab_user_pin_${profile.id}`, pinToVerify);
         sessionStorage.setItem(`groovelab_pin_${token}`, pinToVerify);
         sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
-        setParentUnlocked(true);
         setLessonsUnlocked(true);
         setPinInput('');
         
-        if (pinPurpose === 'unlock_preview') {
-          setActiveTab('lessons');
-          setPageState('profile');
-        } else {
+        if (pinPurpose === 'unlock_app') {
           await redirectToCampus(profile);
+        } else {
+          if (isParentMatch) {
+            setActiveTab('settings');
+          }
+          setPageState('profile');
         }
       } else {
         const remaining = MAX_ATTEMPTS - (pinAttempts + 1);
@@ -3624,17 +3717,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         }
       } catch (e) {}
 
-      // 2. Try verify_parent_pin RPC
+      // 2. Try verifyParentPinClient (parent PIN)
       if (!isVerified) {
-        try {
-          const { data: rpcRes, error } = await supabase.rpc('verify_parent_pin', {
-            student_id: profile.id,
-            input_pin: inputPin,
-          });
-          if (!error && rpcRes === true) {
-            isVerified = true;
-          }
-        } catch (e) {}
+        const parentOk = await verifyParentPinClient(profile.id, inputPin, profile.parent_pin);
+        if (parentOk) {
+          isVerified = true;
+        }
       }
 
       // 3. Fallback comparison
@@ -3642,7 +3730,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         const savedPin = localStorage.getItem(`groovelab_user_pin_${profile.id}`) || localStorage.getItem(`groovelab_pin_${token}`);
         if (
           (profile.personal_pin && String(profile.personal_pin).trim() === inputPin.trim()) ||
-          (profile.parent_pin && String(profile.parent_pin).trim() === inputPin.trim()) ||
           (profile.onboarding_pin && String(profile.onboarding_pin).trim() === inputPin.trim()) ||
           (savedPin && savedPin.trim() === inputPin.trim())
         ) {
@@ -4300,7 +4387,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => setPendingCancelOccId(occ.id)}
+                            onClick={() => {
+                              if (!parentUnlocked && !profile?.parent_allow_absences) {
+                                alert('🛡️ Terminänderungen können nur von Erziehungsberechtigten abgelehnt werden. Bitte melde dich im Eltern-Tab mit der 6-stelligen Eltern-Master-PIN an.');
+                                return;
+                              }
+                              setPendingCancelOccId(occ.id);
+                            }}
                             style={{
                               background: '#fef2f2',
                               color: '#dc2626',
@@ -4482,7 +4575,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => setPendingCancelOccId(occ.id)}
+                              onClick={() => {
+                                if (!parentUnlocked && !profile?.parent_allow_absences) {
+                                  alert('🛡️ Unterrichtsstunden können nur von Erziehungsberechtigten abgesagt werden. Bitte melde dich im Eltern-Tab mit der 6-stelligen Eltern-Master-PIN an.');
+                                  return;
+                                }
+                                setPendingCancelOccId(occ.id);
+                              }}
                               style={{
                                 background: '#f8fafc',
                                 color: isRescheduled ? '#dc2626' : '#64748b',
@@ -5646,10 +5745,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         </button>
         <button
           type="button"
-          onClick={() => {
-            setPinPurpose('unlock_preview');
-            setPageState('pin_required');
-          }}
+          onClick={() => setActiveTab('lessons')}
           style={{
             flex: 1,
             padding: '8px 12px',
@@ -5704,6 +5800,770 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             );
           })()}
         </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setParentUnlockInput('');
+            setParentUnlockError('');
+            setParentSetupPin('');
+            setParentSetupConfirm('');
+            setParentSetupError('');
+            setParentSetupStep('enter');
+            setActiveTab('settings');
+          }}
+          style={{
+            flex: 1,
+            padding: '8px 12px',
+            border: 'none',
+            borderRadius: '11px',
+            background: activeTab === 'settings' ? '#ffffff' : 'transparent',
+            color: activeTab === 'settings' ? '#0284c7' : '#636366',
+            fontSize: '0.85rem',
+            fontWeight: activeTab === 'settings' ? 700 : 550,
+            cursor: 'pointer',
+            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: activeTab === 'settings' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)' : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}
+        >
+          <ShieldCheck size={14} style={{ color: '#0284c7' }} />
+          <span>Eltern</span>
+        </button>
+      </div>
+    );
+  };
+
+  const renderParentSettingsWidget = () => {
+    // 1. Gated Access: If not unlocked, render the 6-digit Master PIN Gatekeeper or Initial Setup
+    if (!parentUnlocked) {
+      const hasConfiguredParentPin = Boolean(
+        profile?.has_parent_pin === true ||
+        (profile?.parent_pin && String(profile.parent_pin).trim() !== '') ||
+        (profile && localStorage.getItem(`groovelab_parent_pin_${profile.id}`))
+      );
+
+      return (
+        <div style={{
+          background: '#ffffff',
+          border: '1.5px solid #e2e8f0',
+          borderRadius: '28px',
+          padding: '32px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          gap: '16px',
+          boxShadow: '0 8px 30px -4px rgba(0,0,0,0.06)',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}>
+          {/* Blue Shield Icon */}
+          <div style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '18px',
+            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.4)'
+          }}>
+            <ShieldCheck size={30} />
+          </div>
+
+          <div>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+              {hasConfiguredParentPin
+                ? 'Eltern-Master-PIN eingeben'
+                : '6-stellige Eltern-Master-PIN festlegen'}
+            </h4>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, lineHeight: 1.4, maxWidth: '300px' }}>
+              {hasConfiguredParentPin
+                ? 'Dieser Bereich ist für Erziehungsberechtigte geschützt. Bitte gib deine 6-stellige Master-PIN ein.'
+                : 'Als Erziehungsberechtigte(r) legst du hier deine 6-stellige Master-PIN fest, um Einstellungen und Freigaben zu steuern.'}
+            </p>
+          </div>
+
+          {/* Error Message */}
+          {(parentUnlockError || parentSetupError) && (
+            <div style={{
+              padding: '8px 14px',
+              background: '#fee2e2',
+              border: '1px solid #fca5a5',
+              borderRadius: '12px',
+              color: '#dc2626',
+              fontSize: '0.76rem',
+              fontWeight: 700
+            }}>
+              {parentUnlockError || parentSetupError}
+            </div>
+          )}
+
+          {/* 6 Dots Indicator */}
+          <div style={{ display: 'flex', gap: '12px', margin: '4px 0 8px 0' }}>
+            {[0, 1, 2, 3, 4, 5].map((idx) => {
+              const activeLen = hasConfiguredParentPin
+                ? parentUnlockInput.length
+                : (parentSetupStep === 'enter' ? parentSetupPin.length : parentSetupConfirm.length);
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    border: `2px solid ${activeLen > idx ? '#0284c7' : '#cbd5e1'}`,
+                    background: activeLen > idx ? '#0284c7' : 'transparent',
+                    transition: 'all 0.15s ease'
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          {!hasConfiguredParentPin && (
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {parentSetupStep === 'enter' ? 'Schritt 1 von 2: PIN wählen' : 'Schritt 2 von 2: PIN bestätigen'}
+            </span>
+          )}
+
+          {/* 3x4 Touch Keypad */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '10px',
+            width: '100%',
+            maxWidth: '300px'
+          }}>
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
+              const isSpecial = key === 'C' || key === 'back';
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={async () => {
+                    setParentUnlockError('');
+                    setParentSetupError('');
+
+                    if (hasConfiguredParentPin) {
+                      // Unlock Existing Parent PIN
+                      if (key === 'C') {
+                        setParentUnlockInput('');
+                      } else if (key === 'back') {
+                        setParentUnlockInput(prev => prev.slice(0, -1));
+                      } else if (parentUnlockInput.length < 6) {
+                        const nextVal = parentUnlockInput + key;
+                        setParentUnlockInput(nextVal);
+                        if (nextVal.length === 6 && profile) {
+                          const isOk = await verifyParentPinClient(profile.id, nextVal.trim(), profile.parent_pin);
+                          if (isOk) {
+                            localStorage.setItem(`groovelab_parent_pin_${profile.id}`, nextVal.trim());
+                            setParentUnlocked(true);
+                            setParentUnlockInput('');
+                          } else {
+                            setParentUnlockError('Falsche Eltern-Master-PIN.');
+                            setParentUnlockInput('');
+                          }
+                        }
+                      }
+                    } else {
+                      // Setup New 6-Digit Parent PIN
+                      if (parentSetupStep === 'enter') {
+                        if (key === 'C') {
+                          setParentSetupPin('');
+                        } else if (key === 'back') {
+                          setParentSetupPin(prev => prev.slice(0, -1));
+                        } else if (parentSetupPin.length < 6) {
+                          const nextVal = parentSetupPin + key;
+                          setParentSetupPin(nextVal);
+                          if (nextVal.length === 6) {
+                            if (/^(\d)\1+$/.test(nextVal) || nextVal === '123456' || nextVal === '654321') {
+                              setParentSetupError('Bitte wähle eine sicherere PIN (nicht 123456 oder 000000).');
+                              setParentSetupPin('');
+                              return;
+                            }
+                            setParentSetupStep('confirm');
+                          }
+                        }
+                      } else {
+                        // Confirm step
+                        if (key === 'C') {
+                          setParentSetupConfirm('');
+                        } else if (key === 'back') {
+                          setParentSetupConfirm(prev => prev.slice(0, -1));
+                        } else if (parentSetupConfirm.length < 6) {
+                          const nextVal = parentSetupConfirm + key;
+                          setParentSetupConfirm(nextVal);
+                          if (nextVal.length === 6) {
+                            if (nextVal !== parentSetupPin) {
+                              setParentSetupError('Die PINs stimmen nicht überein.');
+                              setParentSetupConfirm('');
+                              setParentSetupPin('');
+                              setParentSetupStep('enter');
+                              return;
+                            }
+
+                            if (!profile) return;
+
+                            // Save 6-digit Parent PIN in DB & local backup
+                            try {
+                              localStorage.setItem(`groovelab_parent_pin_${profile.id}`, nextVal);
+                              await supabase.from('users').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', profile.id);
+                              try { await supabase.from('students').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', profile.id); } catch(err){}
+                              
+                              setProfile(prev => prev ? { ...prev, parent_pin: nextVal, has_parent_pin: true } : null);
+                              setParentUnlocked(true);
+                              setParentSetupPin('');
+                              setParentSetupConfirm('');
+                              setParentSetupStep('enter');
+                            } catch (e: any) {
+                              setParentSetupError('Fehler beim Speichern: ' + e.message);
+                              setParentSetupConfirm('');
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }}
+                  style={{
+                    padding: '14px 0',
+                    borderRadius: '16px',
+                    border: '1px solid #e2e8f0',
+                    background: isSpecial ? '#f8fafc' : '#ffffff',
+                    color: '#0f172a',
+                    fontSize: isSpecial ? '0.85rem' : '1.25rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                    transition: 'all 0.1s'
+                  }}
+                  className="hover-scale"
+                >
+                  {key === 'back' ? <Delete size={20} /> : key}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Unlocked Control Center with Draft Changes & Step-Up PIN Confirmation
+    const effectiveUiLevel = draftUiLevel ?? profile?.campus_ui_level ?? 'junior';
+    const effectiveAllowAbsences = draftAllowAbsences ?? profile?.parent_allow_absences ?? false;
+    const effectiveAllowChat = draftAllowChat ?? profile?.parent_allow_chat ?? true;
+    const effectiveAllowLeaderboard = draftAllowLeaderboard ?? profile?.parent_allow_leaderboard ?? true;
+
+    const hasUnsavedSettings = Boolean(
+      (draftUiLevel !== null && draftUiLevel !== (profile?.campus_ui_level ?? 'junior')) ||
+      (draftAllowAbsences !== null && draftAllowAbsences !== (profile?.parent_allow_absences ?? false)) ||
+      (draftAllowChat !== null && draftAllowChat !== (profile?.parent_allow_chat ?? true)) ||
+      (draftAllowLeaderboard !== null && draftAllowLeaderboard !== (profile?.parent_allow_leaderboard ?? true))
+    );
+
+    return (
+      <div style={{
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '24px',
+        padding: '24px 20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        boxShadow: '0 4px 16px -2px rgba(0,0,0,0.05)',
+        width: '100%',
+        boxSizing: 'border-box'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              boxShadow: '0 4px 10px rgba(2, 132, 199, 0.3)'
+            }}>
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                Eltern-Kontrollzentrum 🛡️
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                Schutz- &amp; Freigabefunktionen für {profile?.first_name || 'dein Kind'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setParentUnlocked(false);
+              sessionStorage.removeItem(`groovelab_parent_unlocked_${profile?.id}`);
+              sessionStorage.removeItem(`groovelab_parent_session_${profile?.id}`);
+              setDraftUiLevel(null);
+              setDraftAllowAbsences(null);
+              setDraftAllowChat(null);
+              setDraftAllowLeaderboard(null);
+              setActiveTab(profile?.is_campus_active ? 'action' : 'homework');
+            }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              color: '#64748b',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            🔒 Sperren & Beenden
+          </button>
+        </div>
+
+        {/* 🎨 Campus UI Design Switcher (Junior, Teen, +16) */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          padding: '16px',
+          borderRadius: '16px',
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          textAlign: 'left'
+        }}>
+          <div>
+            <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
+              🎨 App-Design & Altersstufe (Campus)
+            </div>
+            <div style={{ fontSize: '0.73rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+              Legt fest, welche Benutzeroberfläche und Funktionen dein Kind in der Web-App sieht.
+            </div>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '6px',
+            background: '#e2e8f0',
+            padding: '4px',
+            borderRadius: '12px'
+          }}>
+            {[
+              { id: 'junior', label: 'Junior', age: '6–10 J.' },
+              { id: 'teen', label: 'Teen', age: '11–15 J.' },
+              { id: 'pro', label: '+16 / Pro', age: 'Ab 16 J.' }
+            ].map((lvl) => {
+              const active = effectiveUiLevel === lvl.id;
+              return (
+                <button
+                  key={lvl.id}
+                  type="button"
+                  onClick={() => setDraftUiLevel(lvl.id)}
+                  style={{
+                    padding: '8px 4px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: active ? '#ffffff' : 'transparent',
+                    color: active ? '#0284c7' : '#64748b',
+                    fontWeight: active ? 800 : 650,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '2px',
+                    boxShadow: active ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>{lvl.label}</span>
+                  <span style={{ fontSize: '0.62rem', opacity: active ? 0.9 : 0.7 }}>{lvl.age}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
+          {/* Toggle 1: Absences */}
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 14px',
+            borderRadius: '14px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            cursor: 'pointer'
+          }}>
+            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                Unterrichtsstunden selbstständig absagen
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, lineHeight: 1.3 }}>
+                Erlaubt deinem Kind, bei Krankheit oder Verhinderung Termine eigenständig abzusagen.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={effectiveAllowAbsences}
+              onChange={(e) => setDraftAllowAbsences(e.target.checked)}
+              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+            />
+          </label>
+
+          {/* Toggle 2: Chat */}
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 14px',
+            borderRadius: '14px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            cursor: 'pointer'
+          }}>
+            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                Direktnachrichten an Lehrkräfte schreiben
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, lineHeight: 1.3 }}>
+                Erlaubt deinem Kind, im Chat Nachrichten und Fragen zu Hausaufgaben zu senden.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={effectiveAllowChat}
+              onChange={(e) => setDraftAllowChat(e.target.checked)}
+              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+            />
+          </label>
+
+          {/* Toggle 3: Leaderboard */}
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 14px',
+            borderRadius: '14px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            cursor: 'pointer'
+          }}>
+            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                🏆 Klassen-Highlights &amp; Team-Power
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, lineHeight: 1.3 }}>
+                Gemeinsame Übe-Minuten sammeln, Meilensteine der Klasse feiern und Team-Ziele erreichen.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={effectiveAllowLeaderboard}
+              onChange={(e) => setDraftAllowLeaderboard(e.target.checked)}
+              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+            />
+          </label>
+        </div>
+
+        {/* 🔒 Step-Up Confirmation Box (shown when settings have been changed) */}
+        {hasUnsavedSettings && (
+          <div style={{
+            marginTop: '4px',
+            padding: '14px 16px',
+            borderRadius: '16px',
+            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+            border: '1.5px solid #bfdbfe',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            textAlign: 'left'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={18} color="#0284c7" style={{ flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e3a8a' }}>
+                  Ungespeicherte Änderungen
+                </div>
+                <div style={{ fontSize: '0.73rem', color: '#1e40af', fontWeight: 500 }}>
+                  Gib deine 6-stellige Master-PIN ein, um diese Einstellungen verbindlich zu speichern.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSavePinInput('');
+                  setSavePinError(null);
+                  setShowSavePinModal(true);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  color: '#ffffff',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Lock size={15} />
+                <span>Mit Master-PIN speichern</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftUiLevel(null);
+                  setDraftAllowAbsences(null);
+                  setDraftAllowChat(null);
+                  setDraftAllowLeaderboard(null);
+                }}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#64748b',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Verwerfen
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 🔢 Step-Up PIN Modal Dialog */}
+        {showSavePinModal && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}>
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px 20px',
+              maxWidth: '340px',
+              width: '100%',
+              boxShadow: '0 20px 40px -10px rgba(0,0,0,0.3)',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              gap: '14px'
+            }}>
+              <div style={{
+                width: '50px',
+                height: '50px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxShadow: '0 6px 16px rgba(2, 132, 199, 0.35)'
+              }}>
+                <Lock size={24} />
+              </div>
+
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                  Master-PIN bestätigen
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 600, lineHeight: 1.35 }}>
+                  Gib deine 6-stellige Eltern-PIN ein, um die neuen Einstellungen verbindlich zu aktivieren.
+                </p>
+              </div>
+
+              {savePinError && (
+                <div style={{
+                  padding: '6px 12px',
+                  background: '#fee2e2',
+                  border: '1px solid #fca5a5',
+                  borderRadius: '10px',
+                  color: '#dc2626',
+                  fontSize: '0.74rem',
+                  fontWeight: 700
+                }}>
+                  {savePinError}
+                </div>
+              )}
+
+              {/* 6 PIN Dots */}
+              <div style={{ display: 'flex', gap: '10px', margin: '4px 0' }}>
+                {[0, 1, 2, 3, 4, 5].map((idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      borderRadius: '50%',
+                      border: `2px solid ${savePinInput.length > idx ? '#0284c7' : '#cbd5e1'}`,
+                      background: savePinInput.length > idx ? '#0284c7' : 'transparent',
+                      transition: 'all 0.15s ease'
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* 3x4 Touch Keypad */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '8px',
+                width: '100%',
+                maxWidth: '260px'
+              }}>
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={savePinLoading}
+                    onClick={async () => {
+                      setSavePinError(null);
+                      if (key === 'C') {
+                        setSavePinInput('');
+                      } else if (key === 'back') {
+                        setSavePinInput(prev => prev.slice(0, -1));
+                      } else if (savePinInput.length < 6) {
+                        const nextVal = savePinInput + key;
+                        setSavePinInput(nextVal);
+                        if (nextVal.length === 6 && profile) {
+                          setSavePinLoading(true);
+                          try {
+                            const isOk = await verifyParentPinClient(profile.id, nextVal.trim(), profile.parent_pin);
+                            if (isOk) {
+                              // Persist to Supabase
+                              await supabase.from('users').update({
+                                campus_ui_level: effectiveUiLevel,
+                                app_usage_mode: effectiveUiLevel === 'junior' ? 'student_only' : (effectiveUiLevel === 'teen' ? 'teen' : 'adult'),
+                                parent_allow_absences: effectiveAllowAbsences,
+                                parent_allow_chat: effectiveAllowChat,
+                                parent_allow_leaderboard: effectiveAllowLeaderboard
+                              }).eq('id', profile.id);
+                              try {
+                                await supabase.from('students').update({
+                                  campus_ui_level: effectiveUiLevel,
+                                  parent_allow_absences: effectiveAllowAbsences,
+                                  parent_allow_chat: effectiveAllowChat,
+                                  parent_allow_leaderboard: effectiveAllowLeaderboard
+                                }).eq('id', profile.id);
+                              } catch(e) {}
+
+                              // Save local states
+                              localStorage.setItem('campus_student_ui_level', effectiveUiLevel);
+                              localStorage.setItem(`groovelab_parent_allow_absences_${profile.id}`, String(effectiveAllowAbsences));
+                              localStorage.setItem(`groovelab_parent_allow_chat_${profile.id}`, String(effectiveAllowChat));
+                              localStorage.setItem(`groovelab_parent_allow_leaderboard_${profile.id}`, String(effectiveAllowLeaderboard));
+                              window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: effectiveUiLevel }));
+
+                              setProfile(prev => prev ? {
+                                ...prev,
+                                campus_ui_level: effectiveUiLevel,
+                                parent_allow_absences: effectiveAllowAbsences,
+                                parent_allow_chat: effectiveAllowChat,
+                                parent_allow_leaderboard: effectiveAllowLeaderboard
+                              } : null);
+
+                              // Reset drafts
+                              setDraftUiLevel(null);
+                              setDraftAllowAbsences(null);
+                              setDraftAllowChat(null);
+                              setDraftAllowLeaderboard(null);
+
+                              setShowSavePinModal(false);
+                              setSavePinInput('');
+                              showToastMsg('✅ Einstellungen dauerhaft gespeichert!');
+                            } else {
+                              setSavePinError('Falsche Eltern-Master-PIN.');
+                              setSavePinInput('');
+                            }
+                          } catch(err: any) {
+                            setSavePinError('Fehler: ' + (err.message || 'Konnte nicht gespeichert werden'));
+                          } finally {
+                            setSavePinLoading(false);
+                          }
+                        }
+                      }
+                    }}
+                    style={{
+                      padding: '12px 0',
+                      fontSize: key === 'back' || key === 'C' ? '0.85rem' : '1.25rem',
+                      fontWeight: 800,
+                      borderRadius: '12px',
+                      border: '1px solid #e2e8f0',
+                      background: key === 'back' || key === 'C' ? '#f1f5f9' : '#f8fafc',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {key === 'back' ? <Delete size={18} /> : key}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSavePinModal(false);
+                  setSavePinInput('');
+                  setSavePinError(null);
+                }}
+                style={{
+                  marginTop: '4px',
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#64748b',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -5895,47 +6755,103 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   // ── Render: PIN Required ──────────────────────────────────────────────────
   if (pageState === 'pin_required') {
     const blocked = pinAttempts >= MAX_ATTEMPTS;
+    const activeThemeColor = isParentPinMode ? '#0284c7' : '#34a853';
+    const numDots = isParentPinMode ? 6 : (pinPurpose === 'setup_initial_pin' ? 4 : (pinInput.length > 4 ? 6 : 4));
 
     return (
       <div style={styles.fullScreen}>
-        <div style={{ ...styles.card, maxWidth: '360px', gap: '28px' }}>
+        <div style={{ ...styles.card, maxWidth: numDots === 6 ? '390px' : '360px', gap: '24px' }}>
           {/* Header */}
           <div style={{ textAlign: 'center' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
-              <Lock size={28} color="#34a853" />
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '18px',
+              background: isParentPinMode ? '#e0f2fe' : '#e6f4ea',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 14px auto',
+              boxShadow: isParentPinMode ? '0 4px 12px rgba(2, 132, 199, 0.15)' : 'none'
+            }}>
+              {isParentPinMode ? <ShieldCheck size={28} color="#0284c7" /> : <Lock size={28} color="#34a853" />}
             </div>
             {profile && (
-              <h2 style={{ margin: '0 0 12px 0', fontSize: '1.25rem', fontWeight: 800, color: '#34a853' }}>
-                Hallo!
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 800, color: activeThemeColor }}>
+                {isParentPinMode ? 'Erziehungsberechtigte' : 'Hallo!'}
               </h2>
             )}
-            <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-              {pinPurpose === 'setup_initial_pin' ? 'Wähle deine 4-stellige PIN' : 'Sicherheits-PIN zum Einloggen'}
-            </h1>
-            <p style={{ margin: '8px 0 0 0', fontSize: '0.875rem', color: '#64748b', lineHeight: 1.5 }}>
+            <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
               {pinPurpose === 'setup_initial_pin'
-                ? 'Willkommen in deiner Musikschule! 🎵 Wähle deine persönliche 4-stellige PIN, um dein digitales Hausaufgabenheft und deinen Musikpass freizuschalten.'
-                : 'Willkommen zurück! 🎵 Gib deine gewählte 4-stellige PIN ein, um dich auf diesem Gerät anzumelden.'}
+                ? 'Wähle deine 4-stellige PIN'
+                : (isParentPinMode ? 'Eltern-Master-PIN eingeben' : 'Sicherheits-PIN zum Einloggen')}
+            </h1>
+            <p style={{ margin: '8px 0 0 0', fontSize: '0.84rem', color: '#64748b', lineHeight: 1.45 }}>
+              {pinPurpose === 'setup_initial_pin'
+                ? 'Willkommen in deiner Musikschule! 🎵 Wähle deine persönliche 4-stellige PIN, um dein digitales Hausaufgabenheft freizuschalten.'
+                : (isParentPinMode
+                  ? 'Gib deine 6-stellige Eltern-Master-PIN ein, um dich direkt mit vollen Rechten anzumelden.'
+                  : 'Willkommen zurück! 🎵 Gib deine 4-stellige Schüler-PIN ein oder melde dich als Elternteil an.')}
             </p>
           </div>
 
-          {/* PIN Display */}
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} style={{
-                width: '56px',
-                height: '64px',
-                borderRadius: '16px',
-                background: '#f8fafc',
-                border: `2px solid ${pinInput.length > i ? '#34a853' : '#e2e8f0'}`,
+          {/* Mode Switch Button (Parent / Student toggle) */}
+          {pinPurpose !== 'setup_initial_pin' && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsParentPinMode(!isParentPinMode);
+                setPinInput('');
+                setPinError(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '12px',
+                border: `1px solid ${isParentPinMode ? '#dcfce7' : '#e0f2fe'}`,
+                background: isParentPinMode ? '#f0fdf4' : '#f0f9ff',
+                color: isParentPinMode ? '#16a34a' : '#0284c7',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.8rem',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {isParentPinMode ? (
+                <>
+                  <User size={15} />
+                  <span>Als Schüler anmelden (4-stellige PIN)</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck size={15} />
+                  <span>Als Elternteil anmelden (6-stellige Master-PIN)</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* PIN Display (Dynamic 4 or 6 boxes) */}
+          <div style={{ display: 'flex', gap: numDots === 6 ? '8px' : '12px', justifyContent: 'center' }}>
+            {Array.from({ length: numDots }).map((_, i) => (
+              <div key={i} style={{
+                width: numDots === 6 ? '44px' : '56px',
+                height: numDots === 6 ? '54px' : '64px',
+                borderRadius: '16px',
+                background: '#f8fafc',
+                border: `2px solid ${pinInput.length > i ? activeThemeColor : '#e2e8f0'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: numDots === 6 ? '1.5rem' : '1.8rem',
                 fontWeight: 900,
                 color: '#0f172a',
-                transition: 'border-color 0.2s',
-                boxShadow: pinInput.length > i ? '0 0 0 4px rgba(52, 168, 83,0.12)' : 'none'
+                transition: 'all 0.15s ease',
+                boxShadow: pinInput.length > i ? `0 0 0 4px ${isParentPinMode ? 'rgba(2, 132, 199, 0.12)' : 'rgba(52, 168, 83, 0.12)'}` : 'none'
               }}>
                 {pinInput[i] ? '●' : ''}
               </div>
@@ -5948,8 +6864,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               background: '#fef2f2',
               border: '1px solid #fecaca',
               borderRadius: '12px',
-              padding: '12px 16px',
-              fontSize: '0.85rem',
+              padding: '10px 14px',
+              fontSize: '0.82rem',
               color: '#dc2626',
               fontWeight: 700,
               textAlign: 'center'
@@ -5961,28 +6877,34 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {/* Numpad */}
           {!blocked && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-              {['1','2','3','4','5','6','7','8','9','','0','⌫'].map((key) => (
+              {['1','2','3','4','5','6','7','8','9','C','0','⌫'].map((key) => (
                 <button
                   key={key}
                   disabled={pinLoading || !key}
                   onClick={() => {
                     if (key === '⌫') handlePinDelete();
+                    else if (key === 'C') {
+                      setPinInput('');
+                      setPinError(null);
+                    }
                     else if (key) handlePinDigit(key);
                   }}
                   style={{
-                    padding: '18px',
+                    padding: '16px',
                     borderRadius: '16px',
                     border: 'none',
-                    background: key === '⌫' ? '#fee2e2' : key === '' ? 'transparent' : '#f1f5f9',
+                    background: key === '⌫' ? '#fee2e2' : key === 'C' ? '#f1f5f9' : '#f8fafc',
                     color: key === '⌫' ? '#ef4444' : '#0f172a',
-                    fontSize: key === '⌫' ? '1.2rem' : '1.4rem',
+                    fontSize: key === '⌫' ? '1.2rem' : '1.35rem',
                     fontWeight: 800,
-                    cursor: key ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     transition: 'background 0.15s, transform 0.1s',
-                    visibility: key === '' ? 'hidden' : 'visible',
-                    boxShadow: key ? '0 2px 8px rgba(0,0,0,0.04)' : 'none',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                    borderWidth: '1px',
+                    borderStyle: 'solid',
+                    borderColor: key === '⌫' ? '#fecaca' : '#e2e8f0'
                   }}
-                  onMouseDown={e => e.currentTarget.style.transform = key ? 'scale(0.92)' : ''}
+                  onMouseDown={e => e.currentTarget.style.transform = 'scale(0.92)'}
                   onMouseUp={e => e.currentTarget.style.transform = ''}
                 >
                   {key}
@@ -6000,10 +6922,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               gap: '10px',
               padding: '12px',
               borderRadius: '14px',
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              color: '#16a34a',
-              fontSize: '0.92rem',
+              background: isParentPinMode ? '#f0f9ff' : '#f0fdf4',
+              border: `1px solid ${isParentPinMode ? '#bae6fd' : '#bbf7d0'}`,
+              color: isParentPinMode ? '#0284c7' : '#16a34a',
+              fontSize: '0.88rem',
               fontWeight: 800
             }}>
               <span style={styles.spinnerInline} />
@@ -6019,8 +6941,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#34a853',
-                  fontSize: '0.85rem',
+                  color: activeThemeColor,
+                  fontSize: '0.82rem',
                   fontWeight: 750,
                   cursor: 'pointer',
                   padding: '4px',
@@ -6043,12 +6965,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 }}
                 style={{
                   width: '100%',
-                  padding: '14px',
+                  padding: '13px',
                   borderRadius: '16px',
                   border: 'none',
                   background: '#f1f5f9',
                   color: '#475569',
-                  fontSize: '0.95rem',
+                  fontSize: '0.9rem',
                   fontWeight: 800,
                   cursor: pinLoading ? 'not-allowed' : 'pointer',
                   opacity: pinLoading ? 0.6 : 1,
@@ -7612,9 +8534,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottom: '1px solid #f2f2f7'
+                borderBottom: '1px solid #f2f2f7',
+                gap: '8px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
                   <div style={{
                     width: '26px',
                     height: '26px',
@@ -7624,16 +8547,54 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#34a853',
-                    border: '1px solid #bbf7d0'
+                    border: '1px solid #bbf7d0',
+                    flexShrink: 0
                   }}>
                     <Music size={14} />
                   </div>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Urbanist', 'Outfit', sans-serif" }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Urbanist', 'Outfit', sans-serif", whiteSpace: 'nowrap' }}>
                     Campus-Groovelab
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: '5px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                  {/* 🛡️ 1-Klick Schnellwechsel zur Schüleransicht (nur wenn Eltern-Modus aktiv ist) */}
+                  {parentUnlocked && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setParentUnlocked(false);
+                        sessionStorage.removeItem(`groovelab_parent_unlocked_${token}`);
+                        if (profile) {
+                          sessionStorage.removeItem(`groovelab_parent_unlocked_${profile.id}`);
+                          sessionStorage.removeItem(`groovelab_parent_session_${profile.id}`);
+                        }
+                        setActiveTab('lessons');
+                        showToastMsg(`Zur Schüleransicht gewechselt (${profile?.first_name || 'Schüler'} gesichert)`);
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 11px',
+                        borderRadius: '20px',
+                        border: '1px solid #bae6fd',
+                        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                        color: '#0284c7',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(2, 132, 199, 0.12)',
+                        transition: 'all 0.15s ease',
+                        whiteSpace: 'nowrap'
+                      }}
+                      title="Eltern-Modus beenden und zur geschützten Schüleransicht wechseln"
+                    >
+                      <User size={13} color="#0284c7" />
+                      <span>Schüleransicht</span>
+                    </button>
+                  )}
+
                   {hasCampusStudent && (
                     <span style={{ background: '#e6f4ea', color: '#34a853', border: '1px solid #ceebd6', padding: '2px 6px', borderRadius: '6px', fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                       CAMPUS
@@ -7649,46 +8610,93 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </>
           )}
 
-          {!timerRunning && profile.app_usage_mode === 'parent_hybrid' && (
+          {/* 🛡️ Persistent Ambient Banner when Parent Mode is active */}
+          {parentUnlocked && (
             <div style={{
-              background: parentUnlocked ? '#e6f4ea' : '#f8fafc',
+              position: 'sticky',
+              top: 0,
+              zIndex: 90,
+              background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
+              color: '#ffffff',
+              padding: '8px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              boxShadow: '0 2px 10px rgba(2, 132, 199, 0.25)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ShieldCheck size={16} color="#ffffff" />
+                <span>Eltern-Bereich aktiv (Voller Zugriff)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setParentUnlocked(false);
+                  sessionStorage.removeItem(`groovelab_parent_unlocked_${token}`);
+                  if (profile) {
+                    sessionStorage.removeItem(`groovelab_parent_unlocked_${profile.id}`);
+                    sessionStorage.removeItem(`groovelab_parent_session_${profile.id}`);
+                  }
+                  setDraftUiLevel(null);
+                  setDraftAllowAbsences(null);
+                  setDraftAllowChat(null);
+                  setDraftAllowLeaderboard(null);
+                  setActiveTab(profile?.is_campus_active ? 'action' : 'homework');
+                  showToastMsg(`Zur Schüleransicht gewechselt (${profile?.first_name || 'Schüler'} gesichert)`);
+                }}
+                style={{
+                  background: '#ffffff',
+                  color: '#0369a1',
+                  border: 'none',
+                  borderRadius: '16px',
+                  padding: '4px 12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Eltern-Modus beenden und zur geschützten Schüleransicht wechseln"
+              >
+                <User size={12} color="#0369a1" />
+                <span>Schüleransicht</span>
+              </button>
+            </div>
+          )}
+
+          {!timerRunning && profile.app_usage_mode === 'parent_hybrid' && !parentUnlocked && (
+            <div style={{
+              background: '#f8fafc',
               borderBottom: '1px solid #e2e8f0',
               padding: '10px 20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               fontSize: '0.8rem',
-              color: parentUnlocked ? '#1b5e20' : '#475569',
+              color: '#475569',
               fontWeight: 700
             }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                {parentUnlocked ? (
-                  <>
-                    <Lock size={14} style={{ color: '#1b5e20' }} />
-                    Eltern-Bereich aktiv (Einstellungen freigeschaltet)
-                  </>
-                ) : (
-                  <>
-                    <Users size={14} style={{ color: '#64748b' }} />
-                    Dieser Bereich ist für Schüler optimiert.
-                  </>
-                )}
+                <Users size={14} style={{ color: '#64748b' }} />
+                Dieser Bereich ist für Schüler optimiert.
               </span>
               <button
                 type="button"
                 onClick={() => {
-                  if (parentUnlocked) {
-                    setParentUnlocked(false);
-                  } else {
-                    setParentPinErrorMsg(null);
-                    setParentPinSuccessMsg(null);
-                    setShowPinPrompt(true);
-                  }
+                  setParentPinErrorMsg(null);
+                  setParentPinSuccessMsg(null);
+                  setShowPinPrompt(true);
                 }}
                 style={{
-                  background: parentUnlocked ? '#f1f5f9' : '#34a853',
-                  color: parentUnlocked ? '#475569' : 'white',
-                  border: parentUnlocked ? '1.5px solid #cbd5e1' : 'none',
+                  background: '#34a853',
+                  color: 'white',
+                  border: 'none',
                   borderRadius: '8px',
                   padding: '6px 12px',
                   fontWeight: 800,
@@ -7699,17 +8707,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   gap: '4px'
                 }}
               >
-                {parentUnlocked ? (
-                  <>
-                    <Lock size={12} />
-                    Sperren
-                  </>
-                ) : (
-                  <>
-                    <Key size={12} />
-                    Eltern-Bereich
-                  </>
-                )}
+                <Key size={12} />
+                Eltern-Bereich
               </button>
             </div>
           )}
@@ -7895,13 +8894,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     </p>
                     <input
                       type="password"
-                      maxLength={4}
+                      maxLength={6}
                       value={parentPinInput}
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const val = e.target.value.replace(/\D/g, '');
                         setParentPinInput(val);
                         setParentPinErrorMsg(null);
-                        if (val.length === 4) {
+                        if (val.length === 4 || val.length === 6) {
                           if (parentPinLockoutUntil && Date.now() < parentPinLockoutUntil) {
                             const minsLeft = Math.ceil((parentPinLockoutUntil - Date.now()) / 60000);
                             setParentPinErrorMsg(`Bereich gesperrt. Bitte versuche es in ${minsLeft} Minuten erneut.`);
@@ -7909,44 +8908,35 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             return;
                           }
 
-                          supabase
-                              .rpc('verify_parent_pin', { student_id: profile.id, input_pin: val })
-                              .then(({ data: isCorrect, error: rpcErr }) => {
-                                if (rpcErr) {
-                                  console.error('PIN verification failed:', rpcErr);
-                                  setParentPinError(true);
-                                  setParentPinErrorMsg('Verbindung zum Server fehlgeschlagen.');
-                                  setParentPinInput('');
-                                  return;
-                                }
-                                if (isCorrect) {
-                                  setParentPinAttempts(0);
-                                  setParentUnlocked(true);
-                                  setLessonsUnlocked(true);
-                                  setShowPinPrompt(false);
-                                  setActiveTab('lessons');
-                                  setParentPinInput('');
-                                  setParentPinError(false);
-                                  setParentPinErrorMsg(null);
-                                  localStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
-                                } else {
-                                  const newAttempts = parentPinAttempts + 1;
-                                  setParentPinAttempts(newAttempts);
-                                  if (newAttempts >= 3) {
-                                    const lockoutTime = Date.now() + 15 * 60 * 1000;
-                                    setParentPinLockoutUntil(lockoutTime);
-                                    setParentPinAttempts(0);
-                                    setParentPinErrorMsg('Zu viele Fehlversuche. Der Eltern-Bereich ist aus Sicherheitsgründen für 15 Minuten gesperrt.');
-                                  } else {
-                                    setParentPinError(true);
-                                    setParentPinErrorMsg(`Falsche PIN. Du hast noch ${3 - newAttempts} Versuche.`);
-                                  }
-                                  setParentPinInput('');
-                                }
-                              });
+                          const isCorrect = await verifyParentPinClient(profile.id, val, profile.parent_pin);
+                          if (isCorrect) {
+                            setParentPinAttempts(0);
+                            setParentUnlocked(true);
+                            setLessonsUnlocked(true);
+                            setShowPinPrompt(false);
+                            setActiveTab('lessons');
+                            setParentPinInput('');
+                            setParentPinError(false);
+                            setParentPinErrorMsg(null);
+                            localStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
+                            localStorage.setItem(`groovelab_parent_pin_${profile.id}`, val);
+                          } else if (val.length === 6) {
+                            const newAttempts = parentPinAttempts + 1;
+                            setParentPinAttempts(newAttempts);
+                            if (newAttempts >= 3) {
+                              const lockoutTime = Date.now() + 15 * 60 * 1000;
+                              setParentPinLockoutUntil(lockoutTime);
+                              setParentPinAttempts(0);
+                              setParentPinErrorMsg('Zu viele Fehlversuche. Der Eltern-Bereich ist aus Sicherheitsgründen für 15 Minuten gesperrt.');
+                            } else {
+                              setParentPinError(true);
+                              setParentPinErrorMsg(`Falsche PIN. Du hast noch ${3 - newAttempts} Versuche.`);
+                            }
+                            setParentPinInput('');
+                          }
                         }
                       }}
-                      placeholder="••••"
+                      placeholder="••••••"
                       style={{
                         width: '120px',
                         padding: '12px 0',
@@ -8447,7 +9437,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               </span>
                             </div>
                             <span style={{ fontSize: '0.76rem', color: '#15803d', lineHeight: 1.35, fontWeight: 600 }}>
-                              Deine Musikschule übernimmt alle Aktivierungsgebühren für deinen Campus-Zugang.
+                              Deine Musikschule übernimmt alle Cloud-Bereitstellungsgebühren für deinen Campus-Zugang. Die Software-Nutzung ist 100% kostenlos.
                             </span>
                           </div>
                         </div>
@@ -8475,7 +9465,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            💳 Aktivierungs-Beitrag
+                            💳 Cloud- &amp; Modul-Bereitstellung
                           </span>
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: '100px' }}>
                             Transparente Abrechnung
@@ -8491,8 +9481,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         </div>
                         <span style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.35, fontWeight: 500 }}>
                           {isPartial 
-                            ? 'Deine Musikschule bezuschusst deinen Zugang. Der Aktivierungsbeitrag wird als transparente Einmalzahlung für das Schuljahr abgerechnet (keine automatische Verlängerung).' 
-                            : 'Direktabrechnung für deinen vollen Campus-Zugang. Der Aktivierungsbeitrag wird als transparente Einmalzahlung für das Schuljahr abgerechnet (keine automatische Verlängerung).'}
+                            ? 'Deine Musikschule bezuschusst deinen Zugang. Die Cloud-Bereitstellung wird als transparente Einmalzahlung für das Schuljahr abgerechnet (keine automatische Verlängerung). Die Software-Nutzung ist 100% kostenlos.' 
+                            : 'Cloud- & Modul-Bereitstellung für deinen vollen Campus-Zugang (Einmalzahlung für das Schuljahr, keine automatische Verlängerung). Die Software-Nutzung ist 100% kostenlos.'}
                         </span>
 
                         {/* 🛡️ Treue-Preisgarantie Badge */}
@@ -8808,7 +9798,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           style={{ accentColor: '#34a853' }}
                         />
                         <Trophy size={14} style={{ color: '#34a853', flexShrink: 0 }} />
-                        <span>Sichtbarkeit in Bestenlisten</span>
+                        <span>Klassen-Highlights &amp; Team-Power</span>
                       </label>
 
                       {/* Toggle 4: Groups */}
@@ -9272,12 +10262,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   </div>
                 ) : activeTab === 'homework' ? (
                   renderHomeworkWidget(false)
+                ) : activeTab === 'settings' ? (
+                  renderParentSettingsWidget()
                 ) : (
                   renderLessonsWidget()
                 )}</> : (
                   <>
                     {!timerRunning && renderSegmentedControl()}
-                    {activeTab === 'lessons' ? renderLessonsWidget() : renderHomeworkWidget(false)}
+                    {activeTab === 'lessons' ? renderLessonsWidget() : activeTab === 'settings' ? renderParentSettingsWidget() : renderHomeworkWidget(false)}
                   </>
                 )}
 

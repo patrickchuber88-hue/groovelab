@@ -590,8 +590,8 @@ export function CampusSetupScreen({
                     )}
 
                     {renderToggleRow(
-                      "Schul-Rangliste (Leaderboard)",
-                      "Die Bestenliste für alle Schüler in der App sichtbar machen.",
+                      "Klassen-Highlights & Team-Power",
+                      "Gemeinsame Übe-Erfolge und Team-Highlights für Schüler in der App sichtbar machen.",
                       showLeaderboard,
                       setShowLeaderboard,
                       <Users size={18} />

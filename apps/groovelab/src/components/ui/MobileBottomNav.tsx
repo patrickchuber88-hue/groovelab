@@ -13,6 +13,7 @@ import {
   GraduationCap, 
   Music, 
   Shield,
+  ShieldCheck,
   BookOpen,
   Zap,
   Play,
@@ -31,6 +32,37 @@ interface MobileBottomNavProps {
   unreadCount?: number;
 }
 
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: any;
+  badge?: number;
+}
+
+const isBoardAllowedForStudent = (boardId: string, level: string, isParentUnlocked: boolean): boolean => {
+  if (isParentUnlocked) return true;
+  if (level === 'pro') return true;
+
+  // Custom parent override from localStorage if set
+  if (typeof window !== 'undefined') {
+    const override = localStorage.getItem(`campus_board_override_${boardId}`);
+    if (override === 'true') return true;
+    if (override === 'false') return false;
+  }
+
+  if (level === 'junior') {
+    // Junior defaults: Briefing, Homework Book, Practice Board (Übe-Pfad), Events (Termine), Settings
+    const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings'];
+    return juniorAllowed.includes(boardId);
+  }
+
+  if (level === 'teen') {
+    return true;
+  }
+
+  return true;
+};
+
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeTab,
   setActiveTab,
@@ -41,6 +73,37 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  const [campusStudentUiLevel, setCampusStudentUiLevel] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'junior';
+    return localStorage.getItem('campus_student_ui_level') || 'junior';
+  });
+  const [parentUnlocked, setParentUnlocked] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
+  });
+
+  const [, setNavVersion] = useState(0);
+
+  React.useEffect(() => {
+    const handleLevelChangeEvt = (e: any) => {
+      if (e?.detail) setCampusStudentUiLevel(e.detail);
+    };
+    const handleParentModeChange = (e: any) => {
+      if (typeof e?.detail === 'boolean') setParentUnlocked(e.detail);
+    };
+    const handlePermissionChange = () => {
+      setNavVersion(v => v + 1);
+    };
+    window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+    window.addEventListener('groovelab_parent_mode_changed', handleParentModeChange);
+    window.addEventListener('campus_board_permission_changed', handlePermissionChange);
+    return () => {
+      window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+      window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChange);
+      window.removeEventListener('campus_board_permission_changed', handlePermissionChange);
+    };
+  }, []);
 
   const itemRefs = React.useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
@@ -64,10 +127,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   };
 
   // Define 1:1 menu items matching Desktop Left Sidebar in exact order
-  const getMenuItems = () => {
+  const getMenuItems = (): MenuItem[] => {
     if (userRole === 'student') {
       if (activePlatform === 'campus') {
-        return [
+        const allItems: MenuItem[] = [
           { id: 'briefing', label: 'Briefing', icon: Monitor },
           { id: 'homework_book', label: 'Aufgaben', icon: BookOpen },
           { id: 'practice_board', label: 'Übe-Pfad', icon: Zap },
@@ -75,10 +138,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           { id: 'events', label: 'Termine', icon: Calendar },
           { id: 'campus_cup', label: 'Performance', icon: Trophy },
           { id: 'messages', label: 'Nachrichten', icon: Mail, badge: unreadCount },
-          { id: 'settings', label: 'Einstellungen', icon: Settings },
+          { 
+            id: 'settings', 
+            label: (campusStudentUiLevel === 'junior' || campusStudentUiLevel === 'teen') && !parentUnlocked ? 'Elternbereich' : 'Einstellungen', 
+            icon: (campusStudentUiLevel === 'junior' || campusStudentUiLevel === 'teen') && !parentUnlocked ? ShieldCheck : Settings 
+          },
         ];
+        return allItems.filter(item => isBoardAllowedForStudent(item.id, campusStudentUiLevel, parentUnlocked));
       } else {
-        return [
+        const allItems: MenuItem[] = [
           { id: 'live', label: 'Live Lab', icon: Monitor },
           { id: 'practice', label: 'Üben', icon: Play },
           { id: 'library', label: 'Bibliothek', icon: Library },
@@ -87,6 +155,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           { id: 'bands', label: 'Bands', icon: Box },
           { id: 'messages', label: 'Nachrichten', icon: Megaphone },
         ];
+        return allItems.filter(item => isBoardAllowedForStudent(item.id, campusStudentUiLevel, parentUnlocked));
       }
     } else {
       // Teacher / Admin / Secretary
@@ -122,22 +191,34 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   const menuItems = getMenuItems();
 
-  // Primary 4 Tabs for Bottom Nav
-  const primaryTabs: Array<{ id: string; label: string; icon: any; badge?: number }> = userRole === 'student'
-    ? (activePlatform === 'campus'
-        ? [
+  // Primary 4 Tabs for Bottom Nav based on UI Level
+  const getPrimaryTabs = () => {
+    if (userRole === 'student') {
+      if (activePlatform === 'campus') {
+        if (campusStudentUiLevel === 'junior' && !parentUnlocked) {
+          return [
             { id: 'briefing', label: 'Briefing', icon: Monitor },
             { id: 'homework_book', label: 'Aufgaben', icon: BookOpen },
-            { id: 'events', label: 'Termine', icon: Calendar },
-            { id: 'messages', label: 'Chat', icon: Mail, badge: unreadCount }
-          ]
-        : [
-            { id: 'live', label: 'Live Lab', icon: Monitor },
-            { id: 'practice', label: 'Üben', icon: Play },
-            { id: 'repertoire', label: 'Repertoire', icon: Award },
-            { id: 'messages', label: 'Chat', icon: Megaphone, badge: unreadCount }
-          ])
-    : (activePlatform === 'campus'
+            { id: 'practice_board', label: 'Übe-Pfad', icon: Zap },
+            { id: 'events', label: 'Termine', icon: Calendar }
+          ];
+        }
+        return [
+          { id: 'briefing', label: 'Briefing', icon: Monitor },
+          { id: 'homework_book', label: 'Aufgaben', icon: BookOpen },
+          { id: 'events', label: 'Termine', icon: Calendar },
+          { id: 'messages', label: 'Chat', icon: Mail, badge: unreadCount }
+        ];
+      } else {
+        return [
+          { id: 'live', label: 'Live Lab', icon: Monitor },
+          { id: 'practice', label: 'Üben', icon: Play },
+          { id: 'repertoire', label: 'Repertoire', icon: Award },
+          { id: 'messages', label: 'Chat', icon: Megaphone, badge: unreadCount }
+        ];
+      }
+    } else {
+      return activePlatform === 'campus'
         ? [
             { id: 'live', label: 'Briefing', icon: Monitor },
             { id: 'schedule', label: 'Stundenplan', icon: Calendar },
@@ -149,7 +230,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             { id: 'bands', label: 'Bands', icon: Box },
             { id: 'songs', label: 'Songs', icon: Library },
             { id: 'messages', label: 'Chat', icon: Mail, badge: unreadCount }
-          ]);
+          ];
+    }
+  };
+
+  const primaryTabs: Array<{ id: string; label: string; icon: any; badge?: number }> = getPrimaryTabs();
 
   return (
     <>

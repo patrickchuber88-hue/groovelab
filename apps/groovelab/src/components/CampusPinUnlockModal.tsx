@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, Delete, X, Lock } from 'lucide-react';
+import { Key, Delete, X, Lock, ShieldCheck } from 'lucide-react';
 import { validateNewPin } from '../utils/pinValidation';
 
 interface CampusPinUnlockModalProps {
@@ -22,8 +22,9 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
   const [isSetupMode, setIsSetupMode] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [attempts, setAttempts] = useState(0);
+  const [isParentMode, setIsParentMode] = useState(false);
 
-  const primaryColor = '#34a853'; // Campus Green theme color
+  const primaryColor = isParentMode ? '#0284c7' : '#34a853';
 
   // Determine PIN mode on mount
   useEffect(() => {
@@ -53,28 +54,39 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
     checkPinMode();
   }, [user, supabase]);
 
-  const expectedLength = isSetupMode ? 4 : (studentBirthDay ? 2 : 4);
-
   const handleKeyPress = (val: string) => {
     if (loading) return;
     if (val === 'back') {
-      setPinInput(prev => prev.slice(0, -1));
+      setPinInput(prev => {
+        const next = prev.slice(0, -1);
+        if (next.length <= 4 && isParentMode) {
+          // Keep parent mode if active
+        }
+        return next;
+      });
     } else if (val === 'clear') {
       setPinInput('');
-    } else if (pinInput.length < expectedLength) {
+    } else if (pinInput.length < 6) {
       const nextPin = pinInput + val;
       setPinInput(nextPin);
-      if (nextPin.length === expectedLength) {
-        setTimeout(() => {
-          handleVerify(nextPin);
-        }, 100);
+
+      // Dynamically detect parent 5th/6th digit
+      if (nextPin.length === 5 && !isParentMode) {
+        setIsParentMode(true);
+      }
+
+      // Check verification at 4 digits (student) or 6 digits (parent)
+      if (nextPin.length === 4 && !isParentMode && !isSetupMode) {
+        handleVerify(nextPin, false);
+      } else if (nextPin.length === 6) {
+        handleVerify(nextPin, true);
       }
     }
   };
 
-  const handleVerify = async (explicitPin?: string) => {
+  const handleVerify = async (explicitPin?: string, isSixDigits: boolean = false) => {
     const pinToVerify = typeof explicitPin === 'string' ? explicitPin : pinInput;
-    if (pinToVerify.length !== expectedLength || loading) return;
+    if (pinToVerify.length < 4 || loading) return;
     setLoading(true);
 
     try {
@@ -186,45 +198,73 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
         alert('Deine PIN wurde erfolgreich eingerichtet!');
         onUnlock();
       } else {
-        // Verification Mode
+        // Verification Mode (Adaptive: 4-digit student or 6-digit parent)
         let isMatch = false;
-        const cleanInput = pinInput.trim();
-        const userPin = String(user.personal_pin || user.parent_pin || user.onboarding_pin || '').trim();
+        let isParentMatch = false;
+        const cleanInput = pinToVerify.trim();
+        const userPersonalPin = String(user.personal_pin || user.onboarding_pin || '').trim();
+        const userParentPin = String(user.parent_pin || '').trim();
         const cachedPin = localStorage.getItem(`groovelab_user_pin_${user.id}`);
 
-        if (userPin && (userPin === cleanInput || userPin.padStart(4, '0') === cleanInput)) {
-          isMatch = true;
-        } else if (cachedPin && cachedPin.trim() === cleanInput) {
-          isMatch = true;
-        } else {
-          const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {
-            user_uuid: user.id,
-            input_pin: cleanInput
-          });
-          if (!pinErr && pinOk === true) {
+        if (cleanInput.length === 4) {
+          if (userPersonalPin && (userPersonalPin === cleanInput || userPersonalPin.padStart(4, '0') === cleanInput)) {
             isMatch = true;
-          } else if (studentBirthDay && parseInt(cleanInput) === parseInt(studentBirthDay)) {
+          } else if (cachedPin && cachedPin.trim() === cleanInput) {
             isMatch = true;
+          } else {
+            const { data: pinOk } = await supabase.rpc('verify_personal_pin', {
+              user_uuid: user.id,
+              input_pin: cleanInput
+            });
+            if (pinOk === true) isMatch = true;
+          }
+        } else if (cleanInput.length === 6 || isSixDigits) {
+          const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${user.id}`);
+          if (userParentPin && (userParentPin === cleanInput || userParentPin.padStart(6, '0') === cleanInput)) {
+            isMatch = true;
+            isParentMatch = true;
+          } else if (cachedParentPin && (cachedParentPin.trim() === cleanInput || cachedParentPin.trim() === cleanInput.padStart(6, '0'))) {
+            isMatch = true;
+            isParentMatch = true;
+          } else {
+            const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+              student_id: user.id,
+              input_pin: cleanInput
+            });
+            if (parentOk === true) {
+              isMatch = true;
+              isParentMatch = true;
+            } else if (userParentPin) {
+              try {
+                const msgBuffer = new TextEncoder().encode(cleanInput);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                if (userParentPin.toLowerCase() === hashHex.toLowerCase()) {
+                  isMatch = true;
+                  isParentMatch = true;
+                }
+              } catch (e) {}
+            }
           }
         }
 
         if (isMatch) {
+          if (isParentMatch) {
+            sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
+            sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 15 * 60 * 1000));
+          }
           onUnlock();
         } else {
-          const newAttempts = attempts + 1;
-          setAttempts(newAttempts);
-
-          if (newAttempts >= 3) {
-            // Lock user's campus access temporarily
-            await supabase
-              .from('users')
-              .update({ is_campus_active: false })
-              .eq('id', user.id);
-            alert('Dieses Konto wurde nach 3 Fehlversuchen für den Campus gesperrt. Bitte wende dich an deine Musikschule.');
-            onClose();
-          } else {
-            alert(`Falsche PIN. Noch ${3 - newAttempts} Versuche.`);
-            setPinInput('');
+          if (cleanInput.length === 6) {
+            const newAttempts = attempts + 1;
+            setAttempts(newAttempts);
+            if (newAttempts >= 5) {
+              alert('Zu viele Fehlversuche. Bitte wende dich an deine Musikschule.');
+              onClose();
+            } else {
+              alert(`Falsche PIN. Noch ${5 - newAttempts} Versuche.`);
+              setPinInput('');
+            }
           }
         }
       }
@@ -281,6 +321,8 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
     );
   };
 
+  const activeSlotsCount = (isParentMode || pinInput.length > 4) ? 6 : 4;
+
   return (
     <div style={{
       position: 'fixed',
@@ -327,50 +369,41 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           width: '56px',
           height: '56px',
           borderRadius: '50%',
-          background: '#e6f4ea',
+          background: isParentMode ? '#f0f9ff' : '#e6f4ea',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           color: primaryColor,
           marginBottom: '16px'
         }}>
-          {isSetupMode ? <Key size={28} /> : <Lock size={28} />}
+          {isParentMode ? <ShieldCheck size={28} /> : (isSetupMode ? <Key size={28} /> : <Lock size={28} />)}
         </div>
 
         <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-          {isSetupMode ? 'Persönliche PIN einrichten' : 'Campus freischalten'}
+          {isParentMode ? 'Eltern-Master-Zugang' : (isSetupMode ? 'Persönliche PIN einrichten' : 'Campus freischalten')}
         </h3>
         
         <p style={{ margin: '8px 0 20px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
-          {isSetupMode ? (
-            <>
-              Lege eine geheime 4-stellige PIN fest,<br/>
-              um deine privaten Campus-Daten zu schützen.
-            </>
-          ) : studentBirthDay ? (
-            <>
-              Bitte gib deinen Geburtstag (nur den Tag, z.B. 05)<br/>
-              als 2-stellige PIN ein.
-            </>
+          {isParentMode ? (
+            <>Bitte gib deine 6-stellige Eltern-Master-PIN ein,<br/>um die Eltern-Zentrale zu öffnen.</>
+          ) : isSetupMode ? (
+            <>Lege eine geheime 4-stellige PIN fest,<br/>um deine privaten Campus-Daten zu schützen.</>
           ) : (
-            <>
-              Bitte gib deine persönliche 4-stellige PIN ein,<br/>
-              um deinen Campus freizuschalten.
-            </>
+            <>Bitte gib deine 4-stellige Schüler-PIN ein<br/>oder deine 6-stellige Eltern-Master-PIN.</>
           )}
         </p>
 
-        {/* Input indicators */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-          {Array.from({ length: expectedLength }).map((_, idx) => (
+        {/* Input indicators with smooth transition */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+          {Array.from({ length: activeSlotsCount }).map((_, idx) => (
             <div
               key={idx}
               style={{
-                width: '18px',
-                height: '18px',
+                width: '16px',
+                height: '16px',
                 borderRadius: '50%',
-                border: '2px solid #cbd5e1',
-                background: pinInput.length > idx ? '#cbd5e1' : 'transparent',
+                border: `2px solid ${pinInput.length > idx ? primaryColor : '#cbd5e1'}`,
+                background: pinInput.length > idx ? primaryColor : 'transparent',
                 transition: 'all 0.15s ease'
               }}
             />
@@ -379,8 +412,31 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
 
         {renderKeypad()}
 
+        {/* Mode switcher link */}
+        {!isSetupMode && (
+          <button
+            type="button"
+            onClick={() => {
+              setIsParentMode(!isParentMode);
+              setPinInput('');
+            }}
+            style={{
+              marginTop: '16px',
+              background: 'none',
+              border: 'none',
+              color: isParentMode ? '#34a853' : '#0284c7',
+              fontSize: '0.76rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              textDecoration: 'underline'
+            }}
+          >
+            {isParentMode ? '← Zurück zur Schüler-Eingabe (4 Ziffern)' : 'Als Elternteil anmelden (6-stellige Master-PIN) →'}
+          </button>
+        )}
+
         {loading && (
-          <div style={{ marginTop: '18px', color: primaryColor, fontWeight: 800, fontSize: '0.9rem' }}>
+          <div style={{ marginTop: '14px', color: primaryColor, fontWeight: 800, fontSize: '0.9rem' }}>
             Einen Moment bitte...
           </div>
         )}

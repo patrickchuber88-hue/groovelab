@@ -5,9 +5,9 @@ import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronLeft, ChevronRight, Coffee, Clock, Timer, Flame, BookOpen, Share2, Play, 
-  Pause, RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, Check, CheckCircle, Target, MessageSquare, Send,
+  Pause, RotateCcw, Volume2, VolumeX, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, CalendarX, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
-  Mic, Disc, Trash2, Download, Key, Delete, Headphones, ArrowRight
+  Mic, Disc, Trash2, Download, Key, Delete, Headphones, ArrowRight, Sliders, Compass, Palette
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -30,6 +30,7 @@ import { processPureRawBlob } from '../utils/audioMasteringEngine';
 import { downloadStudentAudioBackup } from '../utils/audioBackupHelper';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate } from '../utils/studentProgressEngine';
 import { PushNotificationSoftPromptModal } from './ui/PushNotificationSoftPromptModal';
+import { generateGdprDataReportPDF } from '../utils/pdfGenerator';
 
 const showMissionsFeature = false;
 
@@ -574,6 +575,8 @@ interface MobileBriefingViewProps {
   unreadClassFeedCount: number;
   studentUiLevel?: 'junior' | 'teen' | 'pro' | null;
   schoolFokusLevels?: any;
+  handleTriggerCancelOccurrence?: (occ: any) => void;
+  handleUndoCancelOccurrence?: (occ: any) => void;
 }
 
 function MobileBriefingView({
@@ -590,6 +593,8 @@ function MobileBriefingView({
   handleRejectReschedule,
   handleConfirmReschedule,
   handleAcknowledgeCancellation,
+  handleTriggerCancelOccurrence,
+  handleUndoCancelOccurrence,
   getISOWeek,
   handleTabChangeLocal,
   campusFeedAnnouncements,
@@ -620,6 +625,19 @@ function MobileBriefingView({
       
       {/* TOP WELCOME CARD - BEGRÜSSUNGSWIDGET */}
       <style>{`
+        @keyframes chatNoticePulse {
+          0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 2px 8px rgba(234, 179, 8, 0.35);
+          }
+          50% {
+            transform: scale(1.028);
+            box-shadow: 0 0 0 5px rgba(234, 179, 8, 0.22), 0 4px 14px rgba(234, 179, 8, 0.45);
+          }
+        }
+        .pulse-amber-button {
+          animation: chatNoticePulse 2.2s infinite ease-in-out !important;
+        }
         .welcome-card-container {
           display: flex;
           background: #ffffff;
@@ -750,66 +768,106 @@ function MobileBriefingView({
             const cardBorder = isGroove ? 'rgba(234, 179, 8, 0.1)' : 'rgba(52, 168, 83, 0.1)';
             const cardColor = isGroove ? '#ca8a04' : '#34a853';
 
+            const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_sick' || nextOcc?.status === 'canceled_by_teacher_sick';
+
             return (
               <div style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'space-between',
-                gap: '12px', 
-                background: cardBg, 
+                gap: '8px', 
+                background: isCanceled ? '#fef2f2' : cardBg, 
                 padding: '8px 12px', 
-                borderRadius: '8px', 
-                border: `1px solid ${cardBorder}`,
-                marginTop: '4px'
+                borderRadius: '10px', 
+                border: `1px solid ${isCanceled ? 'rgba(239, 68, 68, 0.25)' : cardBorder}`,
+                marginTop: '4px',
+                flexWrap: 'wrap'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: cardColor, fontSize: '0.74rem', fontWeight: 800 }}>
-                  <Calendar size={12} color={cardColor} />
-                  <span>Nächster Unterricht: {lessonText}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: isCanceled ? '#dc2626' : cardColor, fontSize: '0.74rem', fontWeight: 800 }}>
+                  <Calendar size={12} color={isCanceled ? '#dc2626' : cardColor} />
+                  <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächster Unterricht: ${lessonText}`}</span>
                 </div>
 
-                {teacherId && (() => {
-                  const hasMessage = finalOccurId && occurrencesWithMessages.includes(finalOccurId);
-                  return (
-                    <button 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                  {teacherId && (() => {
+                    const hasMessage = finalOccurId && occurrencesWithMessages.includes(finalOccurId);
+                    return (
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAppointmentChatData({
+                            teacherId,
+                            date: targetDateStr,
+                            start_time: timeLabel,
+                            label,
+                            occurrenceId: finalOccurId
+                          });
+                          setShowAppointmentChat(true);
+                        }}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          background: hasMessage ? '#fde047' : '#ffffff', 
+                          color: hasMessage ? '#0f172a' : '#475569', 
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          border: hasMessage ? '1.5px solid #eab308' : '1px solid rgba(0, 0, 0, 0.12)',
+                          boxShadow: hasMessage ? '0 2px 8px rgba(234, 179, 8, 0.35)' : '0 2px 4px rgba(0, 0, 0, 0.04)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          flexShrink: 0
+                        }}
+                        className={hasMessage ? 'pulse-amber-button' : ''}
+                        onMouseOver={e => {
+                          e.currentTarget.style.background = hasMessage ? '#facc15' : '#f1f5f9';
+                          e.currentTarget.style.color = hasMessage ? '#0f172a' : '#1e293b';
+                        }}
+                        onMouseOut={e => {
+                          e.currentTarget.style.background = hasMessage ? '#fde047' : '#ffffff';
+                          e.currentTarget.style.color = hasMessage ? '#0f172a' : '#475569';
+                        }}
+                        title={hasMessage ? "Nachrichten ansehen (1:1 Chat mit Lehrkraft)" : "Nachrichten (1:1 Chat mit Lehrkraft)"}
+                      >
+                        <MessageSquare size={12} fill={hasMessage ? 'currentColor' : 'none'} color={hasMessage ? '#0f172a' : '#34a853'} />
+                      </button>
+                    );
+                  })()}
+
+                  {nextOcc && (
+                    <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setAppointmentChatData({
-                          teacherId,
-                          date: targetDateStr,
-                          start_time: timeLabel,
-                          label,
-                          occurrenceId: finalOccurId
-                        });
-                        setShowAppointmentChat(true);
+                        if (isCanceled) {
+                          handleUndoCancelOccurrence?.(nextOcc);
+                        } else {
+                          handleTriggerCancelOccurrence?.(nextOcc);
+                        }
                       }}
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'center',
-                        background: hasMessage ? '#fef3c7' : '#ffffff', 
-                        color: hasMessage ? '#d97706' : '#475569', 
+                        background: isCanceled ? '#fee2e2' : '#ffffff',
+                        color: isCanceled ? '#dc2626' : '#64748b',
                         width: '28px',
                         height: '28px',
                         borderRadius: '50%',
-                        border: '1px solid rgba(0, 0, 0, 0.08)',
+                        border: `1px solid ${isCanceled ? '#f87171' : '#e2e8f0'}`,
                         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         flexShrink: 0
                       }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.background = hasMessage ? '#fde68a' : '#f1f5f9';
-                        e.currentTarget.style.color = hasMessage ? '#d97706' : '#1e293b';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.background = hasMessage ? '#fef3c7' : '#ffffff';
-                        e.currentTarget.style.color = hasMessage ? '#d97706' : '#475569';
-                      }}
+                      title={isCanceled ? "Absage zurücknehmen" : "Unterricht absagen"}
                     >
-                      <MessageSquare size={12} fill={hasMessage ? 'currentColor' : 'none'} />
+                      <CalendarX size={12} color={isCanceled ? '#dc2626' : '#64748b'} />
                     </button>
-                  );
-                })()}
+                  )}
+                </div>
               </div>
             );
           })() : (
@@ -2190,7 +2248,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
             due_date: new Date(actDate.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             items: [
               {
-                name: `Rest-Schuljahrespauschale Infrastruktur- & Servicegebühren (${restmonate} Monate)`,
+                name: `Cloud- & Modul-Bereitstellung: Modul Campus (${restmonate} Monate Rest-Schuljahr)`,
                 quantity: 1,
                 unit: 'Profil',
                 unitPrice: totalAmount,
@@ -2219,12 +2277,12 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
   }
 
   return (
-    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '24px', marginTop: '24px' }}>
+    <div>
       <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <FileText size={18} color="#34a853" /> 3. Abrechnung & Rechnungen
+        <FileText size={18} color="#34a853" /> Abrechnung & Rechnungen
       </h3>
       <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px', fontWeight: 600, lineHeight: '1.4' }}>
-        Hier findest du die Rechnungen für deine Infrastruktur- & Servicegebühren (Rest-Schuljahrespauschale).
+        Hier findest du die Rechnungen für deine Cloud- & Modul-Bereitstellung (Rest-Schuljahrespauschale). Die Campus-Groovelab Software-Nutzung ist dauerhaft 100% kostenlos.
       </p>
 
       {invoices.length === 0 ? (
@@ -2818,7 +2876,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       {
         selector: 'tour-student-hero',
         title: 'Dein Profil & Level',
-        description: 'Hier siehst du deinen aktuellen Fortschritt, gesammelte XP und deine aktuelle Liga im Campus Cup.'
+        description: 'Hier siehst du deinen aktuellen Fortschritt, gesammelte XP und dein Level.'
       },
       {
         selector: 'tour-student-practice',
@@ -2827,8 +2885,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       },
       {
         selector: 'tour-student-songs',
-        title: 'Campus Cup & Meisterwerke',
-        description: 'Messe dich mit anderen im Campus Cup, entdecke neue Songs und teile deine aufgenommenen Meisterwerke.'
+        title: 'Klassen-Highlights & Team-Power',
+        description: 'Entdecke die Erfolge deiner Mitschüler, sammelt gemeinsame Übe-Minuten und feiert eure Meilensteine.'
       }
     ];
   }, []);
@@ -2873,7 +2931,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [savingProfile, setSavingProfile] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushNotifScheduleChanges, setPushNotifScheduleChanges] = useState(true);
-  const [pushNotifHomework, setPushNotifHomework] = useState(false);
+  const [pushNotifHomework, setPushNotifHomework] = useState(true);
+  const [pushNotifChat, setPushNotifChat] = useState(true);
+  const [pushNotifPracticeReminder, setPushNotifPracticeReminder] = useState(true);
+  const [pushNotifWeeklyDigest, setPushNotifWeeklyDigest] = useState(true);
   const [pushNotifAllFeatures, setPushNotifAllFeatures] = useState(false);
   const [showPushSoftPrompt, setShowPushSoftPrompt] = useState(false);
 
@@ -2881,8 +2942,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
 
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
-  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'security' | 'billing' | 'legal'>('notifications');
-  const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'security' | 'billing' | 'legal' | null>(null);
+  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal' | 'overview'>('parent_controls');
+  const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal' | null>(null);
   const [pinFormNew, setPinFormNew] = useState('');
   const [pinFormConfirm, setPinFormConfirm] = useState('');
   const [pinFormError, setPinFormError] = useState('');
@@ -2892,6 +2953,353 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [firstPinShowMask, setFirstPinShowMask] = useState<boolean>(false);
   const [firstPinSavedSuccess, setFirstPinSavedSuccess] = useState<boolean>(false);
   const [matchCelebrationData, setMatchCelebrationData] = useState<any | null>(null);
+
+  // Parent Control Center Draft States & Step-Up Save Modal
+  const [draftUiLevel, setDraftUiLevel] = useState<string | null>(null);
+  const [draftAllowAbsences, setDraftAllowAbsences] = useState<boolean | null>(null);
+  const [draftAllowChat, setDraftAllowChat] = useState<boolean | null>(null);
+  const [draftAllowTimer, setDraftAllowTimer] = useState<boolean | null>(null);
+  const [draftAllowLeaderboard, setDraftAllowLeaderboard] = useState<boolean | null>(null);
+  const [draftAllowProposals, setDraftAllowProposals] = useState<boolean | null>(null);
+  const [draftAllowAudio, setDraftAllowAudio] = useState<boolean | null>(null);
+  const [draftAllowTts, setDraftAllowTts] = useState<boolean | null>(null);
+  const [draftBoardOverrides, setDraftBoardOverrides] = useState<Record<string, boolean>>({});
+  const [showSavePinModal, setShowSavePinModal] = useState<boolean>(false);
+  const [savePinInput, setSavePinInput] = useState<string>('');
+  const [savePinError, setSavePinError] = useState<string | null>(null);
+  const [savePinLoading, setSavePinLoading] = useState<boolean>(false);
+
+  // Parental Gatekeeper State (6-Digit Parent Master PIN)
+  const [showParentGateModal, setShowParentGateModal] = useState(false);
+  const [pendingParentTarget, setPendingParentTarget] = useState<'parent_controls' | 'security' | 'billing' | 'legal' | null>(null);
+  const [parentGatePinInput, setParentGatePinInput] = useState('');
+  const [parentGateError, setParentGateError] = useState('');
+  const [isVerifyingParentGate, setIsVerifyingParentGate] = useState(false);
+  const [parentSetupStep, setParentSetupStep] = useState<'enter' | 'confirm'>('enter');
+  const [parentSetupPin, setParentSetupPin] = useState('');
+  const [parentSetupConfirm, setParentSetupConfirm] = useState('');
+  const [parentSetupError, setParentSetupError] = useState('');
+
+  const checkIsParentSessionActive = () => {
+    const sessionExpiry = sessionStorage.getItem(`groovelab_parent_session_${studentId}`);
+    if (sessionExpiry && Number(sessionExpiry) > Date.now()) {
+      return true;
+    }
+    return false;
+  };
+
+  const CAMPUS_AGE_STANDARDS: Record<string, {
+    label: string;
+    uiLevel: string;
+    allowAbsences: boolean;
+    allowChat: boolean;
+    allowTimer: boolean;
+    allowLeaderboard: boolean;
+    allowProposals: boolean;
+    allowAudio: boolean;
+    allowTts: boolean;
+    boardOverrides: Record<string, boolean>;
+  }> = {
+    junior: {
+      label: 'Junior (6–10 J.)',
+      uiLevel: 'junior',
+      allowAbsences: false,
+      allowChat: false,
+      allowTimer: true,
+      allowLeaderboard: false,
+      allowProposals: false,
+      allowAudio: true,
+      allowTts: true,
+      boardOverrides: {
+        practice_board: true,
+        mediathek: false,
+        recordings: true,
+        events: true,
+        campus_cup: false,
+        messages: false
+      }
+    },
+    teen: {
+      label: 'Teen (11–15 J.)',
+      uiLevel: 'teen',
+      allowAbsences: true,
+      allowChat: true,
+      allowTimer: true,
+      allowLeaderboard: true,
+      allowProposals: true,
+      allowAudio: true,
+      allowTts: false,
+      boardOverrides: {
+        practice_board: true,
+        mediathek: true,
+        recordings: true,
+        events: true,
+        campus_cup: true,
+        messages: true
+      }
+    },
+    pro: {
+      label: '+16 / Pro (Ab 16 J.)',
+      uiLevel: 'pro',
+      allowAbsences: true,
+      allowChat: true,
+      allowTimer: true,
+      allowLeaderboard: true,
+      allowProposals: true,
+      allowAudio: true,
+      allowTts: false,
+      boardOverrides: {
+        practice_board: true,
+        mediathek: true,
+        recordings: true,
+        events: true,
+        campus_cup: true,
+        messages: true
+      }
+    }
+  };
+
+  const applyAndSaveParentControls = async (updates: {
+    uiLevel?: 'junior' | 'teen' | 'pro' | string;
+    allowAbsences?: boolean;
+    allowChat?: boolean;
+    allowTimer?: boolean;
+    allowLeaderboard?: boolean;
+    allowProposals?: boolean;
+    allowAudio?: boolean;
+    allowTts?: boolean;
+    boardOverrides?: Record<string, boolean>;
+  }) => {
+    const nextUiLevel = updates.uiLevel ?? draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior');
+    const nextAllowAbsences = updates.allowAbsences ?? (draftAllowAbsences ?? (studentUser as any)?.parent_allow_absences ?? (nextUiLevel !== 'junior'));
+    const nextAllowChat = updates.allowChat ?? (draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (nextUiLevel !== 'junior'));
+    const nextAllowTimer = updates.allowTimer ?? (draftAllowTimer ?? (studentUser as any)?.parent_allow_timer ?? true);
+    const nextAllowLeaderboard = updates.allowLeaderboard ?? (draftAllowLeaderboard ?? (studentUser as any)?.parent_allow_leaderboard ?? (nextUiLevel !== 'junior'));
+    const nextAllowProposals = updates.allowProposals ?? (draftAllowProposals ?? (studentUser as any)?.parent_allow_proposals ?? (nextUiLevel !== 'junior'));
+    const nextAllowAudio = updates.allowAudio ?? (draftAllowAudio ?? (studentUser as any)?.parent_allow_audio ?? true);
+    const nextAllowTts = updates.allowTts ?? (draftAllowTts ?? (studentUser as any)?.parent_allow_tts ?? (nextUiLevel === 'junior'));
+    const nextOverrides = {
+      ...((studentUser as any)?.parent_permissions?.board_overrides || {}),
+      ...draftBoardOverrides,
+      ...(updates.boardOverrides || {})
+    };
+
+    if (updates.uiLevel !== undefined) {
+      setDraftUiLevel(updates.uiLevel);
+      setStudentUiLevel(updates.uiLevel as any);
+      localStorage.setItem('campus_student_ui_level', updates.uiLevel);
+      window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: updates.uiLevel }));
+    }
+    if (updates.allowAbsences !== undefined) {
+      setDraftAllowAbsences(updates.allowAbsences);
+      localStorage.setItem('campus_allow_absences', String(updates.allowAbsences));
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_absences_${studentId}`, String(updates.allowAbsences));
+    }
+    if (updates.allowChat !== undefined) {
+      setDraftAllowChat(updates.allowChat);
+      localStorage.setItem('campus_allow_chat', String(updates.allowChat));
+      localStorage.setItem('campus_board_override_messages', String(updates.allowChat));
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_chat_${studentId}`, String(updates.allowChat));
+      window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'messages', allowed: updates.allowChat } }));
+    }
+    if (updates.allowTimer !== undefined) {
+      setDraftAllowTimer(updates.allowTimer);
+      localStorage.setItem('campus_allow_timer', String(updates.allowTimer));
+      localStorage.setItem('campus_board_override_practice_board', String(updates.allowTimer));
+      window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'practice_board', allowed: updates.allowTimer } }));
+    }
+    if (updates.allowLeaderboard !== undefined) {
+      setDraftAllowLeaderboard(updates.allowLeaderboard);
+      localStorage.setItem('campus_allow_leaderboard', String(updates.allowLeaderboard));
+      localStorage.setItem('campus_board_override_campus_cup', String(updates.allowLeaderboard));
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_leaderboard_${studentId}`, String(updates.allowLeaderboard));
+      window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'campus_cup', allowed: updates.allowLeaderboard } }));
+    }
+    if (updates.allowProposals !== undefined) {
+      setDraftAllowProposals(updates.allowProposals);
+      localStorage.setItem('campus_allow_proposals', String(updates.allowProposals));
+      localStorage.setItem('campus_board_override_mediathek', String(updates.allowProposals));
+      window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'mediathek', allowed: updates.allowProposals } }));
+    }
+    if (updates.allowAudio !== undefined) {
+      setDraftAllowAudio(updates.allowAudio);
+      localStorage.setItem('campus_allow_audio', String(updates.allowAudio));
+      localStorage.setItem('campus_board_override_recordings', String(updates.allowAudio));
+      window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'recordings', allowed: updates.allowAudio } }));
+    }
+    if (updates.allowTts !== undefined) {
+      setDraftAllowTts(updates.allowTts);
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_tts_${studentId}`, String(updates.allowTts));
+    }
+    if (updates.boardOverrides) {
+      setDraftBoardOverrides(prev => ({ ...prev, ...updates.boardOverrides }));
+      Object.entries(updates.boardOverrides).forEach(([bId, allowed]) => {
+        localStorage.setItem(`campus_board_override_${bId}`, String(allowed));
+        window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: bId, allowed } }));
+      });
+    }
+
+    const nextPermissions = {
+      ...((studentUser as any)?.parent_permissions || {}),
+      board_overrides: nextOverrides
+    };
+
+    const payload: any = {
+      campus_ui_level: nextUiLevel,
+      parent_allow_absences: nextAllowAbsences,
+      parent_allow_chat: nextAllowChat,
+      parent_allow_timer: nextAllowTimer,
+      parent_allow_leaderboard: nextAllowLeaderboard,
+      parent_allow_proposals: nextAllowProposals,
+      parent_allow_audio: nextAllowAudio,
+      parent_allow_tts: nextAllowTts,
+      parent_permissions: nextPermissions
+    };
+
+    // Update in-memory React state immediately for snappy UI
+    setStudentUser((prev: any) => prev ? { ...prev, ...payload } : prev);
+
+    try {
+      const { error: userErr } = await supabase.from('users').update(payload).eq('id', studentId);
+      if (userErr) {
+        console.warn('Primary update with JSONB failed, executing column fallback:', userErr);
+        const fallbackPayload: any = {
+          campus_ui_level: nextUiLevel,
+          parent_allow_absences: nextAllowAbsences,
+          parent_allow_chat: nextAllowChat,
+          parent_allow_timer: nextAllowTimer,
+          parent_allow_leaderboard: nextAllowLeaderboard,
+          parent_allow_proposals: nextAllowProposals,
+          parent_allow_audio: nextAllowAudio,
+          parent_allow_tts: nextAllowTts
+        };
+        await supabase.from('users').update(fallbackPayload).eq('id', studentId);
+      }
+      try {
+        await supabase.from('students').update(payload).eq('id', studentId);
+      } catch(e) {}
+    } catch (err) {
+      console.error('Error auto-saving parent controls:', err);
+    }
+  };
+
+  // Must-Have 1: Bedtime Mode (Ruhezeiten)
+  const [bedtimeModeEnabled, setBedtimeModeEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = localStorage.getItem('campus_bedtime_enabled');
+    return saved !== null ? saved === 'true' : false;
+  });
+  const [bedtimeStart, setBedtimeStart] = useState<string>(() => {
+    if (typeof window === 'undefined') return '20:00';
+    return localStorage.getItem('campus_bedtime_start') || '20:00';
+  });
+  const [bedtimeEnd, setBedtimeEnd] = useState<string>(() => {
+    if (typeof window === 'undefined') return '07:00';
+    return localStorage.getItem('campus_bedtime_end') || '07:00';
+  });
+
+  const isCurrentlyInBedtime = useMemo(() => {
+    if (!bedtimeModeEnabled) return false;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const [startH, startM] = bedtimeStart.split(':').map(Number);
+    const [endH, endM] = bedtimeEnd.split(':').map(Number);
+    const startMinutes = (startH ?? 20) * 60 + (startM ?? 0);
+    const endMinutes = (endH ?? 7) * 60 + (endM ?? 0);
+
+    if (startMinutes > endMinutes) {
+      // Overnight (e.g. 20:00 to 07:00)
+      return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+    } else {
+      // Same day
+      return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+    }
+  }, [bedtimeModeEnabled, bedtimeStart, bedtimeEnd]);
+
+  const handleUpdateBedtime = async (enabled: boolean, start?: string, end?: string) => {
+    setBedtimeModeEnabled(enabled);
+    localStorage.setItem('campus_bedtime_enabled', String(enabled));
+    const nextStart = start || bedtimeStart;
+    const nextEnd = end || bedtimeEnd;
+    if (start) {
+      setBedtimeStart(start);
+      localStorage.setItem('campus_bedtime_start', start);
+    }
+    if (end) {
+      setBedtimeEnd(end);
+      localStorage.setItem('campus_bedtime_end', end);
+    }
+
+    const bedtimeObj = { enabled, start: nextStart, end: nextEnd };
+    const nextPerms = {
+      ...((studentUser as any)?.parent_permissions || {}),
+      bedtime_mode: bedtimeObj
+    };
+
+    setStudentUser((prev: any) => prev ? {
+      ...prev,
+      parent_permissions: nextPerms
+    } : prev);
+
+    try {
+      await supabase.from('users').update({
+        parent_permissions: nextPerms
+      }).eq('id', studentId);
+      try {
+        await supabase.from('students').update({
+          parent_permissions: nextPerms
+        }).eq('id', studentId);
+      } catch(e) {}
+    } catch(e) {
+      console.warn('Could not persist bedtime mode:', e);
+    }
+  };
+
+  // Must-Have 2: Family Profiles (Geschwister-Schnellwechsel)
+  const [familyProfiles, setFamilyProfiles] = useState<any[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('campus_family_profiles');
+      return saved ? JSON.parse(saved) : [];
+    } catch(e) {
+      return [];
+    }
+  });
+
+  const handleSwitchFamilyStudent = (targetStudentId: string) => {
+    if (targetStudentId === studentId) return;
+    localStorage.setItem('groovelab_current_student_id', targetStudentId);
+    localStorage.setItem('campus_active_student_id', targetStudentId);
+    sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+    sessionStorage.setItem(`groovelab_parent_session_${targetStudentId}`, String(Date.now() + 60 * 60 * 1000));
+    window.location.search = `?student=${targetStudentId}`;
+  };
+
+  const handleOpenSettingsModule = (moduleId: 'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal') => {
+    if (moduleId === 'notifications') {
+      setSettingsSubTab(moduleId);
+      setActiveStudentSettingsModal(moduleId);
+      return;
+    }
+
+    if (checkIsParentSessionActive()) {
+      if (moduleId === 'security') {
+        setFirstPinActiveField('new');
+        setPinFormNew('');
+        setPinFormConfirm('');
+        setPinFormError('');
+        setPinFormSuccess('');
+      }
+      setSettingsSubTab(moduleId);
+      setActiveStudentSettingsModal(moduleId);
+    } else {
+      setPendingParentTarget(moduleId);
+      setParentGatePinInput('');
+      setParentGateError('');
+      setShowParentGateModal(true);
+    }
+  };
 
   const [isAppUser, setIsAppUser] = useState(false);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
@@ -2903,6 +3311,119 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     xp: 0,
     asset_path: getInstrumentAvatarUrl(studentUser?.instrument),
     streak_flame: 0
+  };
+
+  useEffect(() => {
+    if (!studentId) return;
+    const currentFirst = studentUser?.first_name || '';
+    const currentLast = studentUser?.last_name || '';
+    const currentInst = studentUser?.instrument || '';
+    const currentPhoto = studentUser?.photo_url || (avatar as any)?.photo_url || (avatar as any)?.asset_path || '';
+    const currentUi = studentUiLevel || studentUser?.campus_ui_level || 'junior';
+
+    if (!currentFirst) return;
+
+    setFamilyProfiles(prev => {
+      const filtered = prev.filter(p => p.id !== studentId);
+      const updated = [
+        ...filtered,
+        {
+          id: studentId,
+          first_name: currentFirst,
+          last_name: currentLast,
+          instrument: currentInst,
+          photo_url: currentPhoto,
+          campus_ui_level: currentUi,
+          last_active: new Date().toISOString()
+        }
+      ];
+      try {
+        localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
+      } catch(e) {}
+      return updated;
+    });
+  }, [studentId, studentUser, studentUiLevel, avatar]);
+
+  // Must-Have 3: DSGVO Art. 15 Report Export
+  const handleExportGdprReport = async () => {
+    try {
+      const currentLevelKey = (draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior')) as 'junior' | 'teen' | 'pro';
+      const curAbsences = draftAllowAbsences ?? (studentUser as any)?.parent_allow_absences ?? (currentLevelKey !== 'junior');
+      const curChat = draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (currentLevelKey !== 'junior');
+      const curLeaderboard = draftAllowLeaderboard ?? (studentUser as any)?.parent_allow_leaderboard ?? (currentLevelKey !== 'junior');
+      const curPractice = draftBoardOverrides.practice_board ?? (localStorage.getItem('campus_board_override_practice_board') !== 'false');
+      const curMediathek = draftBoardOverrides.mediathek ?? (localStorage.getItem('campus_board_override_mediathek') === 'true' || currentLevelKey !== 'junior');
+
+      const fullStudentName = studentUser?.first_name 
+        ? `${studentUser.first_name} ${studentUser.last_name || ''}`.trim()
+        : 'Schüler-Profil';
+
+      const maskedStudentName = studentUser?.first_name 
+        ? `${studentUser.first_name} ${studentUser.last_name ? studentUser.last_name.trim().charAt(0) + '.' : ''}`.trim()
+        : 'Schüler-Profil';
+
+      // Resolve Teacher Name (Full Name, e.g. Severin Landenberger)
+      let resolvedTeacherName = '';
+      const teacherObj = (studentUser as any)?.teachers || (studentUser as any)?.teacher;
+      if (teacherObj) {
+        resolvedTeacherName = formatTeacherFullName(teacherObj);
+      } else if (briefingData?.todayLesson?.teacher_name) {
+        resolvedTeacherName = briefingData.todayLesson.teacher_name;
+      } else if (studentUser?.teacher_id) {
+        try {
+          const { data: tData } = await supabase.from('users').select('first_name, last_name').eq('id', studentUser.teacher_id).maybeSingle();
+          if (tData) resolvedTeacherName = formatTeacherFullName(tData);
+        } catch (e) {}
+      }
+      if (!resolvedTeacherName) {
+        resolvedTeacherName = 'Fachliche Lehrkraft (Musikschule)';
+      }
+
+      // Precise stats calculation
+      const unlockedStickersCount = Object.values(unifiedStickersMap || {}).filter((s: any) => s?.isUnlocked).length;
+      const totalAvailableStickers = (typeof ALL_STICKERS !== 'undefined' && ALL_STICKERS?.length) ? ALL_STICKERS.length : 20;
+      const masteredHomeworkCount = (progressItems || []).filter(p => p.status === 'MASTERED' || p.status === 'THEORY_DONE').length;
+
+      // Audio recordings count
+      const localRecordingsStr = typeof window !== 'undefined' ? localStorage.getItem(`campus_junior_recordings_${studentId}`) || '[]' : '[]';
+      let audioRecordingsCount = 0;
+      try {
+        audioRecordingsCount = JSON.parse(localRecordingsStr).length;
+      } catch (e) {}
+
+      await generateGdprDataReportPDF({
+        studentName: maskedStudentName,
+        studentFullName: fullStudentName,
+        studentMaskedName: maskedStudentName,
+        schoolName: (studentUser as any)?.schools?.name || 'Campus-Groovelab Partner-Musikschule',
+        teacherName: resolvedTeacherName,
+        instrument: studentUser?.instrument || 'Instrumentalunterricht',
+        campusUiLevel: currentLevelKey,
+        parentPermissions: {
+          allowAbsences: curAbsences,
+          allowChat: curChat,
+          allowLeaderboard: curLeaderboard,
+          allowPracticeBoard: curPractice,
+          allowMediathek: curMediathek,
+          bedtimeModeEnabled,
+          bedtimeStart,
+          bedtimeEnd
+        },
+        stats: {
+          totalPracticeMinutes: totalPracticeMinutes || 0,
+          streakDays: avatar?.streak_flame || 1,
+          currentXp: currentXp || 0,
+          completedMissionsCount: masteredHomeworkCount,
+          stickersUnlockedCount: unlockedStickersCount,
+          stickersTotalCount: totalAvailableStickers,
+          audioRecordingsCount: audioRecordingsCount,
+          audioStorageBytes: (audioRecordingsCount * 1.5 * 1024 * 1024)
+        }
+      });
+    } catch(err) {
+      console.error('Error generating GDPR report:', err);
+      alert('Der DSGVO-Auskunftsbericht konnte nicht exportiert werden.');
+    }
   };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -3012,6 +3533,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   // Daily Briefing State
   const [rawBriefingData, setRawBriefingData] = useState<any>(null);
   const [occurrencesWithMessages, setOccurrencesWithMessages] = useState<string[]>([]);
+  const [occurrencesWithUnreadCount, setOccurrencesWithUnreadCount] = useState<Record<string, number>>({});
   const [briefingLoading, setBriefingLoading] = useState(true);
   const [rawScheduleOccurrences, setRawScheduleOccurrences] = useState<any[]>([]);
   const [roomBookings, setRoomBookings] = useState<any[]>([]);
@@ -3396,6 +3918,32 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     if (data) {
       setChatMessages(data);
       setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+
+      // Automatically mark unread incoming messages as read
+      const unreadIncoming = data.filter((m: any) => m.recipient_id === studentId && !m.is_read);
+      if (unreadIncoming.length > 0) {
+        try {
+          if (occurrenceId) {
+            await supabase
+              .from('campus_direct_messages')
+              .update({ is_read: true })
+              .eq('occurrence_id', occurrenceId)
+              .eq('recipient_id', studentId)
+              .eq('is_read', false);
+
+            setOccurrencesWithUnreadCount(prev => ({ ...prev, [occurrenceId]: 0 }));
+          } else {
+            await supabase
+              .from('campus_direct_messages')
+              .update({ is_read: true })
+              .eq('sender_id', teacherId)
+              .eq('recipient_id', studentId)
+              .eq('is_read', false);
+          }
+        } catch (e) {
+          console.warn('Error marking messages as read:', e);
+        }
+      }
     }
   };
 
@@ -3588,11 +4136,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     try {
       const { data, error } = await supabase
         .from('campus_direct_messages')
-        .select('occurrence_id')
+        .select('occurrence_id, recipient_id, is_read')
         .or(`sender_id.eq.${studentId},recipient_id.eq.${studentId}`);
       if (!error && data) {
         const ids = Array.from(new Set(data.map((m: any) => m.occurrence_id).filter(Boolean)));
         setOccurrencesWithMessages(ids);
+
+        const unreadMap: Record<string, number> = {};
+        data.forEach((m: any) => {
+          if (m.occurrence_id && m.recipient_id === studentId && !m.is_read) {
+            unreadMap[m.occurrence_id] = (unreadMap[m.occurrence_id] || 0) + 1;
+          }
+        });
+        setOccurrencesWithUnreadCount(unreadMap);
       }
     } catch (err) {
       console.error('Error fetching occurrences with messages:', err);
@@ -3982,7 +4538,167 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   };
 
+  // Global Master PIN Gate States for Welcome Widget & Absence Actions
+  const [showGlobalParentPinModal, setShowGlobalParentPinModal] = useState(false);
+  const [globalPinPendingAction, setGlobalPinPendingAction] = useState<(() => void) | null>(null);
+  const [globalPinInput, setGlobalPinInput] = useState('');
+  const [globalPinError, setGlobalPinError] = useState('');
+  const [isVerifyingGlobalPin, setIsVerifyingGlobalPin] = useState(false);
+
+  const checkIsParentUnlockedGlobal = () => {
+    if (typeof window === 'undefined') return false;
+    const globalUnlocked = sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
+    const userSession = sessionStorage.getItem(`groovelab_parent_session_${studentId}`);
+    return globalUnlocked || (userSession !== null && Number(userSession) > Date.now());
+  };
+
+  const isStudentAbsenceAllowed = useMemo(() => {
+    if (checkIsParentUnlockedGlobal()) return true;
+    if (draftAllowAbsences !== null) return draftAllowAbsences;
+    const userAbs = (studentUser as any)?.parent_allow_absences;
+    if (userAbs !== undefined && userAbs !== null) return Boolean(userAbs);
+    const localSetting = typeof window !== 'undefined' ? localStorage.getItem('campus_allow_absences') : null;
+    if (localSetting !== null) return localSetting === 'true';
+    const localUserSetting = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) : null;
+    if (localUserSetting !== null) return localUserSetting === 'true';
+    const currentLvl = draftUiLevel || (studentUser as any)?.campus_ui_level || (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : 'junior') || 'junior';
+  }, [studentUser, studentId, draftAllowAbsences, draftUiLevel]);
+
+  const isStudentChatAllowed = useMemo(() => {
+    if (checkIsParentUnlockedGlobal()) return true;
+    if (draftAllowChat !== null) return draftAllowChat;
+    const userChat = (studentUser as any)?.parent_allow_chat;
+    if (userChat !== undefined && userChat !== null) return Boolean(userChat);
+    const localSetting = typeof window !== 'undefined' ? localStorage.getItem('campus_allow_chat') : null;
+    if (localSetting !== null) return localSetting === 'true';
+    const localUserSetting = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) : null;
+    if (localUserSetting !== null) return localUserSetting === 'true';
+    const currentLvl = draftUiLevel || (studentUser as any)?.campus_ui_level || (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : 'junior') || 'junior';
+    return currentLvl !== 'junior';
+  }, [studentUser, studentId, draftAllowChat, draftUiLevel]);
+
+  const handleVerifyGlobalParentPin = async (inputPin: string) => {
+    if (!inputPin || inputPin.length < 4) {
+      setGlobalPinError('Bitte gib die 6-stellige Eltern-Master-PIN ein.');
+      return;
+    }
+    setIsVerifyingGlobalPin(true);
+    setGlobalPinError('');
+    try {
+      const cleanInput = inputPin.trim();
+      let isMatch = false;
+
+      const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${studentId}`);
+      const cachedUserPin = localStorage.getItem(`groovelab_user_pin_${studentId}`);
+      const cachedStudentPin = localStorage.getItem(`groovelab_student_pin_${studentId}`);
+      if ((cachedParentPin && cachedParentPin === cleanInput) ||
+          (cachedUserPin && cachedUserPin === cleanInput) ||
+          (cachedStudentPin && cachedStudentPin === cleanInput)) {
+        isMatch = true;
+      }
+
+      if (!isMatch && studentUser) {
+        if (studentUser.parent_pin && String(studentUser.parent_pin).trim() === cleanInput) {
+          isMatch = true;
+        } else if (studentUser.personal_pin && String(studentUser.personal_pin).trim() === cleanInput) {
+          isMatch = true;
+        }
+      }
+
+      if (!isMatch && studentId) {
+        try {
+          const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+            student_id: studentId,
+            input_pin: cleanInput
+          });
+          if (parentOk === true) isMatch = true;
+        } catch (e) {}
+      }
+
+      if (!isMatch && studentId) {
+        try {
+          const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
+            user_uuid: studentId,
+            input_pin: cleanInput
+          });
+          if (personalOk === true) isMatch = true;
+        } catch (e) {}
+      }
+
+      if (!isMatch && studentId) {
+        const { data: uData } = await supabase
+          .from('users')
+          .select('parent_pin, personal_pin, onboarding_pin')
+          .eq('id', studentId)
+          .maybeSingle();
+        if (uData) {
+          if (String(uData.parent_pin || '').trim() === cleanInput || 
+              String(uData.personal_pin || '').trim() === cleanInput ||
+              String(uData.onboarding_pin || '').trim() === cleanInput) {
+            isMatch = true;
+          }
+        }
+      }
+
+      if (isMatch) {
+        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+        sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 60 * 60 * 1000));
+        setShowGlobalParentPinModal(false);
+        setGlobalPinInput('');
+        if (globalPinPendingAction) {
+          const action = globalPinPendingAction;
+          setGlobalPinPendingAction(null);
+          action();
+        }
+      } else {
+        setGlobalPinError('Falsche Master-PIN. Bitte versuche es erneut.');
+        setGlobalPinInput('');
+      }
+    } catch (err: any) {
+      setGlobalPinError('Fehler bei der PIN-Prüfung: ' + (err?.message || 'Unbekannt'));
+    } finally {
+      setIsVerifyingGlobalPin(false);
+    }
+  };
+
+  const handleTriggerCancelOccurrence = (occ: any) => {
+    if (!isStudentAbsenceAllowed && !checkIsParentUnlockedGlobal()) {
+      setGlobalPinPendingAction(() => () => handleCancelOccurrence(occ));
+      setGlobalPinInput('');
+      setGlobalPinError('');
+      setShowGlobalParentPinModal(true);
+      return;
+    }
+    handleCancelOccurrence(occ);
+  };
+
+  const handleUndoCancelOccurrence = async (occ: any) => {
+    if (!confirm('Möchtest du die Absage zurücknehmen und diesen Unterrichtstermin wieder reaktivieren?')) return;
+    try {
+      if (occ.id && !String(occ.id).startsWith('virt_')) {
+        await supabase
+          .from('schedule_occurrences')
+          .update({ status: 'scheduled', student_acknowledged: true })
+          .eq('id', occ.id);
+      }
+      fetchSchedule();
+      fetchSchoolYearSchedule();
+      alert('Der Termin wurde erfolgreich reaktiviert.');
+    } catch(e) {
+      console.error(e);
+      alert('Fehler beim Reaktivieren des Termins.');
+    }
+  };
+
   const handleCancelOccurrence = async (occ: any) => {
+    if (!isStudentAbsenceAllowed && !checkIsParentUnlockedGlobal()) {
+      setGlobalPinPendingAction(() => () => handleCancelOccurrence(occ));
+      setGlobalPinInput('');
+      setGlobalPinError('');
+      setShowGlobalParentPinModal(true);
+      return;
+    }
+
     const d = new Date(occ.date);
     const formattedDate = d.toLocaleDateString('de-DE');
     if (!confirm(`Möchtest du deinen Termin am ${formattedDate} um ${occ.start_time?.substring(0,5)} Uhr wirklich absagen?`)) return;
@@ -4374,6 +5090,149 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [juniorSelectedPreviewSticker, setJuniorSelectedPreviewSticker] = useState<any | null>(null);
   const [juniorCheckedPages, setJuniorCheckedPages] = useState<Record<string, boolean>>({});
 
+  // 🗣️ TTS (Text-to-Speech) Vorlese-Engine für Hausaufgaben
+  const [ttsAvailableVoices, setTtsAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [isTtsSpeaking, setIsTtsSpeaking] = useState<boolean>(false);
+  const [activeTtsKey, setActiveTtsKey] = useState<string | null>(null);
+  const ttsSessionIdRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const loadVoices = () => {
+      try {
+        const v = window.speechSynthesis.getVoices();
+        if (v && v.length > 0) {
+          setTtsAvailableVoices(v);
+        }
+      } catch (e) {
+        console.warn('[TTS] Failed to load voices:', e);
+      }
+    };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
+
+  const selectBestGermanVoice = useCallback((): SpeechSynthesisVoice | null => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+    const voices = ttsAvailableVoices.length > 0 ? ttsAvailableVoices : window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return null;
+    const germanVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('de'));
+    if (germanVoices.length === 0) return voices[0] || null;
+
+    const annaVoice = germanVoices.find(v => v.name.toLowerCase().includes('anna'));
+    if (annaVoice) return annaVoice;
+    const googleVoice = germanVoices.find(v => v.name.includes('Google'));
+    if (googleVoice) return googleVoice;
+    const naturalVoice = germanVoices.find(v => v.name.toLowerCase().includes('natural') || v.name.includes('Katja'));
+    if (naturalVoice) return naturalVoice;
+    return germanVoices[0] || null;
+  }, [ttsAvailableVoices]);
+
+  const cleanTextForTts = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/KW\s*(\d+)/gi, 'Kalenderwoche $1')
+      .replace(/Takt\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Takt $1 bis $2')
+      .replace(/S\.\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Seite $1 bis $2')
+      .replace(/S\.\s*(\d+)/gi, 'Seite $1')
+      .replace(/z\.\s*B\./gi, 'zum Beispiel')
+      .replace(/bzw\./gi, 'beziehungsweise')
+      .replace(/(\d+)\s*BPM/gi, '$1 Schläge pro Minute')
+      .replace(/BPM/gi, 'Schläge pro Minute')
+      .replace(/(\d+)\s*min/gi, '$1 Minuten')
+      .replace(/(\d+)\s*x\b/gi, '$1 mal')
+      .replace(/Übe-Timer/gi, 'Übe Timer')
+      .replace(/Play-Along/gi, 'Play Along')
+      .replace(/•/g, ', ')
+      .replace(/#/g, 'Nummer ')
+      .replace(/p\/f/gi, 'piano und forte')
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Keine Emojis vorlesen
+      .replace(/[\u{2600}-\u{27BF}]/gu, '')
+      .replace(/\s*[-–—]\s*/g, ', ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const handleStopSpeaking = useCallback(() => {
+    ttsSessionIdRef.current += 1;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsTtsSpeaking(false);
+    setActiveTtsKey(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      ttsSessionIdRef.current += 1;
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleSpeakText = useCallback(async (textOrPhrases: string | string[], elementKey: string = 'global') => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      alert('Sprachausgabe wird in diesem Browser leider nicht unterstützt.');
+      return;
+    }
+
+    if (isTtsSpeaking && activeTtsKey === elementKey) {
+      handleStopSpeaking();
+      return;
+    }
+
+    handleStopSpeaking();
+
+    const rawPhrases = Array.isArray(textOrPhrases)
+      ? textOrPhrases
+      : textOrPhrases
+          .split(/(?<=[.!?])\s+/)
+          .filter(p => p.trim().length > 0);
+
+    const phrases = rawPhrases
+      .map(p => cleanTextForTts(p))
+      .filter(p => p.length > 0);
+
+    if (phrases.length === 0) return;
+
+    const currentSessionId = ++ttsSessionIdRef.current;
+    setIsTtsSpeaking(true);
+    setActiveTtsKey(elementKey);
+
+    const bestVoice = selectBestGermanVoice();
+
+    for (let i = 0; i < phrases.length; i++) {
+      if (ttsSessionIdRef.current !== currentSessionId) break;
+
+      const phrase = phrases[i];
+      await new Promise<void>((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(phrase);
+        utterance.lang = 'de-DE';
+        if (bestVoice) utterance.voice = bestVoice;
+        utterance.onend = () => resolve();
+        utterance.onerror = () => resolve();
+        window.speechSynthesis.speak(utterance);
+      });
+
+      if (ttsSessionIdRef.current !== currentSessionId) break;
+
+      if (i < phrases.length - 1) {
+        await new Promise((r) => setTimeout(r, 380));
+      }
+    }
+
+    if (ttsSessionIdRef.current === currentSessionId) {
+      setIsTtsSpeaking(false);
+      setActiveTtsKey(null);
+    }
+  }, [isTtsSpeaking, activeTtsKey, handleStopSpeaking, selectBestGermanVoice]);
+
   // Junior Audio Recording State
   const [juniorIsRecording, setJuniorIsRecording] = useState(false);
   const [juniorCountdown, setJuniorCountdown] = useState<number | null>(null);
@@ -4496,6 +5355,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     setJuniorRecordedUrl(null);
     setJuniorRecordDuration(0);
     setJuniorCountdown(null);
+
+    const isAllowed = draftAllowAudio ?? (studentUser as any)?.parent_allow_audio ?? (draftBoardOverrides.recordings ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' : true));
+    if (!isAllowed) {
+      alert('Die Aufnahme-Funktion ist im Eltern-Kontrollzentrum aktuell deaktiviert.');
+      setShowJuniorRecordModal(false);
+      return;
+    }
 
     // 1. Request microphone permission FIRST before starting any visual countdown
     try {
@@ -4900,6 +5766,90 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     return Array.from(recsMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [juniorLocalRecordings]);
 
+  // Junior Teacher Recordings (All historical recordings created by the teacher across all weeks/progressItems)
+  const juniorTeacherRecordings = useMemo(() => {
+    const recsMap = new Map<string, { id: string; title: string; url: string; duration?: number; date: string; topic?: string; week?: string; blobKey?: string }>();
+
+    // 1. From progressItems across all weeks/history
+    (progressItems || []).forEach((item: any) => {
+      if (!item || !item.homework_notes) return;
+      const notesList: string[] = [];
+      try {
+        const parsed = JSON.parse(item.homework_notes);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((n: any) => { if (typeof n === 'string' && n.trim()) notesList.push(n.trim()); });
+        } else if (typeof parsed === 'string' && parsed.trim()) {
+          notesList.push(parsed.trim());
+        }
+      } catch {
+        notesList.push(item.homework_notes.trim());
+      }
+
+      notesList.forEach((n, idx) => {
+        if (n.startsWith('AUDIO:')) {
+          const parts = n.substring(6).split('|');
+          const audioUrl = parts[0] || '';
+          if (!audioUrl && !parts[6]) return;
+          const duration = parseFloat(parts[1]) || 0;
+          const audioDate = parts[2] || item.created_at || item.updated_at || new Date().toISOString();
+          const label = parts[3] || item.topic_name || `Aufnahme #${idx + 1}`;
+          const author = parts[4] || 'teacher';
+          const uniqueKey = parts[6] || audioUrl || `prog_${item.id}_${idx}`;
+          const itemWeek = getItemWeek(item);
+
+          if (!recsMap.has(uniqueKey) && (author === 'teacher' || author === '')) {
+            recsMap.set(uniqueKey, {
+              id: uniqueKey,
+              title: label,
+              url: audioUrl,
+              duration,
+              date: audioDate,
+              topic: item.topic_name || 'Unterrichts-Übung',
+              week: itemWeek,
+              blobKey: parts[6] ? `campus_audio_${parts[6]}_raw` : undefined
+            });
+          }
+        }
+      });
+    });
+
+    // 2. Also from localStorage campus_homework_notes_${studentId}
+    try {
+      const localGenNotes = localStorage.getItem(`campus_homework_notes_${studentId}`);
+      if (localGenNotes && localGenNotes.trim()) {
+        const parsed = JSON.parse(localGenNotes);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((n: any, idx: number) => {
+            if (typeof n === 'string' && n.startsWith('AUDIO:')) {
+              const parts = n.substring(6).split('|');
+              const audioUrl = parts[0] || '';
+              if (!audioUrl && !parts[6]) return;
+              const duration = parseFloat(parts[1]) || 0;
+              const audioDate = parts[2] || new Date().toISOString();
+              const label = parts[3] || `Aufnahme #${idx + 1}`;
+              const author = parts[4] || 'teacher';
+              const uniqueKey = parts[6] || audioUrl || `local_gen_${idx}`;
+
+              if (!recsMap.has(uniqueKey) && (author === 'teacher' || author === '')) {
+                recsMap.set(uniqueKey, {
+                  id: uniqueKey,
+                  title: label,
+                  url: audioUrl,
+                  duration,
+                  date: audioDate,
+                  topic: 'Hausaufgabe',
+                  blobKey: parts[6] ? `campus_audio_${parts[6]}_raw` : undefined
+                });
+              }
+            }
+          });
+        }
+      }
+    } catch {}
+
+    return Array.from(recsMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [progressItems, studentId]);
+
   const togglePlayJuniorRecording = async (recId: string, audioUrl: string, blobKey?: string) => {
     if (juniorActivePlayingAudioId === recId) {
       if (juniorAudioPlayerRef.current) {
@@ -5039,9 +5989,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     }
   }, [studentUser, studentId]);
 
-  // Hardware Keyboard listener for First-Login PIN modal
+  // Hardware Keyboard listener for First-Login PIN modal & Settings PIN modal
   useEffect(() => {
-    if (!showFirstLoginPinModal) return;
+    if (!showFirstLoginPinModal && activeStudentSettingsModal !== 'security') return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'text') return;
@@ -5076,7 +6026,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showFirstLoginPinModal, firstPinActiveField, pinFormNew, pinFormConfirm]);
+  }, [showFirstLoginPinModal, activeStudentSettingsModal, firstPinActiveField, pinFormNew, pinFormConfirm]);
 
   const [preStartCountdown, setPreStartCountdown] = useState<number | null>(null);
   const preStartCountdownRef = useRef(preStartCountdown);
@@ -7892,7 +8842,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         const monthlyStreak = monthlyWeeks.size;
 
         // Privacy opt-out check
-        let isOptedOut = false;
+        let isOptedOut = student.parent_allow_leaderboard === false;
         try {
           const savedOpt = localStorage.getItem(`campus_privacy_show_highlights_${student.id}`);
           if (savedOpt !== null && JSON.parse(savedOpt) === false) {
@@ -8100,9 +9050,51 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
 
       setStudentUser(user);
-      if (user?.campus_ui_level && (user.campus_ui_level === 'junior' || user.campus_ui_level === 'teen' || user.campus_ui_level === 'pro')) {
-        setStudentUiLevel(user.campus_ui_level);
-        localStorage.setItem('campus_student_ui_level', user.campus_ui_level);
+      if (user) {
+        if (user.campus_ui_level && (user.campus_ui_level === 'junior' || user.campus_ui_level === 'teen' || user.campus_ui_level === 'pro')) {
+          setStudentUiLevel(user.campus_ui_level);
+          setDraftUiLevel(user.campus_ui_level);
+          localStorage.setItem('campus_student_ui_level', user.campus_ui_level);
+        }
+        if (user.parent_allow_absences !== undefined && user.parent_allow_absences !== null) {
+          setDraftAllowAbsences(Boolean(user.parent_allow_absences));
+        }
+        if (user.parent_allow_chat !== undefined && user.parent_allow_chat !== null) {
+          setDraftAllowChat(Boolean(user.parent_allow_chat));
+        }
+        if (user.parent_allow_timer !== undefined && user.parent_allow_timer !== null) {
+          setDraftAllowTimer(Boolean(user.parent_allow_timer));
+        }
+        if (user.parent_allow_leaderboard !== undefined && user.parent_allow_leaderboard !== null) {
+          setDraftAllowLeaderboard(Boolean(user.parent_allow_leaderboard));
+        }
+        if (user.parent_allow_proposals !== undefined && user.parent_allow_proposals !== null) {
+          setDraftAllowProposals(Boolean(user.parent_allow_proposals));
+        }
+        if (user.parent_allow_audio !== undefined && user.parent_allow_audio !== null) {
+          setDraftAllowAudio(Boolean(user.parent_allow_audio));
+        }
+        if (user.parent_allow_tts !== undefined && user.parent_allow_tts !== null) {
+          setDraftAllowTts(Boolean(user.parent_allow_tts));
+        }
+        if (user.parent_permissions?.board_overrides) {
+          setDraftBoardOverrides(user.parent_permissions.board_overrides);
+        }
+        if (user.parent_permissions?.bedtime_mode) {
+          const bt = user.parent_permissions.bedtime_mode;
+          if (bt.enabled !== undefined) {
+            setBedtimeModeEnabled(Boolean(bt.enabled));
+            localStorage.setItem('campus_bedtime_enabled', String(bt.enabled));
+          }
+          if (bt.start) {
+            setBedtimeStart(bt.start);
+            localStorage.setItem('campus_bedtime_start', bt.start);
+          }
+          if (bt.end) {
+            setBedtimeEnd(bt.end);
+            localStorage.setItem('campus_bedtime_end', bt.end);
+          }
+        }
       }
       if (user?.briefing_sidebar_collapsed !== undefined && user?.briefing_sidebar_collapsed !== null) {
         setIsRightSidebarCollapsed(Boolean(user.briefing_sidebar_collapsed));
@@ -8113,7 +9105,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setIsPremiumUser((user.is_premium_user || user.is_active || user.is_campus_active) ?? false);
       setPushEnabled(user.push_notifications_enabled ?? false);
       setPushNotifScheduleChanges(user.push_notif_schedule_changes ?? true);
-      setPushNotifHomework(user.push_notif_homework ?? false);
+      setPushNotifHomework(user.push_notif_homework ?? true);
+      setPushNotifChat(user.push_notif_chat ?? true);
+      setPushNotifPracticeReminder(user.push_notif_practice_reminder ?? true);
+      setPushNotifWeeklyDigest(user.push_notif_weekly_digest ?? true);
       setPushNotifAllFeatures(user.push_notif_all_features ?? false);
 
       const avatarRecord = avatarRes.data;
@@ -8679,6 +9674,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   };
 
   const handleCancelLesson = async (scheduleId: string) => {
+    const isParentUnlocked = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
+    const isAbsenceAllowed = isParentUnlocked || ((studentUser as any)?.parent_allow_absences ?? (typeof window !== 'undefined' && localStorage.getItem('campus_allow_absences') !== 'false' && localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) !== 'false'));
+    if (!isAbsenceAllowed) {
+      alert('Terminabsagen sind durch den Elternbereich geschützt und können nur von deinen Eltern vorgenommen werden.');
+      return;
+    }
+
     if (!confirm('Möchtest du den heutigen Unterricht wirklich absagen? Der Slot wird für andere freigegeben.')) return;
     try {
       const resp = await fetch('/api/schedule/cancel', {
@@ -8790,6 +9792,76 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   }
 
 
+
+  // Must-Have 1: Nachtruhe / Ruhezeiten Sperrbildschirm
+  if (isCurrentlyInBedtime && !checkIsParentSessionActive()) {
+    return (
+      <div style={{
+        minHeight: '70vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '36px 24px',
+        textAlign: 'center',
+        background: 'linear-gradient(145deg, #0f172a 0%, #1e1b4b 100%)',
+        borderRadius: '32px',
+        color: '#ffffff',
+        margin: '24px auto',
+        maxWidth: '560px',
+        boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
+        border: '1px solid rgba(255,255,255,0.1)'
+      }}>
+        <div style={{
+          width: '76px',
+          height: '76px',
+          borderRadius: '50%',
+          background: 'rgba(56, 189, 248, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '20px',
+          border: '1px solid rgba(56, 189, 248, 0.3)'
+        }}>
+          <Moon size={38} color="#38bdf8" />
+        </div>
+
+        <h2 style={{ fontSize: '1.65rem', fontWeight: 900, margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+          Gute Nacht! 🌙
+        </h2>
+        <p style={{ fontSize: '0.96rem', color: '#94a3b8', maxWidth: '420px', margin: '0 0 24px 0', lineHeight: 1.5, fontWeight: 500 }}>
+          Deine Instrumente schlafen schon. Die Übe-App ist von <strong style={{ color: '#ffffff' }}>{bedtimeStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{bedtimeEnd} Uhr</strong> in der Ruhepause, damit du fit für den nächsten Schultag bist!
+        </p>
+
+        <button
+          type="button"
+          onClick={() => {
+            setPendingParentTarget('parent_controls');
+            setShowParentGateModal(true);
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '12px 24px',
+            borderRadius: '100px',
+            background: 'rgba(255, 255, 255, 0.12)',
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            color: '#ffffff',
+            fontSize: '0.85rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            backdropFilter: 'blur(10px)',
+            transition: 'all 0.2s ease'
+          }}
+          className="hover-scale"
+        >
+          <Lock size={15} />
+          <span>Eltern-PIN eingeben (Entsperren)</span>
+        </button>
+      </div>
+    );
+  }
 
   // WENN IS_APP_USER = TRUE (Selector Screen if no avatar chosen yet)
   if (showSelector) {
@@ -13826,6 +14898,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             schoolId={studentUser?.school_id || ''}
             supabase={supabase}
             brandColor={studentUser?.schools?.brand_color || '#34a853'}
+            studentUser={studentUser}
+            parentAllowChat={draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (studentUiLevel !== 'junior')}
+            parentAllowAbsences={draftAllowAbsences ?? (studentUser as any)?.parent_allow_absences ?? (studentUiLevel !== 'junior')}
           />
         )}
       </div>
@@ -13898,6 +14973,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             unreadClassFeedCount={unreadClassFeedCount}
             studentUiLevel={studentUiLevel || 'pro'}
             schoolFokusLevels={schoolFokusLevels}
+            handleTriggerCancelOccurrence={handleTriggerCancelOccurrence}
+            handleUndoCancelOccurrence={handleUndoCancelOccurrence}
           />
         ) : (() => {
           const sidebarAppointmentChanges = (scheduleOccurrences || []).filter(occ => 
@@ -14246,8 +15323,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             const hasToday = !!briefingData?.todayLesson;
                             const teacherId = hasToday ? briefingData.todayLesson.teacher_id : (nextOcc?.teacher_id || studentUser?.teacher_id);
                             const timeLabel = hasToday ? briefingData.todayLesson.time : (nextOcc?.start_time?.substring(0, 5) || '15:15');
+                            const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
                             const todayStr = new Date().toISOString().split('T')[0];
                             const targetDateStr = hasToday ? todayStr : (nextOcc?.date || todayStr);
+                            const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
+                            const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
+                            const label = `${targetDayOfWeek} (${formattedDate}), ${timeLabel} Uhr`;
                             const finalOccurId = hasToday 
                               ? (briefingData?.todayLesson?.id || `today-${teacherId}-${todayStr}`) 
                               : (nextOcc?.id || `sched-${studentId}`);
@@ -14257,25 +15338,134 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   const d = new Date(nextOcc.date);
                                   return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
                                 })() : 'Demnächst');
-                            const hasMessage = finalOccurId && occurrencesWithMessages.includes(finalOccurId);
+                            const hasMessage = Boolean(finalOccurId && occurrencesWithMessages.includes(finalOccurId));
+                            const unreadMsgCount = finalOccurId ? (occurrencesWithUnreadCount[finalOccurId] || 0) : 0;
+                            const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_sick' || nextOcc?.status === 'canceled_by_teacher_sick';
 
                             return (
-                              <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                              <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                {/* 1. Next Lesson Status Badge */}
                                 <div style={{ 
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
                                   gap: '8px', 
-                                  background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.09) 0%, rgba(52, 168, 83, 0.03) 100%)', 
-                                  color: '#2e7d32', 
-                                  padding: '7px 14px', 
+                                  background: isCanceled ? 'rgba(239, 68, 68, 0.08)' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.09) 0%, rgba(52, 168, 83, 0.03) 100%)', 
+                                  color: isCanceled ? '#dc2626' : '#2e7d32', 
+                                  padding: '8px 16px', 
+                                  minHeight: '38px',
+                                  boxSizing: 'border-box',
                                   borderRadius: '12px', 
-                                  fontSize: '0.82rem', 
-                                  fontWeight: 850,
-                                  border: '1.5px solid rgba(52, 168, 83, 0.2)'
+                                  fontSize: '0.78rem', 
+                                  fontWeight: 850, 
+                                  border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.2)'
                                 }}>
-                                  <Calendar size={15} color="#34a853" />
-                                  <span>Nächste Musikstunde: {lessonText}</span>
+                                  <Calendar size={14} color={isCanceled ? '#dc2626' : '#34a853'} />
+                                  <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächste Musikstunde: ${lessonText}`}</span>
                                 </div>
+
+                                {/* 2. Nachrichten Button */}
+                                {teacherId && (
+                                  <button 
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setAppointmentChatData({
+                                        teacherId,
+                                        date: targetDateStr,
+                                        start_time: timeLabel,
+                                        label,
+                                        occurrenceId: finalOccurId
+                                      });
+                                      setShowAppointmentChat(true);
+                                    }}
+                                    style={{ 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      gap: '8px', 
+                                      background: hasMessage ? 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)' : '#ffffff', 
+                                      color: hasMessage ? '#78350f' : '#475569', 
+                                      padding: '8px 16px', 
+                                      minHeight: '38px',
+                                      boxSizing: 'border-box',
+                                      borderRadius: '14px', 
+                                      fontSize: '0.80rem', 
+                                      fontWeight: 900, 
+                                      border: hasMessage ? '2px solid #f59e0b' : '1px solid #cbd5e1', 
+                                      cursor: 'pointer',
+                                      boxShadow: hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                      transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.transform = 'translateY(-1px)';
+                                      e.currentTarget.style.boxShadow = hasMessage ? '0 6px 18px rgba(245, 158, 11, 0.32)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.transform = 'none';
+                                      e.currentTarget.style.boxShadow = hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.currentTarget.style.transform = 'translateY(1px)';
+                                    }}
+                                    onMouseUp={(e) => {
+                                      e.currentTarget.style.transform = 'translateY(-1px)';
+                                    }}
+                                    title="1:1 Nachrichten zum Unterrichtstermin"
+                                  >
+                                    <MessageSquare size={15} color={hasMessage ? '#d97706' : '#64748b'} fill={hasMessage ? 'rgba(245, 158, 11, 0.2)' : 'none'} />
+                                    <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : 'Nachrichten'}</span>
+                                    {unreadMsgCount > 0 && (
+                                      <span style={{
+                                        background: '#f59e0b',
+                                        color: '#ffffff',
+                                        fontSize: '0.70rem',
+                                        fontWeight: 950,
+                                        padding: '2px 8px',
+                                        borderRadius: '100px',
+                                        letterSpacing: '0.02em',
+                                        boxShadow: '0 2px 6px rgba(245, 158, 11, 0.35)'
+                                      }}>
+                                        {unreadMsgCount === 1 ? '1 neu ★' : `${unreadMsgCount} neu ★`}
+                                      </span>
+                                    )}
+                                  </button>
+                                )}
+
+                                {/* 3. Absage / Reaktivieren Button (Master-PIN geschützt für Junior) */}
+                                {nextOcc && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (isCanceled) {
+                                        handleUndoCancelOccurrence(nextOcc);
+                                      } else {
+                                        handleTriggerCancelOccurrence(nextOcc);
+                                      }
+                                    }}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      background: isCanceled ? '#fee2e2' : '#ffffff',
+                                      color: isCanceled ? '#dc2626' : '#475569',
+                                      padding: '8px 16px',
+                                      minHeight: '38px',
+                                      boxSizing: 'border-box',
+                                      borderRadius: '12px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 800,
+                                      border: isCanceled ? '1px solid #f87171' : '1px solid #e2e8f0',
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    className="hover-scale"
+                                    title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen (Eltern-PIN)"}
+                                  >
+                                    <CalendarX size={14} color={isCanceled ? '#dc2626' : '#64748b'} />
+                                    <span>{isCanceled ? 'Absage zurücknehmen' : 'Unterricht absagen'}</span>
+                                  </button>
+                                )}
                               </div>
                             );
                           })()}
@@ -14289,71 +15479,90 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   {/* ========================================================================= */}
                   {(() => {
                     let nextStickerTitle = 'Fleiß-Pionier';
-                    let nextStickerDesc = `Noch ${Math.max(1, 20 - totalFocusMinutes)} Min. Üben für deinen 1. Meilenstein! 🐝✨`;
+                    let nextStickerDesc = `Noch ${Math.max(1, 20 - totalFocusMinutes)} Min. üben für deinen 1. Meilenstein! ✨`;
                     let nextStickerEmoji = '🐝';
                     let nextStickerId = 'fleiss-pionier';
+                    let currentProgressVal = totalFocusMinutes;
+                    let targetProgressVal = 20;
 
                     if (totalFocusMinutes < 20) {
                       nextStickerTitle = 'Fleiß-Pionier';
-                      nextStickerDesc = `Noch ${Math.max(1, 20 - totalFocusMinutes)} Min. Üben für deinen 1. Meilenstein! 🐝`;
+                      nextStickerDesc = `Noch ${Math.max(1, 20 - totalFocusMinutes)} Min. üben bis zur Freischaltung ✨`;
                       nextStickerEmoji = '🐝';
                       nextStickerId = 'fleiss-pionier';
+                      currentProgressVal = totalFocusMinutes;
+                      targetProgressVal = 20;
                     } else if ((avatar?.streak_flame || 0) < 3) {
                       nextStickerTitle = 'Dranbleiber';
                       nextStickerDesc = `Noch ${3 - (avatar?.streak_flame || 0)} Tage Streak bis zum Disziplin-Sticker! 🔥`;
                       nextStickerEmoji = '🔥';
                       nextStickerId = 'dranbleiber';
+                      currentProgressVal = avatar?.streak_flame || 0;
+                      targetProgressVal = 3;
                     } else if (totalFocusMinutes < 100) {
                       nextStickerTitle = 'Übe-Meister';
                       nextStickerDesc = `Noch ${Math.max(1, 100 - totalFocusMinutes)} Min. bis zum seltenen Sticker! 🦉`;
                       nextStickerEmoji = '🦉';
                       nextStickerId = 'uebe-meister';
+                      currentProgressVal = totalFocusMinutes;
+                      targetProgressVal = 100;
                     } else if ((avatar?.streak_flame || 0) < 7) {
                       nextStickerTitle = 'Wochen-Held';
                       nextStickerDesc = `Noch ${7 - (avatar?.streak_flame || 0)} Tage Streak bis zum Wochen-Held! 📆`;
                       nextStickerEmoji = '📆';
                       nextStickerId = 'wochen-held';
+                      currentProgressVal = avatar?.streak_flame || 0;
+                      targetProgressVal = 7;
                     } else if (totalFocusMinutes < 500) {
                       nextStickerTitle = 'Übe-Legende';
                       nextStickerDesc = `Noch ${Math.max(1, 500 - totalFocusMinutes)} Min. bis zum epischen Meilenstein! 👑`;
                       nextStickerEmoji = '👑';
                       nextStickerId = 'uebe-legende';
+                      currentProgressVal = totalFocusMinutes;
+                      targetProgressVal = 500;
                     } else {
                       nextStickerTitle = 'Übe-Großmeister';
                       nextStickerDesc = `Sammle alle Trophäen in deinem Panini-Album! 🏆`;
                       nextStickerEmoji = '🏆';
                       nextStickerId = 'uebe-grossmeister';
+                      currentProgressVal = 100;
+                      targetProgressVal = 100;
                     }
+
+                    const progressPercent = Math.min(100, Math.max(0, Math.round((currentProgressVal / (targetProgressVal || 1)) * 100)));
 
                     return (
                       <div 
                         onClick={() => setShowJuniorStickerModal(true)}
                         style={{
-                          background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                          background: 'linear-gradient(135deg, #fffdfa 0%, #fef3c7 100%)',
                           borderRadius: '24px',
                           padding: '16px 24px',
                           border: '2px solid #fde68a',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
+                          gap: '16px',
                           cursor: 'pointer',
-                          boxShadow: '0 8px 24px rgba(217, 119, 6, 0.08)'
+                          boxShadow: '0 8px 24px rgba(217, 119, 6, 0.08)',
+                          flexWrap: 'wrap'
                         }}
                         className="hover-scale"
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '240px' }}>
                           <div style={{
                             background: '#ffffff',
-                            border: '2px solid #f59e0b',
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '16px',
+                            border: '2.5px solid #f59e0b',
+                            width: '50px',
+                            height: '50px',
+                            borderRadius: '18px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
+                            boxShadow: '0 6px 16px rgba(245, 158, 11, 0.25)',
                             overflow: 'hidden',
-                            padding: '4px'
+                            padding: '4px',
+                            flexShrink: 0
                           }}>
                             <img 
                               src={`/stickers/${nextStickerId}.png?v=1`} 
@@ -14369,12 +15578,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               }}
                             />
                           </div>
-                          <div>
+                          <div style={{ flex: 1 }}>
                             <div style={{ fontSize: '1.05rem', fontWeight: 950, color: '#92400e', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Nächster Sticker: {nextStickerTitle} {nextStickerEmoji}
+                              Nächster Sticker: {nextStickerTitle}
                             </div>
-                            <div style={{ fontSize: '0.82rem', color: '#b45309', fontWeight: 700 }}>
+                            <div style={{ fontSize: '0.82rem', color: '#b45309', fontWeight: 700, marginTop: '2px' }}>
                               {nextStickerDesc}
+                            </div>
+
+                            {/* Mini Gamification Progress Bar */}
+                            <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', maxWidth: '320px' }}>
+                              <div style={{ flex: 1, height: '6px', background: 'rgba(245, 158, 11, 0.2)', borderRadius: '100px', overflow: 'hidden' }}>
+                                <div style={{
+                                  width: `${progressPercent}%`,
+                                  height: '100%',
+                                  background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                                  borderRadius: '100px',
+                                  transition: 'width 0.4s ease'
+                                }} />
+                              </div>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#b45309', whiteSpace: 'nowrap' }}>
+                                {progressPercent}%
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -14389,7 +15614,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           display: 'flex',
                           alignItems: 'center',
                           gap: '8px',
-                          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                          flexShrink: 0
                         }}>
                           <span>Sticker-Album</span>
                           <span>★</span>
@@ -14598,23 +15824,101 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 <BookOpen size={30} />
                               </div>
 
-                              {audioTracks.length > 0 && (
-                                <div style={{
-                                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                                  border: '1px solid #bbf7d0',
-                                  borderRadius: '100px',
-                                  padding: '5px 12px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)'
-                                }}>
-                                  <Headphones size={13} color="#15803d" />
-                                  <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#15803d' }}>
-                                    {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
-                                  </span>
-                                </div>
-                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {/* 3D-TOY-BUTTON FÜR VORLESEN (JUNIOR BOX 1) */}
+                                {(draftAllowTts ?? (studentUser as any)?.parent_allow_tts ?? (studentUiLevel === 'junior')) && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const visiblePhrases: string[] = ["Hausaufgaben:"];
+                                      if (activeJuniorBooks.length > 0) {
+                                        activeJuniorBooks.forEach(b => {
+                                          visiblePhrases.push(`${b.title}, ${b.formattedPages.replace('S.', 'Seite').replace('–', ' bis ')}.`);
+                                        });
+                                      }
+                                      if (activeJuniorSongs.length > 0) {
+                                        activeJuniorSongs.forEach(s => {
+                                          visiblePhrases.push(`Song: ${cleanTitle(s.topic_name || s.title)}.`);
+                                        });
+                                      }
+                                      if (audioTracks.length > 0) {
+                                        visiblePhrases.push(`Dazu ${audioTracks.length === 1 ? 'eine Aufnahme' : `${audioTracks.length} Aufnahmen`} von deiner Lehrkraft.`);
+                                      }
+                                      handleSpeakText(visiblePhrases, 'junior_box1');
+                                    }}
+                                    style={{
+                                      background: isTtsSpeaking && activeTtsKey === 'junior_box1' 
+                                        ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                                        : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                      border: 'none',
+                                      borderRadius: '100px',
+                                      padding: '7px 14px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '7px',
+                                      cursor: 'pointer',
+                                      color: '#ffffff',
+                                      fontSize: '0.80rem',
+                                      fontWeight: 950,
+                                      boxShadow: isTtsSpeaking && activeTtsKey === 'junior_box1' 
+                                        ? '0 3px 0 #991b1b, 0 6px 14px rgba(239, 68, 68, 0.35)' 
+                                        : '0 3px 0 #15803d, 0 6px 14px rgba(34, 197, 94, 0.35)',
+                                      transform: isTtsSpeaking && activeTtsKey === 'junior_box1' ? 'translateY(1px)' : 'none',
+                                      transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.filter = 'brightness(1.06)';
+                                      e.currentTarget.style.transform = 'translateY(-1px)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.filter = 'none';
+                                      e.currentTarget.style.transform = isTtsSpeaking && activeTtsKey === 'junior_box1' ? 'translateY(1px)' : 'none';
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.currentTarget.style.transform = 'translateY(2px)';
+                                      e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_box1' ? '0 1px 0 #991b1b' : '0 1px 0 #15803d';
+                                    }}
+                                    onMouseUp={(e) => {
+                                      e.currentTarget.style.transform = 'translateY(-1px)';
+                                      e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_box1' 
+                                        ? '0 3px 0 #991b1b, 0 6px 14px rgba(239, 68, 68, 0.35)' 
+                                        : '0 3px 0 #15803d, 0 6px 14px rgba(34, 197, 94, 0.35)';
+                                    }}
+                                    title={isTtsSpeaking && activeTtsKey === 'junior_box1' ? "Vorlesen stoppen" : "Hausaufgaben vorlesen lassen"}
+                                  >
+                                    {isTtsSpeaking && activeTtsKey === 'junior_box1' ? (
+                                      <>
+                                        <VolumeX size={15} color="#ffffff" strokeWidth={2.8} />
+                                        <span>Stopp ⏹</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Volume2 size={15} color="#ffffff" strokeWidth={2.8} />
+                                        <span>Hör zu! ✨</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+
+                                {audioTracks.length > 0 && (
+                                  <div style={{
+                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                                    border: '1px solid #bbf7d0',
+                                    borderRadius: '100px',
+                                    padding: '5px 12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)'
+                                  }}>
+                                    <Headphones size={13} color="#15803d" />
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#15803d' }}>
+                                      {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -14843,143 +16147,159 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           );
                         })()}
 
-                        {/* BOX 3: AUFNAHME STARTEN */}
-                        <div 
-                          onClick={() => { setShowJuniorRecordModal(true); startJuniorRecordingFlow(); }}
-                          style={{
-                            background: '#ffffff',
-                            borderRadius: '32px',
-                            padding: '28px',
-                            boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
-                            border: '2px solid #e2e8f0',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            gap: '24px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                          className="hover-scale"
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div style={{
-                              background: '#fee2e2',
-                              color: '#ef4444',
-                              width: '64px',
-                              height: '64px',
-                              borderRadius: '22px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 6px 16px rgba(239, 68, 68, 0.15)'
-                            }}>
-                              <Mic size={34} />
-                            </div>
+                        {/* BOX 3: AUFNAHME STARTEN (mit Eltern-Gating) */}
+                        {(() => {
+                          const isAudioAllowed = draftAllowAudio ?? (studentUser as any)?.parent_allow_audio ?? (draftBoardOverrides.recordings ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' : true));
 
-                            <div>
-                              <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Aufnahme
+                          if (!isAudioAllowed) {
+                            return null; // Gracefully collapse Box 3 when microphone is deactivated in parent controls
+                          }
+
+                          return (
+                            <div 
+                              onClick={() => { setShowJuniorRecordModal(true); startJuniorRecordingFlow(); }}
+                              style={{
+                                background: '#ffffff',
+                                borderRadius: '32px',
+                                padding: '28px',
+                                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
+                                border: '2px solid #e2e8f0',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                gap: '24px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{
+                                  background: '#fee2e2',
+                                  color: '#ef4444',
+                                  width: '64px',
+                                  height: '64px',
+                                  borderRadius: '22px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxShadow: '0 6px 16px rgba(239, 68, 68, 0.15)'
+                                }}>
+                                  <Mic size={34} />
+                                </div>
+
+                                <div>
+                                  <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Aufnahme
+                                  </div>
+                                  <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                    Song aufnehmen
+                                  </h3>
+                                  <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650 }}>
+                                    3-2-1 Countdown &amp; Mikrofon
+                                  </p>
+                                </div>
                               </div>
-                              <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                Song aufnehmen
-                              </h3>
-                              <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650 }}>
-                                3-2-1 Countdown & Mikrofon
-                              </p>
+
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setShowJuniorRecordModal(true); startJuniorRecordingFlow(); }}
+                                style={{
+                                  width: '100%',
+                                  padding: '16px',
+                                  borderRadius: '20px',
+                                  border: 'none',
+                                  background: '#fef2f2',
+                                  color: '#ef4444',
+                                  fontSize: '1.05rem',
+                                  fontWeight: 950,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '10px'
+                                }}
+                              >
+                                <Mic size={20} />
+                                <span>Jetzt aufnehmen</span>
+                              </button>
                             </div>
-                          </div>
+                          );
+                        })()}
 
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setShowJuniorRecordModal(true); startJuniorRecordingFlow(); }}
-                            style={{
-                              width: '100%',
-                              padding: '16px',
-                              borderRadius: '20px',
-                              border: 'none',
-                              background: '#fef2f2',
-                              color: '#ef4444',
-                              fontSize: '1.05rem',
-                              fontWeight: 950,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '10px'
-                            }}
-                          >
-                            <Mic size={20} />
-                            <span>Jetzt aufnehmen</span>
-                          </button>
-                        </div>
+                        {/* BOX 4: LEHRER-AUFNAHMEN (ALLE WOCHEN & HISTORIE) */}
+                        {(() => {
+                          const teacherNameDisplay = briefingData?.todayLesson?.teacher_name || (studentUser as any)?.teacher_name || 'deiner Lehrkraft';
 
-                        {/* BOX 4: MEINE AUFNAHMEN */}
-                        <div 
-                          onClick={() => setShowJuniorRecordingsModal(true)}
-                          style={{
-                            background: '#ffffff',
-                            borderRadius: '32px',
-                            padding: '28px',
-                            boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
-                            border: '2px solid #e2e8f0',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            gap: '24px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }}
-                          className="hover-scale"
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div style={{
-                              background: '#ede9fe',
-                              color: '#7c3aed',
-                              width: '64px',
-                              height: '64px',
-                              borderRadius: '22px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 6px 16px rgba(124, 58, 237, 0.15)'
-                            }}>
-                              <Disc size={34} />
-                            </div>
+                          return (
+                            <div 
+                              onClick={() => setShowJuniorRecordingsModal(true)}
+                              style={{
+                                background: '#ffffff',
+                                borderRadius: '32px',
+                                padding: '28px',
+                                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
+                                border: '2px solid #e2e8f0',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                gap: '24px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{
+                                  background: '#ede9fe',
+                                  color: '#7c3aed',
+                                  width: '64px',
+                                  height: '64px',
+                                  borderRadius: '22px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxShadow: '0 6px 16px rgba(124, 58, 237, 0.15)'
+                                }}>
+                                  <Headphones size={34} />
+                                </div>
 
-                            <div>
-                              <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Meine Aufnahmen
+                                <div>
+                                  <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Unterrichts-Audios
+                                  </div>
+                                  <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                    {juniorTeacherRecordings.length} {juniorTeacherRecordings.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
+                                  </h3>
+                                  <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Alle Aufnahmen von ${teacherNameDisplay}`}>
+                                    Alle Aufnahmen von {teacherNameDisplay}
+                                  </p>
+                                </div>
                               </div>
-                              <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                {juniorStudentRecordings.length} {juniorStudentRecordings.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
-                              </h3>
-                              <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650 }}>
-                                Deine eingespielten Songs
-                              </p>
-                            </div>
-                          </div>
 
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setShowJuniorRecordingsModal(true); }}
-                            style={{
-                              width: '100%',
-                              padding: '16px',
-                              borderRadius: '20px',
-                              border: 'none',
-                              background: '#f5f3ff',
-                              color: '#7c3aed',
-                              fontSize: '1.05rem',
-                              fontWeight: 950,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '10px'
-                            }}
-                          >
-                            <Disc size={20} />
-                            <span>Lieder anhören</span>
-                          </button>
-                        </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setShowJuniorRecordingsModal(true); }}
+                                style={{
+                                  width: '100%',
+                                  padding: '16px',
+                                  borderRadius: '20px',
+                                  border: 'none',
+                                  background: '#f5f3ff',
+                                  color: '#7c3aed',
+                                  fontSize: '1.05rem',
+                                  fontWeight: 950,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '10px'
+                                }}
+                              >
+                                <Headphones size={20} />
+                                <span>Alle Aufnahmen anhören</span>
+                              </button>
+                            </div>
+                          );
+                        })()}
 
                       </div>
                     );
@@ -15015,7 +16335,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         gap: '22px'
                       }}>
                         <button
-                          onClick={() => setShowJuniorHomeworkModal(false)}
+                          onClick={() => {
+                            handleStopSpeaking();
+                            setShowJuniorHomeworkModal(false);
+                          }}
                           style={{
                             position: 'absolute',
                             top: '22px',
@@ -15322,152 +16645,297 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                               {hasAnyHomework ? (
-                                <div style={{
-                                  background: '#ffffff',
-                                  borderRadius: '24px',
-                                  padding: '20px 24px',
-                                  border: '1.5px solid #f1f5f9',
-                                  boxShadow: '0 8px 24px -4px rgba(0,0,0,0.06)',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '16px'
-                                }}>
-                                  {/* Lehrwerke / Bücher Liste (Editorial Flow) */}
-                                  {formattedJuniorBooks.map((bookItem, idx) => (
-                                    <div key={`j-modal-book-${idx}`} style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '6px',
-                                      paddingBottom: (idx < formattedJuniorBooks.length - 1 || otherActiveSongs.length > 0 || audioTracks.length > 0) ? '12px' : '0',
-                                      borderBottom: (idx < formattedJuniorBooks.length - 1 || otherActiveSongs.length > 0 || audioTracks.length > 0) ? '1px solid rgba(0,0,0,0.06)' : 'none'
-                                    }}>
-                                      {/* Book Header */}
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                                <>
+                                  {/* KINDERGERECHTE 3D-VORLESE-LEISTE */}
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '14px 20px',
+                                    background: isTtsSpeaking && activeTtsKey === 'junior_modal' 
+                                      ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' 
+                                      : 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                    borderRadius: '24px',
+                                    border: isTtsSpeaking && activeTtsKey === 'junior_modal' ? '2px solid #fca5a5' : '2px solid #86efac',
+                                    gap: '14px',
+                                    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.04)',
+                                    transition: 'all 0.2s ease'
+                                  }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                      <div style={{
+                                        width: '42px',
+                                        height: '42px',
+                                        borderRadius: '14px',
+                                        background: isTtsSpeaking && activeTtsKey === 'junior_modal' 
+                                          ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                                          : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                        color: '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: isTtsSpeaking && activeTtsKey === 'junior_modal' 
+                                          ? '0 4px 10px rgba(239, 68, 68, 0.3)' 
+                                          : '0 4px 10px rgba(34, 197, 94, 0.3)',
+                                        flexShrink: 0
+                                      }}>
+                                        {isTtsSpeaking && activeTtsKey === 'junior_modal' ? (
+                                          <VolumeX size={22} strokeWidth={2.6} />
+                                        ) : (
+                                          <Volume2 size={22} strokeWidth={2.6} />
+                                        )}
+                                      </div>
+
+                                      <div>
+                                        <div style={{ fontSize: '0.96rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                          {isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'Liest deine Aufgaben vor... 🎧' : 'Lass es dir einfach vorlesen! ✨'}
+                                        </div>
+                                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700, marginTop: '1px' }}>
+                                          {isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'Tippe auf Stopp zum Anhalten' : 'Höre dir alle Hausaufgaben als Audio an'}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (isTtsSpeaking && activeTtsKey === 'junior_modal') {
+                                          handleStopSpeaking();
+                                        } else {
+                                          const phrases: string[] = ["Deine aktuellen Hausaufgaben für diese Woche:"];
+                                          if (formattedJuniorBooks.length > 0) {
+                                            formattedJuniorBooks.forEach(b => {
+                                              const pageStr = b.pageNums.length === 1 ? `Seite ${b.pageNums[0]}` : `Seiten ${b.pageNums.join(', ')}`;
+                                              phrases.push(`${b.title}, ${pageStr}.`);
+                                              if (b.notesList && b.notesList.length > 0) {
+                                                b.notesList.forEach(n => {
+                                                  phrases.push(`Notiz zu Seite ${n.num}: ${n.text}.`);
+                                                });
+                                              }
+                                            });
+                                          }
+                                          if (otherActiveSongs.length > 0) {
+                                            otherActiveSongs.forEach(s => {
+                                              phrases.push(`Song: ${cleanTitle(s.topic_name || s.title)}.`);
+                                              if (s.homework_notes && s.homework_notes.trim()) {
+                                                phrases.push(`Fahrplan: ${s.homework_notes}.`);
+                                              }
+                                            });
+                                          }
+                                          if (audioTracks.length > 0) {
+                                            phrases.push(`Dazu gibt es ${audioTracks.length === 1 ? 'eine Unterrichtsaufnahme' : `${audioTracks.length} Unterrichtsaufnahmen`} zum Mitspielen.`);
+                                          }
+                                          if (generalNote) {
+                                            phrases.push(`Zusätzlicher Hinweis: ${generalNote}.`);
+                                          }
+                                          handleSpeakText(phrases, 'junior_modal');
+                                        }
+                                      }}
+                                      style={{
+                                        background: isTtsSpeaking && activeTtsKey === 'junior_modal' 
+                                          ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                                          : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        padding: '11px 20px',
+                                        borderRadius: '16px',
+                                        fontSize: '0.90rem',
+                                        fontWeight: 950,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        boxShadow: isTtsSpeaking && activeTtsKey === 'junior_modal' 
+                                          ? '0 4px 0 #991b1b, 0 8px 18px rgba(239, 68, 68, 0.4)' 
+                                          : '0 4px 0 #15803d, 0 8px 18px rgba(34, 197, 94, 0.4)',
+                                        transform: isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'translateY(2px)' : 'none',
+                                        flexShrink: 0,
+                                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.filter = 'brightness(1.06)';
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.filter = 'none';
+                                        e.currentTarget.style.transform = isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'translateY(2px)' : 'none';
+                                      }}
+                                      onMouseDown={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(3px)';
+                                        e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_modal' ? '0 1px 0 #991b1b' : '0 1px 0 #15803d';
+                                      }}
+                                      onMouseUp={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                        e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_modal' 
+                                          ? '0 4px 0 #991b1b, 0 8px 18px rgba(239, 68, 68, 0.4)' 
+                                          : '0 4px 0 #15803d, 0 8px 18px rgba(34, 197, 94, 0.4)';
+                                      }}
+                                      title={isTtsSpeaking && activeTtsKey === 'junior_modal' ? "Vorlesen stoppen" : "Hausaufgaben vorlesen lassen"}
+                                    >
+                                      {isTtsSpeaking && activeTtsKey === 'junior_modal' ? (
+                                        <>
+                                          <VolumeX size={18} color="#ffffff" strokeWidth={2.8} />
+                                          <span>Stopp ⏹</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Volume2 size={18} color="#ffffff" strokeWidth={2.8} />
+                                          <span>Vorlesen 🔊</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+
+                                  <div style={{
+                                    background: '#ffffff',
+                                    borderRadius: '24px',
+                                    padding: '20px 24px',
+                                    border: '1.5px solid #f1f5f9',
+                                    boxShadow: '0 8px 24px -4px rgba(0,0,0,0.06)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '16px'
+                                  }}>
+                                    {/* Lehrwerke / Bücher Liste (Editorial Flow) */}
+                                    {formattedJuniorBooks.map((bookItem, idx) => (
+                                      <div key={`j-modal-book-${idx}`} style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '6px',
+                                        paddingBottom: (idx < formattedJuniorBooks.length - 1 || otherActiveSongs.length > 0 || audioTracks.length > 0) ? '12px' : '0',
+                                        borderBottom: (idx < formattedJuniorBooks.length - 1 || otherActiveSongs.length > 0 || audioTracks.length > 0) ? '1px solid rgba(0,0,0,0.06)' : 'none'
+                                      }}>
+                                        {/* Book Header */}
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                                            <div style={{
+                                              width: '28px',
+                                              height: '28px',
+                                              borderRadius: '8px',
+                                              background: '#fee2e2',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              color: '#dc2626',
+                                              flexShrink: 0
+                                            }}>
+                                              <BookOpen size={14} strokeWidth={2.4} />
+                                            </div>
+                                            <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                              {bookItem.title}
+                                            </span>
+                                          </div>
+
+                                          {/* Individual Page Pills */}
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                            {bookItem.pageNums.map((pNum) => (
+                                              <span key={`p-${pNum}`} style={{
+                                                background: '#dcfce7',
+                                                color: '#15803d',
+                                                fontSize: '0.80rem',
+                                                fontWeight: 900,
+                                                padding: '3px 9px',
+                                                borderRadius: '7px',
+                                                flexShrink: 0
+                                              }}>
+                                                S. {pNum}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        {/* Direct Page Notes */}
+                                        {bookItem.notesList.length > 0 && (
+                                          <div style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '4px',
+                                            marginLeft: '38px'
+                                          }}>
+                                            {bookItem.notesList.map((n, nIdx) => (
+                                              <div key={`j-n-${nIdx}`} style={{ fontSize: '0.88rem', color: '#334155', fontWeight: 600, lineHeight: 1.4 }}>
+                                                <strong style={{ color: '#dc2626', fontWeight: 850 }}>S. {n.num}:</strong> {n.text}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+
+                                    {/* Songs Liste (Editorial Flow) */}
+                                    {otherActiveSongs.map((item, idx) => (
+                                      <div key={`j-modal-song-${idx}`} style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '6px',
+                                        paddingBottom: (idx < otherActiveSongs.length - 1 || audioTracks.length > 0) ? '12px' : '0',
+                                        borderBottom: (idx < otherActiveSongs.length - 1 || audioTracks.length > 0) ? '1px solid rgba(0,0,0,0.06)' : 'none'
+                                      }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                           <div style={{
                                             width: '28px',
                                             height: '28px',
                                             borderRadius: '8px',
-                                            background: '#fee2e2',
+                                            background: '#ede9fe',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            color: '#dc2626',
+                                            color: '#7c3aed',
                                             flexShrink: 0
                                           }}>
-                                            <BookOpen size={14} strokeWidth={2.4} />
+                                            <Music size={14} />
                                           </div>
-                                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                            {bookItem.title}
+                                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                            {cleanTitle(item.topic_name || item.title)}
                                           </span>
                                         </div>
 
-                                        {/* Individual Page Pills */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                                          {bookItem.pageNums.map((pNum) => (
-                                            <span key={`p-${pNum}`} style={{
-                                              background: '#dcfce7',
-                                              color: '#15803d',
-                                              fontSize: '0.80rem',
-                                              fontWeight: 900,
-                                              padding: '3px 9px',
-                                              borderRadius: '7px',
-                                              flexShrink: 0
-                                            }}>
-                                              S. {pNum}
-                                            </span>
-                                          ))}
+                                        {item.homework_notes && (
+                                          <div style={{ marginLeft: '38px', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
+                                            <span style={{ color: '#6366f1', fontWeight: 850 }}>🚀 Fahrplan:</span> {item.homework_notes}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+
+                                    {/* Audio Tracks */}
+                                    {audioTracks.length > 0 && (
+                                      <div style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '8px',
+                                        paddingTop: (formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0) ? '4px' : '0'
+                                      }}>
+                                        <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <Headphones size={13} />
+                                          <span>Unterrichtsaufnahmen ({audioTracks.length})</span>
+                                        </div>
+                                        <AudioTrackCarousel tracks={audioTracks} />
+                                      </div>
+                                    )}
+
+                                    {/* General Note */}
+                                    {generalNote && (
+                                      <div style={{
+                                        marginTop: '4px',
+                                        padding: '12px 14px',
+                                        background: '#f8fafc',
+                                        borderRadius: '14px',
+                                        border: '1px solid #e2e8f0',
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        gap: '8px',
+                                        fontSize: '0.86rem',
+                                        color: '#334155',
+                                        fontWeight: 600
+                                      }}>
+                                        <FileText size={16} color="#15803d" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <div>
+                                          <strong style={{ color: '#15803d', fontWeight: 850 }}>Hinweis:</strong> {generalNote}
                                         </div>
                                       </div>
-
-                                      {/* Direct Page Notes */}
-                                      {bookItem.notesList.length > 0 && (
-                                        <div style={{
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          gap: '4px',
-                                          marginLeft: '38px'
-                                        }}>
-                                          {bookItem.notesList.map((n, nIdx) => (
-                                            <div key={`j-n-${nIdx}`} style={{ fontSize: '0.88rem', color: '#334155', fontWeight: 600, lineHeight: 1.4 }}>
-                                              <strong style={{ color: '#dc2626', fontWeight: 850 }}>S. {n.num}:</strong> {n.text}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-
-                                  {/* Songs Liste (Editorial Flow) */}
-                                  {otherActiveSongs.map((item, idx) => (
-                                    <div key={`j-modal-song-${idx}`} style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '6px',
-                                      paddingBottom: (idx < otherActiveSongs.length - 1 || audioTracks.length > 0) ? '12px' : '0',
-                                      borderBottom: (idx < otherActiveSongs.length - 1 || audioTracks.length > 0) ? '1px solid rgba(0,0,0,0.06)' : 'none'
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div style={{
-                                          width: '28px',
-                                          height: '28px',
-                                          borderRadius: '8px',
-                                          background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          color: '#4338ca',
-                                          flexShrink: 0
-                                        }}>
-                                          <Music size={14} strokeWidth={2.4} />
-                                        </div>
-                                        <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {cleanTitle(item.topic_name || item.title)}
-                                        </span>
-                                      </div>
-
-                                      {item.homework_notes ? (
-                                        <div style={{
-                                          fontSize: '0.88rem',
-                                          color: '#334155',
-                                          fontWeight: 600,
-                                          lineHeight: 1.4,
-                                          marginLeft: '38px'
-                                        }}>
-                                          <strong style={{ color: '#4f46e5', fontWeight: 850 }}>📌 Fahrplan:</strong> {item.homework_notes}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  ))}
-
-                                  {/* Unterrichtsaufnahmen (AudioTrackCarousel) */}
-                                  {audioTracks.length > 0 && (
-                                    <div style={{ paddingTop: '2px' }}>
-                                      <AudioTrackCarousel
-                                        tracks={audioTracks}
-                                        readOnly={true}
-                                      />
-                                    </div>
-                                  )}
-
-                                  {/* Zusätzliche Bemerkung / Hinweis */}
-                                  {generalNote && (
-                                    <div style={{
-                                      display: 'flex',
-                                      alignItems: 'baseline',
-                                      gap: '8px',
-                                      fontSize: '0.88rem',
-                                      color: '#334155',
-                                      fontWeight: 600,
-                                      paddingTop: '10px',
-                                      borderTop: '1px dashed #e2e8f0'
-                                    }}>
-                                      <FileText size={15} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                      <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Hinweis:</strong>
-                                      <span style={{ whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{generalNote}</span>
-                                    </div>
-                                  )}
-                                </div>
+                                    )}
+                                  </div>
+                                </>
                               ) : (
                                 <div style={{ padding: '30px 16px', textAlign: 'center', background: '#f8fafc', borderRadius: '24px', border: '1.5px dashed #cbd5e1' }}>
                                   <div style={{ fontSize: '2.2rem', marginBottom: '8px' }}>🎉</div>
@@ -15484,7 +16952,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         })()}
 
                         <button
-                          onClick={() => setShowJuniorHomeworkModal(false)}
+                          onClick={() => {
+                            handleStopSpeaking();
+                            setShowJuniorHomeworkModal(false);
+                          }}
                           style={{
                             width: '100%',
                             padding: '16px 20px',
@@ -16165,24 +17636,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             borderRadius: '20px',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            boxShadow: '0 6px 16px rgba(124, 58, 237, 0.15)'
                           }}>
-                            <Disc size={30} />
+                            <Headphones size={30} />
                           </div>
                           <div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 950, color: '#7c3aed', textTransform: 'uppercase' }}>
-                              Mein Musik-Tresor
+                            <span style={{ fontSize: '0.75rem', fontWeight: 950, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              Unterrichts-Mediathek
                             </span>
-                            <h2 style={{ margin: '2px 0 0 0', fontSize: '1.6rem', fontWeight: 950, color: '#0f172a' }}>
-                              Deine aufgenommenen Songs 📼
+                            <h2 style={{ margin: '2px 0 0 0', fontSize: '1.55rem', fontWeight: 950, color: '#0f172a' }}>
+                              Alle Lehrer-Aufnahmen 🎧
                             </h2>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 700 }}>
+                              {briefingData?.todayLesson?.teacher_name ? `Eingespielt von ${briefingData.todayLesson.teacher_name}` : 'Hörbeispiele & Play-Alongs aus deinem Unterricht'}
+                            </p>
                           </div>
                         </div>
 
-                        {/* Kassetten / Cover Playlist */}
+                        {/* Lehrer-Aufnahmen Playlist */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                          {juniorStudentRecordings.length > 0 ? (
-                            juniorStudentRecordings.map((rec) => {
+                          {juniorTeacherRecordings.length > 0 ? (
+                            juniorTeacherRecordings.map((rec) => {
                               const isPlaying = juniorActivePlayingAudioId === rec.id;
                               return (
                                 <div key={rec.id} style={{
@@ -16195,11 +17670,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   justifyContent: 'space-between',
                                   gap: '16px'
                                 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
                                     <button
                                       onClick={() => togglePlayJuniorRecording(rec.id, rec.url, rec.blobKey)}
                                       style={{
-                                        background: isPlaying ? '#7c3aed' : '#34a853',
+                                        background: isPlaying ? '#7c3aed' : '#16a34a',
                                         color: '#ffffff',
                                         border: 'none',
                                         width: '50px',
@@ -16209,24 +17684,40 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         cursor: 'pointer',
-                                        boxShadow: isPlaying ? '0 6px 16px rgba(124, 58, 237, 0.35)' : '0 6px 16px rgba(52, 168, 83, 0.3)'
+                                        boxShadow: isPlaying ? '0 6px 16px rgba(124, 58, 237, 0.35)' : '0 6px 16px rgba(22, 163, 74, 0.3)',
+                                        flexShrink: 0
                                       }}
                                       className="hover-scale"
+                                      title={isPlaying ? "Pause" : "Abspielen"}
                                     >
                                       {isPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" />}
                                     </button>
 
-                                    <div>
-                                      <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#0f172a' }}>
+                                    <div style={{ overflow: 'hidden' }}>
+                                      <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {rec.title}
                                       </h4>
-                                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>
-                                        📅 {new Date(rec.date).toLocaleDateString('de-DE')} {rec.duration ? `• ${rec.duration} Sek.` : ''}
-                                      </span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '3px' }}>
+                                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>
+                                          📅 {new Date(rec.date).toLocaleDateString('de-DE')} {rec.duration ? `• ${rec.duration} Sek.` : ''}
+                                        </span>
+                                        {rec.topic && rec.topic !== rec.title && (
+                                          <span style={{
+                                            background: '#f1f5f9',
+                                            color: '#475569',
+                                            fontSize: '0.72rem',
+                                            fontWeight: 800,
+                                            padding: '2px 8px',
+                                            borderRadius: '6px'
+                                          }}>
+                                            {rec.topic}
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
 
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                     <button
                                       onClick={() => downloadJuniorRecording(rec)}
                                       style={{
@@ -16234,8 +17725,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         border: 'none',
                                         color: '#334155',
                                         cursor: 'pointer',
-                                        width: '38px',
-                                        height: '38px',
+                                        width: '40px',
+                                        height: '40px',
                                         borderRadius: '12px',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -16247,39 +17738,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     >
                                       <Download size={18} />
                                     </button>
-
-                                    <button
-                                      onClick={() => deleteJuniorRecording(rec)}
-                                      style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: '#94a3b8',
-                                        cursor: 'pointer',
-                                        width: '38px',
-                                        height: '38px',
-                                        borderRadius: '12px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'all 0.15s ease'
-                                      }}
-                                      className="hover-scale"
-                                      title="Aufnahme löschen"
-                                    >
-                                      <Trash2 size={18} />
-                                    </button>
                                   </div>
                                 </div>
                               );
                             })
                           ) : (
                             <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
-                              <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎙️</div>
+                              <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎧</div>
                               <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 950, color: '#0f172a' }}>
-                                Noch keine Songs aufgenommen
+                                Noch keine Lehrer-Aufnahmen vorhanden
                               </h3>
                               <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 650 }}>
-                                Klicke auf „Aufnahme starten“ und nimm deinen allerersten Hit auf!
+                                Deine Lehrkraft hat noch keine Audio-Dateien im Unterricht hinterlegt. Sobald neue Hörbeispiele oder Aufgaben aufgenommen werden, findest du sie hier!
                               </p>
                             </div>
                           )}
@@ -17291,8 +18761,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         const hasToday = !!briefingData?.todayLesson;
                         const teacherId = hasToday ? briefingData.todayLesson.teacher_id : (nextOcc?.teacher_id || studentUser?.teacher_id);
                         const timeLabel = hasToday ? briefingData.todayLesson.time : (nextOcc?.start_time?.substring(0, 5) || '15:15');
+                        const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
                         const todayStr = new Date().toISOString().split('T')[0];
                         const targetDateStr = hasToday ? todayStr : (nextOcc?.date || todayStr);
+                        const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
+                        const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
+                        const label = `${targetDayOfWeek} (${formattedDate}), ${timeLabel} Uhr`;
                         const finalOccurId = hasToday ? (briefingData?.todayLesson?.id || `today-${teacherId}-${todayStr}`) : (nextOcc?.id || `sched-${studentId}`);
                         const lessonText = hasToday 
                           ? `Heute, ${briefingData.todayLesson.time} Uhr` 
@@ -17300,35 +18774,42 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               const d = new Date(nextOcc.date);
                               return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
                             })() : 'Demnächst');
-                        const hasMessage = finalOccurId && occurrencesWithMessages.includes(finalOccurId);
+                        const hasMessage = Boolean(finalOccurId && occurrencesWithMessages.includes(finalOccurId));
+                        const unreadMsgCount = finalOccurId ? (occurrencesWithUnreadCount[finalOccurId] || 0) : 0;
+                        const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_sick' || nextOcc?.status === 'canceled_by_teacher_sick';
 
                         return (
                           <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            {/* 1. Next Lesson Status Badge */}
                             <div style={{ 
                               display: 'inline-flex', 
                               alignItems: 'center', 
                               gap: '8px', 
-                              background: 'rgba(52, 168, 83, 0.08)', 
-                              color: '#34a853', 
-                              padding: '6px 14px', 
+                              background: isCanceled ? 'rgba(239, 68, 68, 0.08)' : 'rgba(52, 168, 83, 0.08)', 
+                              color: isCanceled ? '#dc2626' : '#34a853', 
+                              padding: '8px 16px', 
+                              minHeight: '38px',
+                              boxSizing: 'border-box',
                               borderRadius: '12px', 
                               fontSize: '0.78rem', 
                               fontWeight: 800,
-                              border: '1px solid rgba(52, 168, 83, 0.15)'
+                              border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.3)' : '1px solid rgba(52, 168, 83, 0.15)'
                             }}>
-                              <Calendar size={14} color="#34a853" />
-                              <span>Nächste Session: {lessonText}</span>
+                              <Calendar size={14} color={isCanceled ? '#dc2626' : '#34a853'} />
+                              <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächste Session: ${lessonText}`}</span>
                             </div>
 
+                            {/* 2. Nachrichten Button */}
                             {teacherId && (
                               <button 
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setAppointmentChatData({
                                     teacherId,
                                     date: targetDateStr,
                                     start_time: timeLabel,
-                                    label: `Nachricht an Lehrer`,
+                                    label,
                                     occurrenceId: finalOccurId
                                   });
                                   setShowAppointmentChat(true);
@@ -17336,21 +18817,89 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 style={{ 
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
-                                  gap: '6px', 
-                                  background: hasMessage ? '#34a853' : '#ffffff', 
-                                  color: hasMessage ? '#ffffff' : '#475569', 
-                                  padding: '6px 12px', 
-                                  borderRadius: '12px', 
-                                  fontSize: '0.78rem', 
-                                  fontWeight: 750, 
-                                  border: hasMessage ? 'none' : '1px solid #e2e8f0', 
+                                  gap: '8px', 
+                                  background: hasMessage ? 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)' : '#ffffff', 
+                                  color: hasMessage ? '#78350f' : '#475569', 
+                                  padding: '8px 16px', 
+                                  minHeight: '38px',
+                                  boxSizing: 'border-box',
+                                  borderRadius: '14px', 
+                                  fontSize: '0.80rem', 
+                                  fontWeight: 900, 
+                                  border: hasMessage ? '2px solid #f59e0b' : '1px solid #cbd5e1', 
                                   cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)'
+                                  boxShadow: hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                  e.currentTarget.style.boxShadow = hasMessage ? '0 6px 18px rgba(245, 158, 11, 0.32)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.transform = 'none';
+                                  e.currentTarget.style.boxShadow = hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
+                                }}
+                                onMouseDown={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(1px)';
+                                }}
+                                onMouseUp={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                }}
+                                title="1:1 Chat zum Unterrichtstermin"
+                              >
+                                <MessageSquare size={15} color={hasMessage ? '#d97706' : '#64748b'} fill={hasMessage ? 'rgba(245, 158, 11, 0.2)' : 'none'} />
+                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : 'Nachrichten'}</span>
+                                {unreadMsgCount > 0 && (
+                                  <span style={{
+                                    background: '#f59e0b',
+                                    color: '#ffffff',
+                                    fontSize: '0.70rem',
+                                    fontWeight: 950,
+                                    padding: '2px 8px',
+                                    borderRadius: '100px',
+                                    letterSpacing: '0.02em',
+                                    boxShadow: '0 2px 6px rgba(245, 158, 11, 0.35)'
+                                  }}>
+                                    {unreadMsgCount === 1 ? '1 neu ★' : `${unreadMsgCount} neu ★`}
+                                  </span>
+                                )}
+                              </button>
+                            )}
+
+                            {/* 3. Absage / Reaktivieren Button */}
+                            {nextOcc && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isCanceled) {
+                                    handleUndoCancelOccurrence(nextOcc);
+                                  } else {
+                                    handleTriggerCancelOccurrence(nextOcc);
+                                  }
+                                }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  background: isCanceled ? '#fee2e2' : '#ffffff',
+                                  color: isCanceled ? '#dc2626' : '#475569',
+                                  padding: '8px 16px',
+                                  minHeight: '38px',
+                                  boxSizing: 'border-box',
+                                  borderRadius: '12px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  border: isCanceled ? '1px solid #f87171' : '1px solid #e2e8f0',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+                                  transition: 'all 0.2s'
                                 }}
                                 className="hover-scale"
+                                title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen (Krankmeldung)"}
                               >
-                                <MessageSquare size={14} color={hasMessage ? '#ffffff' : '#34a853'} />
-                                <span>{hasMessage ? 'Chat öffnen' : 'Nachricht an Lehrer'}</span>
+                                <CalendarX size={14} color={isCanceled ? '#dc2626' : '#64748b'} />
+                                <span>{isCanceled ? 'Absage zurücknehmen' : 'Unterricht absagen'}</span>
                               </button>
                             )}
                           </div>
@@ -18359,30 +19908,35 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               const d = new Date(nextOcc.date);
                               return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
                             })() : 'Demnächst');
-                        const hasMessage = finalOccurId && occurrencesWithMessages.includes(finalOccurId);
+                        const hasMessage = Boolean(finalOccurId && occurrencesWithMessages.includes(finalOccurId));
+                        const unreadMsgCount = finalOccurId ? (occurrencesWithUnreadCount[finalOccurId] || 0) : 0;
+                        const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_sick' || nextOcc?.status === 'canceled_by_teacher_sick';
 
                         return (
                           <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            {/* 1. Next Lesson Status Badge */}
                             <div style={{ 
                               display: 'inline-flex', 
                               alignItems: 'center', 
                               gap: '8px', 
-                              background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
-                              color: '#34a853', 
+                              background: isCanceled ? 'rgba(239, 68, 68, 0.08)' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
+                              color: isCanceled ? '#dc2626' : '#34a853', 
                               padding: '8px 16px', 
                               minHeight: '38px',
                               boxSizing: 'border-box',
                               borderRadius: '12px', 
                               fontSize: '0.78rem', 
-                              fontWeight: 800,
-                              border: '1px solid rgba(52, 168, 83, 0.18)'
+                              fontWeight: 800, 
+                              border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.3)' : '1px solid rgba(52, 168, 83, 0.18)'
                             }}>
-                              <Calendar size={14} color="#34a853" />
-                              <span>Nächster Unterricht: {lessonText}</span>
+                              <Calendar size={14} color={isCanceled ? '#dc2626' : '#34a853'} />
+                              <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächster Unterricht: ${lessonText}`}</span>
                             </div>
 
+                            {/* 2. Nachrichten Button */}
                             {teacherId && (
                               <button 
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setAppointmentChatData({
@@ -18398,23 +19952,88 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
                                   gap: '8px', 
-                                  background: hasMessage ? '#34a853' : '#ffffff', 
-                                  color: hasMessage ? '#ffffff' : '#334155', 
+                                  background: hasMessage ? 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)' : '#ffffff', 
+                                  color: hasMessage ? '#78350f' : '#475569', 
                                   padding: '8px 16px', 
                                   minHeight: '38px',
                                   boxSizing: 'border-box',
-                                  borderRadius: '12px', 
-                                  fontSize: '0.78rem', 
-                                  fontWeight: 800, 
-                                  border: hasMessage ? 'none' : '1px solid #cbd5e1', 
+                                  borderRadius: '14px', 
+                                  fontSize: '0.80rem', 
+                                  fontWeight: 900, 
+                                  border: hasMessage ? '2px solid #f59e0b' : '1px solid #cbd5e1', 
+                                  cursor: 'pointer',
+                                  boxShadow: hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                  e.currentTarget.style.boxShadow = hasMessage ? '0 6px 18px rgba(245, 158, 11, 0.32)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.transform = 'none';
+                                  e.currentTarget.style.boxShadow = hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
+                                }}
+                                onMouseDown={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(1px)';
+                                }}
+                                onMouseUp={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                }}
+                                title="1:1 Nachrichten zum Unterrichtstermin"
+                              >
+                                <MessageSquare size={15} color={hasMessage ? '#d97706' : '#64748b'} fill={hasMessage ? 'rgba(245, 158, 11, 0.2)' : 'none'} />
+                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : 'Nachrichten'}</span>
+                                {unreadMsgCount > 0 && (
+                                  <span style={{
+                                    background: '#f59e0b',
+                                    color: '#ffffff',
+                                    fontSize: '0.70rem',
+                                    fontWeight: 950,
+                                    padding: '2px 8px',
+                                    borderRadius: '100px',
+                                    letterSpacing: '0.02em',
+                                    boxShadow: '0 2px 6px rgba(245, 158, 11, 0.35)'
+                                  }}>
+                                    {unreadMsgCount === 1 ? '1 neu ★' : `${unreadMsgCount} neu ★`}
+                                  </span>
+                                )}
+                              </button>
+                            )}
+
+                            {/* 3. Absage / Reaktivieren Button */}
+                            {nextOcc && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isCanceled) {
+                                    handleUndoCancelOccurrence(nextOcc);
+                                  } else {
+                                    handleTriggerCancelOccurrence(nextOcc);
+                                  }
+                                }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  background: isCanceled ? '#fee2e2' : '#ffffff',
+                                  color: isCanceled ? '#dc2626' : '#475569',
+                                  padding: '8px 16px',
+                                  minHeight: '38px',
+                                  boxSizing: 'border-box',
+                                  borderRadius: '12px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  border: isCanceled ? '1px solid #f87171' : '1px solid #e2e8f0',
                                   cursor: 'pointer',
                                   boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
                                   transition: 'all 0.2s'
                                 }}
                                 className="hover-scale"
+                                title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen (Krankmeldung)"}
                               >
-                                <MessageSquare size={14} color={hasMessage ? '#ffffff' : '#34a853'} />
-                                <span>{hasMessage ? 'Nachricht ansehen' : 'Nachricht an Lehrer'}</span>
+                                <CalendarX size={14} color={isCanceled ? '#dc2626' : '#64748b'} />
+                                <span>{isCanceled ? 'Absage zurücknehmen' : 'Unterricht absagen'}</span>
                               </button>
                             )}
                           </div>
@@ -21816,18 +23435,279 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
       {/* Settings Tab */}
       <div style={{ display: (activeTab === 'settings' && studentUser) ? 'flex' : 'none', marginTop: '0px', flexDirection: 'column', gap: '20px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0' }}>
-        {activeTab === 'settings' && studentUser && (
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
-                ⚙️ Einstellungen
-              </h2>
-              <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
-                Verwalte deine Push-Benachrichtigungen, persönliche PIN, Abrechnungsbelege und Datenschutz-Einstellungen.
-              </p>
-            </div>
+        {activeTab === 'settings' && studentUser && (() => {
+          const isJuniorOrTeen = (studentUiLevel === 'junior' || studentUiLevel === 'teen');
+          const isParentSessionActive = checkIsParentSessionActive();
+          const hasConfiguredParentPin = Boolean(
+            studentUser?.has_parent_pin ||
+            (studentUser as any)?.parent_pin ||
+            (typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_pin_${studentId}`))
+          );
 
-            {/* MODULAR COVER CARDS GRID */}
+          if (isJuniorOrTeen && !isParentSessionActive) {
+            return (
+              <div style={{
+                width: '100%',
+                maxWidth: '440px',
+                margin: '20px auto',
+                background: '#ffffff',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '32px',
+                padding: '36px 28px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.08)'
+              }}>
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '22px',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  marginBottom: '16px',
+                  boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.4)'
+                }}>
+                  <ShieldCheck size={34} />
+                </div>
+
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  {hasConfiguredParentPin ? 'Elternbereich geschützt 🛡️' : '6-stellige Eltern-Master-PIN vergeben 🛡️'}
+                </h2>
+                <p style={{ margin: '8px 0 18px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.4 }}>
+                  {hasConfiguredParentPin
+                    ? 'Bitte gib deine 6-stellige Eltern-Master-PIN ein, um den Elternbereich und alle Einstellungen zu öffnen.'
+                    : (parentSetupStep === 'enter'
+                        ? 'Erstelle eine neue 6-stellige Master-PIN für den geschützten Elternbereich.'
+                        : 'Wiederhole deine 6-stellige Master-PIN zur Bestätigung.')}
+                </p>
+
+                {(parentGateError || parentSetupError) && (
+                  <div style={{
+                    padding: '10px 16px',
+                    background: '#fee2e2',
+                    border: '1px solid #fca5a5',
+                    borderRadius: '14px',
+                    color: '#dc2626',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    marginBottom: '16px',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    {parentGateError || parentSetupError}
+                  </div>
+                )}
+
+                {/* 6 Dots Display */}
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                  {[0, 1, 2, 3, 4, 5].map((idx) => {
+                    const currentLen = hasConfiguredParentPin 
+                      ? parentGatePinInput.length 
+                      : (parentSetupStep === 'enter' ? parentSetupPin.length : parentSetupConfirm.length);
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '50%',
+                          border: `2px solid ${currentLen > idx ? '#0284c7' : '#cbd5e1'}`,
+                          background: currentLen > idx ? '#0284c7' : 'transparent',
+                          transition: 'all 0.15s ease'
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* 3x4 Touch Keypad */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '10px',
+                  width: '100%',
+                  maxWidth: '300px'
+                }}>
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
+                    const isSpecial = key === 'C' || key === 'back';
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        disabled={isVerifyingParentGate}
+                        onClick={async () => {
+                          setParentGateError('');
+                          setParentSetupError('');
+
+                          if (hasConfiguredParentPin) {
+                            if (key === 'C') {
+                              setParentGatePinInput('');
+                            } else if (key === 'back') {
+                              setParentGatePinInput(prev => prev.slice(0, -1));
+                            } else if (parentGatePinInput.length < 6) {
+                              const nextVal = parentGatePinInput + key;
+                              setParentGatePinInput(nextVal);
+                              if (nextVal.length === 6) {
+                                setIsVerifyingParentGate(true);
+                                try {
+                                  let isOk = false;
+                                  const cleanInput = nextVal.trim();
+                                  const userParentPin = String((studentUser as any)?.parent_pin || '').trim();
+                                  const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${studentId}`);
+                                  const cachedPin = localStorage.getItem(`groovelab_user_pin_${studentId}`);
+
+                                  try {
+                                    const { data: rpcOk } = await supabase.rpc('verify_parent_pin', {
+                                      student_id: studentId,
+                                      input_pin: cleanInput
+                                    });
+                                    if (rpcOk === true) isOk = true;
+                                  } catch (e) {}
+
+                                  if (!isOk && userParentPin) {
+                                    if (userParentPin === cleanInput || userParentPin.padStart(6, '0') === cleanInput) {
+                                      isOk = true;
+                                    } else {
+                                      try {
+                                        const msgBuffer = new TextEncoder().encode(cleanInput);
+                                        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                                        const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                                        if (userParentPin.toLowerCase() === hashHex.toLowerCase()) {
+                                          isOk = true;
+                                        }
+                                      } catch (e) {}
+                                    }
+                                  }
+
+                                  if (!isOk && (cachedParentPin?.trim() === cleanInput || cachedPin?.trim() === cleanInput)) {
+                                    isOk = true;
+                                  }
+
+                                  if (isOk) {
+                                    sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
+                                    sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
+                                    sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+                                    window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+                                    setParentGatePinInput('');
+                                    setSettingsSubTab('overview');
+                                    setActiveStudentSettingsModal(null);
+                                  } else {
+                                    setParentGateError('Falsche Eltern-Master-PIN.');
+                                    setParentGatePinInput('');
+                                  }
+                                } catch (e: any) {
+                                  setParentGateError('Fehler: ' + (e?.message || 'Verbindungsfehler'));
+                                  setParentGatePinInput('');
+                                } finally {
+                                  setIsVerifyingParentGate(false);
+                                }
+                              }
+                            }
+                          } else {
+                            // First-time PIN setup
+                            if (parentSetupStep === 'enter') {
+                              if (key === 'C') {
+                                setParentSetupPin('');
+                              } else if (key === 'back') {
+                                setParentSetupPin(prev => prev.slice(0, -1));
+                              } else if (parentSetupPin.length < 6) {
+                                const nextVal = parentSetupPin + key;
+                                setParentSetupPin(nextVal);
+                                if (nextVal.length === 6) {
+                                  if (/^(\d)\1+$/.test(nextVal) || nextVal === '123456' || nextVal === '654321') {
+                                    setParentSetupError('Bitte wähle eine sicherere PIN (nicht 123456 oder 000000).');
+                                    setParentSetupPin('');
+                                    return;
+                                  }
+                                  setParentSetupStep('confirm');
+                                }
+                              }
+                            } else {
+                              if (key === 'C') {
+                                setParentSetupConfirm('');
+                              } else if (key === 'back') {
+                                setParentSetupConfirm(prev => prev.slice(0, -1));
+                              } else if (parentSetupConfirm.length < 6) {
+                                const nextVal = parentSetupConfirm + key;
+                                setParentSetupConfirm(nextVal);
+                                if (nextVal.length === 6) {
+                                  if (nextVal !== parentSetupPin) {
+                                    setParentSetupError('Die PINs stimmen nicht überein.');
+                                    setParentSetupConfirm('');
+                                    setParentSetupPin('');
+                                    setParentSetupStep('enter');
+                                    return;
+                                  }
+
+                                  try {
+                                    localStorage.setItem(`groovelab_parent_pin_${studentId}`, nextVal);
+                                    await supabase.from('users').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', studentId);
+                                    try { await supabase.from('students').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', studentId); } catch(err){}
+                                    
+                                    sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
+                                    sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
+                                    sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+                                    window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+
+                                    setParentSetupPin('');
+                                    setParentSetupConfirm('');
+                                    setParentSetupStep('enter');
+                                    setSettingsSubTab('overview');
+                                    setActiveStudentSettingsModal(null);
+                                  } catch (e: any) {
+                                    setParentSetupError('Fehler beim Speichern: ' + e.message);
+                                    setParentSetupConfirm('');
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }}
+                        style={{
+                          padding: '14px 0',
+                          borderRadius: '16px',
+                          border: '1px solid #e2e8f0',
+                          background: isSpecial ? '#f1f5f9' : '#ffffff',
+                          color: '#0f172a',
+                          fontSize: isSpecial ? '0.9rem' : '1.3rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                          transition: 'all 0.1s'
+                        }}
+                        className="hover-scale"
+                      >
+                        {key === 'back' ? <Delete size={20} /> : key}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
+                  {isJuniorOrTeen ? '🛡️ Elternbereich' : '⚙️ Einstellungen'}
+                </h2>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
+                  {isJuniorOrTeen 
+                    ? 'Schutz- & Freigabefunktionen, Benachrichtigungen und Sicherheit für Eltern.' 
+                    : 'Verwalte deine Push-Benachrichtigungen, persönliche PIN, Abrechnungsbelege und Datenschutz-Einstellungen.'}
+                </p>
+              </div>
+
+              {/* MODULAR COVER CARDS GRID */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
@@ -21836,9 +23716,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             }}>
               {[
                 {
+                  id: 'parent_controls',
+                  title: 'Eltern-Kontrollzentrum',
+                  subtitle: 'Altersstufe & Freigaben',
+                  badge: 'Master-PIN Schutz',
+                  gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  shadowColor: 'rgba(2, 132, 199, 0.40)',
+                  icon: ShieldCheck
+                },
+                {
                   id: 'notifications',
-                  title: 'System & Alerts',
-                  subtitle: pushEnabled ? 'Push-Mitteilungen aktiv' : 'Mitteilungen & Cache',
+                  title: 'Mitteilungen & Alerts',
+                  subtitle: pushEnabled ? 'Push-Mitteilungen aktiv' : 'Mitteilungen & Push-Kanäle',
                   badge: pushEnabled ? 'Aktiv' : 'Konfigurieren',
                   gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                   shadowColor: 'rgba(59, 130, 246, 0.40)',
@@ -21847,7 +23736,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 {
                   id: 'security',
                   title: 'PIN & Sicherheit',
-                  subtitle: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : 'Persönliche PIN festlegen',
+                  subtitle: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : '4-stellige PIN festlegen',
                   badge: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? 'Geschützt' : 'Empfohlen',
                   gradient: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
                   shadowColor: 'rgba(52, 168, 83, 0.40)',
@@ -21865,10 +23754,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 {
                   id: 'legal',
                   title: 'Rechtliches & DSGVO',
-                  subtitle: 'Datenschutz & Impressum',
+                  subtitle: 'Datenschutz & Art. 15 Export',
                   badge: 'DSGVO Konform',
-                  gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                  shadowColor: 'rgba(2, 132, 199, 0.40)',
+                  gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+                  shadowColor: 'rgba(100, 116, 139, 0.40)',
                   icon: ShieldCheck
                 }
               ].map((module) => {
@@ -21876,10 +23765,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 return (
                   <div
                     key={module.id}
-                    onClick={() => {
-                      setSettingsSubTab(module.id as any);
-                      setActiveStudentSettingsModal(module.id as any);
-                    }}
+                    onClick={() => handleOpenSettingsModule(module.id as any)}
                     style={{
                       background: '#ffffff',
                       border: '1.5px solid #e2e8f0',
@@ -21970,6 +23856,308 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </span>
             </div>
 
+            {/* PARENT GATEKEEPER MODAL (6-Digit Parent Master PIN) */}
+            {showParentGateModal && (() => {
+              const hasConfiguredParentPin = Boolean(
+                studentUser?.has_parent_pin ||
+                (studentUser as any)?.parent_pin ||
+                (typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_pin_${studentId}`))
+              );
+
+              return (
+                <div style={{
+                  position: 'fixed',
+                  inset: 0,
+                  background: 'rgba(15, 23, 42, 0.55)',
+                  backdropFilter: 'blur(16px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 12000,
+                  padding: '20px'
+                }}>
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '32px',
+                    padding: '32px 28px',
+                    width: '100%',
+                    maxWidth: '380px',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    border: '1px solid #f1f5f9',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    position: 'relative'
+                  }}>
+                    <button
+                      onClick={() => {
+                        setShowParentGateModal(false);
+                        setPendingParentTarget(null);
+                        setParentSetupPin('');
+                        setParentSetupConfirm('');
+                        setParentSetupStep('enter');
+                        setParentGatePinInput('');
+                        setParentGateError('');
+                        setParentSetupError('');
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '20px',
+                        right: '20px',
+                        background: '#f1f5f9',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '36px',
+                        height: '36px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: '#64748b'
+                      }}
+                    >
+                      <X size={18} />
+                    </button>
+
+                    <div style={{
+                      width: '60px',
+                      height: '60px',
+                      borderRadius: '20px',
+                      background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      marginBottom: '16px',
+                      boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.4)'
+                    }}>
+                      <ShieldCheck size={32} />
+                    </div>
+
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+                      {hasConfiguredParentPin ? 'Eltern-Bereich geschützt 🛡️' : '6-stellige Eltern-Master-PIN vergeben 🛡️'}
+                    </h3>
+                    
+                    <p style={{ margin: '8px 0 16px 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
+                      {hasConfiguredParentPin
+                        ? 'Bitte gib deine 6-stellige Eltern-Master-PIN ein, um diesen geschützten Bereich zu öffnen.'
+                        : (parentSetupStep === 'enter'
+                            ? 'Erstelle eine neue 6-stellige Master-PIN für den geschützten Elternbereich.'
+                            : 'Wiederhole deine 6-stellige Master-PIN zur Bestätigung.')}
+                    </p>
+
+                    {(parentGateError || parentSetupError) && (
+                      <div style={{
+                        padding: '10px 14px',
+                        background: '#fee2e2',
+                        border: '1px solid #fca5a5',
+                        borderRadius: '12px',
+                        color: '#dc2626',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        marginBottom: '14px',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}>
+                        {parentGateError || parentSetupError}
+                      </div>
+                    )}
+
+                    {/* 6 Dots Display */}
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                      {[0, 1, 2, 3, 4, 5].map((idx) => {
+                        const curLen = hasConfiguredParentPin
+                          ? parentGatePinInput.length
+                          : (parentSetupStep === 'enter' ? parentSetupPin.length : parentSetupConfirm.length);
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '50%',
+                              border: `2px solid ${curLen > idx ? '#0284c7' : '#cbd5e1'}`,
+                              background: curLen > idx ? '#0284c7' : 'transparent',
+                              transition: 'all 0.15s ease'
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {/* 3x4 Keypad */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: '10px',
+                      width: '100%'
+                    }}>
+                      {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
+                        const isSpecial = key === 'C' || key === 'back';
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            disabled={isVerifyingParentGate}
+                            onClick={async () => {
+                              setParentGateError('');
+                              setParentSetupError('');
+
+                              if (hasConfiguredParentPin) {
+                                if (key === 'C') {
+                                  setParentGatePinInput('');
+                                } else if (key === 'back') {
+                                  setParentGatePinInput(prev => prev.slice(0, -1));
+                                } else if (parentGatePinInput.length < 6) {
+                                  const nextVal = parentGatePinInput + key;
+                                  setParentGatePinInput(nextVal);
+                                  if (nextVal.length === 6) {
+                                    setIsVerifyingParentGate(true);
+                                    try {
+                                      let isOk = false;
+                                      const cleanInput = nextVal.trim();
+                                      const userParentPin = String((studentUser as any)?.parent_pin || '').trim();
+                                      const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${studentId}`);
+                                      const cachedPin = localStorage.getItem(`groovelab_user_pin_${studentId}`);
+
+                                      try {
+                                        const { data: rpcOk } = await supabase.rpc('verify_parent_pin', {
+                                          student_id: studentId,
+                                          input_pin: cleanInput
+                                        });
+                                        if (rpcOk === true) isOk = true;
+                                      } catch (e) {}
+
+                                      if (!isOk && userParentPin) {
+                                        if (userParentPin === cleanInput || userParentPin.padStart(6, '0') === cleanInput) {
+                                          isOk = true;
+                                        } else {
+                                          try {
+                                            const msgBuffer = new TextEncoder().encode(cleanInput);
+                                            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                                            const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                                            if (userParentPin.toLowerCase() === hashHex.toLowerCase()) {
+                                              isOk = true;
+                                            }
+                                          } catch (e) {}
+                                        }
+                                      }
+
+                                      if (!isOk && (cachedParentPin?.trim() === cleanInput || cachedPin?.trim() === cleanInput)) {
+                                        isOk = true;
+                                      }
+
+                                      if (isOk) {
+                                        sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
+                                        sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
+                                        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+                                        window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+                                        setParentGatePinInput('');
+                                        setSettingsSubTab('overview');
+                                        setActiveStudentSettingsModal(null);
+                                      } else {
+                                        setParentGateError('Falsche Eltern-Master-PIN.');
+                                        setParentGatePinInput('');
+                                      }
+                                    } catch (e: any) {
+                                      setParentGateError('Fehler: ' + (e?.message || 'Verbindungsfehler'));
+                                      setParentGatePinInput('');
+                                    } finally {
+                                      setIsVerifyingParentGate(false);
+                                    }
+                                  }
+                                }
+                              } else {
+                                // First-time PIN setup
+                                if (parentSetupStep === 'enter') {
+                                  if (key === 'C') {
+                                    setParentSetupPin('');
+                                  } else if (key === 'back') {
+                                    setParentSetupPin(prev => prev.slice(0, -1));
+                                  } else if (parentSetupPin.length < 6) {
+                                    const nextVal = parentSetupPin + key;
+                                    setParentSetupPin(nextVal);
+                                    if (nextVal.length === 6) {
+                                      if (/^(\d)\1+$/.test(nextVal) || nextVal === '123456' || nextVal === '654321') {
+                                        setParentSetupError('Bitte wähle eine sicherere PIN (nicht 123456 oder 000000).');
+                                        setParentSetupPin('');
+                                        return;
+                                      }
+                                      setParentSetupStep('confirm');
+                                    }
+                                  }
+                                } else {
+                                  if (key === 'C') {
+                                    setParentSetupConfirm('');
+                                  } else if (key === 'back') {
+                                    setParentSetupConfirm(prev => prev.slice(0, -1));
+                                  } else if (parentSetupConfirm.length < 6) {
+                                    const nextVal = parentSetupConfirm + key;
+                                    setParentSetupConfirm(nextVal);
+                                    if (nextVal.length === 6) {
+                                      if (nextVal !== parentSetupPin) {
+                                        setParentSetupError('Die PINs stimmen nicht überein.');
+                                        setParentSetupConfirm('');
+                                        setParentSetupPin('');
+                                        setParentSetupStep('enter');
+                                        return;
+                                      }
+
+                                      try {
+                                        localStorage.setItem(`groovelab_parent_pin_${studentId}`, nextVal);
+                                        await supabase.from('users').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', studentId);
+                                        try { await supabase.from('students').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', studentId); } catch(err){}
+                                        
+                                        sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
+                                        sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
+                                        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+                                        window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+
+                                        setShowParentGateModal(false);
+                                        setParentSetupPin('');
+                                        setParentSetupConfirm('');
+                                        setParentSetupStep('enter');
+                                        if (pendingParentTarget) {
+                                          setSettingsSubTab(pendingParentTarget);
+                                          setActiveStudentSettingsModal(pendingParentTarget);
+                                        }
+                                      } catch (e: any) {
+                                        setParentSetupError('Fehler beim Speichern: ' + e.message);
+                                        setParentSetupConfirm('');
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }}
+                            style={{
+                              padding: '14px 0',
+                              borderRadius: '16px',
+                              border: '1px solid #e2e8f0',
+                              background: isSpecial ? '#f1f5f9' : '#ffffff',
+                              color: '#0f172a',
+                              fontSize: isSpecial ? '0.9rem' : '1.25rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                              transition: 'all 0.1s'
+                            }}
+                            className="hover-scale"
+                          >
+                            {key === 'back' ? <Delete size={20} /> : key}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* FOCUS MODAL */}
             {activeStudentSettingsModal && (
               <div
@@ -22020,18 +24208,21 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         width: '42px',
                         height: '42px',
                         borderRadius: '12px',
-                        background: activeStudentSettingsModal === 'notifications'
+                        background: activeStudentSettingsModal === 'parent_controls'
+                          ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                          : activeStudentSettingsModal === 'notifications'
                           ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
                           : activeStudentSettingsModal === 'security'
                           ? 'linear-gradient(135deg, #34a853 0%, #15803d 100%)'
                           : activeStudentSettingsModal === 'billing'
                           ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
-                          : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                          : 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
                       }}>
+                        {activeStudentSettingsModal === 'parent_controls' && <ShieldCheck size={20} color="#ffffff" />}
                         {activeStudentSettingsModal === 'notifications' && <Bell size={20} color="#ffffff" />}
                         {activeStudentSettingsModal === 'security' && <Lock size={20} color="#ffffff" />}
                         {activeStudentSettingsModal === 'billing' && <FileText size={20} color="#ffffff" />}
@@ -22039,16 +24230,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       </div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          {activeStudentSettingsModal === 'notifications' && 'System & Push-Benachrichtigungen'}
+                          {activeStudentSettingsModal === 'parent_controls' && 'Eltern-Kontrollzentrum'}
+                          {activeStudentSettingsModal === 'notifications' && 'Mitteilungen & Benachrichtigungen'}
                           {activeStudentSettingsModal === 'security' && 'PIN & Sicherheit'}
-                          {activeStudentSettingsModal === 'billing' && 'Abrechnung & Rechnungen'}
+                          {activeStudentSettingsModal === 'billing' && 'Belege & Bereitstellung'}
                           {activeStudentSettingsModal === 'legal' && 'Rechtliches & Datenschutz'}
                         </h3>
                         <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                          {activeStudentSettingsModal === 'parent_controls' && 'Schutz-, Design- & Freigabefunktionen für dein Kind.'}
                           {activeStudentSettingsModal === 'notifications' && 'Passe an, worüber und wie wir dich informieren.'}
-                          {activeStudentSettingsModal === 'security' && 'Erstelle oder ändere deine persönliche 4-stellige Campus-PIN.'}
-                          {activeStudentSettingsModal === 'billing' && 'Übersicht über Gebühren, Rechnungen & Zahlungsstatus.'}
-                          {activeStudentSettingsModal === 'legal' && 'Transparente Informationen zu Datenschutz & Jugendschutz.'}
+                          {activeStudentSettingsModal === 'security' && '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & persönliches Profil).'}
+                          {activeStudentSettingsModal === 'billing' && 'Übersicht über 100% freie App, Bereitstellung & Zahlungsnachweise.'}
+                          {activeStudentSettingsModal === 'legal' && 'Transparente Informationen zu Datenschutz, DSGVO & Jugendschutz.'}
                         </p>
                       </div>
                     </div>
@@ -22074,6 +24267,518 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                   {/* Modal Body */}
                   <div style={{ padding: '24px', overflowY: 'auto', flex: 1, textAlign: 'left' }}>
+                    {activeStudentSettingsModal === 'parent_controls' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* Campus UI Design Switcher (Junior, Teen, +16) */}
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px',
+                          padding: '18px',
+                          borderRadius: '18px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          textAlign: 'left'
+                        }}>
+                          <div>
+                            <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Compass size={18} color="#0284c7" />
+                              <span>App-Design &amp; Altersstufe (Campus)</span>
+                            </div>
+                            <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 500, lineHeight: 1.4, marginTop: '2px' }}>
+                              Legt fest, welche Benutzeroberfläche und Standard-Boards dein Kind in der Web-App sieht.
+                            </div>
+                          </div>
+
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: '8px',
+                            background: '#e2e8f0',
+                            padding: '5px',
+                            borderRadius: '14px'
+                          }}>
+                            {[
+                              { id: 'junior', label: 'Junior', age: '6–10 J.' },
+                              { id: 'teen', label: 'Teen', age: '11–15 J.' },
+                              { id: 'pro', label: '+16 / Pro', age: 'Ab 16 J.' }
+                            ].map((lvl) => {
+                              const currentLevel = draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior');
+                              const active = currentLevel === lvl.id;
+                              return (
+                                <button
+                                  key={lvl.id}
+                                  type="button"
+                                  onClick={() => {
+                                    const std = CAMPUS_AGE_STANDARDS[lvl.id];
+                                    if (std) applyAndSaveParentControls(std);
+                                  }}
+                                  style={{
+                                    padding: '10px 6px',
+                                    borderRadius: '11px',
+                                    border: 'none',
+                                    background: active ? '#ffffff' : 'transparent',
+                                    color: active ? '#0284c7' : '#64748b',
+                                    fontWeight: active ? 850 : 650,
+                                    fontSize: '0.82rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '2px',
+                                    boxShadow: active ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                >
+                                  <span>{lvl.label}</span>
+                                  <span style={{ fontSize: '0.66rem', opacity: active ? 0.9 : 0.7 }}>{lvl.age}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Granular Board & Feature Toggles with Reset to Age Standard */}
+                        {(() => {
+                          const currentLvlKey = (draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior')) as 'junior' | 'teen' | 'pro';
+                          const standard = CAMPUS_AGE_STANDARDS[currentLvlKey] || CAMPUS_AGE_STANDARDS.junior;
+
+                          const curAbsences = draftAllowAbsences ?? (studentUser as any)?.parent_allow_absences ?? (currentLvlKey !== 'junior');
+                          const curChat = draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (currentLvlKey !== 'junior');
+                          const curTimer = draftAllowTimer ?? (studentUser as any)?.parent_allow_timer ?? true;
+                          const curLeaderboard = draftAllowLeaderboard ?? (studentUser as any)?.parent_allow_leaderboard ?? (currentLvlKey !== 'junior');
+                          const curProposals = draftAllowProposals ?? (studentUser as any)?.parent_allow_proposals ?? (draftBoardOverrides.mediathek ?? (currentLvlKey !== 'junior'));
+                          const curAudio = draftAllowAudio ?? (studentUser as any)?.parent_allow_audio ?? (draftBoardOverrides.recordings ?? true);
+                          const curTts = draftAllowTts ?? (studentUser as any)?.parent_allow_tts ?? (currentLvlKey === 'junior');
+
+                          const isDeviating = 
+                            curAbsences !== standard.allowAbsences ||
+                            curChat !== standard.allowChat ||
+                            curTimer !== standard.allowTimer ||
+                            curLeaderboard !== standard.allowLeaderboard ||
+                            curProposals !== standard.allowProposals ||
+                            curAudio !== standard.allowAudio ||
+                            curTts !== standard.allowTts;
+
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <Sliders size={16} color="#0284c7" />
+                                  <span>Individuelle Board- &amp; Feature-Freigaben</span>
+                                </div>
+                                {isDeviating ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => applyAndSaveParentControls(standard)}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      padding: '4px 10px',
+                                      borderRadius: '8px',
+                                      background: '#f1f5f9',
+                                      border: '1px solid #cbd5e1',
+                                      color: '#0369a1',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 750,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale"
+                                    title={`Setzt alle Freigaben auf den empfohlenen Standard für ${standard.label} zurück`}
+                                  >
+                                    <RotateCcw size={12} />
+                                    <span>Standard für {standard.label} wiederherstellen</span>
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: '0.70rem', color: '#16a34a', fontWeight: 750, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <Check size={12} strokeWidth={3} />
+                                    <span>Standard aktiv</span>
+                                  </span>
+                                )}
+                              </div>
+
+                          {/* Toggle 1: Practice Board (Übe-Pfad & Fokus-Timer) */}
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            cursor: 'pointer'
+                          }}>
+                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Zap size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                <span>Übe-Pfad &amp; Fokus-Timer</span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                Interaktiver Übe-Timer, Streak-Flammen und XP-Sammeln für eigenständiges Üben zu Hause.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={curTimer}
+                              onChange={(e) => applyAndSaveParentControls({ allowTimer: e.target.checked, boardOverrides: { practice_board: e.target.checked } })}
+                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                            />
+                          </label>
+
+                          {/* Toggle 2: Mediathek: Songs & Lehrwerke */}
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            cursor: 'pointer'
+                          }}>
+                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Library size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                <span>Mediathek: Songs &amp; Lehrwerke</span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                Schulkatalog, Song-Bibliotheken, Play-Along-Tracks und digitale Notenbücher.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={curProposals}
+                              onChange={(e) => applyAndSaveParentControls({ allowProposals: e.target.checked, boardOverrides: { mediathek: e.target.checked } })}
+                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                            />
+                          </label>
+
+                          {/* Toggle 3: Mikrofon & Eigene Song-Aufnahmen */}
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            cursor: 'pointer'
+                          }}>
+                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Mic size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                <span>Mikrofon &amp; Eigene Song-Aufnahmen</span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                Erlaubt deinem Kind, eigene Übe-Aufnahmen und Sprachmemos mit dem Mikrofon aufzuzeichnen (Aufnahmen der Lehrkraft bleiben immer abspielbar).
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={curAudio}
+                              onChange={(e) => applyAndSaveParentControls({ allowAudio: e.target.checked, boardOverrides: { recordings: e.target.checked } })}
+                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                            />
+                          </label>
+
+                          {/* Toggle 4: Absences (Unterrichtsstunden selbstständig absagen) */}
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            cursor: 'pointer'
+                          }}>
+                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Calendar size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                <span>Unterrichtsstunden selbstständig absagen</span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                Erlaubt deinem Kind, Termine im Kalender bei Krankheit eigenständig abzusagen.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={curAbsences}
+                              onChange={(e) => applyAndSaveParentControls({ allowAbsences: e.target.checked })}
+                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                            />
+                          </label>
+
+                          {/* Toggle 5: Chat (Direktnachrichten an Lehrkräfte schreiben) */}
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            cursor: 'pointer'
+                          }}>
+                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Mail size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                <span>Direktnachrichten an Lehrkräfte schreiben</span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                Erlaubt deinem Kind, im Chat Nachrichten und Fragen zu Hausaufgaben zu senden.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={curChat}
+                              onChange={(e) => applyAndSaveParentControls({ allowChat: e.target.checked, boardOverrides: { messages: e.target.checked } })}
+                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                            />
+                          </label>
+
+                          {/* Toggle 6: Leaderboard (Klassen-Highlights & Team-Power) */}
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            cursor: 'pointer'
+                          }}>
+                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Trophy size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                <span>Klassen-Highlights &amp; Team-Power</span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                Gemeinsame Übe-Minuten sammeln, Meilensteine der Klasse feiern und Team-Ziele erreichen.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={curLeaderboard}
+                              onChange={(e) => applyAndSaveParentControls({ allowLeaderboard: e.target.checked, boardOverrides: { campus_cup: e.target.checked } })}
+                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                            />
+                          </label>
+
+                          {/* Toggle 7: Audio-Vorleseassistent (Sprachausgabe) */}
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            cursor: 'pointer'
+                          }}>
+                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Volume2 size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                <span>Audio-Vorleseassistent (Sprachausgabe)</span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                Liest Hausaufgaben, Notizen und Übe-Fahrpläne laut auf Deutsch vor. Ideal für Leseanfänger, auditive Lerntypen und bei LRS/Dyslexie.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={curTts}
+                              onChange={(e) => applyAndSaveParentControls({ allowTts: e.target.checked })}
+                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                            />
+                          </label>
+                        </div>
+                      );
+                    })()}
+
+                        {/* Must-Have 1: Ruhezeiten & Nachtruhe-Schutz */}
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px',
+                          padding: '18px',
+                          borderRadius: '18px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          textAlign: 'left'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <Moon size={18} color="#0284c7" style={{ flexShrink: 0 }} />
+                              <div>
+                                <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                                  Nachtruhe-Schutz &amp; Ruhezeiten
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  Sperrt die Übe-App für dein Kind in der Nacht (kann per Eltern-PIN jederzeit entsperrt werden).
+                                </div>
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={bedtimeModeEnabled}
+                              onChange={(e) => handleUpdateBedtime(e.target.checked)}
+                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer', flexShrink: 0 }}
+                            />
+                          </div>
+
+                          {bedtimeModeEnabled && (
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: '10px',
+                              padding: '12px',
+                              borderRadius: '12px',
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              marginTop: '4px'
+                            }}>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                                  Ruhezeit ab:
+                                </label>
+                                <select
+                                  value={bedtimeStart}
+                                  onChange={(e) => handleUpdateBedtime(true, e.target.value, bedtimeEnd)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 10px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 700,
+                                    color: '#0f172a',
+                                    background: '#f8fafc',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {['19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00', '22:30'].map(t => (
+                                    <option key={t} value={t}>{t} Uhr</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                                  Aufwachen um:
+                                </label>
+                                <select
+                                  value={bedtimeEnd}
+                                  onChange={(e) => handleUpdateBedtime(true, bedtimeStart, e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 10px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 700,
+                                    color: '#0f172a',
+                                    background: '#f8fafc',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {['06:00', '06:30', '07:00', '07:30', '08:00', '08:30', '09:00'].map(t => (
+                                    <option key={t} value={t}>{t} Uhr</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Must-Have 2: Geschwister-Schnellwechsel (Family Hub) */}
+                        {familyProfiles.length > 0 && (
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            padding: '18px',
+                            borderRadius: '18px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            textAlign: 'left'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <Users size={18} color="#0284c7" style={{ flexShrink: 0 }} />
+                              <div>
+                                <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                                  Familien-Profile &amp; Geschwister (Schnellwechsel)
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  Wechsle ohne erneute PIN-Eingabe zwischen deinen Kindern auf diesem Gerät.
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px', marginTop: '4px' }}>
+                              {familyProfiles.map((member) => {
+                                const isCurrent = member.id === studentId;
+                                return (
+                                  <button
+                                    key={member.id}
+                                    type="button"
+                                    onClick={() => !isCurrent && handleSwitchFamilyStudent(member.id)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '10px',
+                                      padding: '10px 12px',
+                                      borderRadius: '12px',
+                                      background: isCurrent ? '#e0f2fe' : '#ffffff',
+                                      border: isCurrent ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+                                      cursor: isCurrent ? 'default' : 'pointer',
+                                      textAlign: 'left',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className={!isCurrent ? 'hover-scale' : undefined}
+                                  >
+                                    <img
+                                      src={getInstrumentAvatarUrl(member.instrument)}
+                                      alt={member.first_name}
+                                      style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', background: '#f1f5f9' }}
+                                    />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: isCurrent ? '#0369a1' : '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {member.first_name} {member.last_name ? member.last_name.trim().charAt(0) + '.' : ''}
+                                      </div>
+                                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+                                        {isCurrent ? '● Aktives Kind' : (member.instrument || 'Schüler')}
+                                      </div>
+                                    </div>
+                                    {!isCurrent && <ArrowRight size={14} color="#64748b" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Real-time sync status footer bar */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '12px 16px',
+                          borderRadius: '14px',
+                          background: '#e6f4ea',
+                          border: '1px solid #bbf7d0',
+                          color: '#15803d',
+                          fontSize: '0.78rem',
+                          fontWeight: 700
+                        }}>
+                          <ShieldCheck size={16} color="#15803d" style={{ flexShrink: 0 }} />
+                          <span>Alle Einstellungen werden in Echtzeit gespeichert und in der App übernommen.</span>
+                        </div>
+                      </div>
+                    )}
+
                     {activeStudentSettingsModal === 'notifications' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -22085,7 +24790,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               </div>
                               <div>
                                 <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Push-Benachrichtigungen aktivieren</h4>
-                                <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Erlaube der App, dir Direktnachrichten auf dein Handy zu schicken.</p>
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Erlaube der App, dir wichtige Mitteilungen auf dein Handy zu schicken.</p>
                               </div>
                             </div>
                             
@@ -22155,17 +24860,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               lineHeight: '1.4',
                               fontWeight: 600
                             }}>
-                              <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne GrooveLab danach über das neue App-Icon auf deinem Homescreen.
+                              <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne Campus-Groovelab danach über das neue App-Icon auf deinem Homescreen.
                             </div>
                           )}
 
-                          {/* Detail-Toggles */}
+                          {/* The 5 Modular Granular Push Channels */}
                           {pushEnabled && isPremiumUser && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
+                              <div style={{ fontSize: '0.78rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                                Spezifische Benachrichtigungs-Kanäle
+                              </div>
                               {[
-                                { k: 'changes', label: 'Terminänderungen', desc: 'Verschiebungen, Ausfälle oder Lehrerwechsel', val: pushNotifScheduleChanges, setter: setPushNotifScheduleChanges, dbKey: 'push_notif_schedule_changes', icon: <Calendar size={18} /> },
-                                { k: 'homework', label: 'Hausaufgaben', desc: 'Neue Übe-Aufgaben oder Feedback deiner Lehrkraft', val: pushNotifHomework, setter: setPushNotifHomework, dbKey: 'push_notif_homework', icon: <Pencil size={18} /> },
-                                { k: 'news', label: 'Neuigkeiten & Aktionen', desc: 'Mitteilungen der Musikschule und interessante Aktionen', val: pushNotifAllFeatures, setter: setPushNotifAllFeatures, dbKey: 'push_notif_all_features', icon: <Users size={18} /> }
+                                { k: 'changes', label: 'Termin- & Stundenplanänderungen', desc: 'Sofortige Alerts bei Raumwechseln, Vertretungen oder Ausfällen.', val: pushNotifScheduleChanges, setter: setPushNotifScheduleChanges, dbKey: 'push_notif_schedule_changes', icon: <Calendar size={18} /> },
+                                { k: 'homework', label: 'Hausaufgaben & Lehrer-Feedback', desc: 'Benachrichtigung, sobald deine Lehrkraft neue Aufgaben notiert hat.', val: pushNotifHomework, setter: setPushNotifHomework, dbKey: 'push_notif_homework', icon: <Pencil size={18} /> },
+                                { k: 'chat', label: 'Direktnachrichten & Chat', desc: 'Sofort-Mitteilung bei neuen Antworten von deiner Lehrkraft oder Musikschule.', val: pushNotifChat, setter: setPushNotifChat, dbKey: 'push_notif_chat', icon: <Mail size={18} /> },
+                                { k: 'practice', label: 'Übe-Erinnerung & Streak-Schutz', desc: 'Sanfter Reminder am Nachmittag, um die tägliche Übe-Serie zu halten.', val: pushNotifPracticeReminder, setter: setPushNotifPracticeReminder, dbKey: 'push_notif_practice_reminder', icon: <Zap size={18} /> },
+                                { k: 'digest', label: 'Wöchentlicher Übe-Rückblick', desc: 'Sonntags-Digest mit gesammelten Übe-Minuten und Meilensteinen.', val: pushNotifWeeklyDigest, setter: setPushNotifWeeklyDigest, dbKey: 'push_notif_weekly_digest', icon: <Trophy size={18} /> }
                               ].map((row) => (
                                 <div key={row.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
                                   <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
@@ -22195,13 +24905,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           )}
                         </div>
 
-                        {/* System zurücksetzen */}
+                        {/* System-Cache leeren (Hilfe & Diagnose) */}
                         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
-                          <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#ef4444', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <RotateCcw size={16} color="#ef4444" /> System-Cache leeren
+                          <h3 style={{ fontSize: '0.90rem', fontWeight: 850, color: '#64748b', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <RotateCcw size={15} color="#64748b" /> App-Cache &amp; Diagnose
                           </h3>
-                          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '14px', fontWeight: 600, lineHeight: '1.4' }}>
-                            Wenn die App nicht korrekt lädt, der Timer hakt oder Anzeigefehler auftreten, kannst du hier alle lokalen Cache-Daten zurücksetzen.
+                          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '12px', fontWeight: 550, lineHeight: '1.4' }}>
+                            Wenn die App nicht korrekt lädt oder alte Daten anzeigt, kannst du hier den lokalen Speicher bereinigen.
                           </p>
                           <button
                             type="button"
@@ -22224,11 +24934,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               }
                             }}
                             style={{
-                              background: '#fee2e2',
-                              color: '#ef4444',
-                              border: '1px solid #fca5a5',
-                              padding: '10px 18px',
-                              borderRadius: '12px',
                               fontWeight: 800,
                               fontSize: '0.82rem',
                               cursor: 'pointer',
@@ -22246,15 +24951,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     )}
 
                     {activeStudentSettingsModal === 'security' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '400px', margin: '0 auto', width: '100%' }}>
                         <div style={{
                           background: '#f8fafc',
                           border: '1px solid #e2e8f0',
-                          borderRadius: '20px',
+                          borderRadius: '24px',
                           padding: '24px',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '20px'
+                          gap: '16px'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ padding: '10px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853' }}>
@@ -22278,212 +24983,348 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             </div>
                           )}
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#475569', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                Neue 4-stellige PIN
-                              </label>
-                              <input
-                                type="password"
-                                maxLength={4}
-                                pattern="[0-9]*"
-                                inputMode="numeric"
-                                placeholder="z. B. 1234"
-                                value={pinFormNew}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                                  setPinFormNew(val);
-                                  setPinFormError('');
-                                  setPinFormSuccess('');
-                                }}
-                                style={{
-                                  width: '100%',
-                                  padding: '12px 16px',
-                                  borderRadius: '12px',
-                                  border: '1.5px solid #cbd5e1',
-                                  fontSize: '1.2rem',
-                                  fontWeight: 800,
-                                  letterSpacing: '0.25em',
-                                  textAlign: 'center',
-                                  background: '#ffffff',
-                                  color: '#0f172a',
-                                  outline: 'none',
-                                  boxSizing: 'border-box'
-                                }}
-                              />
+                          {/* Field 1: Neue PIN */}
+                          <div 
+                            onClick={() => setFirstPinActiveField('new')}
+                            style={{
+                              padding: '12px 14px',
+                              borderRadius: '16px',
+                              border: firstPinActiveField === 'new' ? '2px solid #15803d' : '1.5px solid #e2e8f0',
+                              background: firstPinActiveField === 'new' ? '#f0fdf4' : '#ffffff',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: firstPinActiveField === 'new' ? '#15803d' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                1. Neue 4-stellige PIN
+                              </span>
+                              {pinFormNew.length === 4 && (
+                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  <Check size={13} strokeWidth={3} /> 4 Ziffern
+                                </span>
+                              )}
                             </div>
 
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#475569', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                PIN bestätigen
-                              </label>
-                              <input
-                                type="password"
-                                maxLength={4}
-                                pattern="[0-9]*"
-                                inputMode="numeric"
-                                placeholder="PIN wiederholen"
-                                value={pinFormConfirm}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                                  setPinFormConfirm(val);
-                                  setPinFormError('');
-                                  setPinFormSuccess('');
-                                }}
-                                style={{
-                                  width: '100%',
-                                  padding: '12px 16px',
-                                  borderRadius: '12px',
-                                  border: '1.5px solid #cbd5e1',
-                                  fontSize: '1.2rem',
-                                  fontWeight: 800,
-                                  letterSpacing: '0.25em',
-                                  textAlign: 'center',
-                                  background: '#ffffff',
-                                  color: '#0f172a',
-                                  outline: 'none',
-                                  boxSizing: 'border-box'
-                                }}
-                              />
+                            {/* 4 Dots / Numbers Display */}
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', padding: '4px 0' }}>
+                              {[0, 1, 2, 3].map((idx) => {
+                                const char = pinFormNew[idx];
+                                const isFilled = Boolean(char);
+                                return (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      width: '42px',
+                                      height: '46px',
+                                      borderRadius: '12px',
+                                      border: isFilled ? '2px solid #15803d' : (firstPinActiveField === 'new' && pinFormNew.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
+                                      background: '#ffffff',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '1.25rem',
+                                      fontWeight: 900,
+                                      color: '#0f172a',
+                                      boxShadow: isFilled ? '0 2px 6px rgba(21, 128, 61, 0.15)' : 'none',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    {isFilled ? (firstPinShowMask ? char : '●') : ''}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Field 2: PIN Bestätigen */}
+                          <div 
+                            onClick={() => setFirstPinActiveField('confirm')}
+                            style={{
+                              padding: '12px 14px',
+                              borderRadius: '16px',
+                              border: firstPinActiveField === 'confirm' ? '2px solid #15803d' : '1.5px solid #e2e8f0',
+                              background: firstPinActiveField === 'confirm' ? '#f0fdf4' : '#ffffff',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: firstPinActiveField === 'confirm' ? '#15803d' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                2. PIN wiederholen
+                              </span>
+                              {pinFormConfirm.length === 4 && (
+                                pinFormNew === pinFormConfirm ? (
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <CheckCheck size={14} strokeWidth={2.5} /> Stimmt überein
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#dc2626' }}>
+                                    Stimmt nicht überein
+                                  </span>
+                                )
+                              )}
                             </div>
 
+                            {/* 4 Dots / Numbers Display */}
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', padding: '4px 0' }}>
+                              {[0, 1, 2, 3].map((idx) => {
+                                const char = pinFormConfirm[idx];
+                                const isFilled = Boolean(char);
+                                return (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      width: '42px',
+                                      height: '46px',
+                                      borderRadius: '12px',
+                                      border: isFilled ? (pinFormNew === pinFormConfirm && pinFormConfirm.length === 4 ? '2px solid #15803d' : '2px solid #64748b') : (firstPinActiveField === 'confirm' && pinFormConfirm.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
+                                      background: '#ffffff',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '1.25rem',
+                                      fontWeight: 900,
+                                      color: '#0f172a',
+                                      boxShadow: isFilled ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    {isFilled ? (firstPinShowMask ? char : '●') : ''}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Toggle show/hide numbers */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', margin: '-4px 0 0 0' }}>
                             <button
                               type="button"
-                              disabled={isSavingPin || pinFormNew.length !== 4 || pinFormConfirm.length !== 4}
-                              onClick={async () => {
-                                if (pinFormNew.length !== 4) {
-                                  setPinFormError('Bitte gib eine vollständige 4-stellige PIN ein.');
-                                  return;
-                                }
-                                if (pinFormNew !== pinFormConfirm) {
-                                  setPinFormError('Die eingegebenen PINs stimmen nicht überein.');
-                                  return;
-                                }
+                              onClick={() => setFirstPinShowMask(!firstPinShowMask)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#64748b',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '2px 4px'
+                              }}
+                            >
+                              {firstPinShowMask ? <EyeOff size={14} /> : <Eye size={14} />}
+                              <span>{firstPinShowMask ? 'Ziffern verbergen' : 'Ziffern anzeigen'}</span>
+                            </button>
+                          </div>
 
-                                const dayOfBirth = (studentUser as any)?.day_of_birth || (Array.isArray((studentUser as any)?.activation_days) ? (studentUser as any)?.activation_days[0]?.day_of_birth : (studentUser as any)?.activation_days?.day_of_birth);
-                                const validation = validateNewPin(pinFormNew, dayOfBirth);
-                                if (!validation.isValid) {
-                                  setPinFormError(validation.error || 'Ungültige PIN.');
-                                  return;
-                                }
+                          {/* On-Screen Touch Keypad */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: '8px',
+                            width: '100%',
+                            marginTop: '4px'
+                          }}>
+                            {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
+                              const isClear = key === 'C';
+                              const isBack = key === 'back';
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => {
+                                    setPinFormError('');
+                                    setPinFormSuccess('');
+                                    if (firstPinActiveField === 'new') {
+                                      if (isClear) {
+                                        setPinFormNew('');
+                                      } else if (isBack) {
+                                        setPinFormNew(prev => prev.slice(0, -1));
+                                      } else if (pinFormNew.length < 4) {
+                                        const nextVal = pinFormNew + key;
+                                        setPinFormNew(nextVal);
+                                        if (nextVal.length === 4) {
+                                          setFirstPinActiveField('confirm');
+                                        }
+                                      }
+                                    } else {
+                                      if (isClear) {
+                                        setPinFormConfirm('');
+                                      } else if (isBack) {
+                                        if (pinFormConfirm.length === 0) {
+                                          setFirstPinActiveField('new');
+                                        } else {
+                                          setPinFormConfirm(prev => prev.slice(0, -1));
+                                        }
+                                      } else if (pinFormConfirm.length < 4) {
+                                        setPinFormConfirm(prev => prev + key);
+                                      }
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '12px 0',
+                                    borderRadius: '14px',
+                                    border: '1px solid #e2e8f0',
+                                    background: (isClear || isBack) ? '#f1f5f9' : '#ffffff',
+                                    color: '#0f172a',
+                                    fontSize: (isClear || isBack) ? '0.85rem' : '1.25rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                                    transition: 'all 0.1s'
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  {isBack ? <Delete size={18} /> : key}
+                                </button>
+                              );
+                            })}
+                          </div>
 
-                                setIsSavingPin(true);
-                                setPinFormError('');
+                          <button
+                            type="button"
+                            disabled={isSavingPin || pinFormNew.length !== 4 || pinFormConfirm.length !== 4}
+                            onClick={async () => {
+                              if (pinFormNew.length !== 4) {
+                                setPinFormError('Bitte gib eine vollständige 4-stellige PIN ein.');
+                                return;
+                              }
+                              if (pinFormNew !== pinFormConfirm) {
+                                setPinFormError('Die eingegebenen PINs stimmen nicht überein.');
+                                return;
+                              }
+
+                              const dayOfBirth = (studentUser as any)?.day_of_birth || (Array.isArray((studentUser as any)?.activation_days) ? (studentUser as any)?.activation_days[0]?.day_of_birth : (studentUser as any)?.activation_days?.day_of_birth);
+                              const validation = validateNewPin(pinFormNew, dayOfBirth);
+                              if (!validation.isValid) {
+                                setPinFormError(validation.error || 'Ungültige PIN.');
+                                return;
+                              }
+
+                              setIsSavingPin(true);
+                              setPinFormError('');
+
+                              try {
+                                if (studentId) {
+                                  sessionStorage.setItem('groovelab_user_id', studentId);
+                                  localStorage.setItem('groovelab_user_id', studentId);
+                                  const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
+                                  if (authQrToken) {
+                                    sessionStorage.setItem('groovelab_qr_token', authQrToken);
+                                  }
+                                }
 
                                 try {
-                                  if (studentId) {
-                                    sessionStorage.setItem('groovelab_user_id', studentId);
-                                    localStorage.setItem('groovelab_user_id', studentId);
-                                    const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
-                                    if (authQrToken) {
-                                      sessionStorage.setItem('groovelab_qr_token', authQrToken);
-                                    }
-                                  }
-
-                                  try {
-                                    await supabase.from('students').update({
-                                      personal_pin: pinFormNew,
-                                      parent_pin: pinFormNew,
-                                      onboarding_pin: pinFormNew,
-                                      is_pin_activated: true,
-                                      is_campus_active: true
-                                    }).eq('id', studentId);
-
-                                    await supabase.from('pending_students').update({
-                                      personal_pin: pinFormNew,
-                                      parent_pin: pinFormNew,
-                                      onboarding_pin: pinFormNew,
-                                      is_pin_activated: true,
-                                      is_campus_active: true
-                                    }).eq('id', studentId);
-                                  } catch (e) {}
-
-                                  try {
-                                    await supabase.from('users_raw').update({
-                                      personal_pin: pinFormNew,
-                                      parent_pin: pinFormNew,
-                                      onboarding_pin: pinFormNew,
-                                      is_pin_activated: true,
-                                      is_campus_active: true
-                                    }).eq('id', studentId);
-                                  } catch (e) {}
-
-                                  const userUpdatePayload: any = {
+                                  await supabase.from('students').update({
                                     personal_pin: pinFormNew,
                                     parent_pin: pinFormNew,
                                     onboarding_pin: pinFormNew,
                                     is_pin_activated: true,
                                     is_campus_active: true
-                                  };
-                                  let { error } = await supabase
+                                  }).eq('id', studentId);
+
+                                  await supabase.from('pending_students').update({
+                                    personal_pin: pinFormNew,
+                                    parent_pin: pinFormNew,
+                                    onboarding_pin: pinFormNew,
+                                    is_pin_activated: true,
+                                    is_campus_active: true
+                                  }).eq('id', studentId);
+                                } catch (e) {}
+
+                                try {
+                                  await supabase.from('users_raw').update({
+                                    personal_pin: pinFormNew,
+                                    parent_pin: pinFormNew,
+                                    onboarding_pin: pinFormNew,
+                                    is_pin_activated: true,
+                                    is_campus_active: true
+                                  }).eq('id', studentId);
+                                } catch (e) {}
+
+                                const userUpdatePayload: any = {
+                                  personal_pin: pinFormNew,
+                                  parent_pin: pinFormNew,
+                                  onboarding_pin: pinFormNew,
+                                  is_pin_activated: true,
+                                  is_campus_active: true
+                                };
+                                let { error } = await supabase
+                                  .from('users')
+                                  .update(userUpdatePayload)
+                                  .eq('id', studentId);
+
+                                if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                                  delete userUpdatePayload.onboarding_pin;
+                                  const fallbackRes = await supabase
                                     .from('users')
                                     .update(userUpdatePayload)
                                     .eq('id', studentId);
-
-                                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                                    delete userUpdatePayload.onboarding_pin;
-                                    const fallbackRes = await supabase
-                                      .from('users')
-                                      .update(userUpdatePayload)
-                                      .eq('id', studentId);
-                                    error = fallbackRes.error;
-                                  }
-
-                                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                                    console.warn('[StudentAvatarDashboard] users view trigger warning ignored because student table was updated:', error);
-                                    error = null;
-                                  }
-
-                                  localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
-                                  localStorage.setItem(`groovelab_student_pin_${studentId}`, pinFormNew);
-                                  sessionStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
-
-                                  if (error) {
-                                    setPinFormError('Fehler beim Speichern der PIN: ' + error.message);
-                                  } else {
-                                    setPinFormSuccess('Deine 4-stellige PIN wurde erfolgreich gespeichert! 🔒');
-                                    setStudentUser((prev: any) => prev ? {
-                                      ...prev,
-                                      is_pin_activated: true,
-                                      has_personal_pin: true,
-                                      has_parent_pin: true,
-                                      personal_pin: pinFormNew,
-                                      parent_pin: pinFormNew
-                                    } : prev);
-                                    if (onProfileUpdate) {
-                                      try { onProfileUpdate({ is_pin_activated: true, personal_pin: pinFormNew }); } catch (e) {}
-                                    }
-                                    setPinFormNew('');
-                                    setPinFormConfirm('');
-                                  }
-                                } catch (err: any) {
-                                  setPinFormError('Fehler: ' + (err?.message || 'Speichern fehlgeschlagen.'));
-                                } finally {
-                                  setIsSavingPin(false);
+                                  error = fallbackRes.error;
                                 }
-                              }}
-                              style={{
-                                marginTop: '8px',
-                                padding: '14px 20px',
-                                borderRadius: '14px',
-                                background: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#34a853' : '#e2e8f0',
-                                color: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#ffffff' : '#94a3b8',
-                                border: 'none',
-                                fontWeight: 800,
-                                fontSize: '0.875rem',
-                                cursor: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && !isSavingPin) ? 'pointer' : 'not-allowed',
-                                transition: 'all 0.2s ease',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px'
-                              }}
-                              className={(pinFormNew.length === 4 && pinFormConfirm.length === 4) ? "hover-scale" : ""}
-                            >
-                              <Lock size={16} />
-                              {isSavingPin ? 'Speichere PIN...' : 'Neue PIN jetzt speichern'}
-                            </button>
-                          </div>
+
+                                if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                                  console.warn('[StudentAvatarDashboard] users view trigger warning ignored because student table was updated:', error);
+                                  error = null;
+                                }
+
+                                localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
+                                localStorage.setItem(`groovelab_student_pin_${studentId}`, pinFormNew);
+                                sessionStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
+
+                                if (error) {
+                                  setPinFormError('Fehler beim Speichern der PIN: ' + error.message);
+                                } else {
+                                  setPinFormSuccess('Deine 4-stellige PIN wurde erfolgreich gespeichert! 🔒');
+                                  setStudentUser((prev: any) => prev ? {
+                                    ...prev,
+                                    is_pin_activated: true,
+                                    has_personal_pin: true,
+                                    has_parent_pin: true,
+                                    personal_pin: pinFormNew,
+                                    parent_pin: pinFormNew
+                                  } : prev);
+                                  if (onProfileUpdate) {
+                                    try { onProfileUpdate({ is_pin_activated: true, personal_pin: pinFormNew }); } catch (e) {}
+                                  }
+                                  setPinFormNew('');
+                                  setPinFormConfirm('');
+                                }
+                              } catch (err: any) {
+                                setPinFormError('Fehler: ' + (err?.message || 'Speichern fehlgeschlagen.'));
+                              } finally {
+                                setIsSavingPin(false);
+                              }
+                            }}
+                            style={{
+                              marginTop: '6px',
+                              padding: '14px 20px',
+                              borderRadius: '14px',
+                              background: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#34a853' : '#e2e8f0',
+                              color: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#ffffff' : '#94a3b8',
+                              border: 'none',
+                              fontWeight: 800,
+                              fontSize: '0.875rem',
+                              cursor: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && !isSavingPin) ? 'pointer' : 'not-allowed',
+                              transition: 'all 0.2s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px'
+                            }}
+                            className={(pinFormNew.length === 4 && pinFormConfirm.length === 4) ? "hover-scale" : ""}
+                          >
+                            <Lock size={16} />
+                            {isSavingPin ? 'Speichere PIN...' : 'Neue PIN jetzt speichern'}
+                          </button>
                         </div>
                       </div>
                     )}
@@ -22513,35 +25354,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </ul>
                         </div>
 
-                        {/* Privatsphäre in der Klasse & Helden-Momente */}
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                            <div>
-                              <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                ✨ Meilensteine in Klassen-Highlights teilen
-                              </span>
-                              <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#475569', lineHeight: 1.4, fontWeight: 550 }}>
-                                Erlaube Mitschülern deiner Klasse, gemeisterte Songs und Meilensteine (anonymisiert als Vorname + Initiale) im Feed zu sehen und dir Kudos zu senden.
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const next = !privacyShowHighlights;
-                                setPrivacyShowHighlights(next);
-                                try {
-                                  localStorage.setItem(`campus_privacy_show_highlights_${studentId}`, JSON.stringify(next));
-                                } catch (e) {}
-                              }}
-                              className={`app-binary-switch ${privacyShowHighlights ? 'active' : ''}`}
-                              style={{ backgroundColor: privacyShowHighlights ? '#34a853' : undefined, flexShrink: 0 }}
-                              title="Sichtbarkeit in Klassen-Highlights anpassen"
-                            >
-                              <div className="app-binary-switch-knob" />
-                            </button>
-                          </div>
-                        </div>
-
                         {/* Kostenfreie Software & Bereitstellung */}
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -22550,6 +25362,43 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
                             Die Campus-Groovelab Software-Nutzung ist für alle Schüler und Lehrkräfte <strong>dauerhaft 100% kostenlos</strong> (Reine Cloud- &amp; Hosting-Infrastruktur).
                           </p>
+                        </div>
+
+                        {/* DSGVO Art. 15 PDF Export */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <FileText size={18} color="#0284c7" style={{ flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
+                                DSGVO Art. 15 Auskunftsbericht
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, marginTop: '2px' }}>
+                                Offizielles Daten- &amp; Übeprotokoll gemäß DSGVO als PDF herunterladen.
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleExportGdprReport}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '8px 14px',
+                              borderRadius: '10px',
+                              background: '#0284c7',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '0.78rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              flexShrink: 0
+                            }}
+                            className="hover-scale"
+                          >
+                            <Download size={14} />
+                            <span>PDF Export</span>
+                          </button>
                         </div>
 
                         {/* Impressum & Anbieterkennzeichnung */}
@@ -22598,8 +25447,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
             )}
           </div>
-        )}
-      </div>
+        );
+      })()}
+    </div>
 
       {/* Junior-Optimized Song Detail Modal */}
       {selectedSongForDetail && (() => {
@@ -23470,7 +26320,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                       {/* One click WhatsApp Status Share */}
                       <a 
-                        href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Schau mal! Mein GrooveLab Rückblick diesen Monat: Ich war ${wrappedData.monthlyFlashback.focusMinutes} Minuten fokussiert und habe mein ${wrappedData.monthlyFlashback.badgeName} freigeschaltet! Musik machen ist genial! Werde auch Mitglied: https://groovelab.app/join?ref=${studentId}`)}`}
+                        href={'https://api.whatsapp.com/send?text=' + encodeURIComponent('Schau mal! Mein GrooveLab Rückblick diesen Monat: Ich war ' + wrappedData.monthlyFlashback.focusMinutes + ' Minuten fokussiert und habe mein ' + wrappedData.monthlyFlashback.badgeName + ' freigeschaltet! Musik machen ist genial! Werde auch Mitglied: https://groovelab.app/join?ref=' + studentId)}
                         target="_blank"
                         rel="noreferrer"
                         style={{ background: '#25d366', color: 'white', textDecoration: 'none', padding: '14px 28px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', boxShadow: '0 4px 12px rgba(37, 211, 102, 0.2)' }}
@@ -23487,7 +26337,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                       {/* Redirect to WhatsApp upgrade trigger */}
                       <a 
-                        href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Hallo Musikschule! Ich möchte mein GrooveLab-Konto auf Premium upgraden, um Avatare, Streaks und monatliche Stories freizuschalten. Bitte sendet mir den Upgrade-Link für 0,49€.`)}`}
+                        href={'https://api.whatsapp.com/send?text=' + encodeURIComponent('Hallo Musikschule! Ich möchte mein GrooveLab-Konto auf Premium upgraden, um Avatare, Streaks und monatliche Stories freizuschalten. Bitte sendet mir den Upgrade-Link für 0,49€.')}
                         target="_blank"
                         rel="noreferrer"
                         style={{ background: '#fbbf24', color: '#09090b', textDecoration: 'none', padding: '14px 28px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px' }}
@@ -24569,7 +27419,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => setChatTypedMessage(chip)}
+                      onClick={() => {
+                        if (!isStudentChatAllowed && !checkIsParentUnlockedGlobal()) {
+                          setGlobalPinPendingAction(() => () => setChatTypedMessage(chip));
+                          setGlobalPinInput('');
+                          setGlobalPinError('');
+                          setShowGlobalParentPinModal(true);
+                          return;
+                        }
+                        setChatTypedMessage(chip);
+                      }}
                       style={{
                         padding: '5px 10px',
                         borderRadius: '20px',
@@ -24597,57 +27456,305 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
               )}
 
+              {/* Chat Protection Lock Banner */}
+              {!isStudentChatAllowed && !checkIsParentUnlockedGlobal() && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 14px',
+                  margin: '6px 20px 0 20px',
+                  borderRadius: '12px',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  color: '#1e40af',
+                  fontSize: '0.78rem',
+                  fontWeight: 700
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Lock size={14} color="#2563eb" />
+                    <span>Antworten durch Eltern geschützt (Lesen frei)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGlobalPinPendingAction(() => () => {});
+                      setGlobalPinInput('');
+                      setGlobalPinError('');
+                      setShowGlobalParentPinModal(true);
+                    }}
+                    style={{
+                      background: '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                    className="hover-scale"
+                  >
+                    Mit Eltern-PIN freischalten
+                  </button>
+                </div>
+              )}
+
               {/* Send Form */}
-              <form onSubmit={handleSendChatMessage} style={{
-                padding: '16px 20px',
-                borderTop: '1px solid #f1f5f9',
-                background: '#ffffff',
-                display: 'flex',
-                gap: '10px'
-              }}>
-                <input
-                  type="text"
-                  placeholder={isFrozen ? "Eingefroren..." : "Schreibe eine Nachricht..."}
-                  disabled={isFrozen}
-                  value={chatTypedMessage}
-                  onChange={e => setChatTypedMessage(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '10px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    background: isFrozen ? '#f1f5f9' : '#ffffff',
-                    fontSize: '0.85rem',
-                    outline: 'none',
-                    fontWeight: 650
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={isFrozen || !chatTypedMessage.trim()}
-                  style={{
-                    border: 'none',
-                    background: isFrozen || !chatTypedMessage.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #137333)',
-                    color: '#ffffff',
-                    borderRadius: '12px',
-                    width: '42px',
-                    height: '42px',
+              {(() => {
+                const isChatLocked = !isStudentChatAllowed && !checkIsParentUnlockedGlobal();
+                return (
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (isChatLocked) {
+                      setGlobalPinPendingAction(() => () => {});
+                      setGlobalPinInput('');
+                      setGlobalPinError('');
+                      setShowGlobalParentPinModal(true);
+                      return;
+                    }
+                    handleSendChatMessage(e);
+                  }} style={{
+                    padding: '16px 20px',
+                    borderTop: '1px solid #f1f5f9',
+                    background: '#ffffff',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: isFrozen || !chatTypedMessage.trim() ? 'none' : '0 4px 12px rgba(52, 168, 83, 0.25)',
-                    flexShrink: 0
-                  }}
-                >
-                  <Send size={16} />
-                </button>
-              </form>
+                    gap: '10px'
+                  }}>
+                    <input
+                      type="text"
+                      placeholder={isFrozen ? "Eingefroren..." : isChatLocked ? "🔒 Antworten durch Eltern geschützt..." : "Schreibe eine Nachricht..."}
+                      disabled={isFrozen}
+                      value={chatTypedMessage}
+                      onClick={() => {
+                        if (isChatLocked) {
+                          setGlobalPinPendingAction(() => () => {});
+                          setGlobalPinInput('');
+                          setGlobalPinError('');
+                          setShowGlobalParentPinModal(true);
+                        }
+                      }}
+                      onChange={e => {
+                        if (isChatLocked) {
+                          setGlobalPinPendingAction(() => () => {});
+                          setGlobalPinInput('');
+                          setGlobalPinError('');
+                          setShowGlobalParentPinModal(true);
+                          return;
+                        }
+                        setChatTypedMessage(e.target.value);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        border: isChatLocked ? '1.5px dashed #93c5fd' : '1px solid #e2e8f0',
+                        background: isFrozen ? '#f1f5f9' : isChatLocked ? '#f8fafc' : '#ffffff',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        fontWeight: 650,
+                        cursor: isChatLocked ? 'pointer' : 'text'
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={isFrozen || !chatTypedMessage.trim()}
+                      style={{
+                        border: 'none',
+                        background: isFrozen || !chatTypedMessage.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #137333)',
+                        color: '#ffffff',
+                        borderRadius: '12px',
+                        width: '42px',
+                        height: '42px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: isFrozen || !chatTypedMessage.trim() ? 'none' : '0 4px 12px rgba(52, 168, 83, 0.25)',
+                        flexShrink: 0
+                      }}
+                    >
+                      <Send size={16} />
+                    </button>
+                  </form>
+                );
+              })()}
             </div>
           </div>
         );
       })()}
+
+      {/* Global Master PIN Gate Modal for Student Absence & Chat Unlock */}
+      {showGlobalParentPinModal && (
+        <div
+          onClick={() => {
+            setShowGlobalParentPinModal(false);
+            setGlobalPinPendingAction(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.15s ease'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '28px',
+              maxWidth: '380px',
+              width: '100%',
+              padding: '30px 24px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}
+          >
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '20px',
+              background: '#e0f2fe',
+              color: '#0284c7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Lock size={28} />
+            </div>
+
+            <div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                Eltern Master-PIN
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
+                Diese Funktion ist durch den Elternbereich geschützt. Bitte gib deine 6-stellige Eltern-Master-PIN ein.
+              </p>
+            </div>
+
+            {globalPinError && (
+              <div style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                background: '#fee2e2',
+                color: '#dc2626',
+                fontSize: '0.78rem',
+                fontWeight: 700
+              }}>
+                {globalPinError}
+              </div>
+            )}
+
+            {/* PIN Display Dots (6-stellig) */}
+            <div style={{
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'center',
+              margin: '8px 0'
+            }}>
+              {[0, 1, 2, 3, 4, 5].map(idx => {
+                const isFilled = globalPinInput.length > idx;
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      background: isFilled ? '#0284c7' : '#e2e8f0',
+                      border: isFilled ? '2px solid #0284c7' : '2px solid #cbd5e1',
+                      transition: 'all 0.15s ease',
+                      transform: isFilled ? 'scale(1.15)' : 'scale(1)'
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Touch Keypad */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '10px',
+              width: '100%',
+              marginTop: '6px'
+            }}>
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((key) => {
+                const isClear = key === 'C';
+                const isBack = key === '⌫';
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setGlobalPinError('');
+                      if (isClear) {
+                        setGlobalPinInput('');
+                      } else if (isBack) {
+                        setGlobalPinInput(prev => prev.slice(0, -1));
+                      } else if (globalPinInput.length < 6) {
+                        const nextVal = globalPinInput + key;
+                        setGlobalPinInput(nextVal);
+                        if (nextVal.length === 6) {
+                          handleVerifyGlobalParentPin(nextVal);
+                        }
+                      }
+                    }}
+                    style={{
+                      padding: '14px',
+                      borderRadius: '16px',
+                      border: '1.5px solid #f1f5f9',
+                      background: isClear || isBack ? '#f8fafc' : '#ffffff',
+                      color: isClear ? '#ef4444' : isBack ? '#64748b' : '#0f172a',
+                      fontSize: isBack ? '1.1rem' : '1.25rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
+                      transition: 'all 0.12s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    {key}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowGlobalParentPinModal(false);
+                setGlobalPinPendingAction(null);
+              }}
+              style={{
+                marginTop: '6px',
+                padding: '10px 18px',
+                borderRadius: '100px',
+                background: '#f1f5f9',
+                color: '#64748b',
+                border: 'none',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Crisis Notification Modal for Student Confirmation */}
       {unreadCrisisNotifs.length > 0 && (() => {

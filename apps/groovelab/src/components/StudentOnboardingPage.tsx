@@ -639,11 +639,11 @@ Deine Vorteile auf einen Blick:
                 <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
                   {campusUsageMode === 'selbstnutzer' ? (
                     <div style={{ fontSize: '0.7rem', color: '#334155', lineHeight: 1.45 }}>
-                      💡 <strong>Modus Selbstnutzer:</strong> Ideal für Schüler ab ca. 10–12 Jahren mit eigenem Smartphone/Tablet. Dein Kind nutzt die App eigenständig für Hausaufgaben, Fokus-Timer &amp; Bestenlisten.
+                      💡 <strong>Modus Selbstnutzer:</strong> Ideal für Schüler ab ca. 10–12 Jahren mit eigenem Smartphone/Tablet. Dein Kind nutzt die App eigenständig für Hausaufgaben, Fokus-Timer &amp; Team-Power.
                     </div>
                   ) : (
                     <div style={{ fontSize: '0.7rem', color: '#334155', lineHeight: 1.45 }}>
-                      💡 <strong>Modus Von Eltern geführt:</strong> Ideal für Grundschulkinder &amp; Familien-Tablets. Bestenlisten sind zum Schutz deines Kindes standardmäßig deaktiviert. Übezeit wird per 1-Klick von Eltern verbucht.
+                      💡 <strong>Modus Von Eltern geführt:</strong> Ideal für Grundschulkinder &amp; Familien-Tablets. Klassen-Highlights &amp; Team-Power sind zum Schutz deines Kindes standardmäßig geschützt. Übezeit wird per 1-Klick von Eltern verbucht.
                     </div>
                   )}
                 </div>
@@ -677,7 +677,7 @@ Deine Vorteile auf einen Blick:
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <input type="checkbox" checked={parentAllowLeaderboard} onChange={e => setParentAllowLeaderboard(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px', flexShrink: 0 }} />
-                      <span>🏆 Teilnahme an Schul-Übe-Bestenlisten</span>
+                      <span>🏆 Klassen-Highlights &amp; Team-Power</span>
                     </div>
                     <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '2px 6px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                       Empfohlen

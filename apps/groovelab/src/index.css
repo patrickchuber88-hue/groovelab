@@ -963,6 +963,7 @@ button, a, [role="button"], [onClick] {
 /* Mini Time Input styling to hide native picker indicator and optimize spacing */
 .mini-time-input::-webkit-calendar-picker-indicator {
   display: none !important;
+  appearance: none !important;
   -webkit-appearance: none !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -970,6 +971,7 @@ button, a, [role="button"], [onClick] {
   height: 0 !important;
 }
 .mini-time-input {
+  appearance: none !important;
   -webkit-appearance: none !important;
   -moz-appearance: textfield !important;
 }

@@ -13,6 +13,7 @@ interface QRCodeModalProps {
     role: string;
     qr_token: string;
     teacher_qr_token?: string;
+    ausweis_nummer?: string;
     photo_url?: string;
     instrument?: string;
     school_id?: string;
@@ -494,6 +495,9 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
         {(() => {
           const isStudentUser = (user.role || '').toLowerCase() === 'student';
           const isCampus = activePlatform === 'campus';
+          const effectiveToken = isStudentUser
+            ? (localQrToken || user.qr_token || user.ausweis_nummer || user.id || '')
+            : (localTeacherQrToken || user.teacher_qr_token || localQrToken || user.qr_token || user.id || '');
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: '20px' }}>
@@ -501,7 +505,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
               <IDBadgeCard 
                 user={user} 
                 activePlatform={activePlatform} 
-                qrValue={`${qrOrigin}/qr/${localTeacherQrToken || localQrToken || user.teacher_qr_token || user.qr_token || user.id || ''}`} 
+                qrValue={`${qrOrigin}/qr/${effectiveToken}`} 
                 cardRef={cardRef} 
               />
 
@@ -730,7 +734,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 {/* 5. Share Button */}
                 <button 
                   onClick={() => {
-                    const link = `${window.location.origin}/onboarding/${localTeacherQrToken || localQrToken || user.id}?platform=${isCampus ? 'campus' : 'groovelab'}`;
+                    const link = `${window.location.origin}/onboarding/${effectiveToken}?platform=${isCampus ? 'campus' : 'groovelab'}`;
                     const formattedText = `Hallo ${user.first_name}! 🎶
 
 Hier ist dein persönlicher Campus-Groovelab Zugang:
@@ -763,7 +767,7 @@ ${link}`;
                 {/* Entwickler Button: QR-Landingpage testen */}
                 <button
                   onClick={() => {
-                    const qrUrl = `${window.location.origin}/qr/${localTeacherQrToken || localQrToken || user.id}`;
+                    const qrUrl = `${window.location.origin}/qr/${effectiveToken}`;
                     window.open(qrUrl, '_blank');
                   }}
                   style={{

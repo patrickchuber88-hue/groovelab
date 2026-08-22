@@ -616,7 +616,10 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       const current = JSON.parse(localStorage.getItem(storageKey) || '{"bravo":0,"love":0,"fire":0,"star":0}');
       current[type] = (current[type] || 0) + 1;
       localStorage.setItem(storageKey, JSON.stringify(current));
+      localStorage.setItem(`campus_family_listen_${targetId}`, new Date().toISOString());
+      localStorage.setItem(`campus_family_shared_${targetId}`, 'true');
       window.dispatchEvent(new CustomEvent('campus_reaction_received', { detail: { targetId, playlistId: playlistKey, type } }));
+      window.dispatchEvent(new CustomEvent('campus_family_listen_received', { detail: { targetId, playlistId: playlistKey, reaction: type } }));
     } catch {}
 
     const messages = {
@@ -643,6 +646,13 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     setPlaybackProgress(0);
     setCurrentTimeSec(0);
     setTotalDurationSec(track.duration || 45);
+
+    // 🌟 DSGVO-konforme Registrierung des ersten Hörerlebnisses für den Meilenstein
+    try {
+      localStorage.setItem(`campus_family_listen_${targetId}`, new Date().toISOString());
+      localStorage.setItem(`campus_family_shared_${targetId}`, 'true');
+      window.dispatchEvent(new CustomEvent('campus_family_listen_received', { detail: { targetId, trackId: track.id } }));
+    } catch {}
 
     if (effectiveUrl) {
       const audio = new Audio(effectiveUrl);

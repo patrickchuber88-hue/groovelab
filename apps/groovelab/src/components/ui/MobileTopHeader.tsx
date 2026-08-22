@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GraduationCap, Music, Bell, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { GraduationCap, Music, Bell, Cloud, CloudOff, RefreshCw, User } from 'lucide-react';
 import { subscribePendingOfflineCount, flushOfflineSyncQueue } from '../../services/offlineSyncService';
 import { CampusLevelSwitcher, CampusUiLevel } from '../campus/CampusLevelSwitcher';
 
@@ -19,6 +19,11 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [parentUnlocked, setParentUnlocked] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
+           (user?.id ? sessionStorage.getItem(`groovelab_parent_unlocked_${user.id}`) === 'true' : false);
+  });
   const [campusStudentUiLevel, setCampusStudentUiLevel] = useState<CampusUiLevel>(() => {
     if (typeof window === 'undefined') return 'junior';
     const saved = localStorage.getItem('campus_student_ui_level');
@@ -30,8 +35,15 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
     const handleLevelChangeEvt = (e: any) => {
       if (e?.detail) setCampusStudentUiLevel(e.detail);
     };
+    const handleParentModeChange = (e: any) => {
+      if (typeof e?.detail === 'boolean') setParentUnlocked(e.detail);
+    };
     window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
-    return () => window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+    window.addEventListener('groovelab_parent_mode_changed', handleParentModeChange);
+    return () => {
+      window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+      window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -100,8 +112,8 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
         boxSizing: 'border-box'
       }}
     >
-      {/* Left: App Brand Title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+      {/* Left: App Brand Title & Parent Switcher */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
         <span style={{
           fontSize: '0.82rem',
           fontWeight: 900,
@@ -115,6 +127,41 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
           <span style={{ color: '#34a853' }}>Campus-</span>
           <span style={{ color: '#eab308' }}>Groovelab</span>
         </span>
+
+        {parentUnlocked && (
+          <button
+            type="button"
+            onClick={() => {
+              sessionStorage.removeItem('groovelab_parent_unlocked_global');
+              if (user?.id) {
+                sessionStorage.removeItem(`groovelab_parent_unlocked_${user.id}`);
+                sessionStorage.removeItem(`groovelab_parent_session_${user.id}`);
+              }
+              setParentUnlocked(false);
+              window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '3px 8px',
+              borderRadius: '20px',
+              border: '1px solid #bae6fd',
+              background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+              color: '#0284c7',
+              fontSize: '0.68rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.12)',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap'
+            }}
+            title="Eltern-Modus beenden und zur geschützten Schüleransicht wechseln"
+          >
+            <User size={11} color="#0284c7" />
+            <span>Schüleransicht</span>
+          </button>
+        )}
       </div>
 
       {/* Center: iOS Segmented Control Toggle [ Campus | GrooveLab ] */}

@@ -620,11 +620,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {/* Position 1: Student Activations */}
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '8px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Account Aktivierungsgebühr (Sammelabrechnung)</strong>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Modul Campus (Sammelabrechnung)</strong>
                           <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
                             {studentBillingOption === 'option2' 
-                              ? `Monatliche Gebühr für aktivierte Schüler-Accounts (Umlagesatz = ${masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo.)`
-                              : `Jahrespauschale für aktivierte Schüler-Accounts (Umlagesatz = ${((invoice.studentFee || 4.80) / (invoice.restmonate || 12)).toFixed(2).replace('.', ',')} € / Mo. für ${invoice.restmonate || 12} Restmonate)`
+                              ? `Monatliche Cloud-Bereitstellung für Schüler-Profile (Umlagesatz = ${masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo.). Die Software-Nutzung ist 100% kostenlos.`
+                              : `Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = ${((invoice.studentFee || 4.80) / (invoice.restmonate || 12)).toFixed(2).replace('.', ',')} € / Mo. für ${invoice.restmonate || 12} Restmonate). Die Software-Nutzung ist 100% kostenlos.`
                             }
                             {studentBillingOption === 'option3_2' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
                             {studentBillingOption === 'option3_3' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
@@ -662,7 +662,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 )}
                 {isAkt && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
-                    <span>{billingPayer === 'student' ? '• Durchlaufender Posten (Umlage an Schüler):' : '• Direktabrechnung Schüler-Aktivierungen (Träger):'}</span>
+                    <span>{billingPayer === 'student' ? '• Durchlaufender Posten (Umlage an Schüler):' : '• Direktabrechnung Schüler-Bereitstellung (Träger):'}</span>
                     <span style={{ fontWeight: 650, color: billingPayer === 'student' ? '#34a853' : '#ea580c', whiteSpace: 'nowrap' }}>
                       {studentShareTotal.toFixed(2).replace('.', ',')} €
                     </span>
@@ -681,17 +681,17 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               
               {isAkt && billingPayer === 'student' && (
                 <div style={{ fontSize: '0.64rem', color: '#34a853', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
-                  <strong>Durchlaufender Posten:</strong> Dieses Guthaben gleicht sich zu 100% durch die Aktivierungsgebühren der Eltern/Schüler aus. Keine effektiven Kosten für die Musikschule.
+                  <strong>Durchlaufender Posten:</strong> Dieses Guthaben gleicht sich zu 100% durch die Bereitstellungsgebühren der Eltern/Schüler aus. Keine effektiven Kosten für die Musikschule.
                 </div>
               )}
               {isAkt && billingPayer === 'school' && (
                 <div style={{ fontSize: '0.64rem', color: '#ea580c', background: '#ffedd5', border: '1px solid #fed7aa', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
-                  <strong>Sammelabrechnung:</strong> Diese Aktivierungen werden direkt von der Musikschule getragen und über das Sammelzahlungs-Modell abgerechnet.
+                  <strong>Sammelabrechnung:</strong> Diese Cloud-Bereitstellungen werden direkt von der Musikschule getragen und über das Sammelzahlungs-Modell abgerechnet.
                 </div>
               )}
               
               <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '12px', textAlign: 'right', fontStyle: 'italic', fontWeight: 600 }}>
-                Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
+                Die Campus-Groovelab Software-Nutzung ist 100% dauerhaft kostenlos. Das Entgelt wird ausschließlich für die Miete und Bereitstellung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
               </div>
               
               {/* Payment or Payout notice */}

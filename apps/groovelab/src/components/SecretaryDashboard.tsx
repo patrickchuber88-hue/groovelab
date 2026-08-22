@@ -26722,7 +26722,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             {subscriptionBypass ? (
                                               <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#faf5ff', border: '1px solid #f3e8ff', color: '#6b21a8', fontSize: '0.75rem', lineHeight: '1.4' }}>
                                                 <div style={{ fontWeight: 800, marginBottom: '2px' }}>⚡ Kostenfreie Freistellung aktiv</div>
-                                                <span>Alle Server-Hosting-Flatrates &amp; Aktivierungsgebühren sind 100% freigestellt (0,00 € / Mo.).</span>
+                                                <span>Alle Server-Hosting-Flatrates &amp; Bereitstellungsgebühren sind 100% freigestellt (0,00 € / Mo.).</span>
                                               </div>
                                             ) : (
                                               <>
