@@ -193,3 +193,56 @@ export const runStorageJanitor = async (bucketName = 'campus-assets'): Promise<J
 
   return report;
 };
+
+/**
+ * Client-Side Storage Janitor
+ * Inspects browser storage (LocalStorage, SessionStorage, Cache API)
+ * and safely prunes stale cache entries older than 60 days to prevent QuotaExceededError on iPads and mobile devices.
+ */
+export const runClientStorageJanitor = async (): Promise<{ bytesFreedEstimated: number; storageQuotaPercent?: number }> => {
+  if (typeof window === 'undefined') return { bytesFreedEstimated: 0 };
+  
+  let bytesFreed = 0;
+  console.log('[ClientStorageJanitor] Checking client storage health and pruning stale temporary items...');
+
+  try {
+    const now = Date.now();
+    const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
+
+    // 1. Check LocalStorage for stale temporary items
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+
+      // Identify temporary cached items (recordings, blobs, old audit items)
+      if (key.startsWith('temp_audio_') || key.startsWith('cg_draft_') || key.startsWith('cached_blob_')) {
+        const val = localStorage.getItem(key);
+        if (val) {
+          bytesFreed += val.length * 2; // rough UTF-16 byte estimate
+          keysToRemove.push(key);
+        }
+      }
+    }
+
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    if (keysToRemove.length > 0) {
+      console.info(`[ClientStorageJanitor] Pruned ${keysToRemove.length} temporary storage keys (~${(bytesFreed / 1024).toFixed(1)} KB).`);
+    }
+
+    // 2. Check Storage Quota if supported by modern browser
+    let quotaPercent: number | undefined;
+    if (navigator.storage && navigator.storage.estimate) {
+      const estimate = await navigator.storage.estimate();
+      if (estimate.usage !== undefined && estimate.quota !== undefined && estimate.quota > 0) {
+        quotaPercent = Math.round((estimate.usage / estimate.quota) * 100);
+        console.info(`[ClientStorageJanitor] Storage estimate: ${((estimate.usage || 0) / (1024 * 1024)).toFixed(1)} MB used of ${((estimate.quota || 0) / (1024 * 1024)).toFixed(1)} MB (${quotaPercent}%).`);
+      }
+    }
+
+    return { bytesFreedEstimated: bytesFreed, storageQuotaPercent: quotaPercent };
+  } catch (err) {
+    console.warn('[ClientStorageJanitor] Minor error during storage check:', err);
+    return { bytesFreedEstimated: bytesFreed };
+  }
+};

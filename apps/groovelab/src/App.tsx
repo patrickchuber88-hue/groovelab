@@ -53,7 +53,9 @@ import { CampusLevelSwitcher, CampusUiLevel } from './components/campus/CampusLe
 import { useMasterPricing } from './context/MasterPricingContext';
 import { MaintenanceLockoutOverlay } from './components/MaintenanceLockoutOverlay';
 import { GlobalBroadcastBanner } from './components/GlobalBroadcastBanner';
-import { runStorageJanitor } from './services/storageJanitorService';
+import { PwaUpdateToast } from './components/ui/PwaUpdateToast';
+import { runStorageJanitor, runClientStorageJanitor } from './services/storageJanitorService';
+import { verifyMasterSessionLease, revokeMasterSessionLease } from './utils/masterAuditLogger';
 import './App.css';
 
 // --- GLOBAL CAMERA KILL SWITCH ---
@@ -2211,6 +2213,7 @@ function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [showInstallGuide, setShowInstallGuide] = useState(false);
+  const [showPwaUpdateToast, setShowPwaUpdateToast] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2246,15 +2249,10 @@ function App() {
         .then((reg) => {
           console.log('Service Worker registered successfully on load:', reg.scope);
 
-          // If there is already a waiting worker, prompt user to update immediately
+          // If there is already a waiting worker, prompt user to update smoothly via floating toast
           if (reg.waiting && navigator.serviceWorker.controller) {
             console.log('[PWA] Waiting service worker found on load.');
-            const confirmUpdate = window.confirm(
-              'Eine neue Version von Campus-Groovelab ist verfügbar. Jetzt aktualisieren, um die neuesten Funktionen zu laden?'
-            );
-            if (confirmUpdate) {
-              window.location.replace(window.location.pathname + '?reload_manual=1');
-            }
+            setShowPwaUpdateToast(true);
           }
 
           // Register offline sync queue flusher on network restore
@@ -2280,16 +2278,8 @@ function App() {
               installingWorker.onstatechange = () => {
                 if (installingWorker.state === 'installed') {
                   if (navigator.serviceWorker.controller) {
-                    console.log('[PWA] New content is available; prompt user to refresh.');
-                    
-                    // Show confirmation popup to user
-                    const confirmUpdate = window.confirm(
-                      'Eine neue Version von Campus-Groovelab ist verfügbar. Jetzt aktualisieren, um die neuesten Funktionen zu laden?'
-                    );
-                    if (confirmUpdate) {
-                      // Redirect with cache-bypass parameter defined in sw.js fetch handler
-                      window.location.replace(window.location.pathname + '?reload_manual=1');
-                    }
+                    console.log('[PWA] New content is available; prompt user via toast.');
+                    setShowPwaUpdateToast(true);
                   } else {
                     console.log('[PWA] Content is cached for offline use.');
                   }
@@ -2637,9 +2627,13 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Automated Audio Storage Janitor 24h Background Task
+  // Automated Audio Storage Janitor & Client Cache Janitor Background Task
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
+    // Always prune stale local client caches on mount to prevent QuotaExceededError
+    runClientStorageJanitor().catch(() => {});
+
     const lastRunStr = localStorage.getItem('groovelab_storage_janitor_last_run');
     const lastRun = lastRunStr ? parseInt(lastRunStr, 10) : 0;
     const twentyFourHoursMs = 24 * 60 * 60 * 1000;
@@ -7410,6 +7404,25 @@ function App() {
   const isMasterAdminSession = (user?.is_master_admin === true || 
                                sessionStorage.getItem('groovelab_is_master_admin') === 'true') && !(isGhostParam && ghostSchoolId);
 
+  // Enterprise+ Tier 3: Master Admin Ephemeral Session Lease TTL Guard (Zero Standing Privileges)
+  useEffect(() => {
+    if (!isMasterAdminSession) return;
+
+    const checkMasterLease = async () => {
+      const { isValid } = await verifyMasterSessionLease();
+      if (!isValid && sessionStorage.getItem('groovelab_is_master_admin') === 'true') {
+        console.warn('[Security] Master Admin Session Lease abgelaufen. Auto-Lockout wird ausgeführt.');
+        sessionStorage.removeItem('groovelab_is_master_admin');
+        sessionStorage.removeItem('groovelab_user_id');
+        window.location.href = '/';
+      }
+    };
+
+    checkMasterLease();
+    const interval = setInterval(checkMasterLease, 30000);
+    return () => clearInterval(interval);
+  }, [isMasterAdminSession]);
+
   const currentSchoolObj = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
   const currentSchoolId = user?.school_id || currentSchoolObj?.id;
 
@@ -8433,6 +8446,12 @@ function App() {
         />
       )}
       <GlobalBroadcastBanner announcement={broadcastAnnouncement} currentRole={user?.role} />
+      {showPwaUpdateToast && (
+        <PwaUpdateToast 
+          onUpdate={() => window.location.replace(window.location.pathname + '?reload_manual=1')}
+          onDismiss={() => setShowPwaUpdateToast(false)}
+        />
+      )}
       <div className="app-layout">
       {toastMessage && (
         <div 

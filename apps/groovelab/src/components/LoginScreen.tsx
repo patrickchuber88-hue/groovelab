@@ -6539,64 +6539,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           >
             🔓 BYPASS: MANUEL WAGNER (VERWALTUNG - {schoolData.name})
           </button>
-
-          {/* Master Admin / Master Dashboard Bypass */}
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                console.log('[Bypass] Attempting Master Admin login for school:', schoolData.name);
-                sessionStorage.removeItem('groovelab_is_master_admin');
-
-                // 1. Search for dedicated Master Admin user
-                let targetUser: any = null;
-                const { data: adminUsers } = await supabase
-                  .from('users')
-                  .select('id, role, is_master_admin, school_id, first_name, last_name')
-                  .limit(30);
-
-                if (adminUsers && adminUsers.length > 0) {
-                  targetUser = adminUsers.find((u: any) => u.is_master_admin === true) ||
-                               adminUsers.find((u: any) => u.first_name?.toLowerCase().includes('patrick') && u.role === 'admin') ||
-                               adminUsers.find((u: any) => u.role === 'admin') ||
-                               adminUsers[0];
-                }
-
-                const targetId = targetUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90';
-                console.log('[Bypass] Master Admin logging in with ID:', targetId);
-                sessionStorage.setItem('groovelab_user_id', targetId);
-                sessionStorage.setItem('groovelab_is_master_admin', 'true');
-                sessionStorage.removeItem('groovelab_qr_token');
-                onLogin(targetId, true);
-              } catch (err: any) {
-                sessionStorage.removeItem('groovelab_qr_token');
-                sessionStorage.removeItem('groovelab_is_master_admin');
-                console.error('[Bypass] Runtime Error:', err);
-                alert('Ein Fehler ist aufgetreten: ' + err.message);
-              }
-            }}
-            style={{
-              width: '100%',
-              padding: '16px',
-              background: 'rgba(254, 249, 195, 0.08)',
-              border: '2px solid rgba(253, 224, 71, 0.25)',
-              borderRadius: '24px',
-              color: '#fef9c3',
-              fontWeight: 800,
-              fontSize: '13px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(234,179,8,0.1)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.02em',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.15)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(244, 249, 195, 0.08)'; }}
-          >
-            🔓 BYPASS: ADMIN (MASTER ADMIN)
-          </button>
         </div>
       )}
 

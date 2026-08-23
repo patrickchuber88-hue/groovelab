@@ -277,3 +277,77 @@ export const authenticateUserBiometrics = async (
   return selectedProfile;
 };
 
+// ─── Master Admin Dedicated Passkey / FIDO2 Engine ───────────────────────────
+
+const MASTER_PASSKEY_STORAGE_KEY = 'gl_master_admin_passkey';
+
+export interface MasterPasskeyProfile {
+  userId: string;
+  email: string;
+  credentialId: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
+/**
+ * Checks whether a Master Admin Passkey is registered on this hardware device
+ */
+export const isMasterPasskeyRegistered = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(MASTER_PASSKEY_STORAGE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    return !!(parsed && parsed.credentialId && parsed.userId);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Registers a new hardware-bound Passkey (TouchID / FaceID / YubiKey) for Master Admin
+ */
+export const registerMasterPasskey = async (
+  userId: string,
+  email: string = 'master@campus-groovelab.de'
+): Promise<MasterPasskeyProfile> => {
+  if (!isWebAuthnSupported()) {
+    throw new Error('WebAuthn / Biometrie wird von diesem Gerät nicht unterstützt.');
+  }
+
+  const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+  const challenge = arrayBufferToBase64url(randomBytes.buffer);
+  const credential = await registerBiometrics(email, userId, challenge);
+
+  const profile: MasterPasskeyProfile = {
+    userId,
+    email,
+    credentialId: credential.id,
+    createdAt: new Date().toISOString()
+  };
+
+  localStorage.setItem(MASTER_PASSKEY_STORAGE_KEY, JSON.stringify(profile));
+  return profile;
+};
+
+/**
+ * Authenticates the Master Admin using the hardware Passkey
+ */
+export const authenticateMasterPasskey = async (): Promise<MasterPasskeyProfile> => {
+  if (!isMasterPasskeyRegistered()) {
+    throw new Error('Kein Master-Passkey auf diesem Gerät hinterlegt.');
+  }
+
+  const raw = localStorage.getItem(MASTER_PASSKEY_STORAGE_KEY);
+  const profile: MasterPasskeyProfile = JSON.parse(raw!);
+
+  const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+  const challenge = arrayBufferToBase64url(randomBytes.buffer);
+  await authenticateBiometrics(challenge, [profile.credentialId]);
+
+  profile.lastUsedAt = new Date().toISOString();
+  localStorage.setItem(MASTER_PASSKEY_STORAGE_KEY, JSON.stringify(profile));
+
+  return profile;
+};
+

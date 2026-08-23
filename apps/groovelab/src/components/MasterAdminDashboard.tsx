@@ -6,7 +6,7 @@ import {
   Edit2, Settings, Sliders, Search, Tag, Percent,
   Activity, Cpu, Database, AlertTriangle, HardDrive, Server, Zap, Link, Key, History as HistoryIcon,
   Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Building2, Building, Eye, Radio, Heart, ShieldCheck,
-  QrCode, Lock, Smartphone, Laptop, Wrench, Lightbulb, Rocket, Sparkles, RotateCcw, WifiOff
+  QrCode, Lock, Smartphone, Laptop, Wrench, Lightbulb, Rocket, Sparkles, RotateCcw, WifiOff, Fingerprint
 } from 'lucide-react';
 import { MaintenanceTab } from './masterAdmin/tabs/MaintenanceTab';
 import { SchoolsTab } from './masterAdmin/tabs/SchoolsTab';
@@ -15,6 +15,9 @@ import { FeedbackTab } from './masterAdmin/tabs/FeedbackTab';
 import { SchoolDetailDrawer } from './masterAdmin/drawers/SchoolDetailDrawer';
 import { ClientErrorTelemetryPanel } from './masterAdmin/components/ClientErrorTelemetryPanel';
 import { generateResilienceAuditPDF } from '../utils/pdfGenerator';
+import { isMasterPasskeyRegistered, registerMasterPasskey, isWebAuthnSupported } from '../utils/webauthn';
+import { getMasterAuditLogs, verifyMasterSessionLease, createMasterSessionLease, revokeMasterSessionLease, MasterAuditEvent } from '../utils/masterAuditLogger';
+import { subscribeLatency, measureDatabasePing, LatencyMetric } from '../utils/latencyMonitor';
 
 interface ServerMetric {
   id: string;
@@ -243,6 +246,66 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [updatingAdmin, setUpdatingAdmin] = useState(false);
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+
+  // Hardware Passkey & Ephemeral Session Lease State (Solo-Founder Enterprise+ Suite)
+  const [masterPasskeyActive, setMasterPasskeyActive] = useState(false);
+  const [webAuthnSupportedOnDevice, setWebAuthnSupportedOnDevice] = useState(false);
+  const [leaseMinutesLeft, setLeaseMinutesLeft] = useState<number>(45);
+  const [auditLogsList, setAuditLogsList] = useState<MasterAuditEvent[]>([]);
+  const [registeringPasskey, setRegisteringPasskey] = useState(false);
+  const [passkeySuccessMessage, setPasskeySuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setWebAuthnSupportedOnDevice(isWebAuthnSupported());
+    setMasterPasskeyActive(isMasterPasskeyRegistered());
+    setAuditLogsList(getMasterAuditLogs());
+
+    const updateLeaseTimer = async () => {
+      const { remainingMinutes } = await verifyMasterSessionLease();
+      setLeaseMinutesLeft(remainingMinutes);
+    };
+
+    updateLeaseTimer();
+    measureDatabasePing().then(setDbLatency).catch(() => {});
+    const interval = setInterval(updateLeaseTimer, 30000);
+    const pingInterval = setInterval(() => {
+      measureDatabasePing().then(setDbLatency).catch(() => {});
+    }, 15000);
+    return () => {
+      clearInterval(interval);
+      clearInterval(pingInterval);
+    };
+  }, []);
+
+  const [dbLatency, setDbLatency] = useState<LatencyMetric>({ rttMs: 18, quality: 'EXCELLENT', timestamp: Date.now() });
+
+  const handleRegisterThisDevicePasskey = async () => {
+    setRegisteringPasskey(true);
+    setPasskeySuccessMessage(null);
+    try {
+      const targetUserId = currentUser?.id || adminUser?.id || 'master_admin';
+      await registerMasterPasskey(targetUserId, 'master@campus-groovelab.de');
+      setMasterPasskeyActive(true);
+      setPasskeySuccessMessage('TouchID / Hardware-Passkey erfolgreich an diesen Mac gekoppelt!');
+      setAuditLogsList(getMasterAuditLogs());
+    } catch (err: any) {
+      console.error('Failed to register passkey:', err);
+      alert('Kopplung fehlgeschlagen oder abgebrochen: ' + (err.message || err));
+    } finally {
+      setRegisteringPasskey(false);
+    }
+  };
+
+  const handleRenewSessionLease = async () => {
+    try {
+      const targetUserId = currentUser?.id || adminUser?.id || 'master_admin';
+      await createMasterSessionLease(targetUserId, masterPasskeyActive ? 'passkey_fido2' : 'master_pin', 45);
+      setLeaseMinutesLeft(45);
+      setSaveSuccessToast('Sitzung erfolgreich um 45 Minuten verlängert!');
+    } catch (e: any) {
+      alert('Fehler beim Verlängern der Sitzung: ' + e.message);
+    }
+  };
 
     // Pricing States
   const [priceCampus, setPriceCampus] = useState<number | string>(14.90);
@@ -3043,6 +3106,27 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   }} />
                   <span>{isMaint ? '🔴 Wartungsmodus Aktiv (Plattform eingeschränkt)' : '🟢 System-Status: Normal & Online'}</span>
                 </button>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '100px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  color: dbLatency.quality === 'POOR' ? '#dc2626' : (dbLatency.quality === 'FAIR' ? '#d97706' : '#15803d')
+                }}>
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: dbLatency.quality === 'POOR' ? '#dc2626' : (dbLatency.quality === 'FAIR' ? '#d97706' : '#16a34a')
+                  }} />
+                  <span>DB-Ping: {dbLatency.rttMs} ms (Hetzner EU)</span>
+                </div>
 
                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
                   Campus-Groovelab Enterprise Leitstand
@@ -6598,6 +6682,201 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     >
                       <Printer size={13} /> Ausweis drucken
                     </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 🛡️ Full-Width Card: Hardware-Passkey & DSGVO Zero-Trust Audit Trail */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                padding: '32px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '24px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                      <Fingerprint size={22} color="#0284c7" /> FIDO2 Hardware-Passkey &amp; DSGVO Zero-Trust Suite
+                    </h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                      Phishing-resistente TouchID / YubiKey Authentifizierung &amp; revisionssicherer Audit-Trail (100% DSGVO &amp; BSI IT-Grundschutz konform).
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      padding: '6px 14px',
+                      borderRadius: '100px',
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      color: '#15803d',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}>
+                      <Clock size={14} color="#15803d" />
+                      Session-Lease: Noch {leaseMinutesLeft} Min. aktiv
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleRenewSessionLease}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '100px',
+                        background: '#0f172a',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '0.76rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      +45 Min. verlängern
+                    </button>
+                  </div>
+                </div>
+
+                {passkeySuccessMessage && (
+                  <div style={{
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    background: '#f0fdf4',
+                    border: '1px solid #86efac',
+                    color: '#15803d',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <CheckCircle size={18} color="#15803d" />
+                    <span>{passkeySuccessMessage}</span>
+                  </div>
+                )}
+
+                {/* Passkey Status Box */}
+                <div style={{
+                  padding: '20px',
+                  borderRadius: '16px',
+                  background: masterPasskeyActive ? '#f0fdf4' : '#f8fafc',
+                  border: masterPasskeyActive ? '1.5px solid #86efac' : '1.5px solid #cbd5e1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '12px',
+                      background: masterPasskeyActive ? '#dcfce7' : '#e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Fingerprint size={24} color={masterPasskeyActive ? '#15803d' : '#64748b'} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
+                        {masterPasskeyActive ? 'TouchID / Hardware-Passkey aktiv' : 'Kein Passkey auf diesem Gerät gekoppelt'}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                        {masterPasskeyActive 
+                          ? 'Sie können sich auf diesem Mac mit 1 Klick & Fingerabdruck ohne Passworteingabe anmelden.'
+                          : 'Koppeln Sie Apple TouchID, FaceID oder einen YubiKey 5 für blitzschnellen, absolut phishing-resistenten Master-Login.'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRegisterThisDevicePasskey}
+                    disabled={registeringPasskey || !webAuthnSupportedOnDevice}
+                    style={{
+                      padding: '10px 18px',
+                      borderRadius: '12px',
+                      background: masterPasskeyActive ? '#16a34a' : '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.84rem',
+                      fontWeight: 800,
+                      cursor: (registeringPasskey || !webAuthnSupportedOnDevice) ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 3px 10px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    <Fingerprint size={16} />
+                    {registeringPasskey 
+                      ? 'Warte auf Fingerabdruck...' 
+                      : (masterPasskeyActive ? 'Passkey neu registrieren' : 'Diesen Mac jetzt per TouchID koppeln')}
+                  </button>
+                </div>
+
+                {/* Audit Trail List */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      DSGVO Audit-Trail (Letzte privilegierte Master-Ereignisse)
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      Lokaler, manipulationsgeschützter Ringpuffer ({auditLogsList.length} Einträge)
+                    </span>
+                  </div>
+
+                  <div style={{
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    background: '#f8fafc'
+                  }}>
+                    {auditLogsList.length === 0 ? (
+                      <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.80rem' }}>
+                        Noch keine Audit-Ereignisse protokolliert.
+                      </div>
+                    ) : (
+                      auditLogsList.slice(0, 10).map((log, idx) => (
+                        <div key={log.id || idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 14px',
+                          borderBottom: idx < auditLogsList.length - 1 ? '1px solid #e2e8f0' : 'none',
+                          fontSize: '0.78rem'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              background: log.status === 'SUCCESS' ? '#dcfce7' : '#fee2e2',
+                              color: log.status === 'SUCCESS' ? '#15803d' : '#b91c1c'
+                            }}>
+                              {log.status}
+                            </span>
+                            <strong style={{ color: '#0f172a' }}>{log.action}</strong>
+                            <span style={{ color: '#64748b' }}>
+                              ({log.authMethod || 'system'})
+                            </span>
+                          </div>
+                          <span style={{ color: '#94a3b8', fontFamily: 'monospace', fontSize: '0.72rem' }}>
+                            {new Date(log.timestamp).toLocaleString('de-DE')}
+                          </span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>

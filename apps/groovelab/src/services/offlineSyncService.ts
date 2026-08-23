@@ -148,3 +148,11 @@ export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed
   return { success: successCount, failed: failedCount, quarantined: quarantinedCount };
 };
 
+// Automatic Online Auto-Flush Listener for Tier-1 Offline Resilience
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    console.info('[OfflineSync] Network connectivity restored. Triggering automatic queue flush...');
+    flushOfflineSyncQueue();
+  });
+}
+

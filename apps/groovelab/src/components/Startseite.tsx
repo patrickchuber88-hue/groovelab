@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Search, School, MapPin, Loader2, ArrowRight, ShieldCheck, Lock, X } from 'lucide-react';
+import { Sparkles, Search, School, MapPin, Loader2, ArrowRight, ShieldCheck, Lock, X, Eye, EyeOff, KeyRound, AlertTriangle, Fingerprint } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { isWebAuthnSupported, isMasterPasskeyRegistered, registerMasterPasskey, authenticateMasterPasskey } from '../utils/webauthn';
+import { createMasterSessionLease, logMasterAdminEvent } from '../utils/masterAuditLogger';
 
 interface StartseiteProps {
   onLogin: () => void;
@@ -23,11 +25,22 @@ export const Startseite: React.FC<StartseiteProps> = ({
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // Secret Master Admin Modal State
+  // Hardened Master Admin Auth State (Enterprise+ Stufe 3)
   const [showMasterModal, setShowMasterModal] = useState(false);
+  const [masterKeyInput, setMasterKeyInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [isLoggingInMaster, setIsLoggingInMaster] = useState(false);
   const [masterAuthError, setMasterAuthError] = useState<string | null>(null);
+  const [hasPasskey, setHasPasskey] = useState(false);
+  const [isWebAuthnAvail, setIsWebAuthnAvail] = useState(false);
   const bgClicksRef = useRef<{ count: number; lastTime: number }>({ count: 0, lastTime: 0 });
+
+  useEffect(() => {
+    setIsWebAuthnAvail(isWebAuthnSupported());
+    setHasPasskey(isMasterPasskeyRegistered());
+  }, [showMasterModal]);
 
   // Secret Keyboard Shortcut: Ctrl + Shift + M or Cmd + Shift + M
   useEffect(() => {
@@ -211,33 +224,81 @@ export const Startseite: React.FC<StartseiteProps> = ({
     }
   };
 
+  const handlePasskeyLogin = async () => {
+    setIsLoggingInMaster(true);
+    setMasterAuthError(null);
+    try {
+      const profile = await authenticateMasterPasskey();
+      await createMasterSessionLease(profile.userId, 'passkey_fido2', 45);
+      window.location.href = '/';
+    } catch (err: any) {
+      console.error('Master passkey auth error:', err);
+      setMasterAuthError(err.message || 'Passkey-Authentifizierung fehlgeschlagen.');
+      setIsLoggingInMaster(false);
+    }
+  };
+
   const handleMasterLogin = async () => {
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+      const remainingSecs = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      setMasterAuthError(`Sicherheitssperre aktiv. Bitte warten Sie noch ${remainingSecs} Sekunden.`);
+      return;
+    }
+
+    const cleanKey = masterKeyInput.trim();
+    if (!cleanKey) {
+      setMasterAuthError('Bitte Master-Sicherheitsschlüssel oder PIN eingeben.');
+      return;
+    }
+
     setIsLoggingInMaster(true);
     setMasterAuthError(null);
     try {
       sessionStorage.removeItem('groovelab_is_master_admin');
 
-      // Query for master admin user in Supabase
-      const { data: adminUsers, error } = await supabase
+      // Verify key against registered master admin users only
+      const { data: user, error } = await supabase
         .from('users')
-        .select('id, role, is_master_admin, school_id, first_name, last_name')
-        .limit(30);
+        .select('id, role, is_master_admin, school_id, first_name, last_name, ausweis_nummer, qr_token, teacher_qr_token')
+        .eq('is_master_admin', true)
+        .or(`ausweis_nummer.eq.${cleanKey},qr_token.eq.${cleanKey},teacher_qr_token.eq.${cleanKey},id.eq.${cleanKey}`)
+        .maybeSingle();
 
-      if (error) throw error;
-
-      let targetUser: any = null;
-      if (adminUsers && adminUsers.length > 0) {
-        targetUser = adminUsers.find((u: any) => u.is_master_admin === true) ||
-                     adminUsers.find((u: any) => u.first_name?.toLowerCase().includes('patrick') && u.role === 'admin') ||
-                     adminUsers.find((u: any) => u.role === 'admin') ||
-                     adminUsers[0];
+      if (error || !user || user.is_master_admin !== true) {
+        const nextFailed = failedAttempts + 1;
+        setFailedAttempts(nextFailed);
+        await logMasterAdminEvent({
+          userId: cleanKey.substring(0, 4) + '***',
+          action: 'master_login_failed',
+          authMethod: 'master_pin',
+          status: 'FAILURE',
+          details: { attempt: nextFailed }
+        });
+        if (nextFailed >= 3) {
+          const lockTime = Date.now() + 5 * 60 * 1000;
+          setLockoutUntil(lockTime);
+          throw new Error('Sicherheitssperre: 3 ungültige Versuche. Login für 5 Minuten gesperrt.');
+        }
+        throw new Error(`Ungültiger Master-Schlüssel. Zugriff verweigert (Versuch ${nextFailed}/3).`);
       }
 
-      const targetId = targetUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90';
+      // Success: Issue Ephemeral Session Lease (45 minutes TTL)
+      setFailedAttempts(0);
+      setLockoutUntil(null);
+      await createMasterSessionLease(user.id, 'master_pin', 45);
 
-      sessionStorage.setItem('groovelab_user_id', targetId);
-      sessionStorage.setItem('groovelab_is_master_admin', 'true');
-      sessionStorage.removeItem('groovelab_qr_token');
+      // Offer to register Passkey if WebAuthn is supported and not registered yet
+      if (isWebAuthnAvail && !hasPasskey) {
+        try {
+          const registerConsent = window.confirm('Möchten Sie dieses Gerät (TouchID / YubiKey) für 1-Klick Master-Logins koppeln?');
+          if (registerConsent) {
+            await registerMasterPasskey(user.id, 'master@campus-groovelab.de');
+            alert('Hardware-Passkey erfolgreich gekoppelt!');
+          }
+        } catch (passkeyErr: any) {
+          console.warn('Passkey registration skipped:', passkeyErr);
+        }
+      }
 
       // Refresh to load Master Cockpit
       window.location.href = '/';
@@ -712,10 +773,102 @@ export const Startseite: React.FC<StartseiteProps> = ({
               fontSize: '0.85rem',
               color: '#94a3b8',
               lineHeight: 1.5,
-              margin: '0 0 24px 0'
+              margin: '0 0 20px 0'
             }}>
-              Direkte Authentifizierung als Plattform-Masteradministrator für Wartung, Instanzverwaltung & Systemtelemetrie.
+              Geben Sie Ihren autorisierten Master-Admin-Sicherheitsschlüssel oder PIN ein.
             </p>
+
+            {/* If Passkey is registered on this device, offer 1-Click Biometrics */}
+            {hasPasskey && (
+              <div style={{ marginBottom: '18px' }}>
+                <button
+                  type="button"
+                  onClick={handlePasskeyLogin}
+                  disabled={isLoggingInMaster || (!!lockoutUntil && Date.now() < lockoutUntil)}
+                  style={{
+                    width: '100%',
+                    padding: '13px 18px',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    color: '#ffffff',
+                    border: '1px solid rgba(147, 197, 253, 0.4)',
+                    borderRadius: '16px',
+                    fontSize: '0.92rem',
+                    fontWeight: 800,
+                    cursor: (isLoggingInMaster || (!!lockoutUntil && Date.now() < lockoutUntil)) ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 8px 24px rgba(37, 99, 235, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                    opacity: (isLoggingInMaster || (!!lockoutUntil && Date.now() < lockoutUntil)) ? 0.6 : 1
+                  }}
+                >
+                  <Fingerprint size={20} />
+                  1-Klick Hardware-Passkey (TouchID / YubiKey)
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '14px 0 10px', color: '#64748b', fontSize: '0.72rem', fontWeight: 800 }}>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.12)' }} />
+                  <span>ODER MIT MASTER-PIN / SCHLÜSSEL</span>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.12)' }} />
+                </div>
+              </div>
+            )}
+
+            {/* Input for Master Key */}
+            <div style={{ position: 'relative', marginBottom: '16px', textAlign: 'left' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#d4d4d8', marginBottom: '6px' }}>
+                Master-Sicherheitsschlüssel / PIN
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input 
+                  type={showPassword ? 'text' : 'password'}
+                  value={masterKeyInput}
+                  onChange={(e) => {
+                    setMasterKeyInput(e.target.value);
+                    if (masterAuthError) setMasterAuthError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isLoggingInMaster) handleMasterLogin();
+                  }}
+                  placeholder="Master-Schlüssel eingeben..."
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '14px',
+                    padding: '12px 42px 12px 16px',
+                    color: '#ffffff',
+                    fontSize: '0.95rem',
+                    outline: 'none',
+                    fontFamily: showPassword ? 'inherit' : 'monospace',
+                    letterSpacing: showPassword ? 'normal' : '0.15em'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#71717a',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '4px'
+                  }}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
 
             {masterAuthError && (
               <div style={{
@@ -725,43 +878,48 @@ export const Startseite: React.FC<StartseiteProps> = ({
                 padding: '10px 14px',
                 borderRadius: '12px',
                 fontSize: '0.82rem',
-                marginBottom: '16px'
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                textAlign: 'left'
               }}>
-                {masterAuthError}
+                <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                <span>{masterAuthError}</span>
               </div>
             )}
 
             <button
               onClick={handleMasterLogin}
-              disabled={isLoggingInMaster}
+              disabled={isLoggingInMaster || (!!lockoutUntil && Date.now() < lockoutUntil)}
               style={{
                 width: '100%',
-                padding: '15px 20px',
+                padding: '14px 20px',
                 background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                 color: '#000000',
                 border: 'none',
                 borderRadius: '16px',
                 fontSize: '0.95rem',
                 fontWeight: 800,
-                cursor: isLoggingInMaster ? 'not-allowed' : 'pointer',
+                cursor: (isLoggingInMaster || (!!lockoutUntil && Date.now() < lockoutUntil)) ? 'not-allowed' : 'pointer',
                 boxShadow: '0 8px 24px rgba(234, 179, 8, 0.3)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
                 transition: 'all 0.2s',
-                opacity: isLoggingInMaster ? 0.7 : 1
+                opacity: (isLoggingInMaster || (!!lockoutUntil && Date.now() < lockoutUntil)) ? 0.6 : 1
               }}
             >
               {isLoggingInMaster ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  Authentifiziere Master Cockpit...
+                  Verifiziere Master-Schlüssel...
                 </>
               ) : (
                 <>
-                  <Lock size={18} />
-                  Master Cockpit starten
+                  <KeyRound size={18} />
+                  Verifizieren & Master Cockpit öffnen
                 </>
               )}
             </button>
