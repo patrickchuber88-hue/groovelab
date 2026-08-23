@@ -4969,7 +4969,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
               <School size={16} color="#e6f4ea" />
-              Neue Schule registrieren (Software 100% kostenlos)
+              Neue Musikschule registrieren (Kostenlos testen)
             </button>
           </div>
         )}

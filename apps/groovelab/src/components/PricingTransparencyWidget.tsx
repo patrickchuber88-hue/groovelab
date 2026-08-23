@@ -54,7 +54,7 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
           padding: '4px 10px',
           borderRadius: '20px'
         }}>
-          Software-Nutzung 100% kostenlos
+          Keine Lizenzkaufgebühren
         </span>
       </div>
 

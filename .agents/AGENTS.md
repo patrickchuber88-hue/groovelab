@@ -10,7 +10,7 @@
 - **Administration & Secretariat**: Users belonging to administration/secretariat (roles `admin` and `secretary`) must not have musician/instrument avatars. Their profile picture must always display the briefing board chalkboard image: `/campus_login_hero.png` across all modules.
 
 ## Billing & Pricing Rules
-- **Kostenfreie Software**: The base software for **Campus-Groovelab** is always 100% free of charge ("100% kostenlos").
+- **Keine Software-Lizenzgebühren**: The base software for **Campus-Groovelab** is provided without license purchase fees (`0,00 € (Inklusive)`).
 - Only server hosting/service fees, team members, and pupil activation fees are subject to charge. We exclusively rent and host the required cloud infrastructure for the school/user.
 - **Module Pricing & Bundles**:
   - **Campus Module**: Base price is 14,90 € / Mo. (fixed server-hosting flat rate per music school).
@@ -31,7 +31,7 @@
     - *Härtefälle & Geschwisterrabatte*: Individual students can be manually marked in the student administration to exempt them from direct billing (costs remain with the school, no contribution is collected).
 ## Canonical Billing Sequence & Legal SaaS Nomenclature (Verbindlicher Standard)
 - **Plattformweites Master-Wording**: Für alle Gebührenaufstellungen, Gebühren-Vorschauen, Ratenübersichten, Rechnungs-PDFs, Onboarding-Karten und Modals innerhalb der gesamten Plattform MUSS immer die exakt gleiche kanonische Reihenfolge und das gleiche juristisch wasserdichte Wording verwendet werden:
-  1. **`Campus-Groovelab Software-Bereitstellung`**: `100% kostenlos (0,00 €)`
+  1. **`Campus-Groovelab Software-Bereitstellung`**: `0,00 € (Inklusive)`
   2. **`Cloud- & Datenbank-Hosting: Modul Campus`**: `14,90 € / Mo.` (sofern Modul Campus aktiv)
   3. **`Cloud- & Datenbank-Hosting: Modul GrooveLab`**: `9,90 € / Mo.` (sofern Modul GrooveLab aktiv)
   4. **`Kombi-Vorteilsrabatt (Infrastruktur-Bündel)`**: `-4,90 € / Mo.` (sofern beide Module aktiv)
@@ -40,7 +40,7 @@
   7. **`Cloud- & Modul-Bereitstellung: Campus`**: `[X] Schüler × 0,49 € / Mo.` (Interaktive App-Nutzung: Übe-Timer, Loopstation, Meisterwerk-Protokoll)
   8. **`Cloud- & Modul-Bereitstellung: GrooveLab`**: `[X] Schüler × 0,49 € / Mo.` (Interaktive Band-Nutzung: Song-Bibliotheken, Band-Rooms, Repertoire)
   9. **`Zusatz-Speichervolumen: Audio-Tresor (+[X] GB)`**: `[X,XX] € / Mo.` (sofern Speicher-Add-on gebucht)
-- **Verbotene Begriffe**: Das Wort „Lizenz“, „Lizenzen“ oder „Lizenzgebühr“ darf NIEMALS in Zusammenhang mit unserem Geschäftsmodell und unserem Angebot verwendet werden. Die Software ist dauerhaft zu 100% kostenlos (0,00 €); vermietet und abgerechnet wird ausschließlich die Cloud-, Datenbank-, Bereitstellungs- und Hosting-Infrastruktur. Ebenfalls verboten sind die Begriffe „Passiv-Lizenz“, „Karteileichen-Gebühr“, „Schüler-Lizenz“ oder „Profilaktivierung“.
+- **Verbotene Begriffe & Abmahnschutz (UWG / PAngV)**: Das Wort „Lizenz“, „Lizenzen“ oder „Lizenzgebühr“ darf NIEMALS in Zusammenhang mit unserem Geschäftsmodell und unserem Angebot verwendet werden. Die Software ist ohne gesonderte Lizenzkaufgebühren im Hosting-Paket inklusive (0,00 €); vermietet und abgerechnet wird ausschließlich die Cloud-, Datenbank-, Bereitstellungs- und Hosting-Infrastruktur. Ebenfalls verboten sind irreführende Blickfang-Werbeaussagen wie „100% kostenlos ohne Bedingungen“ auf Landingpages, sowie die Begriffe „Passiv-Lizenz“, „Karteileichen-Gebühr“, „Schüler-Lizenz“ oder „Profilaktivierung“. Stattdessen gilt das Wording: „Transparentes Cloud-Hosting statt teurer Software-Lizenzen“ und „Keine Einrichtungsgebühr, keine Lizenzkaufgebühren“.
 
 ## Invoice Numbering Format (Rechnungsnummer-Logik)
 - **B2C Student Activations (Direktabrechnung)**: Format `CG-[STUDENT_HASH_8]-[YYMM]` (e.g., `CG-F63B8EDE-2607`). Uses the platform prefix `CG-`, the first 8 uppercase hex characters of the student ID, and 2-digit year + 2-digit month. Ensures 100% GDPR compliance (no plain text names on bank statements), unique idempotency, and exact 1:1 match with the transfer reference (`Verwendungszweck`).

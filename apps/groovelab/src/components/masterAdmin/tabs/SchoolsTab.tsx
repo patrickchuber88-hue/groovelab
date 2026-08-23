@@ -865,7 +865,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               <div style={{ fontWeight: 850, borderBottom: '1px solid #f1f5f9', paddingBottom: '5px', marginBottom: '6px', color: '#0f172a' }}>
                                 Kanonische MRR-Kalkulation
                               </div>
-                              <div style={{ color: '#16a34a', fontWeight: 600 }}>1. Campus-Groovelab Software-Bereitstellung: 100% kostenlos (0,00 €)</div>
+                              <div style={{ color: '#16a34a', fontWeight: 600 }}>1. Campus-Groovelab Software-Bereitstellung: 0,00 € (Inklusive)</div>
                               {school.has_campus_subscription && school.has_groovelab_subscription ? (
                                 <>
                                   <div style={{ color: '#475569' }}>2. Cloud Campus: {rates.priceCampus.toFixed(2)} €</div>

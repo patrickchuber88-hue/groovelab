@@ -9467,7 +9467,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               </span>
                             </div>
                             <span style={{ fontSize: '0.76rem', color: '#15803d', lineHeight: 1.35, fontWeight: 600 }}>
-                              Deine Musikschule übernimmt alle Cloud-Bereitstellungsgebühren für deinen Campus-Zugang. Die Software-Nutzung ist 100% kostenlos.
+                              Deine Musikschule übernimmt alle Cloud-Bereitstellungsgebühren für deinen Campus-Zugang. Für dich fallen keine Kosten an.
                             </span>
                           </div>
                         </div>
@@ -9511,8 +9511,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         </div>
                         <span style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.35, fontWeight: 500 }}>
                           {isPartial 
-                            ? 'Deine Musikschule bezuschusst deinen Zugang. Die Cloud-Bereitstellung wird als transparente Einmalzahlung für das Schuljahr abgerechnet (keine automatische Verlängerung). Die Software-Nutzung ist 100% kostenlos.' 
-                            : 'Cloud- & Modul-Bereitstellung für deinen vollen Campus-Zugang (Einmalzahlung für das Schuljahr, keine automatische Verlängerung). Die Software-Nutzung ist 100% kostenlos.'}
+                            ? 'Deine Musikschule bezuschusst deinen Zugang. Die Cloud-Bereitstellung wird als transparente Einmalzahlung für das Schuljahr abgerechnet (keine automatische Verlängerung, keine gesonderten Lizenzgebühren).' 
+                            : 'Cloud- & Modul-Bereitstellung für deinen vollen Campus-Zugang (Einmalzahlung für das Schuljahr, keine automatische Verlängerung, keine gesonderten Lizenzgebühren).'}
                         </span>
 
                         {/* 🛡️ Treue-Preisgarantie Badge */}

@@ -637,7 +637,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
           marginBottom: '64px',
           marginTop: '0px'
         }}>
-          Die Software ist zu 100% kostenlos. Keine Kreditkarte erforderlich.
+          Transparente Cloud-Flatrates. Keine Einrichtungsgebühr, keine Kreditkarte erforderlich.
         </p>
 
         {/* Visual: Browser Mockup of Schedule Board */}
@@ -1376,17 +1376,17 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
             marginBottom: '24px',
             color: '#000000'
           }}>
-            Fokus auf die Musik. Nicht auf die Kosten.
+            Fokus auf die Musik. Nicht auf teure Lizenzverträge.
           </h2>
 
           <p style={{
             fontSize: '16px',
             color: '#7d7d82',
-            maxWidth: '600px',
+            maxWidth: '650px',
             margin: '0 auto 64px auto',
             lineHeight: 1.6
           }}>
-            Wir glauben an die Kraft der Musik. Deshalb ist die Kernanwendung für deine Schule dauerhaft kostenfrei. Ohne Risiko, ohne Bedingungen.
+            Faire, planbare Cloud-Flatrates für deine Musikschule. Keine teuren Software-Lizenzen, keine Einrichtungsgebühren und 100 % DSGVO-konformes Hosting in Deutschland.
           </p>
 
           {/* Professional Senior Sales Pricing Model */}
@@ -1398,7 +1398,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
             gap: '48px'
           }}>
             
-            {/* Prominent Core Value Banner: 100% Free Core License */}
+            {/* Prominent Core Value Banner: Transparent Cloud Hosting */}
             <div style={{
               background: 'linear-gradient(135deg, #e6f4ea 0%, #f4fbf7 100%)',
               border: '1.5px solid rgba(52, 168, 83, 0.25)',
@@ -1429,7 +1429,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 margin: '0 0 12px 0',
                 letterSpacing: '-0.02em'
               }}>
-                Die Core-Software ist dauerhaft 100% kostenlos
+                Transparentes Cloud-Hosting statt teurer Software-Lizenzen
               </h3>
               <p style={{
                 fontSize: '16px',
@@ -1439,7 +1439,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 lineHeight: 1.6,
                 fontWeight: 550
               }}>
-                Keine Einrichtungsgebühr und keine Softwaregebühren (Software dauerhaft zu 100% kostenlos). Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab {Math.min(pricing.campus, pricing.groovelab).toFixed(2).replace('.', ',')} € / Mo.) und aktive Profile.
+                Keine Einrichtungsgebühr, keine Lizenzkaufgebühren und keine Knebelverträge. Verwaltungs- und Sekretariats-Nutzer sowie inaktive Schülerprofile sind dauerhaft kostenfrei inklusive. Sie zahlen ausschließlich die transparente Cloud- &amp; Hostingpauschale (ab {Math.min(pricing.campus, pricing.groovelab).toFixed(2).replace('.', ',')} € / Mo.) und aktive Profile bei tatsächlicher Nutzung.
               </p>
             </div>
 

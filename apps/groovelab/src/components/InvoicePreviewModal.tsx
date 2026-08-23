@@ -118,7 +118,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     lineItems.push({
       id: 1,
       name: 'Campus-Groovelab Software-Bereitstellung',
-      description: '100% kostenlose Software-Bereitstellung für Musikschulen',
+      description: 'Pädagogische Schulplattform & Web-App (Im Cloud-Paket inklusive)',
       quantity: 1,
       unitPrice: 0,
       totalPrice: 0,
@@ -455,11 +455,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 <>
                   {isInf && (
                     <>
-                      {/* Position 1: 100% Kostenlose Software-Bereitstellung */}
+                      {/* Position 1: Software-Bereitstellung (Inklusive) */}
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '8px 0' }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Software-Bereitstellung</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 700 }}>Pädagogische Schulplattform &amp; Web-App (100% kostenfrei / inklusive)</span>
+                          <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 700 }}>Pädagogische Schulplattform &amp; Web-App (Im Cloud-Paket inklusive / 0,00 €)</span>
                         </td>
                         <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
                         <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>0,00 €</td>
@@ -623,8 +623,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                           <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Modul Campus (Sammelabrechnung)</strong>
                           <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
                             {studentBillingOption === 'option2' 
-                              ? `Monatliche Cloud-Bereitstellung für Schüler-Profile (Umlagesatz = ${masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo.). Die Software-Nutzung ist 100% kostenlos.`
-                              : `Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = ${((invoice.studentFee || 4.80) / (invoice.restmonate || 12)).toFixed(2).replace('.', ',')} € / Mo. für ${invoice.restmonate || 12} Restmonate). Die Software-Nutzung ist 100% kostenlos.`
+                              ? `Monatliche Cloud-Bereitstellung für Schüler-Profile (Umlagesatz = ${masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo.). Keine gesonderten Lizenzgebühren.`
+                              : `Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = ${((invoice.studentFee || 4.80) / (invoice.restmonate || 12)).toFixed(2).replace('.', ',')} € / Mo. für ${invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzgebühren.`
                             }
                             {studentBillingOption === 'option3_2' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
                             {studentBillingOption === 'option3_3' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}

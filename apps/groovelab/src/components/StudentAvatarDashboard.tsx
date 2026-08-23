@@ -2292,7 +2292,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
         <FileText size={18} color="#34a853" /> Abrechnung & Rechnungen
       </h3>
       <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px', fontWeight: 600, lineHeight: '1.4' }}>
-        Hier findest du die Rechnungen für deine Cloud- & Modul-Bereitstellung (Rest-Schuljahrespauschale). Die Campus-Groovelab Software-Nutzung ist dauerhaft 100% kostenlos.
+        Hier findest du die Rechnungen für deine Cloud- & Modul-Bereitstellung (Rest-Schuljahrespauschale). Die Software-Nutzung ist im gebuchten Bereitstellungspaket ohne gesonderte Lizenzgebühren enthalten.
       </p>
 
       {invoices.length === 0 ? (
@@ -25929,10 +25929,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         {/* Kostenfreie Software & Bereitstellung */}
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            ⚖️ Campus-Groovelab Software-Nutzung
+                            ⚖️ Campus-Groovelab Bereitstellung
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
-                            Die Campus-Groovelab Software-Nutzung ist für alle Schüler und Lehrkräfte <strong>dauerhaft 100% kostenlos</strong> (Reine Cloud- &amp; Hosting-Infrastruktur).
+                            Die Campus-Groovelab Software ist ohne gesonderte Lizenzgebühren im Bereitstellungspaket enthalten (Reine Cloud- &amp; Hosting-Infrastruktur).
                           </p>
                         </div>
 
@@ -25980,7 +25980,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
                             <strong>Campus-Groovelab</strong> ist ein Produkt und Service für Musikschulen.<br />
-                            Software-Bereitstellung: 100% kostenlos.<br />
+                            Keine Lizenzkaufgebühren (Cloud- &amp; Hostingpauschale).<br />
                             Server-Standort &amp; Datenspeicherung: Bundesrepublik Deutschland (EU).
                           </p>
                         </div>

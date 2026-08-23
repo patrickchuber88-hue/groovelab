@@ -26199,8 +26199,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Campus-Groovelab Software-Nutzung:</span>
-                                <strong style={{ color: '#34a853' }}>100% kostenlos</strong>
+                                <span>Campus-Groovelab Software-Bereitstellung:</span>
+                                <strong style={{ color: '#34a853' }}>0,00 € (Inklusive)</strong>
                               </div>
 
                               {hasCampusSub && (
@@ -26785,8 +26785,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>Campus-Groovelab Software-Nutzung:</span>
-                                              <strong style={{ color: '#34a853' }}>100% kostenlos</strong>
+                                              <span>Campus-Groovelab Software-Bereitstellung:</span>
+                                              <strong style={{ color: '#34a853' }}>0,00 € (Inklusive)</strong>
                                             </div>
 
                                             {subscriptionBypass ? (
@@ -30607,7 +30607,7 @@ status: status,
                           <div>
                             <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Aktive Zahlungsart</strong>
                             <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.35' }}>
-                              Die Software-Nutzung für <strong>Campus-Groovelab</strong> ist zu 100% kostenlos. Es fallen lediglich optionale Hosting- und Bereitstellungsgebühren an. Die Abrechnung erfolgt per Rechnung (14 Tage Zahlungsziel).
+                              Die Abrechnung für Cloud-Hosting und Bereitstellung erfolgt transparent per Sammelrechnung (14 Tage Zahlungsziel). Es fallen keine gesonderten Lizenzkaufgebühren an.
                             </span>
                           </div>
                           <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#ea4335', background: '#fce8e6', border: '1px solid #fca5a5', padding: '6px 14px', borderRadius: '100px', letterSpacing: '0.04em', whiteSpace: 'nowrap', marginLeft: '12px' }}>
