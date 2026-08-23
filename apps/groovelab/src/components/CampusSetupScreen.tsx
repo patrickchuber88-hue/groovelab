@@ -12,9 +12,11 @@ import {
   Bell,
   Link2,
   X,
-  ShieldCheck
+  ShieldCheck,
+  Lightbulb
 } from 'lucide-react';
 import { generateConsentPDF, generateDSBCompliancePDF } from '../utils/pdfGenerator';
+import { FeedbackHubModal } from './feedback/FeedbackHubModal';
 
 interface CampusSetupScreenProps {
   school: any;
@@ -37,6 +39,7 @@ export function CampusSetupScreen({
   const [isSaving, setIsSaving] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'calendar' | 'communication' | 'gamification' | 'datenschutz'>('calendar');
   const [activeCampusSettingsModal, setActiveCampusSettingsModal] = useState<'calendar' | 'communication' | 'gamification' | 'datenschutz' | null>(null);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
   const [initialConfig, setInitialConfig] = useState<any>(null);
 
   // Responsive Mobile Viewport Detection (<= 1024px or Device Simulator)
@@ -281,6 +284,15 @@ export function CampusSetupScreen({
             gradient: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
             shadowColor: 'rgba(52, 168, 83, 0.40)',
             icon: ShieldCheck
+          },
+          {
+            id: 'feedback',
+            title: 'Ideenschmiede',
+            subtitle: 'Wünsche & Fehler melden',
+            badge: 'Mitgestalten',
+            gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+            shadowColor: 'rgba(236, 72, 153, 0.40)',
+            icon: Lightbulb
           }
         ].map((module) => {
           const IconComp = module.icon;
@@ -288,8 +300,12 @@ export function CampusSetupScreen({
             <div
               key={module.id}
               onClick={() => {
-                setSettingsTab(module.id as any);
-                setActiveCampusSettingsModal(module.id as any);
+                if (module.id === 'feedback') {
+                  setIsFeedbackModalOpen(true);
+                } else {
+                  setSettingsTab(module.id as any);
+                  setActiveCampusSettingsModal(module.id as any);
+                }
               }}
               style={{
                 background: '#ffffff',
@@ -860,6 +876,18 @@ export function CampusSetupScreen({
           </div>
         </div>
       )}
+
+      {/* Ideenschmiede & Feedback Modal */}
+      <FeedbackHubModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        userRole={admin?.role || 'teacher'}
+        userId={admin?.id || admin?.userId}
+        userName={`${admin?.first_name || ''} ${admin?.last_name || ''}`.trim() || 'Lehrkraft'}
+        schoolId={effectiveSchool?.id || admin?.school_id}
+        schoolName={effectiveSchool?.name || ''}
+        activePlatform="campus"
+      />
     </div>
   );
 }

@@ -486,10 +486,39 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   </div>
                 )}
                 <div style={{ borderTop: '1px dashed #e2e8f0', margin: '8px 0' }}></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
-                  <span style={{ fontWeight: 800 }}>Gesamtbetrag dieser Rechnung:</span>
-                  <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#34a853', whiteSpace: 'nowrap' }}>{invoice.amount.toFixed(2).replace('.', ',')} €</strong>
-                </div>
+                {(() => {
+                  const currentTaxMode = typeof window !== 'undefined' ? (localStorage.getItem('cg_tax_mode') || 'small_business') : 'small_business';
+                  const isStandardVat = currentTaxMode === 'standard_vat';
+                  const netAmount = invoice.amount;
+                  const vatAmount = isStandardVat ? (netAmount * 0.19) : 0;
+                  const grossAmount = netAmount + vatAmount;
+
+                  if (isStandardVat) {
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569' }}>
+                          <span>Nettobetrag:</span>
+                          <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{netAmount.toFixed(2).replace('.', ',')} €</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#0369a1' }}>
+                          <span>zzgl. 19% Umsatzsteuer:</span>
+                          <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{vatAmount.toFixed(2).replace('.', ',')} €</span>
+                        </div>
+                        <div style={{ borderTop: '1px solid #cbd5e1', marginTop: '4px', paddingTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#0f172a' }}>
+                          <span style={{ fontWeight: 900 }}>Gesamtbetrag (Brutto):</span>
+                          <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#34a853', whiteSpace: 'nowrap' }}>{grossAmount.toFixed(2).replace('.', ',')} €</strong>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
+                      <span style={{ fontWeight: 800 }}>Gesamtbetrag dieser Rechnung:</span>
+                      <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#34a853', whiteSpace: 'nowrap' }}>{invoice.amount.toFixed(2).replace('.', ',')} €</strong>
+                    </div>
+                  );
+                })()}
               </div>
               {isAkt && school.billingPayer === 'student' && (
                 <div style={{ fontSize: '0.64rem', color: '#137333', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
@@ -502,7 +531,15 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                 </div>
               )}
               <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '12px', textAlign: 'right', fontStyle: 'italic', fontWeight: 600 }}>
-                Die Campus-Groovelab Software-Nutzung ist 100% dauerhaft kostenlos. Das Entgelt wird ausschließlich für die Miete und Bereitstellung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
+                {typeof window !== 'undefined' && localStorage.getItem('cg_tax_mode') === 'standard_vat' ? (
+                  <>
+                    Die Campus-Groovelab Software-Nutzung ist 100% dauerhaft kostenlos. Das Entgelt wird ausschließlich für die Miete und Bereitstellung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Rechnungsstellung nach §§ 14, 14a UStG. Umsatzsteuer-Identifikationsnummer: <strong>{localStorage.getItem('cg_vat_id') || 'DE345678901'}</strong>.
+                  </>
+                ) : (
+                  <>
+                    Die Campus-Groovelab Software-Nutzung ist 100% dauerhaft kostenlos. Das Entgelt wird ausschließlich für die Miete und Bereitstellung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
+                  </>
+                )}
               </div>
               
               {invoice.amount > 0 ? (

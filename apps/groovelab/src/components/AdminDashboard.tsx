@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -21,6 +21,7 @@ import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { AVVModal } from './AVVModal';
+import { FeedbackHubModal } from './feedback/FeedbackHubModal';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -2473,7 +2474,16 @@ export function AdminDashboard({
             ? schoolRoster.filter(s => s.is_groovelab_active) 
             : schoolRoster;
         } else {
-          studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
+          const targetTeacherId = adminData.is_ghost_mode 
+            ? (sessionStorage.getItem('groovelab_ghost_shadowed_teacher_id') || adminData.id) 
+            : adminData.id;
+          studentsData = await fetchTeacherStudentsHelper(targetTeacherId, adminData.school_id, activePlatform);
+          if (adminData.is_ghost_mode && (!studentsData || studentsData.length === 0)) {
+            const schoolRoster = await fetchSchoolRoster(adminData.school_id, supabase);
+            studentsData = activePlatform === 'groovelab' 
+              ? schoolRoster.filter(s => s.is_groovelab_active) 
+              : schoolRoster;
+          }
         }
 
         if (studentsData) {
@@ -18931,6 +18941,7 @@ function DeviceSetupScreen({
   });
   const [isSaving, setIsSaving] = useState(false);
   const [copiedKioskLink, setCopiedKioskLink] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   useEffect(() => {
     if (rooms.length > 0 && !selectedRoomId) {
@@ -19809,6 +19820,56 @@ function DeviceSetupScreen({
                 <Download size={14} /> Alle Anwesenheiten exportieren (CSV)
               </button>
             </div>
+
+            {/* Sektion: Ideenschmiede & Feedback */}
+            <div style={{ 
+              background: '#fdf2f8', 
+              borderRadius: '24px', 
+              padding: '20px 24px', 
+              border: '1.5px solid #fbcfe8',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              marginTop: '8px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ec4899', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Lightbulb size={20} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: '#831843' }}>
+                      Ideenschmiede & Feature-Wünsche
+                    </h4>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#9d174d' }}>
+                      Reiche Wünsche, Feature-Ideen oder Fehlerberichte ein und stimme über Community-Vorschläge ab.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFeedbackModalOpen(true)}
+                  style={{
+                    background: '#ec4899',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '9px 18px',
+                    borderRadius: '10px',
+                    fontWeight: 800,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(236,72,153,0.25)',
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale"
+                >
+                  <Lightbulb size={14} /> Ideenschmiede öffnen
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -19929,6 +19990,18 @@ function DeviceSetupScreen({
           </div>
         </div>
       )}
+
+      {/* Feedback & Ideenschmiede Modal */}
+      <FeedbackHubModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        userRole="admin"
+        userId={admin?.id || admin?.userId || 'admin'}
+        userName="Administrator"
+        schoolId={effectiveSchool?.id || school?.id}
+        schoolName={effectiveSchool?.name}
+        activePlatform={activePlatform as any}
+      />
     </div>
   );
 }

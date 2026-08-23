@@ -174,10 +174,15 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
       newTime = rightRaw;
     }
     oldTime = leftRaw;
-  } else if (content.includes('zurückgesetzt') || content.includes('wiederhergestellt')) {
-    title = 'Regulärer Termin wiederhergestellt';
+  } else if (content.includes('zurückgesetzt') || content.includes('wiederhergestellt') || content.includes('reaktiviert') || content.includes('zurückgenommen')) {
+    title = 'Termin zurückgesetzt';
     badgeText = 'Termin regulär';
-    note = content.replace(/Der verschobene oder abgesagte Termin wurde auf den regulären (Stamm-)?Termin zurückgesetzt:?/i, '').replace(/Der verschobene Termin wurde auf den regulären (Stamm-)?Termin zurückgesetzt:?/i, '').trim();
+    note = content
+      .replace(/Der verschobene oder abgesagte Termin wurde auf den regulären (Stamm-)?Termin zurückgesetzt:?/i, '')
+      .replace(/Der verschobene Termin wurde auf den regulären (Stamm-)?Termin zurückgesetzt:?/i, '')
+      .replace(/Der Ausfall für diesen Termin wurde zurückgenommen:?/i, '')
+      .replace(/Der Ausfall wurde zurückgenommen:?/i, '')
+      .trim();
   } else if (content.includes('abgelehnt')) {
     title = 'Verschiebung abgelehnt';
     badgeText = 'Abgelehnt';
@@ -213,13 +218,13 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
     badgeBg = '#fffbe6';
     badgeColor = '#b45309';
     badgeBorder = '#fde68a';
-  } else if (badgeText === 'Bestätigt') {
-    // Soft Muted Green (Confirmed)
+  } else if (badgeText === 'Bestätigt' || badgeText === 'Termin regulär' || badgeText === 'Regulär' || badgeText === 'Reaktiviert') {
+    // Soft Muted Green (Confirmed / Regular)
     badgeBg = '#e6f4ea';
     badgeColor = '#15803d';
     badgeBorder = '#bbf7d0';
-  } else if (badgeText === 'Termin regulär' || badgeText === 'Termin zurückgesetzt' || badgeText === 'Nicht mehr aktuell') {
-    // Soft Slate Gray (Reset / Regular / Superseded)
+  } else if (badgeText === 'Termin zurückgesetzt' || badgeText === 'Nicht mehr aktuell') {
+    // Soft Slate Gray (Reset / Superseded)
     badgeBg = '#f1f5f9';
     badgeColor = '#475569';
     badgeBorder = '#e2e8f0';
@@ -837,6 +842,8 @@ export function CampusDirectMessages({
       lower.includes('termin wurde auf den regulären') ||
       lower.includes('termin zurückgesetzt') ||
       lower.includes('stamm-termin zurückgesetzt') ||
+      lower.includes('ausfall wurde zurückgenommen') ||
+      lower.includes('ausfall für diesen termin wurde zurückgenommen') ||
       lower.includes('abgesagt') ||
       content.includes('❌') ||
       lower.includes('unterrichtstermin bestätigt') ||
@@ -1662,7 +1669,7 @@ export function CampusDirectMessages({
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
                 }}>
                   <ShieldCheck size={14} color="#ffffff" />
-                  <span>100% DSGVO-konform • End-to-End verschlüsselt</span>
+                  <span>100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
                 </span>
               </div>
             </div>
@@ -2009,17 +2016,54 @@ export function CampusDirectMessages({
                           <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             1:1 Termin-Shoutbox
                           </span>
-                          <span style={{
-                            fontSize: '0.65rem',
-                            background: stammterminText ? '#e6f4ea' : (occObj?.status === 'cancelled' || occObj?.status === 'canceled' || (currentTab.messages || []).some((m: any) => isSystemMessage(m) && (m.content || '').includes('abgesagt')) ? '#fef2f2' : '#dcfce7'),
-                            color: stammterminText ? '#15803d' : (occObj?.status === 'cancelled' || occObj?.status === 'canceled' || (currentTab.messages || []).some((m: any) => isSystemMessage(m) && (m.content || '').includes('abgesagt')) ? '#991b1b' : '#15803d'),
-                            padding: '2px 8px',
-                            borderRadius: '100px',
-                            fontWeight: 800,
-                            border: stammterminText ? '1px solid #bbf7d0' : (occObj?.status === 'cancelled' || occObj?.status === 'canceled' || (currentTab.messages || []).some((m: any) => isSystemMessage(m) && (m.content || '').includes('abgesagt')) ? '1px solid #fecaca' : '1px solid #bbf7d0')
-                          }}>
-                            {stammterminText ? '🔄 Termin verschoben' : (occObj?.status === 'cancelled' || occObj?.status === 'canceled' || (currentTab.messages || []).some((m: any) => isSystemMessage(m) && (m.content || '').includes('abgesagt')) ? '❌ Termin abgesagt' : 'Anstehender Unterricht')}
-                          </span>
+                          {(() => {
+                            const systemMessages = (currentTab.messages || []).filter((m: any) => isSystemMessage(m));
+                            const latestSystemMsg = systemMessages.length > 0 ? systemMessages[systemMessages.length - 1] : null;
+                            const latestIsReset = latestSystemMsg && (
+                              (latestSystemMsg.content || '').includes('zurückgesetzt') || 
+                              (latestSystemMsg.content || '').includes('wiederhergestellt') || 
+                              (latestSystemMsg.content || '').includes('reaktiviert') ||
+                              (latestSystemMsg.content || '').includes('zurückgenommen')
+                            );
+                            const isCurrentlyCancelled = occObj?.status === 'cancelled' || occObj?.status === 'canceled' || occObj?.status === 'canceled_by_student';
+                            const showCancelledBadge = isCurrentlyCancelled || (latestSystemMsg && ((latestSystemMsg.content || '').includes('abgesagt') || (latestSystemMsg.content || '').includes('fällt aus')) && !latestIsReset);
+
+                            let badgeLabel = 'Anstehender Unterricht';
+                            let badgeBg = '#dcfce7';
+                            let badgeColor = '#15803d';
+                            let badgeBorder = '1px solid #bbf7d0';
+
+                            if (stammterminText) {
+                              badgeLabel = '🔄 Termin verschoben';
+                              badgeBg = '#e6f4ea';
+                              badgeColor = '#15803d';
+                              badgeBorder = '1px solid #bbf7d0';
+                            } else if (showCancelledBadge) {
+                              badgeLabel = '❌ Termin abgesagt';
+                              badgeBg = '#fef2f2';
+                              badgeColor = '#991b1b';
+                              badgeBorder = '1px solid #fecaca';
+                            } else if (latestIsReset) {
+                              badgeLabel = '🔄 Termin zurückgesetzt';
+                              badgeBg = '#e6f4ea';
+                              badgeColor = '#15803d';
+                              badgeBorder = '1px solid #bbf7d0';
+                            }
+
+                            return (
+                              <span style={{
+                                fontSize: '0.65rem',
+                                background: badgeBg,
+                                color: badgeColor,
+                                padding: '2px 8px',
+                                borderRadius: '100px',
+                                fontWeight: 800,
+                                border: badgeBorder
+                              }}>
+                                {badgeLabel}
+                              </span>
+                            );
+                          })()}
                         </div>
 
                         {stammterminText ? (
@@ -2521,7 +2565,7 @@ export function CampusDirectMessages({
                     Campus-Groovelab Nachrichten & Shoutbox ({assignedStudents.length})
                   </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
-                    100% DSGVO-konform • End-to-End verschlüsselte Direktnachrichten & termingekoppelte Abstimmungen
+                    100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselte Direktnachrichten &amp; termingekoppelte Abstimmungen
                   </p>
                 </div>
               </div>

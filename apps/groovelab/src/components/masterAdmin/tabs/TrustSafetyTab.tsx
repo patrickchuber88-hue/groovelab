@@ -277,7 +277,7 @@ export function TrustSafetyTab() {
       takedownRecord: newRecord
     } : null);
 
-    showToast(`🚨 Sofort-Takedown ausgeführt: Freigabelink für „${resolvedResult.studentName}“ gesperrt!`);
+    showToast(`Sofort-Takedown ausgeführt: Freigabelink für „${resolvedResult.studentName}“ gesperrt!`);
   };
 
   // Revert / Restore Link Access
@@ -299,7 +299,7 @@ export function TrustSafetyTab() {
       setResolvedResult(prev => prev ? { ...prev, isCurrentlyBlocked: false, takedownRecord: undefined } : null);
     }
 
-    showToast(`🟢 Freigabelink reaktiviert & Takedown aufgehoben.`);
+    showToast(`Freigabelink reaktiviert & Takedown aufgehoben.`);
   };
 
   // Re-Roll PIN (Token Invalidation without full takedown)
@@ -312,7 +312,7 @@ export function TrustSafetyTab() {
         localStorage.setItem(`campus_share_pin_${resolvedResult.studentId}_${resolvedResult.playlistId}`, newRandomPin);
       }
     } catch {}
-    showToast(`🎲 PIN neu gewürfelt (${newRandomPin}): Bisheriger Link-Kryptohash ist ab sofort ungültig!`);
+    showToast(`PIN neu gewürfelt (${newRandomPin}): Bisheriger Link-Kryptohash ist ab sofort ungültig!`);
   };
 
   // Export DSA Compliance Audit Report (JSON / Printable Certificate)
@@ -344,7 +344,7 @@ export function TrustSafetyTab() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast(`📄 DSA-Beweisprotokoll für Anwalt/GEMA heruntergeladen!`);
+    showToast(`DSA-Beweisprotokoll für Anwalt/GEMA heruntergeladen!`);
   };
 
   const filteredRegistry = useMemo(() => {
@@ -383,64 +383,67 @@ export function TrustSafetyTab() {
         </div>
       )}
 
-      {/* Header Banner */}
+      {/* 🌟 BRIGHT APPLE HIG HERO BANNER */}
       <div style={{
-        background: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)',
-        border: '1px solid rgba(99, 102, 241, 0.25)',
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
         borderRadius: '24px',
-        padding: '28px',
-        color: '#f8fafc',
+        padding: '28px 32px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
         gap: '20px',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)'
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
       }}>
         <div style={{ maxWidth: '680px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
             <span style={{
-              background: 'rgba(239, 68, 68, 0.2)',
-              color: '#f87171',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
+              background: '#fef2f2',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
               fontSize: '0.72rem',
               fontWeight: 900,
               padding: '3px 10px',
               borderRadius: '100px',
               textTransform: 'uppercase',
-              letterSpacing: '0.08em'
+              letterSpacing: '0.04em',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px'
             }}>
-              Trust & Safety • Enterprise Notice-and-Takedown Suite
+              <ShieldCheck size={12} color="#dc2626" />
+              Trust &amp; Safety • Link-Schutz
             </span>
-            <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600 }}>
-              Art. 6 DSA / § 10 DDG / UrhDaG
+            <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+              1-Klick Sperre &amp; PIN-Schutz
             </span>
           </div>
-          <h2 style={{ margin: '0 0 8px 0', fontSize: '1.6rem', fontWeight: 900, letterSpacing: '-0.02em' }}>
-            Incident Resolver & Legal Takedown Suite
+          <h2 style={{ margin: '0 0 8px 0', fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+            Freigabelinks prüfen &amp; sperren
           </h2>
-          <p style={{ margin: 0, fontSize: '0.88rem', color: '#94a3b8', lineHeight: 1.55 }}>
-            Füge einen beanstandeten Audio-Freigabelink oder eine Schüler-UUID ein. Das System löst den Mandanten, die Lehrkraft und den Schüler in &lt; 1 Sekunde auf und ermöglicht einen <b>sofortigen Takedown mit gerichtsverwertbarem DSA-Beweisbericht</b>.
+          <p style={{ margin: 0, fontSize: '0.90rem', color: '#64748b', lineHeight: 1.55 }}>
+            Füge einen Freigabelink ein, um das betroffene Schülerprofil in Sekundenschnelle zu identifizieren und den Link bei Bedarf mit 1 Klick zu deaktivieren oder mit einer neuen PIN zu schützen.
           </p>
         </div>
 
         <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
           borderRadius: '18px',
-          padding: '16px 20px',
+          padding: '16px 24px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           gap: '4px'
         }}>
-          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>
-            Aktive Takedowns
+          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>
+            Gesperrte Links
           </span>
-          <span style={{ fontSize: '2rem', fontWeight: 900, color: takedownRegistry.filter(t => t.active).length > 0 ? '#ef4444' : '#10b981' }}>
+          <span style={{ fontSize: '2rem', fontWeight: 900, color: takedownRegistry.filter(t => t.active).length > 0 ? '#dc2626' : '#059669' }}>
             {takedownRegistry.filter(t => t.active).length}
           </span>
-          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+          <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
             im Gesamtsystem
           </span>
         </div>
@@ -451,31 +454,31 @@ export function TrustSafetyTab() {
         background: '#ffffff',
         border: '1px solid #e2e8f0',
         borderRadius: '24px',
-        padding: '28px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.04)',
+        padding: '28px 32px',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
         display: 'flex',
         flexDirection: 'column',
         gap: '20px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
-            width: '38px',
-            height: '38px',
+            width: '40px',
+            height: '40px',
             borderRadius: '12px',
-            background: 'rgba(234, 67, 53, 0.1)',
+            background: '#eff6ff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#ea4335'
+            color: '#2563eb'
           }}>
-            <ShieldAlert size={20} />
+            <Search size={20} />
           </div>
           <div>
             <h3 style={{ margin: 0, fontSize: '1.14rem', fontWeight: 900, color: '#0f172a' }}>
-              Gemeldeten Freigabelink oder Schüler-ID prüfen
+              Schritt 1: Freigabelink oder Schüler-ID eingeben
             </h3>
-            <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
-              Unterstützt vollständige URLs, kurze Slugs oder rohe UUIDs aus Anwaltsschreiben & E-Mails
+            <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+              Füge den vollständigen Link, den Link-Code oder die Schüler-ID ein
             </span>
           </div>
         </div>
@@ -520,8 +523,10 @@ export function TrustSafetyTab() {
               alignItems: 'center',
               gap: '8px',
               opacity: inputUrl.trim() ? 1 : 0.6,
-              transition: 'all 0.15s ease'
+              boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
+            className="hover-scale-mini"
           >
             {isResolving ? <RefreshCw size={16} className="animate-spin" /> : <Search size={16} />}
             <span>Link analysieren</span>
@@ -531,13 +536,14 @@ export function TrustSafetyTab() {
         {/* Resolved Record Cockpit Card */}
         {resolvedResult && (
           <div style={{
-            background: resolvedResult.isCurrentlyBlocked ? '#fef2f2' : '#f8fafc',
-            border: `1.5px solid ${resolvedResult.isCurrentlyBlocked ? '#fca5a5' : '#e2e8f0'}`,
+            background: '#ffffff',
+            border: `1.5px solid ${resolvedResult.isCurrentlyBlocked ? '#fca5a5' : '#a7f3d0'}`,
             borderRadius: '20px',
             padding: '24px',
             display: 'flex',
             flexDirection: 'column',
             gap: '18px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
             animation: 'fadeIn 0.2s ease'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -546,14 +552,13 @@ export function TrustSafetyTab() {
                   width: '46px',
                   height: '46px',
                   borderRadius: '14px',
-                  background: resolvedResult.isCurrentlyBlocked ? '#fee2e2' : '#e0f2fe',
-                  color: resolvedResult.isCurrentlyBlocked ? '#dc2626' : '#0284c7',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '1.4rem'
+                  background: resolvedResult.isCurrentlyBlocked ? '#fee2e2' : '#ecfdf5',
+                  color: resolvedResult.isCurrentlyBlocked ? '#dc2626' : '#059669'
                 }}>
-                  {resolvedResult.isCurrentlyBlocked ? '🔒' : '🎵'}
+                  {resolvedResult.isCurrentlyBlocked ? <Lock size={20} /> : <Music size={20} />}
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -561,8 +566,8 @@ export function TrustSafetyTab() {
                       {resolvedResult.studentName}
                     </h4>
                     {resolvedResult.isAnonymized && (
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '100px', background: '#e2e8f0', color: '#475569' }}>
-                        🕵️ Anonymisiert im Web
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '100px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
+                        Anonymisiert im Web
                       </span>
                     )}
                   </div>
@@ -579,43 +584,43 @@ export function TrustSafetyTab() {
                 gap: '6px',
                 padding: '6px 14px',
                 borderRadius: '100px',
-                background: resolvedResult.isCurrentlyBlocked ? '#ef4444' : '#10b981',
-                color: '#ffffff',
+                background: resolvedResult.isCurrentlyBlocked ? '#fee2e2' : '#ecfdf5',
+                color: resolvedResult.isCurrentlyBlocked ? '#dc2626' : '#059669',
+                border: `1px solid ${resolvedResult.isCurrentlyBlocked ? '#fca5a5' : '#a7f3d0'}`,
                 fontSize: '0.78rem',
-                fontWeight: 900,
-                boxShadow: resolvedResult.isCurrentlyBlocked ? '0 4px 14px rgba(239, 68, 68, 0.3)' : '0 4px 14px rgba(16, 185, 129, 0.3)'
+                fontWeight: 900
               }}>
                 {resolvedResult.isCurrentlyBlocked ? <Lock size={14} /> : <CheckCircle2 size={14} />}
-                <span>{resolvedResult.isCurrentlyBlocked ? '🚨 TAKEDOWN AKTIV (HTTP 410)' : '🟢 AKTIV & AUFRUFBAR'}</span>
+                <span>{resolvedResult.isCurrentlyBlocked ? 'Link ist aktuell gesperrt' : 'Link ist aktiv & aufrufbar'}</span>
               </div>
             </div>
 
-            {/* Meta Grid */}
+            {/* Meta Grid (Clean & Compact) */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
               gap: '12px',
-              background: '#ffffff',
+              background: '#f8fafc',
               border: '1px solid #e2e8f0',
               borderRadius: '14px',
               padding: '14px 18px',
               fontSize: '0.78rem'
             }}>
               <div>
-                <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.70rem', fontWeight: 700 }}>Schüler-UUID:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.70rem', fontWeight: 700 }}>Schüler-ID:</span>
                 <span style={{ fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>{resolvedResult.studentId}</span>
               </div>
               <div>
-                <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.70rem', fontWeight: 700 }}>Betroffene Playlist:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.70rem', fontWeight: 700 }}>Betroffene Playlist:</span>
                 <span style={{ fontWeight: 800, color: '#0f172a' }}>{resolvedResult.playlistTitle}</span>
               </div>
               <div>
-                <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.70rem', fontWeight: 700 }}>Rechtsschutz-Status:</span>
-                <span style={{ fontWeight: 800, color: '#10b981' }}>Listen-Only (Downloads gesperrt)</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.70rem', fontWeight: 700 }}>Download-Schutz:</span>
+                <span style={{ fontWeight: 800, color: '#059669' }}>Aktiv (Nur Streaming)</span>
               </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons (1-Click Simplicity) */}
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
               {!resolvedResult.isCurrentlyBlocked ? (
                 <>
@@ -625,26 +630,28 @@ export function TrustSafetyTab() {
                       onChange={(e) => setSelectedReason(e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '10px 12px',
+                        padding: '11px 14px',
                         borderRadius: '12px',
                         border: '1.5px solid #cbd5e1',
                         background: '#ffffff',
-                        fontSize: '0.80rem',
+                        fontSize: '0.82rem',
                         fontWeight: 700,
-                        color: '#0f172a'
+                        color: '#0f172a',
+                        outline: 'none',
+                        cursor: 'pointer'
                       }}
                     >
                       <option value="Unbefugte Verlinkung in Social Media / Öffentliche PIN-Weitergabe">
-                        ⚠️ Grund: Öffentliche PIN-Weitergabe (Social Media)
+                        Grund: Öffentliche PIN-Weitergabe (Social Media)
                       </option>
                       <option value="Urheberrechtliche Beanstandung durch Rechteinhaber / GEMA">
-                        ⚖️ Grund: Beanstandung durch Rechteinhaber / GEMA
+                        Grund: Beanstandung durch Rechteinhaber / GEMA
                       </option>
                       <option value="Pädagogische Notfall-Deaktivierung durch Schulleitung">
-                        🏫 Grund: Anforderung durch Schulleitung
+                        Grund: Anforderung durch Schulleitung
                       </option>
                       <option value="Datenschutzrechtlicher Widerruf der Erziehungsberechtigten">
-                        🛡️ Grund: Datenschutz-Widerruf gem. Art. 17 DSGVO
+                        Grund: Datenschutz-Widerruf gem. Art. 17 DSGVO
                       </option>
                     </select>
                   </div>
@@ -653,43 +660,49 @@ export function TrustSafetyTab() {
                     type="button"
                     onClick={handleExecuteTakedown}
                     style={{
-                      padding: '10px 20px',
+                      padding: '11px 22px',
                       borderRadius: '12px',
                       border: 'none',
                       background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                       color: '#ffffff',
-                      fontSize: '0.84rem',
+                      fontSize: '0.86rem',
                       fontWeight: 900,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)'
+                      boxShadow: '0 4px 14px rgba(239, 68, 68, 0.25)',
+                      transition: 'all 0.15s ease'
                     }}
+                    className="hover-scale-mini"
                   >
                     <ShieldAlert size={16} />
-                    <span>🚨 Sofort-Takedown ausführen</span>
+                    <span>Link sofort sperren</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleReRollPin}
                     style={{
-                      padding: '10px 16px',
+                      padding: '11px 18px',
                       borderRadius: '12px',
-                      border: '1.5px solid #cbd5e1',
+                      border: '1px solid #cbd5e1',
                       background: '#ffffff',
-                      color: '#475569',
+                      color: '#334155',
                       fontSize: '0.84rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px'
+                      gap: '6px',
+                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                      transition: 'all 0.15s ease'
                     }}
+                    className="hover-scale-mini"
+                    title="Erzeugt eine neue 6-stellige PIN für den Schüler"
                   >
                     <RefreshCw size={14} />
-                    <span>🎲 PIN neu würfeln</span>
+                    <span>Neue PIN vergeben</span>
                   </button>
                 </>
               ) : (
@@ -698,21 +711,24 @@ export function TrustSafetyTab() {
                     type="button"
                     onClick={() => handleRestoreAccess(resolvedResult.studentId, resolvedResult.playlistId)}
                     style={{
-                      padding: '10px 20px',
+                      padding: '11px 22px',
                       borderRadius: '12px',
                       border: 'none',
-                      background: '#10b981',
+                      background: '#059669',
                       color: '#ffffff',
-                      fontSize: '0.84rem',
+                      fontSize: '0.86rem',
                       fontWeight: 900,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: '8px',
+                      boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                      transition: 'all 0.15s ease'
                     }}
+                    className="hover-scale-mini"
                   >
                     <Unlock size={16} />
-                    <span>🟢 Link entsperren (Takedown aufheben)</span>
+                    <span>Link wieder freigeben</span>
                   </button>
 
                   {resolvedResult.takedownRecord && (
@@ -720,21 +736,24 @@ export function TrustSafetyTab() {
                       type="button"
                       onClick={() => handleDownloadDsaCertificate(resolvedResult.takedownRecord!)}
                       style={{
-                        padding: '10px 18px',
+                        padding: '11px 18px',
                         borderRadius: '12px',
-                        border: '1.5px solid #cbd5e1',
+                        border: '1px solid #cbd5e1',
                         background: '#ffffff',
-                        color: '#0f172a',
+                        color: '#334155',
                         fontSize: '0.84rem',
                         fontWeight: 800,
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        gap: '6px',
+                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                        transition: 'all 0.15s ease'
                       }}
+                      className="hover-scale-mini"
                     >
-                      <Download size={15} color="#0284c7" />
-                      <span>📄 DSA-Beweisbericht exportieren (JSON)</span>
+                      <Download size={14} />
+                      <span>DSA-Nachweis herunterladen</span>
                     </button>
                   )}
                 </>
@@ -749,8 +768,8 @@ export function TrustSafetyTab() {
         background: '#ffffff',
         border: '1px solid #e2e8f0',
         borderRadius: '24px',
-        padding: '28px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.04)',
+        padding: '28px 32px',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
         display: 'flex',
         flexDirection: 'column',
         gap: '16px'
@@ -825,7 +844,7 @@ export function TrustSafetyTab() {
                       background: rec.active ? '#fee2e2' : '#dcfce7',
                       color: rec.active ? '#dc2626' : '#15803d'
                     }}>
-                      {rec.active ? '🔒 GESPERRT (410)' : '🟢 REAKTIVIERT'}
+                      {rec.active ? 'GESPERRT (410)' : 'REAKTIVIERT'}
                     </span>
                   </td>
                   <td style={{ padding: '14px 16px' }}>
@@ -871,7 +890,16 @@ export function TrustSafetyTab() {
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '4px'
+                          gap: '4px',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.borderColor = '#0284c7';
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.borderColor = '#cbd5e1';
+                          e.currentTarget.style.transform = 'translateY(0)';
                         }}
                         title="DSA-Nachweis herunterladen"
                       >
@@ -890,7 +918,16 @@ export function TrustSafetyTab() {
                             fontSize: '0.74rem',
                             fontWeight: 800,
                             color: '#15803d',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(22, 163, 74, 0.2)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
                           }}
                         >
                           Entsperren
@@ -910,7 +947,16 @@ export function TrustSafetyTab() {
                             fontSize: '0.74rem',
                             fontWeight: 800,
                             color: '#dc2626',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(220, 38, 38, 0.2)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
                           }}
                         >
                           Erneut sperren

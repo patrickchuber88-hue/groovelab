@@ -6,7 +6,7 @@ import {
   ChevronRight, Download, Sparkles, Sliders, Smartphone, Check, Copy,
   Info, Bell, Calendar, Flame, Layers, Laptop, Tablet, Monitor,
   Shield, CheckCircle, ArrowUpRight, Search, Gauge, BookOpen, HelpCircle,
-  X, Compass, FileText, Cpu, CheckSquare, GraduationCap, Music
+  X, Compass, FileText, Cpu, CheckSquare, GraduationCap, Music, Rocket, Users
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { MaintenanceState } from '../../MaintenanceLockoutOverlay';
@@ -422,25 +422,25 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
   // Preset Announcements
   const announcementPresets: { label: string; severity: 'info' | 'warning' | 'emergency'; title: string; message: string }[] = [
     {
-      label: '🗓️ Wartung am Wochenende',
+      label: 'Wartung am Wochenende',
       severity: 'warning',
       title: 'Geplante Wartungsarbeiten am Sonntag',
       message: 'Am kommenden Sonntag zwischen 02:00 und 04:00 Uhr finden geplante Server-Upgrades statt. In dieser Zeit kann es zu kurzen Unterbrechungen kommen.'
     },
     {
-      label: '🚀 Neues Feature-Update',
+      label: 'Neues Feature-Update',
       severity: 'info',
       title: 'Neues Campus-Groovelab Update verfügbar!',
       message: 'Wir haben neue Funktionen für das Schüler-Protokoll, die Loopstation und den Raumplaner veröffentlicht.'
     },
     {
-      label: '⚡ Kurze Datenbank-Optimierung',
+      label: 'Kurze Datenbank-Optimierung',
       severity: 'info',
       title: 'Routinemäßige System-Optimierung',
       message: 'Aktuell führen wir kurze Leistungsoptimierungen an den Cloud-Servern durch. Der Betrieb läuft uneingeschränkt weiter.'
     },
     {
-      label: '⚠️ Dringende Störungsmeldung',
+      label: 'Dringende Störungsmeldung',
       severity: 'emergency',
       title: 'Wichtiger Hinweis zum Audio-Tresor',
       message: 'Aufgrund kurzzeitiger Wartung am Audio-Speicher kann das Hochladen neuer Aufnahmen für wenige Minuten verzögert sein.'
@@ -520,7 +520,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
         {/* Right Actions: Guide Button & Apple Segmented Track */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           
-          {/* 💡 Anleitung & Handbuch Button */}
+          {/* Anleitung & Handbuch Button */}
           <button
             type="button"
             onClick={() => setShowGuideModal(true)}
@@ -537,9 +537,18 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               alignItems: 'center',
               gap: '6px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              transition: 'all 0.15s ease'
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
-            className="hover-scale-mini"
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = '#059669';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(5, 150, 105, 0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+            }}
           >
             <BookOpen size={15} color="#059669" />
             <span>Anleitung &amp; Handbuch</span>
@@ -556,9 +565,9 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
             boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.04)'
           }}>
             {[
-              { id: 'status', label: '🟢 Live-Status & Killswitch', icon: Power },
-              { id: 'planner', label: '🗓️ Broadcast & Planer', icon: Megaphone },
-              { id: 'diagnostics', label: '🩺 Diagnose & Audit-Log', icon: Activity }
+              { id: 'status', label: 'Live-Status & Killswitch', icon: Power },
+              { id: 'planner', label: 'Broadcast & Planer', icon: Megaphone },
+              { id: 'diagnostics', label: 'Diagnose & Audit-Log', icon: Activity }
             ].map((tab) => {
               const Icon = tab.icon;
               const isSel = activeSubTab === tab.id;
@@ -582,8 +591,18 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                     boxShadow: isSel ? '0 3px 12px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)' : 'none',
                     transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                   }}
+                  onMouseOver={(e) => {
+                    if (!isSel) {
+                      e.currentTarget.style.color = '#0f172a';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!isSel) {
+                      e.currentTarget.style.color = '#64748b';
+                    }
+                  }}
                 >
-                  <Icon size={15} color={isSel ? '#0f172a' : '#64748b'} />
+                  <Icon size={16} color={isSel ? '#0f172a' : '#64748b'} />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -627,98 +646,92 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 background: '#ffffff',
                 border: '1px solid #86efac',
                 color: '#047857',
-                padding: '5px 12px',
+                padding: '6px 14px',
                 borderRadius: '100px',
                 fontWeight: 800,
                 fontSize: '0.74rem',
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 6px rgba(4, 120, 87, 0.08)',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 4px 10px rgba(4, 120, 87, 0.16)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 6px rgba(4, 120, 87, 0.08)';
               }}
             >
               Details anzeigen →
             </button>
           </div>
 
-          {/* Hero Live Status Glass Banner with Radial Ambient Glow */}
+          {/* 🌟 BRIGHT APPLE HIG HERO STATUS BANNER */}
           <div style={{
-            background: maintenance.isActive 
-              ? 'linear-gradient(135deg, #2d0606 0%, #111827 100%)' 
-              : 'linear-gradient(135deg, #042f2e 0%, #0f172a 100%)',
-            borderRadius: '28px',
-            padding: '36px 40px',
-            color: '#ffffff',
+            background: '#ffffff',
+            borderRadius: '24px',
+            padding: '28px 32px',
+            color: '#0f172a',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '28px',
-            boxShadow: maintenance.isActive
-              ? '0 24px 50px -15px rgba(220, 38, 38, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-              : '0 24px 50px -15px rgba(5, 150, 105, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-            border: `1px solid ${maintenance.isActive ? 'rgba(239, 68, 68, 0.35)' : 'rgba(16, 185, 129, 0.35)'}`,
-            position: 'relative',
-            overflow: 'hidden'
+            gap: '24px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+            border: `1px solid ${maintenance.isActive ? '#fca5a5' : '#e2e8f0'}`,
+            position: 'relative'
           }}>
-            {/* Ambient Radial Backlight */}
-            <div style={{
-              position: 'absolute',
-              top: '-50%',
-              left: '-20%',
-              width: '500px',
-              height: '500px',
-              borderRadius: '50%',
-              background: maintenance.isActive ? 'radial-gradient(circle, rgba(239, 68, 68, 0.25) 0%, transparent 70%)' : 'radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%)',
-              pointerEvents: 'none',
-              filter: 'blur(40px)'
-            }} />
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '22px', position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
               <div style={{
-                width: '68px',
-                height: '68px',
-                borderRadius: '22px',
-                background: maintenance.isActive ? 'rgba(239, 68, 68, 0.22)' : 'rgba(16, 185, 129, 0.22)',
-                border: `1.5px solid ${maintenance.isActive ? 'rgba(239, 68, 68, 0.45)' : 'rgba(16, 185, 129, 0.45)'}`,
+                width: '60px',
+                height: '60px',
+                borderRadius: '18px',
+                background: maintenance.isActive ? '#fee2e2' : '#ecfdf5',
+                border: `1.5px solid ${maintenance.isActive ? '#fecaca' : '#a7f3d0'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
+                color: maintenance.isActive ? '#dc2626' : '#059669'
               }}>
                 {maintenance.isActive ? (
-                  <ShieldAlert size={34} color="#f87171" className="animate-pulse" />
+                  <ShieldAlert size={30} className="animate-pulse" />
                 ) : (
-                  <ShieldCheck size={34} color="#34d399" />
+                  <ShieldCheck size={30} />
                 )}
               </div>
 
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
                   <span style={{
                     fontSize: '0.72rem',
                     fontWeight: 900,
                     textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    padding: '4px 12px',
+                    letterSpacing: '0.04em',
+                    padding: '3px 10px',
                     borderRadius: '100px',
-                    background: maintenance.isActive ? 'rgba(239, 68, 68, 0.35)' : 'rgba(16, 185, 129, 0.35)',
-                    color: maintenance.isActive ? '#fca5a5' : '#a7f3d0',
-                    border: `1px solid ${maintenance.isActive ? 'rgba(239, 68, 68, 0.45)' : 'rgba(16, 185, 129, 0.45)'}`
+                    background: maintenance.isActive ? '#fef2f2' : '#ecfdf5',
+                    color: maintenance.isActive ? '#dc2626' : '#059669',
+                    border: `1px solid ${maintenance.isActive ? '#fecaca' : '#a7f3d0'}`,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
                   }}>
-                    {maintenance.isActive ? '🔴 Wartungsmodus Aktiv' : '🟢 System Normal & Online'}
+                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: maintenance.isActive ? '#ef4444' : '#10b981' }} />
+                    {maintenance.isActive ? 'Wartungsmodus Aktiv' : 'System Normal & Online'}
                   </span>
 
                   {!maintenance.isActive && maintenance.mode === 'calendar_scheduler' && maintenance.scheduledStartTime && (
                     <span style={{
                       fontSize: '0.72rem',
-                      fontWeight: 900,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
-                      padding: '4px 12px',
+                      fontWeight: 800,
+                      padding: '3px 10px',
                       borderRadius: '100px',
-                      background: 'rgba(2, 132, 199, 0.35)',
-                      color: '#bae6fd',
-                      border: '1px solid rgba(56, 189, 248, 0.45)',
-                      display: 'flex',
+                      background: '#f0f9ff',
+                      color: '#0369a1',
+                      border: '1px solid #bae6fd',
+                      display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px'
                     }}>
@@ -776,8 +789,8 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 <Power size={18} />
                 <span>
                   {maintenance.isActive 
-                    ? '🟢 Wartung beenden & Freischalten' 
-                    : '🚨 Notfall-Wartung aktivieren'}
+                    ? 'Wartung beenden & Freischalten' 
+                    : 'Notfall-Wartung aktivieren'}
                 </span>
               </button>
               <div style={{ textAlign: 'center', marginTop: '8px', fontSize: '0.72rem', color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>
@@ -843,10 +856,15 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                       fontSize: '0.76rem',
                       fontWeight: configViewMode === 'wizard' ? 850 : 600,
                       cursor: 'pointer',
-                      boxShadow: configViewMode === 'wizard' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      boxShadow: configViewMode === 'wizard' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
                   >
-                    ✨ Einfach (Assistent)
+                    <Sparkles size={12} color={configViewMode === 'wizard' ? '#059669' : '#64748b'} />
+                    <span>Einfach (Assistent)</span>
                   </button>
                   <button
                     type="button"
@@ -860,16 +878,21 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                       fontSize: '0.76rem',
                       fontWeight: configViewMode === 'expert' ? 850 : 600,
                       cursor: 'pointer',
-                      boxShadow: configViewMode === 'expert' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      boxShadow: configViewMode === 'expert' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
                   >
-                    🛠️ Experten-Details
+                    <Sliders size={12} color={configViewMode === 'expert' ? '#0f172a' : '#64748b'} />
+                    <span>Experten-Details</span>
                   </button>
                 </div>
               </div>
 
               {/* ═══════════════════════════════════════════════════════════════ */}
-              {/* ✨ WIZARD MODE: 3 GEFÜHRTE SCHRITTE                              */}
+              {/* WIZARD MODE: 3 GEFÜHRTE SCHRITTE                                */}
               {/* ═══════════════════════════════════════════════════════════════ */}
               {configViewMode === 'wizard' ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -900,10 +923,22 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                           color: wizardGoal === 'upgrade' ? '#065f46' : '#334155',
                           textAlign: 'left',
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease'
+                          boxShadow: wizardGoal === 'upgrade' ? '0 2px 8px rgba(5, 150, 105, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = wizardGoal === 'upgrade' ? '0 2px 8px rgba(5, 150, 105, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)';
                         }}
                       >
-                        <div style={{ fontWeight: 900, fontSize: '0.82rem' }}>🚀 Planmäßiges Upgrade</div>
+                        <div style={{ fontWeight: 900, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Rocket size={15} color={wizardGoal === 'upgrade' ? '#059669' : '#64748b'} />
+                          <span>Planmäßiges Upgrade</span>
+                        </div>
                         <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '2px' }}>Standard-Update (30 Min.)</div>
                       </button>
 
@@ -925,10 +960,22 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                           color: wizardGoal === 'fix' ? '#0369a1' : '#334155',
                           textAlign: 'left',
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease'
+                          boxShadow: wizardGoal === 'fix' ? '0 2px 8px rgba(2, 132, 199, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = wizardGoal === 'fix' ? '0 2px 8px rgba(2, 132, 199, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)';
                         }}
                       >
-                        <div style={{ fontWeight: 900, fontSize: '0.82rem' }}>⚡ Kurze Fehlerbehebung</div>
+                        <div style={{ fontWeight: 900, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Zap size={15} color={wizardGoal === 'fix' ? '#0284c7' : '#64748b'} />
+                          <span>Kurze Fehlerbehebung</span>
+                        </div>
                         <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '2px' }}>Schneller Bugfix (15 Min.)</div>
                       </button>
                     </div>
@@ -956,10 +1003,19 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                           color: wizardSoftness === 'readonly' ? '#92400e' : '#334155',
                           textAlign: 'left',
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease'
+                          boxShadow: wizardSoftness === 'readonly' ? '0 2px 8px rgba(217, 119, 6, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = wizardSoftness === 'readonly' ? '0 2px 8px rgba(217, 119, 6, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)';
                         }}
                       >
-                        <div style={{ fontWeight: 900, fontSize: '0.82rem' }}>🛡️ Sanfter Lesemodus (Empfohlen)</div>
+                        <div style={{ fontWeight: 900, fontSize: '0.82rem' }}>Sanfter Lesemodus (Empfohlen)</div>
                         <div style={{ fontSize: '0.70rem', color: '#b45309', marginTop: '2px' }}>Stundenpläne bleiben lesbar (0 Frust)</div>
                       </button>
 
@@ -977,10 +1033,19 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                           color: wizardSoftness === 'lockout' ? '#991b1b' : '#334155',
                           textAlign: 'left',
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease'
+                          boxShadow: wizardSoftness === 'lockout' ? '0 2px 8px rgba(220, 38, 38, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = wizardSoftness === 'lockout' ? '0 2px 8px rgba(220, 38, 38, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)';
                         }}
                       >
-                        <div style={{ fontWeight: 900, fontSize: '0.82rem' }}>🔒 Kompletter Sperrbildschirm</div>
+                        <div style={{ fontWeight: 900, fontSize: '0.82rem' }}>Kompletter Sperrbildschirm</div>
                         <div style={{ fontSize: '0.70rem', color: '#dc2626', marginTop: '2px' }}>Vollsperre bei DB-Migrationen</div>
                       </button>
                     </div>
@@ -1013,10 +1078,19 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                           color: wizardTiming === 'sunday' ? '#0369a1' : '#334155',
                           textAlign: 'left',
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease'
+                          boxShadow: wizardTiming === 'sunday' ? '0 2px 8px rgba(2, 132, 199, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = wizardTiming === 'sunday' ? '0 2px 8px rgba(2, 132, 199, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)';
                         }}
                       >
-                        <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>📅 So. 02:00 Uhr</div>
+                        <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>So. 02:00 Uhr</div>
                         <div style={{ fontSize: '0.68rem', color: '#0284c7', marginTop: '2px' }}>Vollautomatisch (Beste Zeit)</div>
                       </button>
 
@@ -1039,10 +1113,19 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                           color: wizardTiming === 'now_warn' ? '#065f46' : '#334155',
                           textAlign: 'left',
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease'
+                          boxShadow: wizardTiming === 'now_warn' ? '0 2px 8px rgba(5, 150, 105, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = wizardTiming === 'now_warn' ? '0 2px 8px rgba(5, 150, 105, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)';
                         }}
                       >
-                        <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>⏳ Jetzt mit 10m Vorlauf</div>
+                        <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>Jetzt mit 10m Vorlauf</div>
                         <div style={{ fontSize: '0.68rem', color: '#059669', marginTop: '2px' }}>Banner warnt Nutzer vor</div>
                       </button>
 
@@ -1068,7 +1151,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                           transition: 'all 0.15s ease'
                         }}
                       >
-                        <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>🚨 Jetzt sofort</div>
+                        <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>Jetzt sofort</div>
                         <div style={{ fontSize: '0.68rem', color: '#dc2626', marginTop: '2px' }}>Notfall-Sofortsperre</div>
                       </button>
                     </div>
@@ -1077,12 +1160,12 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   {/* ZUSAMMENFASSUNG & 1-KLICK SPEICHERN */}
                   <div style={{ background: '#ecfdf5', borderRadius: '18px', padding: '18px', border: '1px solid #a7f3d0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ fontWeight: 850, color: '#065f46', fontSize: '0.86rem' }}>
-                      📋 Zusammenfassung deiner Auswahl:
+                      Zusammenfassung deiner Auswahl:
                     </div>
                     <div style={{ fontSize: '0.78rem', color: '#065f46', lineHeight: '1.6' }}>
                       • <strong>Wartungsziel:</strong> {wizardGoal === 'upgrade' ? 'Planmäßiges Upgrade (30 Min.)' : wizardGoal === 'fix' ? 'Kurze Fehlerbehebung (15 Min.)' : 'Individuell'}<br />
-                      • <strong>Modus:</strong> {wizardSoftness === 'readonly' ? '🛡️ Sanfter Lesemodus (Stundenpläne bleiben sichtbar)' : '🔒 Vollständiger Sperrbildschirm'}<br />
-                      • <strong>Start:</strong> {wizardTiming === 'sunday' ? '📅 Kommender Sonntag 02:00 Uhr (24h Vorab-Banner)' : wizardTiming === 'now_warn' ? '⏳ Jetzt gleich mit 10 Min. Vorwarnung' : '🚨 Jetzt sofort (Notfall)'}<br />
+                      • <strong>Modus:</strong> {wizardSoftness === 'readonly' ? 'Sanfter Lesemodus (Stundenpläne bleiben sichtbar)' : 'Vollständiger Sperrbildschirm'}<br />
+                      • <strong>Start:</strong> {wizardTiming === 'sunday' ? 'Kommender Sonntag 02:00 Uhr (24h Vorab-Banner)' : wizardTiming === 'now_warn' ? 'Jetzt gleich mit 10 Min. Vorwarnung' : 'Jetzt sofort (Notfall)'}<br />
                       • <strong>Root-Bypass-PIN:</strong> <code style={{ background: '#ffffff', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{maintenance.bypassPin}</code>
                     </div>
 
@@ -1108,7 +1191,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                       className="hover-scale-mini"
                     >
                       <Sparkles size={16} />
-                      <span>🪄 Wartungs-Konfiguration jetzt anwenden &amp; speichern</span>
+                      <span>Wartungs-Konfiguration jetzt anwenden &amp; speichern</span>
                     </button>
                   </div>
 
@@ -2498,12 +2581,13 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   {[
-                    { id: 'all', label: '👥 Alle Benutzer', desc: 'Plattformweit sichtbar' },
-                    { id: 'teachers', label: '🎓 Lehrkräfte & Verwaltung', desc: 'Nur Teacher & Secretary' },
-                    { id: 'students', label: '🎸 Nur Schüler', desc: 'Nur Schüler-Accounts' },
-                    { id: 'admins', label: '🛡️ Nur Administratoren', desc: 'Nur Schulleiter & Admins' }
+                    { id: 'all', label: 'Alle Benutzer', icon: Users, desc: 'Plattformweit sichtbar' },
+                    { id: 'teachers', label: 'Lehrkräfte & Verwaltung', icon: GraduationCap, desc: 'Nur Teacher & Secretary' },
+                    { id: 'students', label: 'Nur Schüler', icon: Music, desc: 'Nur Schüler-Accounts' },
+                    { id: 'admins', label: 'Nur Administratoren', icon: Shield, desc: 'Nur Schulleiter & Admins' }
                   ].map((aud) => {
                     const isSel = announcement.targetAudience === aud.id;
+                    const Icon = aud.icon;
                     return (
                       <div
                         key={aud.id}
@@ -2521,7 +2605,10 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                           transition: 'all 0.15s ease'
                         }}
                       >
-                        <span style={{ fontWeight: 850, fontSize: '0.80rem' }}>{aud.label}</span>
+                        <span style={{ fontWeight: 850, fontSize: '0.80rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Icon size={14} color={isSel ? '#ffffff' : '#64748b'} />
+                          <span>{aud.label}</span>
+                        </span>
                         <span style={{ fontSize: '0.66rem', opacity: isSel ? 0.8 : 0.65 }}>{aud.desc}</span>
                       </div>
                     );
@@ -3263,12 +3350,13 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               overflowX: 'auto'
             }}>
               {[
-                { id: 'general', label: '🌐 Allgemeine Architektur' },
-                { id: 'status', label: '🟢 Tab 1: Live-Status & Killswitch' },
-                { id: 'planner', label: '🗓️ Tab 2: Broadcast & Planer' },
-                { id: 'diagnostics', label: '🩺 Tab 3: Diagnose & Audit-Log' }
+                { id: 'general', label: 'Allgemeine Architektur', icon: Layers },
+                { id: 'status', label: 'Tab 1: Live-Status & Killswitch', icon: Power },
+                { id: 'planner', label: 'Tab 2: Broadcast & Planer', icon: Megaphone },
+                { id: 'diagnostics', label: 'Tab 3: Diagnose & Audit-Log', icon: Activity }
               ].map((t) => {
                 const isSel = guideActiveTab === t.id;
+                const Icon = t.icon;
                 return (
                   <button
                     key={t.id}
@@ -3283,10 +3371,14 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                       fontSize: '0.78rem',
                       fontWeight: isSel ? 850 : 600,
                       cursor: 'pointer',
-                      transition: 'all 0.15s'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    {t.label}
+                    <Icon size={13} color={isSel ? '#ffffff' : '#64748b'} />
+                    <span>{t.label}</span>
                   </button>
                 );
               })}

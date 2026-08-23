@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Search, RefreshCw, AlertTriangle, CheckCircle, Cpu, Users, Layers, ShieldCheck, Tag, Building2, HardDrive } from 'lucide-react';
+import { Activity, RefreshCw, AlertTriangle, CheckCircle, Cpu, Users, Layers, ShieldCheck, Tag, Building2, HardDrive } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { School, SchoolStat, PendingUser } from '../MasterAdminTypes';
 import { MasterPricingRates, isSchoolBypassActive } from '../../../domain/pricingEngine';
@@ -160,29 +160,9 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button
-            onClick={onOpenCommandPalette}
-            style={{
-              padding: '10px 18px',
-              borderRadius: '12px',
-              background: '#0f172a',
-              color: '#ffffff',
-              fontSize: '0.88rem',
-              fontWeight: 800,
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.2)'
-            }}
-          >
-            <Search size={14} /> ⌘K Schnellzugriff
-          </button>
-
-          <button
             onClick={onRefresh}
             style={{
-              padding: '10px 16px',
+              padding: '10px 18px',
               borderRadius: '12px',
               background: '#ffffff',
               border: '1px solid rgba(15, 23, 42, 0.08)',
@@ -193,7 +173,18 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)'
+              boxShadow: '0 2px 8px rgba(15, 23, 42, 0.03)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.16)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.06)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(15, 23, 42, 0.03)';
             }}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Aktualisieren
@@ -202,7 +193,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
           <button
             onClick={() => onNavigateTab('telemetry')}
             style={{
-              padding: '10px 16px',
+              padding: '10px 18px',
               borderRadius: '12px',
               background: isHighLoad ? '#fee2e2' : '#e6f4ea',
               border: isHighLoad ? '1px solid #fca5a5' : '1px solid #a7f3d0',
@@ -212,7 +203,15 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '8px',
+              boxShadow: isHighLoad ? '0 2px 8px rgba(220, 38, 38, 0.15)' : '0 2px 8px rgba(52, 168, 83, 0.12)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
             title="Klicken für detaillierte Server-Telemetrie & Diagnose"
           >
@@ -399,14 +398,14 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             </h3>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '0.70rem', color: '#ffffff', fontWeight: 700, flexWrap: 'wrap' }}>
-            <span title="🏢 Modul-Hosting Flatrates" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.18)', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+            <span title="Modul-Hosting Flatrates" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.18)', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
               <Building2 size={11} color="#ffffff" /> {committedBaseMrr.toFixed(2).replace('.', ',')} €
             </span>
-            <span title="👥 Schüler- &amp; Lehrer-Bereitstellung" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.18)', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+            <span title="Schüler- &amp; Lehrer-Bereitstellung" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.18)', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
               <Users size={11} color="#ffffff" /> {seatUsageMrr.toFixed(2).replace('.', ',')} €
             </span>
             {storageAddonMrr > 0 && (
-              <span title="💽 Audio-Tresor Speicher-Addons" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.18)', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+              <span title="Audio-Tresor Speicher-Addons" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.18)', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
                 <HardDrive size={11} color="#ffffff" /> {storageAddonMrr.toFixed(2).replace('.', ',')} €
               </span>
             )}
@@ -434,14 +433,14 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             </h3>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '0.70rem', color: '#475569', fontWeight: 700, flexWrap: 'wrap' }}>
-            <span title="🏢 Jährliche Modul-Flatrates" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+            <span title="Jährliche Modul-Flatrates" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
               <Building2 size={11} color="#64748b" /> {committedBaseArr.toFixed(2).replace('.', ',')} €
             </span>
-            <span title="👥 Jährliche Schüler- &amp; Lehrereinnahmen" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+            <span title="Jährliche Schüler- &amp; Lehrereinnahmen" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
               <Users size={11} color="#64748b" /> {seatUsageArr.toFixed(2).replace('.', ',')} €
             </span>
             {storageAddonArr > 0 && (
-              <span title="💽 Jährliche Audio-Tresor Addons" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+              <span title="Jährliche Audio-Tresor Addons" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
                 <HardDrive size={11} color="#64748b" /> {storageAddonArr.toFixed(2).replace('.', ',')} €
               </span>
             )}
@@ -470,7 +469,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
           </div>
           <span style={{ fontSize: '0.72rem', color: expiringBypassSchools.length > 0 ? '#b45309' : '#7e22ce', fontWeight: 700, marginTop: '10px', display: 'block' }}>
             {expiringBypassSchools.length > 0
-              ? `⚠️ ${expiringBypassSchools.length} läuft bald ab`
+              ? `${expiringBypassSchools.length} läuft bald ab`
               : '0,00 € Sponsoring / Kulanz'}
           </span>
         </div>

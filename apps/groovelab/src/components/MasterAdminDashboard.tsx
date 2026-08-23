@@ -5,12 +5,13 @@ import {
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap, BookOpen,
   Edit2, Settings, Sliders, Search, Tag, Percent,
   Activity, Cpu, Database, AlertTriangle, HardDrive, Server, Zap, Link, Key, History as HistoryIcon,
-  Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Building2, Eye, Radio, Heart, ShieldCheck,
-  QrCode, Lock, Smartphone, Laptop, Wrench
+  Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Building2, Building, Eye, Radio, Heart, ShieldCheck,
+  QrCode, Lock, Smartphone, Laptop, Wrench, Lightbulb, Rocket, Sparkles, RotateCcw, WifiOff
 } from 'lucide-react';
 import { MaintenanceTab } from './masterAdmin/tabs/MaintenanceTab';
 import { SchoolsTab } from './masterAdmin/tabs/SchoolsTab';
 import { TrustSafetyTab } from './masterAdmin/tabs/TrustSafetyTab';
+import { FeedbackTab } from './masterAdmin/tabs/FeedbackTab';
 import { SchoolDetailDrawer } from './masterAdmin/drawers/SchoolDetailDrawer';
 import { ClientErrorTelemetryPanel } from './masterAdmin/components/ClientErrorTelemetryPanel';
 import { generateResilienceAuditPDF } from '../utils/pdfGenerator';
@@ -120,6 +121,7 @@ import { calculateCampusGroovelabBilling } from '../domain/billingCalculator';
 import { aggregateSchoolMetrics, getSchoolCanonicalBilling } from '../domain/schoolMetricsAggregator';
 
 import { School } from './masterAdmin/MasterAdminTypes';
+import { StorageTier, DEFAULT_STORAGE_TIERS, getStorageTierByGb } from '../domain/pricingEngine';
 
 function getSubdomainOrigin(schoolName: string): string {
   const subdomain = schoolName
@@ -164,7 +166,18 @@ interface MasterAdminDashboardProps {
 
 export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashboardProps) {
   const masterPricing = useMasterPricing();
-  const [schools, setSchools] = useState<School[]>([]);
+  const [schools, setSchools] = useState<School[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('groovelab_cached_master_data');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed.schools) && parsed.schools.length > 0) return parsed.schools;
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -185,7 +198,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
   const [schoolSortOption, setSchoolSortOption] = useState<'students' | 'name' | 'newest'>('students');
   const [schoolModuleFilter, setSchoolModuleFilter] = useState<'all' | 'kombi' | 'campus' | 'groovelab'>('all');
-  const [activePortalTab, setActivePortalTab] = useState<'executive' | 'schools' | 'briefing' | 'billing' | 'telemetry' | 'pricing' | 'trust_safety' | 'operator' | 'maintenance' | 'backup'>('executive');
+  const [activePortalTab, setActivePortalTab] = useState<'executive' | 'schools' | 'briefing' | 'billing' | 'telemetry' | 'pricing' | 'trust_safety' | 'operator' | 'maintenance' | 'backup' | 'feedback'>('executive');
   const [saveSuccessToast, setSaveSuccessToast] = useState<string | null>(null);
   
   // Cmd+K Palette & Slide-Over Drawer States
@@ -232,13 +245,23 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [passwordFocused, setPasswordFocused] = useState(false);
 
     // Pricing States
-  const [priceCampus, setPriceCampus] = useState<number | string>(7.99);
-  const [priceGroovelab, setPriceGroovelab] = useState<number | string>(4.99);
-  const [priceKombi, setPriceKombi] = useState<number | string>(9.99);
+  const [priceCampus, setPriceCampus] = useState<number | string>(14.90);
+  const [priceGroovelab, setPriceGroovelab] = useState<number | string>(9.90);
+  const [priceKombi, setPriceKombi] = useState<number | string>(19.90);
   const [defaultTrialDays, setDefaultTrialDays] = useState<number>(30);
   const [priceTeacher, setPriceTeacher] = useState<number | string>(0.49);
   const [priceStudent, setPriceStudent] = useState<number | string>(0.49);
   const [pricePassiveStudent, setPricePassiveStudent] = useState<number | string>(0.09);
+  const [priceStorageAddon, setPriceStorageAddon] = useState<number | string>(2.99);
+  const [storageTiersList, setStorageTiersList] = useState<StorageTier[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('cg_storage_tiers');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return DEFAULT_STORAGE_TIERS;
+  });
   const [specialOffers, setSpecialOffers] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -298,6 +321,18 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [taxNumber, setTaxNumber] = useState('');
   const [vatRatePercent, setVatRatePercent] = useState<number>(19);
   const [priceDisplayMode, setPriceDisplayMode] = useState<'net_plus_vat' | 'gross_inclusive'>('net_plus_vat');
+  const [grandfatheringActive, setGrandfatheringActive] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('cg_grandfathering_active') !== 'false';
+    }
+    return true;
+  });
+  const [grandfatheringCutoffDate, setGrandfatheringCutoffDate] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('cg_grandfathering_cutoff') || '2026-12-31';
+    }
+    return '2026-12-31';
+  });
 
   // 🛡️ Security, 2FA & Session State
   const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(false);
@@ -312,13 +347,35 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   ]);
 
   // Stats State
-  const [stats, setStats] = useState({
-    totalSchools: 0,
-    totalTeachers: 0,
-    totalStudents: 0,
-    totalSessions: 0
+  const [stats, setStats] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('groovelab_cached_master_data');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.stats) return parsed.stats;
+        }
+      } catch (e) {}
+    }
+    return {
+      totalSchools: 0,
+      totalTeachers: 0,
+      totalStudents: 0,
+      totalSessions: 0
+    };
   });
-  const [schoolStats, setSchoolStats] = useState<Record<string, any>>({});
+  const [schoolStats, setSchoolStats] = useState<Record<string, any>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('groovelab_cached_master_data');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.schoolStats) return parsed.schoolStats;
+        }
+      } catch (e) {}
+    }
+    return {};
+  });
   
   // Selected School Modal State
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
@@ -516,7 +573,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     try {
       const { data, error } = await supabase
         .from('server_metrics')
-        .select('*')
+        .select('id, created_at, cpu_load, mem_used_mb, mem_total_mb, active_connections, disk_used_gb, disk_total_gb, volume_used_gb, volume_total_gb')
         .order('created_at', { ascending: false })
         .limit(30);
       
@@ -843,6 +900,20 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     fetchPendingUsers();
     fetchServerMetrics();
 
+    // Smart auto-reconnect when connection recovers
+    const handleOnline = () => {
+      console.log('[MasterAdmin] Network online event detected. Automatically reconnecting...');
+      setGlobalFetchError(null);
+      fetchSchoolsAndStats();
+    };
+
+    const handleOffline = () => {
+      setGlobalFetchError('Offline (Lokale Internetverbindung unterbrochen)');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     // 1-second interval for countdown and 30s auto-refresh
     const timerInterval = setInterval(() => {
       setTelemetryCountdown(prev => {
@@ -854,7 +925,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       });
     }, 1000);
 
-    return () => clearInterval(timerInterval);
+    return () => {
+      clearInterval(timerInterval);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   const fetchBillingSettings = async () => {
@@ -883,12 +958,23 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           ? data.special_offers.find((o: any) => o?.id === '__cg_master_pricing_overrides__')
           : null;
 
-        const c = data.price_module_campus ?? overrides?.price_module_campus ?? (localStorage.getItem('cg_price_module_campus') ? Number(localStorage.getItem('cg_price_module_campus')) : 7.99);
-        const g = data.price_module_groovelab ?? overrides?.price_module_groovelab ?? (localStorage.getItem('cg_price_module_groovelab') ? Number(localStorage.getItem('cg_price_module_groovelab')) : 4.99);
-        const k = data.price_module_kombi ?? overrides?.price_module_kombi ?? (localStorage.getItem('cg_price_module_kombi') ? Number(localStorage.getItem('cg_price_module_kombi')) : 9.99);
+        let rawC = data.price_module_campus ?? overrides?.price_module_campus ?? localStorage.getItem('cg_price_module_campus');
+        let rawG = data.price_module_groovelab ?? overrides?.price_module_groovelab ?? localStorage.getItem('cg_price_module_groovelab');
+        let rawK = data.price_module_kombi ?? overrides?.price_module_kombi ?? localStorage.getItem('cg_price_module_kombi');
+
+        let c = rawC !== null && rawC !== undefined ? Number(rawC) : 14.90;
+        let g = rawG !== null && rawG !== undefined ? Number(rawG) : 9.90;
+        let k = rawK !== null && rawK !== undefined ? Number(rawK) : 19.90;
+
+        // Auto-upgrade legacy default test values
+        if (Math.abs(c - 7.99) < 0.01) c = 14.90;
+        if (Math.abs(g - 4.99) < 0.01) g = 9.90;
+        if (Math.abs(k - 9.99) < 0.01) k = 19.90;
+
         const t = data.price_user_teacher ?? overrides?.price_user_teacher ?? (localStorage.getItem('cg_price_user_teacher') ? Number(localStorage.getItem('cg_price_user_teacher')) : 0.49);
         const s = data.price_user_student ?? overrides?.price_user_student ?? (localStorage.getItem('cg_price_user_student') ? Number(localStorage.getItem('cg_price_user_student')) : 0.49);
         const ps = data.price_user_passive_student ?? overrides?.price_user_passive_student ?? (localStorage.getItem('cg_price_user_passive_student') ? Number(localStorage.getItem('cg_price_user_passive_student')) : 0.09);
+        const sa = data.price_storage_addon ?? overrides?.price_storage_addon ?? (localStorage.getItem('cg_price_storage_addon') ? Number(localStorage.getItem('cg_price_storage_addon')) : 2.99);
         const td = data.default_trial_days ?? overrides?.default_trial_days ?? (localStorage.getItem('cg_default_trial_days') ? Number(localStorage.getItem('cg_default_trial_days')) : 30);
         const scope = data.price_change_scope || overrides?.price_change_scope || localStorage.getItem('cg_price_change_scope') || 'new_only';
 
@@ -898,8 +984,17 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         setPriceTeacher(t);
         setPriceStudent(s);
         setPricePassiveStudent(ps);
+        setPriceStorageAddon(sa);
         setDefaultTrialDays(td);
         setPriceChangeScope(scope as any);
+
+        const storageTiersOverride = Array.isArray(data.special_offers)
+          ? data.special_offers.find((o: any) => o?.id === '__cg_storage_tiers__')?.tiers
+          : null;
+        const tiers: StorageTier[] = (Array.isArray(storageTiersOverride) && storageTiersOverride.length > 0)
+          ? storageTiersOverride
+          : (data.storage_tiers || DEFAULT_STORAGE_TIERS);
+        setStorageTiersList(tiers);
 
         const dbOffers = Array.isArray(data.special_offers) ? data.special_offers : [];
         const cleanCampaigns = dbOffers.filter((o: any) => o && !String(o.id || '').startsWith('__cg_'));
@@ -924,9 +1019,17 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         }
       } else {
         // Fallback to local storage if no DB row returned
-        if (localStorage.getItem('cg_price_module_campus')) setPriceCampus(Number(localStorage.getItem('cg_price_module_campus')));
-        if (localStorage.getItem('cg_price_module_groovelab')) setPriceGroovelab(Number(localStorage.getItem('cg_price_module_groovelab')));
-        if (localStorage.getItem('cg_price_module_kombi')) setPriceKombi(Number(localStorage.getItem('cg_price_module_kombi')));
+        let localC = localStorage.getItem('cg_price_module_campus') ? Number(localStorage.getItem('cg_price_module_campus')) : 14.90;
+        let localG = localStorage.getItem('cg_price_module_groovelab') ? Number(localStorage.getItem('cg_price_module_groovelab')) : 9.90;
+        let localK = localStorage.getItem('cg_price_module_kombi') ? Number(localStorage.getItem('cg_price_module_kombi')) : 19.90;
+
+        if (Math.abs(localC - 7.99) < 0.01) localC = 14.90;
+        if (Math.abs(localG - 4.99) < 0.01) localG = 9.90;
+        if (Math.abs(localK - 9.99) < 0.01) localK = 19.90;
+
+        setPriceCampus(localC);
+        setPriceGroovelab(localG);
+        setPriceKombi(localK);
         if (localStorage.getItem('cg_price_user_teacher')) setPriceTeacher(Number(localStorage.getItem('cg_price_user_teacher')));
         if (localStorage.getItem('cg_price_user_student')) setPriceStudent(Number(localStorage.getItem('cg_price_user_student')));
         if (localStorage.getItem('cg_price_user_passive_student')) setPricePassiveStudent(Number(localStorage.getItem('cg_price_user_passive_student')));
@@ -1126,12 +1229,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       const curTeacher = school.grandfathered_teacher_price ?? (Number(priceTeacher) || 0.49);
       const curStudent = school.grandfathered_student_price ?? (Number(priceStudent) || 0.49);
       const curPassive = 0.09;
+      const curStorage = Number(school.storage_addon_monthly_fee || 0);
 
       let curBase = 0;
       if (school.has_campus_subscription && school.has_groovelab_subscription) curBase = curKombi;
       else if (school.has_campus_subscription) curBase = curCampus;
       else if (school.has_groovelab_subscription) curBase = curGroove;
-      const curCost = curBase + (teachers * curTeacher) + (activeStudents * curStudent) + (passiveStudents * curPassive);
+      const curCost = curBase + (teachers * curTeacher) + (activeStudents * curStudent) + (passiveStudents * curPassive) + curStorage;
       currentTotalMrr += curCost;
 
       let projCost = curCost;
@@ -1147,7 +1251,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         if (school.has_campus_subscription && school.has_groovelab_subscription) projBase = newKombi;
         else if (school.has_campus_subscription) projBase = newCamp;
         else if (school.has_groovelab_subscription) projBase = newGroove;
-        projCost = projBase + (teachers * newTeach) + (activeStudents * newStud) + (passiveStudents * newPass);
+        projCost = projBase + (teachers * newTeach) + (activeStudents * newStud) + (passiveStudents * newPass) + curStorage;
       }
 
       projectedTotalMrr += projCost;
@@ -1197,6 +1301,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       localStorage.setItem('cg_price_user_teacher', String(priceTeacher));
       localStorage.setItem('cg_price_user_student', String(priceStudent));
       localStorage.setItem('cg_price_user_passive_student', String(pricePassiveStudent));
+      localStorage.setItem('cg_price_storage_addon', String(priceStorageAddon));
+      localStorage.setItem('cg_storage_tiers', JSON.stringify(storageTiersList));
       localStorage.setItem('cg_default_trial_days', String(defaultTrialDays));
       localStorage.setItem('cg_price_change_scope', priceChangeScope);
 
@@ -1206,7 +1312,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         : [];
 
       const existingSystemTags = (currentMaster?.special_offers || []).filter((o: any) => 
-        o && String(o.id || '').startsWith('__cg_') && o.id !== '__cg_master_pricing_overrides__'
+        o && String(o.id || '').startsWith('__cg_') && o.id !== '__cg_master_pricing_overrides__' && o.id !== '__cg_storage_tiers__'
       );
 
       const packagedOffers = [
@@ -1220,8 +1326,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           price_user_teacher: Number(priceTeacher),
           price_user_student: Number(priceStudent),
           price_user_passive_student: Number(pricePassiveStudent),
+          price_storage_addon: Number(priceStorageAddon),
           default_trial_days: Number(defaultTrialDays),
           price_change_scope: priceChangeScope,
+          saved_at: new Date().toISOString()
+        },
+        {
+          id: '__cg_storage_tiers__',
+          tiers: storageTiersList,
           saved_at: new Date().toISOString()
         }
       ];
@@ -1236,6 +1348,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         price_user_teacher: Math.max(0, Number(priceTeacher) || 0),
         price_user_student: Math.max(0, Number(priceStudent) || 0),
         price_user_passive_student: Math.max(0, Number(pricePassiveStudent) || 0),
+        price_storage_addon: Math.max(0, Number(priceStorageAddon) || 0),
         default_trial_days: defaultTrialDays,
         price_change_scope: priceChangeScope,
         price_change_announced_at: new Date().toISOString(),
@@ -1732,8 +1845,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       localStorage.setItem('cg_tax_number', taxNumber);
       localStorage.setItem('cg_vat_rate_percent', String(vatRatePercent));
       localStorage.setItem('cg_price_display_mode', priceDisplayMode);
+      localStorage.setItem('cg_grandfathering_active', String(grandfatheringActive));
+      localStorage.setItem('cg_grandfathering_cutoff', grandfatheringCutoffDate);
 
-      setSaveSuccessToast('Betreiber-Stammdaten, USt-Status & Bankverbindung erfolgreich aktualisiert!');
+      setSaveSuccessToast('Betreiber-Stammdaten, USt-Status & Bestandskundenschutz erfolgreich aktualisiert!');
       setTimeout(() => setSaveSuccessToast(null), 4000);
       fetchBillingSettings();
     } catch (err: any) {
@@ -2042,7 +2157,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       const sStats: Record<string, any> = {};
       schoolData?.forEach(school => {
         const schId = school.id;
-        const schoolStatsRow = statsData?.find(s => s.school_id === schId) || {};
+        const schoolStatsRow: any = statsData?.find((s: any) => s.school_id === schId) || {};
         const stats = aggregateSchoolMetrics(
           school,
           allUsersDb || [],
@@ -2069,10 +2184,51 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       });
       setSchoolStats(sStats);
       setGlobalFetchError(null);
+
+      // Persist master cache in localStorage for instant 0ms offline fallback
+      try {
+        localStorage.setItem('groovelab_cached_master_data', JSON.stringify({
+          schools: mergedSchools,
+          stats: {
+            totalSchools: schoolData?.length || 0,
+            totalTeachers: totalTeachersSum,
+            totalStudents: totalStudentsSum,
+            totalSessions: sessionCount || 0
+          },
+          schoolStats: sStats,
+          cachedAt: new Date().toISOString()
+        }));
+      } catch (cacheErr) {
+        console.warn('LocalStorage cache write error:', cacheErr);
+      }
       
     } catch (err: any) {
       console.warn('Fehler beim Laden der Master-Daten:', err.message);
-      setGlobalFetchError(err.message || 'Verbindung zum Server fehlgeschlagen');
+
+      // Attempt graceful cache recovery
+      try {
+        const cachedRaw = localStorage.getItem('groovelab_cached_master_data');
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (Array.isArray(cached.schools) && cached.schools.length > 0) {
+            setSchools(cached.schools);
+            if (cached.stats) setStats(cached.stats);
+            if (cached.schoolStats) setSchoolStats(cached.schoolStats);
+          }
+        }
+      } catch (e) {
+        console.warn('Could not restore from localStorage master cache:', e);
+      }
+
+      const rawMsg = err?.message || String(err);
+      const isNetwork = 
+        rawMsg.includes('Load failed') || 
+        rawMsg.includes('Failed to fetch') || 
+        rawMsg.includes('NetworkError') || 
+        rawMsg.includes('Network request failed') ||
+        (typeof navigator !== 'undefined' && !navigator.onLine);
+
+      setGlobalFetchError(isNetwork ? 'Verbindung zum Cloud-Cluster unterbrochen (Offline-Modus)' : (err.message || 'Verbindung zum Server fehlgeschlagen'));
     } finally {
       setLoading(false);
     }
@@ -2173,11 +2329,44 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     }
   };
 
-  const handleStartGhostMode = (school: School) => {
+  const handleStartGhostMode = async (school: School) => {
     try {
-      const url = `${window.location.origin}/?school_id=${school.id}&support_ghost=true&role=admin`;
+      // Find principal / admin user of school
+      let targetUserId = '';
+      try {
+        const { data: adminUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('school_id', school.id)
+          .eq('role', 'admin')
+          .limit(1)
+          .maybeSingle();
+        if (adminUser?.id) {
+          targetUserId = adminUser.id;
+        }
+      } catch (e) {}
+
+      // Record session initiation in immutable local audit trail
+      try {
+        const existingAuditRaw = localStorage.getItem('campus_ghost_audit_trail');
+        const existingAudit = existingAuditRaw ? JSON.parse(existingAuditRaw) : [];
+        const newLog = {
+          id: `GHA-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          schoolId: school.id,
+          schoolName: school.name,
+          role: 'admin',
+          targetUserId: targetUserId || null,
+          operator: 'Patrick Huber (MasterAdmin)',
+          status: 'SESSION_LAUNCHED'
+        };
+        localStorage.setItem('campus_ghost_audit_trail', JSON.stringify([newLog, ...existingAudit].slice(0, 50)));
+      } catch (e) {}
+
+      const userParam = targetUserId ? `&ghost_user_id=${targetUserId}` : '';
+      const url = `${window.location.origin}/?school_id=${school.id}&support_ghost=true&role=admin${userParam}&ts=${Date.now()}`;
       window.open(url, '_blank');
-      setSaveSuccessToast(`Ghost-Sitzung für „${school.name}“ im neuen Tab geöffnet.`);
+      setSaveSuccessToast(`Ghost-Sitzung für „${school.name}“ im neuen Tab geöffnet (Kürzel: ⌥+Q).`);
       setTimeout(() => setSaveSuccessToast(null), 3000);
     } catch (err) {
       console.error('Ghost session error:', err);
@@ -2598,6 +2787,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 { id: 'telemetry', label: 'Telemetrie & Health', icon: <Cpu size={18} />, color: '#4f46e5', bg: 'rgba(79, 70, 229, 0.08)' },
                 { id: 'pricing', label: 'Preise & Kampagnen', icon: <Tag size={18} />, color: '#d97706', bg: 'rgba(217, 119, 6, 0.08)' },
                 { id: 'trust_safety', label: 'Trust & Safety (Takedowns)', icon: <ShieldAlert size={18} />, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.08)' },
+                { id: 'feedback', label: 'Ideen & Feedback', icon: <Lightbulb size={18} />, color: '#ca8a04', bg: 'rgba(202, 138, 4, 0.08)' },
                 { id: 'maintenance', label: 'Wartung & Betrieb', icon: <Wrench size={18} />, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.08)' },
                 { id: 'backup', label: 'Backup & Reset', icon: <Database size={18} />, color: '#0d9488', bg: 'rgba(13, 148, 136, 0.08)' },
                 { id: 'operator', label: 'Betreiber & Zugang', icon: <Building2 size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.08)' }
@@ -2725,52 +2915,90 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           boxSizing: 'border-box',
           position: 'relative'
         }}>
-          {/* Non-blocking Server Connection Failure Banner */}
+          {/* Non-blocking Server Connection Failure / Offline Banner */}
           {globalFetchError && (
             <div style={{
               background: '#fffbeb',
               border: '1.5px solid #fde68a',
-              borderRadius: '16px',
-              padding: '14px 20px',
+              borderRadius: '20px',
+              padding: '16px 22px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               flexWrap: 'wrap',
-              gap: '12px',
-              marginBottom: '20px',
-              boxShadow: '0 4px 16px rgba(245, 158, 11, 0.08)'
+              gap: '14px',
+              marginBottom: '24px',
+              boxShadow: '0 4px 20px rgba(245, 158, 11, 0.08)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }} className="animate-fade-in">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <AlertTriangle size={22} color="#d97706" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '13px',
+                  background: '#fef3c7',
+                  border: '1px solid #fde68a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <WifiOff size={20} color="#d97706" />
+                </div>
                 <div>
-                  <strong style={{ fontSize: '0.88rem', color: '#92400e', display: 'block' }}>
-                    Server-Verbindung eingeschränkt ({globalFetchError})
-                  </strong>
-                  <span style={{ fontSize: '0.78rem', color: '#b45309' }}>
-                    Die Verbindung zum Hetzner Server / Supabase Cluster ist temporär unterbrochen. Die Plattform läuft im Offline-/Cache-Modus.
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <strong style={{ fontSize: '0.88rem', color: '#92400e' }}>
+                      Server-Verbindung eingeschränkt
+                    </strong>
+                    <span style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 850,
+                      padding: '2px 8px',
+                      borderRadius: '100px',
+                      background: '#fef3c7',
+                      color: '#b45309',
+                      border: '1px solid #fde68a'
+                    }}>
+                      {globalFetchError}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: '#b45309', marginTop: '2px', display: 'block' }}>
+                    Die Verbindung zum Hetzner Server / Supabase Cluster ist temporär unterbrochen. Das Cockpit schützt alle Daten im Offline-/Cache-Modus und synchronisiert automatisch bei Wiederverbindung.
                   </span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => { setGlobalFetchError(null); fetchSchoolsAndStats(); }}
+                disabled={loading}
                 style={{
                   background: '#ffffff',
                   border: '1px solid #fcd34d',
                   color: '#92400e',
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  fontSize: '0.80rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
+                  padding: '9px 18px',
+                  borderRadius: '12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 850,
+                  cursor: loading ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                  gap: '7px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
-                className="hover-scale-mini"
+                onMouseOver={(e) => {
+                  if (!loading) {
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(217, 119, 6, 0.12)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                }}
               >
-                <RefreshCw size={13} /> Erneut verbinden
+                <RotateCcw size={14} className={loading ? 'animate-spin' : ''} color="#92400e" />
+                <span>{loading ? 'Verbinde...' : 'Erneut verbinden'}</span>
               </button>
             </div>
           )}
@@ -3015,9 +3243,19 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)'
+                      boxShadow: '0 2px 8px rgba(15, 23, 42, 0.03)',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
-                    className="hover-scale-mini"
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.16)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.06)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(15, 23, 42, 0.03)';
+                    }}
                   >
                     <RefreshCw size={15} className={fetchingMetrics ? 'animate-spin' : ''} /> Telemetrie Messung
                   </button>
@@ -3025,8 +3263,6 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               </div>
 
               {/* ═══════════════════════════════════════════════════════════════════════ */}
-              {/* ZONE 1: 4 KONSOLIDIERTE VITAL-KARTEN (Hetzner, CPU/RAM, Disk, DB)    */}
-              {/* ═══════════════════════════════════════════════════════════════════════ */}═════════════════════════════════════════ */
               {/* ZONE 1: 4 KONSOLIDIERTE VITAL-KARTEN (Hetzner, CPU/RAM, Disk, DB)    */}
               {/* ═══════════════════════════════════════════════════════════════════════ */}
               {(() => {
@@ -3755,6 +3991,89 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       </div>
                     </div>
 
+                    {/* 3. Audio-Tresor Cloud-Speicher Staffelpreise */}
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          3. Zusatz-Speichervolumen: Audio-Tresor Flatrates
+                        </div>
+                        <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '100px' }}>
+                          1 GB Basis inklusive (0,00 €)
+                        </span>
+                      </div>
+
+                      <div style={{
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '16px',
+                        padding: '14px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+                          {storageTiersList.map((tier, idx) => {
+                            if (tier.gb === 0) return null; // 0 GB is always free 1 GB base
+                            return (
+                              <div
+                                key={tier.gb}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '12px',
+                                  padding: '10px 12px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '4px'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#0f172a' }}>
+                                    {tier.label}
+                                  </span>
+                                  <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700 }}>
+                                    {tier.sublabel}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={tier.price}
+                                    onChange={(e) => {
+                                      const val = Math.max(0, Number(e.target.value.replace(',', '.')) || 0);
+                                      const updated = [...storageTiersList];
+                                      updated[idx] = { ...updated[idx], price: val, desc: `${val.toFixed(2).replace('.', ',')} € / Mo.` };
+                                      setStorageTiersList(updated);
+                                      if (tier.gb === 10) setPriceStorageAddon(val);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      color: '#0f172a',
+                                      fontSize: '0.92rem',
+                                      fontWeight: 800,
+                                      outline: 'none'
+                                    }}
+                                  />
+                                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b' }}>€/Mo</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.35, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <HardDrive size={13} color="#16a34a" />
+                          <span>
+                            Staffeln gelten dynamisch für alle Musikschulen bei Buchung über das Schulleitungs-Cockpit oder Zuweisung durch den MasterAdmin.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Preisanpassungs-Politik & BGB-Compliance */}
                     <div style={{ padding: '18px 20px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -3941,14 +4260,21 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           fontSize: '0.92rem',
                           fontWeight: 800,
                           cursor: 'pointer',
-                          boxShadow: '0 6px 20px rgba(16, 185, 129, 0.25)',
-                          transition: 'all 0.2s ease',
+                          boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '8px'
                         }}
-                        className="hover-scale-mini"
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.35)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 14px rgba(16, 185, 129, 0.25)';
+                        }}
                       >
                         {updatingBilling ? (
                           <>
@@ -3970,19 +4296,29 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         style={{
                           padding: '14px',
                           borderRadius: '14px',
-                          background: '#f8fafc',
+                          background: '#ffffff',
                           color: '#0f172a',
                           border: '1.5px solid #cbd5e1',
                           fontSize: '0.85rem',
-                          fontWeight: 750,
+                          fontWeight: 800,
                           cursor: 'pointer',
-                          transition: 'all 0.2s ease',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '8px'
+                          gap: '8px',
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
                         }}
-                        className="hover-scale-mini"
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.borderColor = '#94a3b8';
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.borderColor = '#cbd5e1';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.02)';
+                        }}
                       >
                         <Zap size={16} color="#d97706" />
                         <span>📊 MRR-Simulation</span>
@@ -4121,12 +4457,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       </label>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', background: '#f8fafc', padding: '4px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                         {[
-                          { id: 'promocode', label: '🏷️ Promo', title: 'Gutschein-Code' },
-                          { id: 'founder', label: '🚀 Gründer', title: 'Gründer-Aktion' },
-                          { id: 'annual', label: '📅 Jahres-Skonto', title: 'Jahreszahler' },
-                          { id: 'free_quota', label: '🎓 Freikontingent', title: 'Freischüler' }
+                          { id: 'promocode', label: 'Promo', icon: Tag, title: 'Gutschein-Code' },
+                          { id: 'founder', label: 'Gründer', icon: Rocket, title: 'Gründer-Aktion' },
+                          { id: 'annual', label: 'Jahres-Skonto', icon: Calendar, title: 'Jahreszahler' },
+                          { id: 'free_quota', label: 'Freikontingent', icon: GraduationCap, title: 'Freischüler' }
                         ].map(t => {
                           const isSel = newOfferType === t.id;
+                          const Icon = t.icon;
                           return (
                             <button
                               key={t.id}
@@ -4137,7 +4474,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 if (t.id === 'founder') setNewOfferDiscount(50);
                               }}
                               style={{
-                                padding: '8px 4px',
+                                padding: '8px 6px',
                                 borderRadius: '8px',
                                 background: isSel ? '#ffffff' : 'transparent',
                                 border: isSel ? '1px solid #059669' : '1px solid transparent',
@@ -4145,10 +4482,16 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 fontWeight: 800,
                                 fontSize: '0.72rem',
                                 cursor: 'pointer',
-                                transition: 'all 0.15s'
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '5px',
+                                boxShadow: isSel ? '0 1px 4px rgba(0,0,0,0.05)' : 'none',
+                                transition: 'all 0.15s ease'
                               }}
                             >
-                              {t.label}
+                              <Icon size={13} color={isSel ? '#059669' : '#64748b'} />
+                              <span>{t.label}</span>
                             </button>
                           );
                         })}
@@ -4388,23 +4731,30 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     <button
                       type="submit"
                       style={{
-                        padding: '12px',
+                        padding: '14px',
                         borderRadius: '12px',
                         background: '#059669',
                         color: '#ffffff',
                         border: 'none',
-                        fontSize: '0.88rem',
+                        fontSize: '0.90rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        boxShadow: '0 4px 15px rgba(5, 150, 105, 0.2)',
-                        transition: 'all 0.2s ease',
+                        boxShadow: '0 4px 14px rgba(5, 150, 105, 0.2)',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px',
+                        gap: '8px',
                         marginTop: '8px'
                       }}
-                      className="hover-scale-mini"
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 6px 18px rgba(5, 150, 105, 0.3)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 14px rgba(5, 150, 105, 0.2)';
+                      }}
                     >
                       <Plus size={16} /> Kampagne jetzt anlegen
                     </button>
@@ -5248,6 +5598,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           )}
 
           {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* 💡 BOARD: COMMUNITY IDEEN & FEEDBACK (activePortalTab === 'feedback') */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {activePortalTab === 'feedback' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+              <FeedbackTab />
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
           {/* 🛠️ BOARD 3: WARTUNG & BETRIEB (activePortalTab === 'maintenance')       */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
           {activePortalTab === 'maintenance' && (
@@ -5353,9 +5712,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       padding: '3px 10px',
                       borderRadius: '100px',
                       background: taxMode === 'standard_vat' ? '#dbeafe' : '#f0fdf4',
-                      color: taxMode === 'standard_vat' ? '#1e40af' : '#15803d'
+                      color: taxMode === 'standard_vat' ? '#1e40af' : '#15803d',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
                     }}>
-                      {taxMode === 'standard_vat' ? '🏛️ Regelbesteuerung (19% MwSt)' : '🌿 Kleinunternehmer (§ 19 UStG)'}
+                      {taxMode === 'standard_vat' ? <Landmark size={12} color="#1e40af" /> : <Building size={12} color="#15803d" />}
+                      <span>{taxMode === 'standard_vat' ? 'Regelbesteuerung (19% MwSt)' : 'Kleinunternehmer (§ 19 UStG)'}</span>
                     </span>
                   </div>
 
@@ -5487,7 +5850,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       </div>
                     </div>
 
-                    {/* 🏛️ Steuer- & USt-Status Umschaltung */}
+                    {/* Steuer- & USt-Status Umschaltung */}
                     <div style={{
                       padding: '16px 18px',
                       borderRadius: '16px',
@@ -5520,11 +5883,16 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             fontWeight: 800,
                             fontSize: '0.78rem',
                             cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
                             boxShadow: taxMode === 'small_business' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
                             transition: 'all 0.15s'
                           }}
                         >
-                          🌿 Kleinunternehmer (§ 19)
+                          <Building size={14} color={taxMode === 'small_business' ? '#15803d' : '#64748b'} />
+                          <span>Kleinunternehmer (§ 19)</span>
                         </button>
 
                         <button
@@ -5539,17 +5907,22 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             fontWeight: 800,
                             fontSize: '0.78rem',
                             cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
                             boxShadow: taxMode === 'standard_vat' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
                             transition: 'all 0.15s'
                           }}
                         >
-                          🏛️ Regelbesteuerung (19% MwSt)
+                          <Landmark size={14} color={taxMode === 'standard_vat' ? '#0284c7' : '#64748b'} />
+                          <span>Regelbesteuerung (19% MwSt)</span>
                         </button>
                       </div>
 
                       {taxMode === 'small_business' ? (
                         <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: '0.74rem', color: '#166534', lineHeight: 1.35 }}>
-                          ℹ️ <strong>Rechtlicher Hinweis (§ 19 UStG):</strong> Es wird keine Umsatzsteuer gesondert berechnet oder ausgewiesen. Auf allen Rechnungs-PDFs wird der gesetzliche Kleinunternehmer-Hinweis automatisch angedruckt.
+                          <strong>Rechtlicher Hinweis (§ 19 UStG):</strong> Es wird keine Umsatzsteuer gesondert berechnet oder ausgewiesen. Auf allen Rechnungs-PDFs wird der gesetzliche Kleinunternehmer-Hinweis automatisch angedruckt.
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '4px' }}>
@@ -5604,7 +5977,91 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           </div>
 
                           <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#e0f2fe', border: '1px solid #bae6fd', fontSize: '0.74rem', color: '#0369a1', lineHeight: 1.35 }}>
-                            ✅ <strong>B2B-SaaS Logik aktiv:</strong> Alle Standardpreise (z. B. 9,99 €) verstehen sich als <strong>Nettopreise zzgl. 19% MwSt</strong>. Rechnungs-PDFs berechnen automatisch <em>Netto + 19% MwSt = Brutto-Endbetrag</em> nach §§ 14, 14a UStG.
+                            <strong>B2B-SaaS Logik aktiv:</strong> Alle Standardpreise (z. B. 9,99 €) verstehen sich als <strong>Nettopreise zzgl. 19% MwSt</strong>. Rechnungs-PDFs berechnen automatisch <em>Netto + 19% MwSt = Brutto-Endbetrag</em> nach §§ 14, 14a UStG.
+                          </div>
+
+                          {/* Grandfathering / Bestandskundenschutz Box */}
+                          <div style={{
+                            background: '#ffffff',
+                            border: '1.5px solid #cbd5e1',
+                            borderRadius: '14px',
+                            padding: '14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ShieldCheck size={16} color="#16a34a" />
+                                <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>
+                                  Bestandskundenschutz (Grandfathering-Prinzip)
+                                </span>
+                              </div>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={grandfatheringActive}
+                                  onChange={(e) => setGrandfatheringActive(e.target.checked)}
+                                  style={{ width: '16px', height: '16px', accentColor: '#16a34a', cursor: 'pointer' }}
+                                />
+                                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: grandfatheringActive ? '#16a34a' : '#64748b' }}>
+                                  {grandfatheringActive ? 'Aktiviert' : 'Deaktiviert'}
+                                </span>
+                              </label>
+                            </div>
+
+                            {grandfatheringActive && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '4px' }}>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.66rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                                    Stichtag für Neukunden-Tarife (Registrierungsdatum)
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={grandfatheringCutoffDate}
+                                    onChange={(e) => setGrandfatheringCutoffDate(e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      boxSizing: 'border-box',
+                                      padding: '7px 10px',
+                                      borderRadius: '8px',
+                                      background: '#f8fafc',
+                                      border: '1px solid #cbd5e1',
+                                      color: '#0f172a',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 700,
+                                      outline: 'none'
+                                    }}
+                                  />
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
+                                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px' }}>
+                                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>
+                                      🛡️ Bestandskunden (vor Stichtag)
+                                    </div>
+                                    <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#14532d', marginTop: '2px' }}>
+                                      0,49 € brutto / Mo.
+                                    </div>
+                                    <div style={{ fontSize: '0.68rem', color: '#166534', marginTop: '2px' }}>
+                                      (0,41 € netto + 0,08 € MwSt = 5,88 € / Jahr)
+                                    </div>
+                                  </div>
+
+                                  <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px' }}>
+                                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>
+                                      🚀 Neukunden (ab Stichtag)
+                                    </div>
+                                    <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#1e3a8a', marginTop: '2px' }}>
+                                      0,58 € brutto / Mo.
+                                    </div>
+                                    <div style={{ fontSize: '0.68rem', color: '#1e40af', marginTop: '2px' }}>
+                                      (0,49 € netto + 19% MwSt = 6,96 € / Jahr)
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -5623,14 +6080,21 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         fontWeight: 800,
                         cursor: 'pointer',
                         boxShadow: '0 4px 15px rgba(2, 132, 199, 0.25)',
-                        transition: 'all 0.2s ease',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px',
                         marginTop: '4px'
                       }}
-                      className="hover-scale-mini"
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(2, 132, 199, 0.35)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(2, 132, 199, 0.25)';
+                      }}
                     >
                       {updatingBilling ? 'Wird gespeichert...' : 'Betreiber- & Steuerstammdaten speichern'}
                     </button>
@@ -5653,7 +6117,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       type="button"
                       onClick={() => setShowGiroCodeModal(true)}
                       style={{
-                        padding: '4px 10px',
+                        padding: '5px 12px',
                         borderRadius: '8px',
                         background: '#f0fdf4',
                         border: '1px solid #86efac',
@@ -5663,7 +6127,17 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px'
+                        gap: '4px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 3px 8px rgba(22, 163, 74, 0.12)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
                       }}
                     >
                       <QrCode size={13} /> GiroCode Vorschau
@@ -5736,8 +6210,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     </div>
 
                     <div style={{ padding: '12px 14px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#15803d' }}>
-                        💡 Automatisierte Zuordnung (Verwendungszweck-Logik)
+                      <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Lightbulb size={13} color="#15803d" /> Automatisierte Zuordnung (Verwendungszweck-Logik)
                       </span>
                       <span style={{ fontSize: '0.72rem', color: '#166534', lineHeight: 1.35 }}>
                         • <strong>B2B Schulrechnungen:</strong> Format <code>RE-[SCHUL_ID]-[YYMM]-01</code><br />
@@ -5758,14 +6232,21 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         fontWeight: 800,
                         cursor: 'pointer',
                         boxShadow: '0 4px 15px rgba(22, 163, 74, 0.25)',
-                        transition: 'all 0.2s ease',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px',
                         marginTop: '4px'
                       }}
-                      className="hover-scale-mini"
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(22, 163, 74, 0.35)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(22, 163, 74, 0.25)';
+                      }}
                     >
                       {updatingBilling ? 'Wird gespeichert...' : 'Bankverbindung aktualisieren'}
                     </button>
@@ -5796,7 +6277,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       type="button"
                       onClick={handleToggleTwoFactor}
                       style={{
-                        padding: '4px 10px',
+                        padding: '5px 12px',
                         borderRadius: '8px',
                         background: twoFactorEnabled ? '#dcfce7' : '#f1f5f9',
                         border: `1px solid ${twoFactorEnabled ? '#86efac' : '#cbd5e1'}`,
@@ -5806,7 +6287,17 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px'
+                        gap: '4px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 3px 8px rgba(0,0,0,0.06)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
                       }}
                     >
                       <ShieldCheck size={13} color={twoFactorEnabled ? '#15803d' : '#64748b'} />
@@ -5904,7 +6395,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         fontSize: '0.88rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        transition: 'all 0.2s ease',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -5912,7 +6403,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
                         marginTop: '4px'
                       }}
-                      className="hover-scale-mini"
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 6px 18px rgba(15, 23, 42, 0.25)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.15)';
+                      }}
                     >
                       {updatingAdmin ? 'Wird gespeichert...' : 'Zugangsdaten aktualisieren'}
                     </button>
@@ -6040,7 +6538,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       onClick={handleRegenerateKioskToken}
                       style={{
                         flex: 1,
-                        padding: '9px',
+                        padding: '10px',
                         borderRadius: '10px',
                         background: '#f8fafc',
                         border: '1px solid #cbd5e1',
@@ -6051,7 +6549,19 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '4px'
+                        gap: '4px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.borderColor = '#94a3b8';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 3px 8px rgba(0,0,0,0.06)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
                       }}
                     >
                       <RefreshCw size={13} /> Token erneuern
@@ -6062,7 +6572,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       onClick={handlePrintMasterBadge}
                       style={{
                         flex: 1,
-                        padding: '9px',
+                        padding: '10px',
                         borderRadius: '10px',
                         background: '#0284c7',
                         border: 'none',
@@ -6074,7 +6584,16 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '4px'
+                        gap: '4px',
+                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(2, 132, 199, 0.35)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 3px 10px rgba(2, 132, 199, 0.2)';
                       }}
                     >
                       <Printer size={13} /> Ausweis drucken

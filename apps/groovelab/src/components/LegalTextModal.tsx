@@ -291,34 +291,31 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </h4>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand & Rechtsnatur</strong><br />
-                Diese AGB regeln die Bereitstellung von <strong>Campus-Groovelab</strong>. Der Vertragsgegenstand gliedert sich in:
-                <br />
-                a) Die <strong>unentgeltliche Überlassung der Anwendungssoftware (Leihvertrag gemäß § 598 BGB)</strong>.
-                <br />
-                b) Die <strong>entgeltliche Bereitstellung und Vermietung von Server-Speicherplatz und Datenhosting-Infrastruktur (Mietvertrag gemäß § 535 BGB)</strong>.
+                <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand &amp; Rechtsnatur (B2B SaaS)</strong><br />
+                Diese AGB regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB</strong> über die schlüsselfertige Bereitstellung der Softwarefunktionalitäten inklusive dedizierter Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Wartung.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>2. Kostenfreie Software-Nutzung &amp; Hosting-Gebühren (§ 19 UStG Kleinunternehmer)</strong><br />
-                - <strong>Software-Bereitstellung:</strong> Die Nutzung der Anwendungssoftware ist <strong>dauerhaft 100% kostenlos</strong> (0,00 €).<br />
-                - <strong>Campus-Modul Hosting:</strong> {masterPricing.priceCampus.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting & Webspace-Flatrate per Musikschule).<br />
-                - <strong>GrooveLab-Modul Hosting:</strong> {masterPricing.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting & Webspace-Flatrate per Musikschule).<br />
-                - <strong>Kombi-Vorteil Hosting:</strong> {masterPricing.priceKombi.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting & Webspace-Flatrate für beide Module).<br />
+                <strong style={{ color: '#0f172a' }}>2. Bereitstellungsmodell &amp; Hosting-Gebühren (§ 19 UStG Kleinunternehmer)</strong><br />
+                - <strong>Software-Nutzungsrechte:</strong> Die Einräumung der einfachen Nutzungsrechte an der Software erfolgt im Rahmen des gebuchten Cloud-Pakets ohne zusätzliche Lizenzkaufgebühren.<br />
+                - <strong>Campus-Modul Hosting:</strong> {masterPricing.priceCampus.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
+                - <strong>GrooveLab-Modul Hosting:</strong> {masterPricing.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
+                - <strong>Kombi-Vorteil Hosting:</strong> {masterPricing.priceKombi.toFixed(2).replace('.', ',')} € / Mo. (Infrastruktur-Bündel für beide Module, Ersparnis von {masterPricing.kombiSavings.toFixed(2).replace('.', ',')} € / Mo.).<br />
                 - <strong>Infrastruktur-Service-Fee:</strong> {masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. je aktivem Lehrer-Profil. Verwaltungs- und Sekretariats-User (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>admin</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>secretary</code>) sind kostenfrei inklusive.<br />
-                - <strong>Schüler-Infrastruktur-Fee:</strong> {masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. je aktivierter Schülerin/Schüler. Bei mehr als 2 Monaten Inaktivität wird das Profil automatisch passiviert.<br />
+                - <strong>Schüler-Infrastruktur-Fee:</strong> {masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. je aktiver Schülerin / aktivem Schüler. Bei mehr als 2 Monaten Inaktivität wird das Profil automatisch passiviert, um unnötige Kosten zu vermeiden.<br />
                 - <strong>Steuerlicher Hinweis (§ 19 UStG):</strong> <em>Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</em>
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>3. Host-Provider-Privileg & Urheberrecht an Daten (§ 535 BGB, Art. 6 DSA)</strong><br />
-                Der Betreiber stellt lediglich den vermieteten Server-Speicherplatz bereit (Webhosting). Die Kunden/Nutzer sind allein verantwortlich für die Rechtmäßigkeit der von ihnen hochgeladenen Inhalte (Noten, Dokumente, Audios). Der Betreiber haftet als Host-Provider gemäß Art. 6 DSA (§ 10 TDDDG) erst ab Kenntnisnahme von konkreten Rechtsverletzungen (Notice-and-Takedown). Die Urheberrechte an in der Audio-Loopstation erstellten Aufnahmen verbleiben zu 100% beim Ersteller/Schüler.
+                <strong style={{ color: '#0f172a' }}>3. Host-Provider-Privileg &amp; Urheberrecht an Daten (§ 535 BGB, Art. 6 DSA)</strong><br />
+                Der Betreiber stellt die technische Infrastruktur und den Speicherplatz bereit. Der Kunde bzw. die Endnutzer sind allein verantwortlich für die Rechtmäßigkeit der von ihnen erstellten Audioaufnahmen und Unterrichtsnotizen. Der Betreiber haftet als Host-Provider gemäß Art. 6 DSA (§ 10 TDDDG) erst ab Kenntniserlangung von konkreten Rechtsverletzungen (Notice-and-Takedown). Sämtliche Urheber- und Leistungsschutzrechte an in der Audio-Loopstation und im Übe-Studio erstellten Aufnahmen verbleiben zu 100 % beim jeweiligen Ersteller/Schüler.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>4. Haftungsbeschränkung (§ 599 BGB & Mietrecht)</strong><br />
-                - <strong>Kostenlose Software (§ 599 BGB):</strong> Für Sach- und Rechtsmängel der unentgeltlich überlassenen Software haftet der Betreiber gemäß § 599 BGB nur bei Vorsatz und grober Fahrlässigkeit.<br />
-                - <strong>Server-Hosting:</strong> Für die entgeltliche Webspace-Bereitstellung haftet der Betreiber uneingeschränkt bei Vorsatz, grober Fahrlässigkeit sowie Schäden aus der Verletzung des Lebens, des Körpers oder der Gesundheit. Im Übrigen ist die Haftung für leichte Fahrlässigkeit ausgeschlossen.
+                <strong style={{ color: '#0f172a' }}>4. Gewährleistung &amp; Haftungsbeschränkung (§ 535 BGB)</strong><br />
+                - <strong>Unbeschränkte Haftung:</strong> Der Betreiber haftet unbeschränkt bei Vorsatz, grober Fahrlässigkeit, bei arglistigem Verschweigen von Mängeln sowie für Schäden aus der Verletzung des Lebens, des Körpers oder der Gesundheit.<br />
+                - <strong>Kardinalpflichten:</strong> Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten, d. h. Pflichten, deren Erfüllung die ordnungsgemäße Durchführung des Vertrags überhaupt erst ermöglicht und auf deren Einhaltung der Vertragspartner regelmäßig vertraut). In diesem Fall ist die Haftung der Höhe nach auf den vertragstypischen, bei Vertragsschluss vorhersehbaren Schaden begrenzt.<br />
+                - <strong>Haftungsausschluss im Übrigen:</strong> Eine weitergehende Haftung für leichte Fahrlässigkeit, mittelbare Schäden oder entgangenen Gewinn ist ausgeschlossen. Die zwingenden Vorschriften des Produkthaftungsgesetzes und der DSGVO (Art. 82) bleiben unberührt.
               </div>
             </div>
           )}

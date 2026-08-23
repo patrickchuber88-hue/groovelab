@@ -11,9 +11,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Custom fetch wrapper to handle transient network errors and bypass CORS preflight issues
 const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const maxAttempts = 3;
-  let lastError: any = null;
-  
   // Convert headers to a plain record object to avoid Headers class serialization issues in some browsers
   const rawHeaders: Record<string, string> = {};
   if (init?.headers) {
@@ -98,22 +95,40 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     headers: rawHeaders
   };
   
+  const maxAttempts = 2;
+  let lastError: any = null;
+  
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let timeoutId: any = null;
     try {
-      return await fetch(input, newInit);
+      let fetchInit = newInit;
+      // Wrap request with an 8-second timeout if no signal was passed (fast failover to offline cache)
+      if (!newInit.signal && typeof AbortController !== 'undefined') {
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 8000);
+        fetchInit = { ...newInit, signal: controller.signal };
+      }
+
+      const response = await fetch(input, fetchInit);
+      if (timeoutId) clearTimeout(timeoutId);
+      return response;
     } catch (err: any) {
+      if (timeoutId) clearTimeout(timeoutId);
       lastError = err;
       const errMsg = err?.message || String(err);
       
-      // Check for transient network/CORS errors that are safe to retry
+      // Check for transient network/CORS/WebKit errors that are safe to retry
       const isNetworkError = 
         errMsg.includes('Load failed') || 
         errMsg.includes('Failed to fetch') || 
         errMsg.includes('NetworkError') || 
-        errMsg.includes('Network request failed');
+        errMsg.includes('Network request failed') ||
+        errMsg.includes('AbortError') ||
+        errMsg.includes('aborted') ||
+        (typeof navigator !== 'undefined' && !navigator.onLine);
         
       if (isNetworkError && attempt < maxAttempts) {
-        const delay = attempt * 150; // Exponential backoff: 150ms, 300ms
+        const delay = 150; // Fast retry
         console.warn(`[Supabase Fetch] Attempt ${attempt} failed with "${errMsg}". Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;

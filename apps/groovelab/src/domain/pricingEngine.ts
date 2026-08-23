@@ -1,3 +1,34 @@
+export interface StorageTier {
+  gb: number;
+  price: number;
+  label: string;
+  sublabel: string;
+  desc?: string;
+  recommendedFor?: string;
+}
+
+export const DEFAULT_STORAGE_TIERS: StorageTier[] = [
+  { gb: 0, price: 0, label: '1 GB Basis', sublabel: 'Bis 30 Schüler', desc: '0,00 € / Mo.', recommendedFor: 'Kleine Dozenten-Klassen' },
+  { gb: 10, price: 2.99, label: '+10 GB', sublabel: 'Bis 100 Schüler', desc: '2,99 € / Mo.', recommendedFor: 'Kleine Musikschulen' },
+  { gb: 50, price: 9.99, label: '+50 GB', sublabel: 'Bis 250 Schüler', desc: '9,99 € / Mo.', recommendedFor: 'Mittelgroße Musikschulen' },
+  { gb: 100, price: 16.99, label: '+100 GB', sublabel: 'Bis 500 Schüler', desc: '16,99 € / Mo.', recommendedFor: 'Große Musikschulen' },
+  { gb: 250, price: 29.99, label: '+250 GB', sublabel: '500 bis 1.000+ Schüler', desc: '29,99 € / Mo.', recommendedFor: 'Großschulen & Konservatorien' }
+];
+
+export const getStorageTierByGb = (gb: number, customTiers?: StorageTier[]): StorageTier => {
+  const tiers = customTiers && customTiers.length > 0 ? customTiers : DEFAULT_STORAGE_TIERS;
+  const match = tiers.find(t => t.gb === gb);
+  if (match) return match;
+  const fallbackPrice = gb === 0 ? 0 : Number((gb * 0.25).toFixed(2));
+  return {
+    gb,
+    price: fallbackPrice,
+    label: `+${gb} GB`,
+    sublabel: 'Individuell',
+    desc: `${fallbackPrice.toFixed(2).replace('.', ',')} € / Mo.`
+  };
+};
+
 export interface MasterPricingRates {
   priceCampus: number;
   priceGroovelab: number;
@@ -6,6 +37,7 @@ export interface MasterPricingRates {
   priceStudent: number;
   pricePassiveStudent?: number;
   priceStorageAddon?: number;
+  storageTiers?: StorageTier[];
   priceChangeScope?: 'new_only' | 'school_year_start' | 'immediate' | string;
   priceChangeAnnouncedAt?: string | null;
 }

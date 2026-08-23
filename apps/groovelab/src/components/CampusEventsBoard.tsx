@@ -4235,7 +4235,7 @@ export function CampusEventsBoard({
           const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
           const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
           const timeLabel = (occ.start_time || '16:30').slice(0, 5);
-          const notificationMessage = `Der verschobene oder abgesagte Termin wurde auf den regulären Termin zurückgesetzt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr.`;
+          const notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr.`;
 
           await supabase.from('campus_direct_messages').insert({
             sender_id: userId,
@@ -4243,7 +4243,7 @@ export function CampusEventsBoard({
             content: notificationMessage,
             occurrence_id: targetOccId,
             is_system: true,
-            message_type: 'reschedule_notification'
+            message_type: 'cancellation_reset'
           });
         }
       } catch (notifErr) {
@@ -13611,7 +13611,7 @@ export function CampusEventsBoard({
                       gap: '5px'
                     }}>
                       <ShieldCheck size={13} color="#ffffff" />
-                      <span>100% DSGVO-konform • End-to-End verschlüsselt</span>
+                      <span>100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
                     </span>
                   </div>
                 </div>

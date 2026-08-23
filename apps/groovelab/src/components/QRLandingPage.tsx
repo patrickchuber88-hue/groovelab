@@ -3593,6 +3593,34 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         if (updErr) throw updErr;
       }
 
+      // Send system message to Direct Messages & Alerts
+      try {
+        const studentUserId = profile?.id || occ.student_id;
+        const teacherUserId = occ.teacher_id;
+        const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
+
+        if (studentUserId && teacherUserId && occ.date) {
+          const [y, m, d] = String(occ.date).split('-').map(Number);
+          const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
+          const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+          const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+          const timeLabel = (occ.start_time || '16:30').slice(0, 5);
+
+          const notificationMessage = `Der verschobene oder abgesagte Termin wurde auf den regulären Termin zurückgesetzt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr.`;
+
+          await supabase.from('campus_direct_messages').insert({
+            sender_id: studentUserId,
+            recipient_id: teacherUserId,
+            content: notificationMessage,
+            occurrence_id: targetOccId,
+            is_system: true,
+            message_type: 'reschedule_notification'
+          });
+        }
+      } catch (notifErr) {
+        console.warn('Could not insert undo cancel system message in QRLandingPage:', notifErr);
+      }
+
       await fetchDashboardData();
     } catch (err: any) {
       console.error('Error undoing cancellation:', err);
@@ -10771,7 +10799,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           whiteSpace: 'nowrap'
                         }}>
                           <ShieldCheck size={13} color="#ffffff" />
-                          <span>100% DSGVO-konform • End-to-End verschlüsselt</span>
+                          <span>100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
                         </span>
 
                         <button

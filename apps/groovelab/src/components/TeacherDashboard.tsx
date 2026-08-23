@@ -2,10 +2,12 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
+import { FeedbackHubModal } from './feedback/FeedbackHubModal';
+import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, getGroupTypeLabel, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
@@ -1080,6 +1082,28 @@ export function TeacherDashboard({
           alert('Fehler beim Absagen des Termins: ' + error.message);
         } else {
           setToastMessage('Termin erfolgreich abgesagt.');
+          // Send system cancellation message to direct messages
+          try {
+            if (studentId && userId && dateStr) {
+              const [y, m, d] = String(dateStr).split('-').map(Number);
+              const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
+              const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+              const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+              const timeLabel = startTime.substring(0, 5);
+              const targetOccId = (slotId && !String(slotId).startsWith('virt_')) ? slotId : (scheduleId ? `virtual-${scheduleId}-${dateStr}` : null);
+
+              await supabase.from('campus_direct_messages').insert({
+                sender_id: userId,
+                recipient_id: studentId,
+                content: `Dein Unterrichtstermin am ${shortDay} ${shortDate} um ${timeLabel} Uhr fällt aus.`,
+                occurrence_id: targetOccId,
+                is_system: true,
+                message_type: 'reschedule_notification'
+              });
+            }
+          } catch (dmErr) {
+            console.warn('Could not insert cancellation system message in TeacherDashboard:', dmErr);
+          }
           fetchData();
         }
       }
@@ -1285,6 +1309,7 @@ export function TeacherDashboard({
   });
   const [teacherSettingsTab, setTeacherSettingsTab] = useState<'fokus' | 'profile'>('fokus');
   const [activeTeacherSettingsModal, setActiveTeacherSettingsModal] = useState<'fokus' | 'profile' | 'avatar' | 'security' | null>(null);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [initialSchoolData, setInitialSchoolData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [allBands, setAllBands] = useState<any[]>([]);
@@ -4144,13 +4169,69 @@ export function TeacherDashboard({
         throw new Error('API offline');
       } catch (e) {
         try {
-          const { data: teacherProfile } = await supabase
-            .from('users')
-            .select('school_id, instrument, schools(allow_messages_global)')
-            .eq('id', userId)
-            .single();
+          const isGhostMode = userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
+          const ghostSchoolId = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_id') || teacher?.school_id) : null;
+          
+          let teacherProfile: any = null;
+          let targetTeacherId = userId;
 
-          if (!teacherProfile) return;
+          if (isGhostMode && ghostSchoolId) {
+            let effectiveTeacherId = sessionStorage.getItem('groovelab_ghost_shadowed_teacher_id');
+            if (effectiveTeacherId) {
+              const { data: tp } = await supabase
+                .from('users')
+                .select('id, school_id, instrument, schools(allow_messages_global)')
+                .eq('id', effectiveTeacherId)
+                .maybeSingle();
+              teacherProfile = tp;
+            }
+            if (!teacherProfile) {
+              const { data: tp } = await supabase
+                .from('users')
+                .select('id, school_id, instrument, schools(allow_messages_global)')
+                .eq('school_id', ghostSchoolId)
+                .eq('role', 'teacher')
+                .limit(1)
+                .maybeSingle();
+              teacherProfile = tp;
+              if (teacherProfile?.id) {
+                sessionStorage.setItem('groovelab_ghost_shadowed_teacher_id', teacherProfile.id);
+                effectiveTeacherId = teacherProfile.id;
+              }
+            }
+            if (teacherProfile?.id) {
+              targetTeacherId = teacherProfile.id;
+            } else {
+              const { data: ghostSchool } = await supabase.from('schools').select('*').eq('id', ghostSchoolId).maybeSingle();
+              teacherProfile = {
+                id: 'master-support-id',
+                school_id: ghostSchoolId,
+                instrument: 'Lehrkraft',
+                schools: ghostSchool || { allow_messages_global: true }
+              };
+              targetTeacherId = 'master-support-id';
+            }
+          } else {
+            const { data: tp } = await supabase
+              .from('users')
+              .select('id, school_id, instrument, schools(allow_messages_global)')
+              .eq('id', userId)
+              .maybeSingle();
+            teacherProfile = tp;
+          }
+
+          if (!teacherProfile) {
+            setRawBriefingData({
+              success: true,
+              allowMessagesGlobal: true,
+              todayWeekday: (simNow.getDay() === 0 ? 7 : simNow.getDay()),
+              timeline: [],
+              prepMirror: null,
+              rescheduledReminders: []
+            });
+            return;
+          }
+
           const schoolData = Array.isArray(teacherProfile.schools) ? teacherProfile.schools[0] : teacherProfile.schools;
           const allowMessages = schoolData?.allow_messages_global ?? true;
 
@@ -4175,8 +4256,8 @@ export function TeacherDashboard({
              let loadedActiveDraftId = 'default';
              let loadedSubmittedDraftId = '';
 
-             const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${userId}`) || localStorage.getItem(`groovelab_teacher_draft_state_campus_${userId}`);
-             const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${userId}`) || localStorage.getItem(`groovelab_teacher_boards_${userId}`);
+             const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${targetTeacherId}`) || localStorage.getItem(`groovelab_teacher_draft_state_campus_${targetTeacherId}`);
+             const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${targetTeacherId}`) || localStorage.getItem(`groovelab_teacher_boards_${targetTeacherId}`);
 
              if (storedDraftState) {
                try {
@@ -4198,11 +4279,11 @@ export function TeacherDashboard({
                } catch (e) {}
              }
 
-             if (loadedDrafts.length === 0) {
+             if (loadedDrafts.length === 0 && targetTeacherId !== 'master-support-id') {
                const { data: tUser } = await supabase
                  .from('users')
                  .select('planned_boards')
-                 .eq('id', userId)
+                 .eq('id', targetTeacherId)
                  .single();
 
                if (tUser && tUser.planned_boards) {
@@ -4258,7 +4339,7 @@ export function TeacherDashboard({
                      const matchedStudent = (schoolStudents || []).find((st: any) => 
                        (s.id && st.id === s.id) || 
                        (st.first_name?.trim().toLowerCase() === sFn && (!sLn || (st.last_name || '').trim().toLowerCase().startsWith(sLn[0])))
-);
+                     );
 
                      let studentTime = s.customStartTime || s.assignedTime || s.startTime;
                      if (!studentTime) {
@@ -4316,10 +4397,7 @@ export function TeacherDashboard({
 
            // 2. Secondary Fallback: Load from schedules table if no board slots
            if (slots.length === 0) {
-             const dayNamesMap: Record<number, string> = { 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday' };
-             const dayNameStr = dayNamesMap[todayWeekday] || 'Monday';
-
-             const { data: allTeacherSlots } = await supabase
+             let schedQuery = supabase
                .from('schedules')
                .select(`
                  id,
@@ -4339,9 +4417,14 @@ export function TeacherDashboard({
                    avatars (avatar_style, evolution_level, xp, streak_flame)
                  )
                `)
-               .eq('teacher_id', userId)
                .eq('school_id', teacherProfile.school_id)
                .in('status', ['opened', 'approved', 'published']);
+
+             if (targetTeacherId && targetTeacherId !== 'master-support-id') {
+               schedQuery = schedQuery.eq('teacher_id', targetTeacherId);
+             }
+
+             const { data: allTeacherSlots } = await schedQuery;
 
              const dbSlots = (allTeacherSlots || []).filter((s: any) => {
                return s.day_of_week === todayWeekday || 
@@ -4381,7 +4464,7 @@ export function TeacherDashboard({
            }
 
            // Fetch occurrences strictly for target date
-           const { data: dbOccurrences } = await supabase
+           let occQuery = supabase
              .from('schedule_occurrences')
              .select(`
                id,
@@ -4392,6 +4475,7 @@ export function TeacherDashboard({
                schedule_id,
                student_id,
                student_acknowledged,
+               room_id,
                schedules (
                  duration,
                  instrument,
@@ -4407,33 +4491,38 @@ export function TeacherDashboard({
                  avatars (avatar_style, evolution_level, xp, streak_flame)
                )
              `)
-             .eq('teacher_id', userId)
              .eq('school_id', teacherProfile.school_id)
              .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
+
+           if (targetTeacherId && targetTeacherId !== 'master-support-id') {
+             occQuery = occQuery.eq('teacher_id', targetTeacherId);
+           }
+
+           const { data: dbOccurrences } = await occQuery;
 
            // Also collect local occurrences from localStorage for todayStr
            const localOccursForToday: any[] = [];
            try {
-             const pendingSaved = typeof window !== 'undefined' ? ((userId ? localStorage.getItem(`groovelab_pending_schedule_changes_${userId}`) : null) || localStorage.getItem('groovelab_pending_schedule_changes')) : null;
+             const pendingSaved = typeof window !== 'undefined' ? ((targetTeacherId ? localStorage.getItem(`groovelab_pending_schedule_changes_${targetTeacherId}`) : null) || localStorage.getItem('groovelab_pending_schedule_changes')) : null;
              if (pendingSaved) {
                const parsedPending = JSON.parse(pendingSaved);
                Object.values(parsedPending).forEach((item: any) => {
                  if (item && (item.date === todayStr || item.original_date === todayStr)) {
                    const itemTeacherId = item.teacher_id || item.teacherId;
-                   if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
+                   if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(targetTeacherId).replace(/^teacher-/i, '')) {
                      localOccursForToday.push(item);
                    }
                  }
                });
              }
-             const latestSaved = typeof window !== 'undefined' ? (userId ? localStorage.getItem('groovelab_calendar_active_occurrences_' + userId) : null) : null;
+             const latestSaved = typeof window !== 'undefined' ? (targetTeacherId ? localStorage.getItem('groovelab_calendar_active_occurrences_' + targetTeacherId) : null) : null;
              if (latestSaved) {
                const parsedLatest = JSON.parse(latestSaved);
                if (Array.isArray(parsedLatest)) {
                  parsedLatest.forEach((item: any) => {
                    if (item && (item.date === todayStr || item.original_date === todayStr)) {
                      const itemTeacherId = item.teacher_id || item.teacherId;
-                     if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
+                     if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(targetTeacherId).replace(/^teacher-/i, '')) {
                        localOccursForToday.push(item);
                      }
                    }
@@ -4507,13 +4596,11 @@ export function TeacherDashboard({
                };
 
                if (occ.original_date === todayStr && occ.date !== todayStr) {
-                 // Rescheduled AWAY from today -> mark as rescheduled_away
                  const existingIdx = findMatchingTimelineIdx();
                  if (existingIdx !== -1) {
                    timeline[existingIdx].status = 'rescheduled_away';
                  }
                } else if (occ.date === todayStr) {
-                 // Rescheduled TO today or updated today -> update or insert into today's timeline
                  const existingIdx = findMatchingTimelineIdx();
                  const existingItem = existingIdx !== -1 ? timeline[existingIdx] : null;
                  const resolvedRoom = allRooms.find((r: any) => r.id === (occ.room_id || occ.schedules?.room_id || existingItem?.roomId))?.name || 
@@ -4523,17 +4610,17 @@ export function TeacherDashboard({
                  const mappedItem = {
                    id: occ.id,
                    scheduleId: occ.schedule_id || occ.id,
-                   date: occ.date,
+                   date: todayStr,
                    timeSlot: formattedTime,
-                   duration: occ.schedules?.duration || occ.duration || existingItem?.duration || 30,
-                   status: occ.status,
+                   duration: occ.schedules?.duration || existingItem?.duration || 30,
+                   status: occ.status || 'scheduled',
                    isGroup: Boolean(existingItem?.isGroup),
                    groupStudents: existingItem?.groupStudents || [],
-                   roomId: occ.schedules?.rooms?.id || occ.room_id || existingItem?.roomId || null,
+                   roomId: occ.room_id || occ.schedules?.room_id || existingItem?.roomId || null,
                    room: resolvedRoom,
                    instrument: resolvedInstrument,
-                   student_acknowledged: occ.student_acknowledged ?? occ.studentAcknowledged ?? false,
-                   original_date: occ.original_date,
+                   student_acknowledged: occ.student_acknowledged ?? true,
+                   original_date: (occ.original_date || null) as null,
                    student: student ? {
                      id: student.id,
                      name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
@@ -4545,10 +4632,6 @@ export function TeacherDashboard({
                      streakFlame: avatar?.streak_flame || 0
                    } : (existingItem?.student || null)
                  };
-
-                 if (occ.status === 'cancelled') {
-                   mappedItem.status = 'canceled_by_student';
-                 }
 
                  if (existingIdx !== -1) {
                    timeline[existingIdx] = mappedItem;
@@ -4703,7 +4786,7 @@ export function TeacherDashboard({
             const mondayStr = monday.toISOString().substring(0, 10);
             const sundayStr = sunday.toISOString().substring(0, 10);
 
-            const { data: weekOccurrences } = await supabase
+            let weekQuery = supabase
               .from('schedule_occurrences')
               .select(`
                 id,
@@ -4717,9 +4800,15 @@ export function TeacherDashboard({
                   last_name
                 )
               `)
-              .eq('teacher_id', userId)
+              .eq('school_id', teacherProfile.school_id)
               .gte('date', mondayStr)
               .lte('date', sundayStr);
+
+            if (targetTeacherId && targetTeacherId !== 'master-support-id') {
+              weekQuery = weekQuery.eq('teacher_id', targetTeacherId);
+            }
+
+            const { data: weekOccurrences } = await weekQuery;
 
             if (weekOccurrences && weekOccurrences.length > 0) {
               const rescheduledUpcoming = weekOccurrences.filter((occ: any) => {
@@ -4969,76 +5058,97 @@ export function TeacherDashboard({
     if (!userId) return;
     setFetchError(null);
 
-    if (userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true')) {
-      const ghostSchoolId = sessionStorage.getItem('groovelab_ghost_school_id') || '';
-      const ghostSchoolName = sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule';
-      const ghostTeacher = {
-        id: 'master-support-id',
-        school_id: ghostSchoolId,
-        role: 'teacher',
-        first_name: `${ghostSchoolName} Support`,
-        last_name: '',
-        photo_url: '/campus_login_hero.png',
-        avatar_url: '/campus_login_hero.png',
-        instrument: 'Support-Lehrkraft',
-        is_campus_active: true,
-        is_groovelab_active: true,
-        is_ghost_mode: true,
-        schools: {
-          id: ghostSchoolId,
-          name: ghostSchoolName,
-          status: 'active'
-        }
-      };
-      setTeacher(ghostTeacher);
-      if (ghostSchoolId) {
-        supabase.from('schools').select('*').eq('id', ghostSchoolId).single().then(({ data: sd }) => {
-          if (sd) {
-            setSchoolData(sd);
-            setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
-          }
-        });
-      }
-      return;
-    }
+    const isGhostMode = userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
+    const ghostSchoolId = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_id') || '') : '';
+    const ghostSchoolName = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule') : 'Musikschule';
 
-    // Update coach presence in DB
-    supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
+    if (!isGhostMode) {
+      // Update coach presence in DB
+      supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
+    }
 
     try {
       // 0. Shoutbox & Profile Info (Fetched in parallel first)
       let bIds: string[] = [];
-      const [mBandsRes, cBandsRes, tDataRes, actDayRes] = await Promise.all([
-        supabase.from('band_members').select('band_id').eq('user_id', userId),
-        supabase.from('bands').select('id').eq('coach_id', userId),
-        supabase.from('users').select('*, schools(*)').eq('id', userId).single(),
-        supabase.from('activation_days').select('day_of_birth').eq('student_id', userId).maybeSingle()
-      ]);
+      let tData: any = null;
 
-      const mBands = mBandsRes.data;
-      const cBands = cBandsRes.data;
-      let tData = tDataRes.data;
-
-      // Fallback: if schools join failed (e.g. RLS on schools table for student), query users directly
-      if (!tData && userId) {
-        const { data: fallbackUser } = await supabase.from('users').select('*').eq('id', userId).single();
-        if (fallbackUser) {
-          tData = fallbackUser;
+      if (isGhostMode && ghostSchoolId) {
+        let effectiveTeacherId = sessionStorage.getItem('groovelab_ghost_shadowed_teacher_id');
+        let realTeacher: any = null;
+        if (effectiveTeacherId) {
+          const { data: tp } = await supabase.from('users').select('*, schools(*)').eq('id', effectiveTeacherId).maybeSingle();
+          realTeacher = tp;
         }
-      }
+        if (!realTeacher) {
+          const { data: tp } = await supabase.from('users').select('*, schools(*)').eq('school_id', ghostSchoolId).eq('role', 'teacher').limit(1).maybeSingle();
+          realTeacher = tp;
+          if (realTeacher?.id) {
+            sessionStorage.setItem('groovelab_ghost_shadowed_teacher_id', realTeacher.id);
+          }
+        }
 
-      if (tData) {
-        tData.day_of_birth = actDayRes?.data?.day_of_birth || null;
-      }
+        const { data: sd } = await supabase.from('schools').select('*').eq('id', ghostSchoolId).maybeSingle();
 
-      if (mBands) bIds.push(...mBands.map(b => b.band_id));
-      if (cBands) bIds.push(...cBands.map(b => b.id));
-      bIds = [...new Set(bIds)];
+        tData = realTeacher ? {
+          ...realTeacher,
+          is_ghost_mode: true,
+          schools: sd || realTeacher.schools || { id: ghostSchoolId, name: ghostSchoolName, status: 'active' }
+        } : {
+          id: 'master-support-id',
+          school_id: ghostSchoolId,
+          role: 'teacher',
+          first_name: `${ghostSchoolName} Support`,
+          last_name: '',
+          photo_url: '/campus_login_hero.png',
+          avatar_url: '/campus_login_hero.png',
+          instrument: 'Support-Lehrkraft',
+          is_campus_active: true,
+          is_groovelab_active: true,
+          is_ghost_mode: true,
+          schools: sd || {
+            id: ghostSchoolId,
+            name: ghostSchoolName,
+            status: 'active'
+          }
+        };
 
-      if (bIds.length > 0) {
-        const { data: shoutData } = await supabase.from('band_shoutbox').select('*, users(first_name, photo_url), bands(name)').in('band_id', bIds).order('created_at', { ascending: false });
-        const unread = (shoutData || []).filter(s => !(s.read_by || []).includes(userId) && s.user_id !== userId);
-        setUnreadShouts(unread);
+        if (sd) {
+          setSchoolData(sd);
+          setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
+        }
+      } else {
+        const [mBandsRes, cBandsRes, tDataRes, actDayRes] = await Promise.all([
+          supabase.from('band_members').select('band_id').eq('user_id', userId),
+          supabase.from('bands').select('id').eq('coach_id', userId),
+          supabase.from('users').select('*, schools(*)').eq('id', userId).single(),
+          supabase.from('activation_days').select('day_of_birth').eq('student_id', userId).maybeSingle()
+        ]);
+
+        const mBands = mBandsRes.data;
+        const cBands = cBandsRes.data;
+        tData = tDataRes.data;
+
+        // Fallback: if schools join failed (e.g. RLS on schools table for student), query users directly
+        if (!tData && userId) {
+          const { data: fallbackUser } = await supabase.from('users').select('*').eq('id', userId).single();
+          if (fallbackUser) {
+            tData = fallbackUser;
+          }
+        }
+
+        if (tData) {
+          tData.day_of_birth = actDayRes?.data?.day_of_birth || null;
+        }
+
+        if (mBands) bIds.push(...mBands.map(b => b.band_id));
+        if (cBands) bIds.push(...cBands.map(b => b.id));
+        bIds = [...new Set(bIds)];
+
+        if (bIds.length > 0) {
+          const { data: shoutData } = await supabase.from('band_shoutbox').select('*, users(first_name, photo_url), bands(name)').in('band_id', bIds).order('created_at', { ascending: false });
+          const unread = (shoutData || []).filter(s => !(s.read_by || []).includes(userId) && s.user_id !== userId);
+          setUnreadShouts(unread);
+        }
       }
 
       // 1. Info
@@ -5063,7 +5173,7 @@ export function TeacherDashboard({
         });
         // Prepare Student Query: fetch assigned students in the school
         let studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student');
-        if (viewMode !== 'student') {
+        if (viewMode !== 'student' && !tData.is_ghost_mode) {
           studentQuery = studentQuery.eq('teacher_id', userId);
         }
 
@@ -5076,7 +5186,7 @@ export function TeacherDashboard({
           )
         `).eq('school_id', tData.school_id).eq('is_groovelab_active', true);
 
-        if (viewMode !== 'student') {
+        if (viewMode !== 'student' && !tData.is_ghost_mode) {
           wallSongsQuery = wallSongsQuery.eq('teacher_id', userId);
         }
 
@@ -5140,7 +5250,7 @@ export function TeacherDashboard({
             : Promise.resolve({ data: [], error: null }),
           // crisis
           (activeTab === 'briefing')
-            ? Promise.resolve(supabase.from('crisis_notifications').select('*, student:users!crisis_notifications_student_id_fkey(id, first_name, last_name)').eq('teacher_id', userId).gte('slot_start_datetime', new Date(Date.now() - 24 * 60 * 60 * 1000 * 7).toISOString()).order('slot_start_datetime', { ascending: true })).catch(e => ({ data: [], error: e }))
+            ? Promise.resolve(supabase.from('crisis_notifications').select('*, student:users!crisis_notifications_student_id_fkey(id, first_name, last_name)').eq(tData.is_ghost_mode ? 'school_id' : 'teacher_id', tData.is_ghost_mode ? tData.school_id : userId).gte('slot_start_datetime', new Date(Date.now() - 24 * 60 * 60 * 1000 * 7).toISOString()).order('slot_start_datetime', { ascending: true })).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // stations
           (activeTab === 'live')
@@ -10335,6 +10445,9 @@ export function TeacherDashboard({
                 <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
               ) : briefingData ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* Community Update & Helden-Moment Hero */}
+                  <UpdateAnnouncementHero userId={userId} activePlatform={activePlatform} />
+
                   {/* Planning Active Banners */}
                   {activePlanningEvents.map(ev => {
                     if (dismissedBanners[ev.id]) return null;
@@ -17474,6 +17587,15 @@ export function TeacherDashboard({
                 gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 shadowColor: 'rgba(16, 185, 129, 0.40)',
                 icon: ShieldCheck
+              },
+              {
+                id: 'feedback',
+                title: 'Ideenschmiede',
+                subtitle: 'Wünsche & Fehler melden',
+                badge: 'Mitgestalten',
+                gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                shadowColor: 'rgba(236, 72, 153, 0.40)',
+                icon: Lightbulb
               }
             ].map((module) => {
               const IconComp = module.icon;
@@ -17481,8 +17603,12 @@ export function TeacherDashboard({
                 <div
                   key={module.id}
                   onClick={() => {
-                    setTeacherSettingsTab(module.id === 'avatar' ? 'profile' : (module.id as any));
-                    setActiveTeacherSettingsModal(module.id as any);
+                    if (module.id === 'feedback') {
+                      setIsFeedbackModalOpen(true);
+                    } else {
+                      setTeacherSettingsTab(module.id === 'avatar' ? 'profile' : (module.id as any));
+                      setActiveTeacherSettingsModal(module.id as any);
+                    }
                   }}
                   style={{
                     background: '#ffffff',
@@ -17807,6 +17933,53 @@ export function TeacherDashboard({
                           style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
                         />
                       </div>
+
+                      {/* Ideenschmiede & Feature-Wünsche Callout */}
+                      <div style={{
+                        gridColumn: windowWidth < 640 ? 'span 1' : 'span 2',
+                        background: '#fdf2f8',
+                        border: '1px solid #fbcfe8',
+                        borderRadius: '12px',
+                        padding: '14px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        marginTop: '4px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <Lightbulb size={20} color="#ec4899" />
+                          <div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#831843' }}>
+                              Ideenschmiede & Feature-Wünsche
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#9d174d' }}>
+                              Wünsche einreichen und für Community-Ideen abstimmen.
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTeacherSettingsModal(null);
+                            setIsFeedbackModalOpen(true);
+                          }}
+                          style={{
+                            background: '#ec4899',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '8px 14px',
+                            borderRadius: '8px',
+                            fontSize: '0.76rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            flexShrink: 0
+                          }}
+                          className="hover-scale"
+                        >
+                          Öffnen
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -17878,8 +18051,8 @@ export function TeacherDashboard({
                           <ShieldCheck size={24} />
                         </div>
                         <div>
-                          <strong style={{ fontSize: '0.86rem', color: '#0f172a', display: 'block' }}>DSGVO & Datenschutz-Status</strong>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Dein Account ist mit Ende-zu-Ende verschlüsselter Sitzungssicherheit geschützt.</span>
+                          <strong style={{ fontSize: '0.86rem', color: '#0f172a', display: 'block' }}>DSGVO &amp; Datenschutz-Status</strong>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Dein Account ist mit TLS 1.3 Transport- und AES-256 Server-Verschlüsselung (Art. 32 DSGVO) geschützt.</span>
                         </div>
                       </div>
 
@@ -18841,7 +19014,7 @@ export function TeacherDashboard({
                       border: headerBadgeBorder
                     }}>
                       <ShieldCheck size={13} color={headerBadgeColor} />
-                      <span>100% DSGVO-konform • End-to-End verschlüsselt</span>
+                      <span>100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
                     </span>
                   </div>
                 </div>
@@ -19074,6 +19247,18 @@ export function TeacherDashboard({
         </div>
       )}
       <TourComponent />
+
+      {/* Feedback & Ideenschmiede Modal */}
+      <FeedbackHubModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        userRole="teacher"
+        userId={userId}
+        userName={`${teacher?.first_name || ''} ${teacher?.last_name || ''}`.trim() || 'Lehrkraft'}
+        schoolId={teacher?.school_id || (teacher as any)?.schoolId}
+        schoolName={schoolData?.name || (teacher as any)?.school_name}
+        activePlatform={activePlatform}
+      />
     </div>
   );
 }

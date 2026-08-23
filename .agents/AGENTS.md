@@ -13,9 +13,9 @@
 - **Kostenfreie Software**: The base software for **Campus-Groovelab** is always 100% free of charge ("100% kostenlos").
 - Only server hosting/service fees, team members, and pupil activation fees are subject to charge. We exclusively rent and host the required cloud infrastructure for the school/user.
 - **Module Pricing & Bundles**:
-  - **Campus Module**: Base price is 7,99 € / Mo. (fixed server-hosting flat rate per music school).
-  - **GrooveLab Module**: Base price is 4,99 € / Mo. (fixed server-hosting flat rate per music school).
-  - **Kombi-Vorteil Bundle**: If both Campus and GrooveLab are booked together, the bundle price is 9,99 € / Mo. (fixed server-hosting flat rate per music school, saving 2,99 € / Mo. compared to 12,98 € / Mo.).
+  - **Campus Module**: Base price is 14,90 € / Mo. (fixed server-hosting flat rate per music school).
+  - **GrooveLab Module**: Base price is 9,90 € / Mo. (fixed server-hosting flat rate per music school).
+  - **Kombi-Vorteil Bundle**: If both Campus and GrooveLab are booked together, the bundle price is 19,90 € / Mo. (fixed server-hosting flat rate per music school, saving 4,90 € / Mo. compared to 24,80 € / Mo.).
   - **Service Fee (Lehrer & Verwaltung)**: 0,49 € / Mo. per active administrator/teacher profile.
 - **Billing Methods for Student Activations (Schüleraktivierungen)**:
   - Only students who consciously activate their profile/access via the platform are subject to billing (inactive/unregistered profiles in the database are 100% free / 0,00 €).
@@ -32,9 +32,9 @@
 ## Canonical Billing Sequence & Legal SaaS Nomenclature (Verbindlicher Standard)
 - **Plattformweites Master-Wording**: Für alle Gebührenaufstellungen, Gebühren-Vorschauen, Ratenübersichten, Rechnungs-PDFs, Onboarding-Karten und Modals innerhalb der gesamten Plattform MUSS immer die exakt gleiche kanonische Reihenfolge und das gleiche juristisch wasserdichte Wording verwendet werden:
   1. **`Campus-Groovelab Software-Bereitstellung`**: `100% kostenlos (0,00 €)`
-  2. **`Cloud- & Datenbank-Hosting: Modul Campus`**: `7,99 € / Mo.` (sofern Modul Campus aktiv)
-  3. **`Cloud- & Datenbank-Hosting: Modul GrooveLab`**: `4,99 € / Mo.` (sofern Modul GrooveLab aktiv)
-  4. **`Kombi-Vorteilsrabatt (Infrastruktur-Bündel)`**: `-2,99 € / Mo.` (sofern beide Module aktiv)
+  2. **`Cloud- & Datenbank-Hosting: Modul Campus`**: `14,90 € / Mo.` (sofern Modul Campus aktiv)
+  3. **`Cloud- & Datenbank-Hosting: Modul GrooveLab`**: `9,90 € / Mo.` (sofern Modul GrooveLab aktiv)
+  4. **`Kombi-Vorteilsrabatt (Infrastruktur-Bündel)`**: `-4,90 € / Mo.` (sofern beide Module aktiv)
   5. **`Service- & Administrationspauschale`**: `[X] Lehrkräfte & Verwaltung aktiv × 0,49 € / Mo.`
   6. **`Basis-Bereitstellung`**: `[X] Schüler × 0,09 € / Mo.` (QR-Landingpages, Stundenplan-, Termin-, Raumänderungs- und Hausaufgabenheft-Sync sowie DSGVO-Datensatz-Hosting)
   7. **`Cloud- & Modul-Bereitstellung: Campus`**: `[X] Schüler × 0,49 € / Mo.` (Interaktive App-Nutzung: Übe-Timer, Loopstation, Meisterwerk-Protokoll)

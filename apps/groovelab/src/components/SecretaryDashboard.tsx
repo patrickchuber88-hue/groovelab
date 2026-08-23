@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { useRealNamesVisibility, maskLastName, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
 import { useMasterPricing } from '../context/MasterPricingContext';
+import { StorageTier, DEFAULT_STORAGE_TIERS, getStorageTierByGb } from '../domain/pricingEngine';
 import { 
   ShieldAlert, CheckCircle, Users, Settings, ShieldCheck, FileText,
   UserCheck, RefreshCw, Key, ChevronRight, UserX, LogOut,
@@ -26,6 +27,8 @@ import { QRCodeModal } from './QRCodeModal';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { DpoIdCardModal } from './DpoIdCardModal';
 import { DpoAuditPortal } from './DpoAuditPortal';
+import { FeedbackHubModal } from './feedback/FeedbackHubModal';
+import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
@@ -2048,22 +2051,25 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     return typeof window !== 'undefined' ? (localStorage.getItem(`contractStartDate_${schoolId}`) || localStorage.getItem(`simulatedContractStartDate_${schoolId}`)) : null;
   });
   const [simulatedToday, setSimulatedToday] = useState<string>(() => {
-    return typeof window !== 'undefined' ? (localStorage.getItem(`simulatedToday_${schoolId}`) || '') : '';
-  });
-  const [isSimulatedDateLocked, setIsSimulatedDateLocked] = useState<boolean>(() => {
-    return typeof window !== 'undefined' ? !!localStorage.getItem(`simulatedToday_${schoolId}`) : false;
-  });
-  const [tempSimulatedDate, setTempSimulatedDate] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      const sim = localStorage.getItem(`simulatedToday_${schoolId}`);
-      if (sim) return sim;
+      return localStorage.getItem('groovelab_simulated_date') || (schoolId ? localStorage.getItem(`simulatedToday_${schoolId}`) : '') || '';
     }
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    return '';
   });
+
+  // Real-time synchronization of simulated date with TeacherDashboard and all other views
+  useEffect(() => {
+    const handleSimDateSync = () => {
+      const sim = localStorage.getItem('groovelab_simulated_date') || (schoolId ? localStorage.getItem(`simulatedToday_${schoolId}`) : '') || '';
+      setSimulatedToday(sim);
+    };
+    window.addEventListener('storage', handleSimDateSync);
+    window.addEventListener('groovelab_simulated_date_changed', handleSimDateSync);
+    return () => {
+      window.removeEventListener('storage', handleSimDateSync);
+      window.removeEventListener('groovelab_simulated_date_changed', handleSimDateSync);
+    };
+  }, [schoolId]);
   const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({ '2026': true, '2025': true });
   const [isCancelled, setIsCancelled] = useState<boolean>(() => {
     return typeof window !== 'undefined' && localStorage.getItem(`isCancelled_${schoolId}`) === 'true';
@@ -2186,6 +2192,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   // Apple-style settings panel states
   const [settingsTab, setSettingsTab] = useState<'general' | 'sync' | 'security_privacy' | 'backup'>('general');
   const [activeSecretarySettingsModal, setActiveSecretarySettingsModal] = useState<'general' | 'links' | 'sync' | 'security_privacy' | 'backup' | 'school_year' | 'danger_zone' | null>(null);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [initialSettings, setInitialSettings] = useState<any>(null);
   const [kioskPinLength, setKioskPinLength] = useState<number>(4);
   const [kioskAutoLogout, setKioskAutoLogout] = useState<number>(5);
@@ -3803,17 +3810,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         // Restore contractStartDate from DB contract_start_date or created_at
         if (schoolData.contract_start_date) {
           setContractStartDate(schoolData.contract_start_date);
-          setTempSimulatedDate(schoolData.contract_start_date.split('T')[0]);
           localStorage.setItem(`contractStartDate_${schoolId}`, schoolData.contract_start_date);
         } else {
           const simulated = localStorage.getItem(`simulatedContractStartDate_${schoolId}`);
           if (simulated) {
             setContractStartDate(simulated);
-            setTempSimulatedDate(simulated.split('T')[0]);
             localStorage.setItem(`contractStartDate_${schoolId}`, simulated);
           } else if (schoolData.created_at) {
             setContractStartDate(schoolData.created_at);
-            setTempSimulatedDate(schoolData.created_at.split('T')[0]);
             localStorage.setItem(`contractStartDate_${schoolId}`, schoolData.created_at);
           }
         }
@@ -6883,6 +6887,24 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   </div>
                 </div>
 
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  fontSize: '0.76rem',
+                  color: '#475569',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  lineHeight: '1.45'
+                }}>
+                  <CheckCircle size={18} color="#34a853" style={{ flexShrink: 0 }} />
+                  <span>
+                    <strong style={{ color: '#1e293b' }}>Abonnement-Schutz:</strong> Ihr gebuchter Vertrag und das Cloud-Hosting bleiben unverändert aktiv. Variable Schülergebühren stoppen automatisch, bis Sie neue Schülerprofile anlegen.
+                  </span>
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4' }}>
                     Bitte bestätigen Sie diesen Vorgang, indem Sie den genauen Namen Ihrer Musikschule eingeben:
@@ -6901,7 +6923,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       border: '1.5px solid',
                       borderColor: resetConfirmText === schoolName ? '#34a853' : '#cbd5e1', 
                       fontSize: '0.84rem', 
-                      outline: 'none',
+                      outline: 'none', 
                       width: '100%',
                       boxSizing: 'border-box',
                       textAlign: 'center',
@@ -14692,151 +14714,196 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           </div>
 
           {/* Action & Profile */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Dynamic Date Simulator Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Unified School & User Pill */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              background: '#e6f4ea',
-              padding: '6px 12px',
+              background: 'rgba(59, 130, 246, 0.04)',
+              height: '40px',
+              padding: '0 16px',
               borderRadius: '12px',
-              border: '1px solid #e6f4ea',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+              border: '1px solid rgba(59, 130, 246, 0.12)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
             }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                Datumssimulator (heute):
+              <span style={{
+                fontWeight: 750,
+                fontSize: '0.76rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.03em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <School size={14} color="#ef4444" />
+                  <span>{schoolName || 'Meine Musikschule'}</span>
+                </span>
+                <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
+                <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <User size={14} color="#3b82f6" />
+                  <span>
+                    {currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Severin L.'}
+                  </span>
+                </span>
               </span>
-              <input
+            </div>
+
+            {/* Elegant Refresh / Reload Button */}
+            <button 
+              onClick={() => window.location.reload()}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                width: '40px', 
+                height: '40px', 
+                borderRadius: '12px', 
+                background: '#f8fafc', 
+                border: '1px solid #e2e8f0', 
+                color: '#64748b', 
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                flexShrink: 0
+              }}
+              className="hover-scale"
+              title="Seite neu laden"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f1f5f9';
+                e.currentTarget.style.color = '#334155';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f8fafc';
+                e.currentTarget.style.color = '#64748b';
+              }}
+            >
+              <RefreshCw size={16} />
+            </button>
+
+            {/* Datum Simulation Control */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: simulatedToday ? '#fefce8' : '#f8fafc',
+              border: simulatedToday ? '1.5px solid #eab308' : '1.5px solid #cbd5e1',
+              height: '40px',
+              padding: '0 10px',
+              borderRadius: '12px',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: '#334155',
+              boxShadow: simulatedToday ? '0 2px 8px rgba(234, 179, 8, 0.2)' : 'none',
+              transition: 'all 0.2s',
+              flexShrink: 0
+            }} title="Datum-Simulation für alle Dashboards">
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: simulatedToday ? '#854d0e' : '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                📅 Simu:
+              </span>
+              <input 
                 type="date"
-                value={tempSimulatedDate}
-                onChange={(e) => setTempSimulatedDate(e.target.value)}
-                disabled={isSimulatedDateLocked}
+                value={simulatedToday || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSimulatedToday(val);
+                  if (val) {
+                    localStorage.setItem('groovelab_simulated_date', val);
+                    localStorage.setItem('groovelab_simulated_start_timestamp', String(Date.now()));
+                    if (schoolId) {
+                      localStorage.setItem(`simulatedToday_${schoolId}`, val);
+                    }
+                  } else {
+                    localStorage.removeItem('groovelab_simulated_date');
+                    localStorage.removeItem('groovelab_simulated_start_timestamp');
+                    if (schoolId) {
+                      localStorage.removeItem(`simulatedToday_${schoolId}`);
+                    }
+                  }
+                  window.dispatchEvent(new Event('storage'));
+                  window.dispatchEvent(new CustomEvent('groovelab_simulated_date_changed'));
+                }}
                 style={{
                   border: 'none',
                   background: 'transparent',
-                  color: isSimulatedDateLocked ? '#34a853' : '#34a853',
-                  fontWeight: 900,
-                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  fontSize: '0.78rem',
+                  color: simulatedToday ? '#ca8a04' : '#0f172a',
                   outline: 'none',
-                  cursor: isSimulatedDateLocked ? 'default' : 'pointer',
-                  opacity: isSimulatedDateLocked ? 0.8 : 1,
-                  fontFamily: "'Plus Jakarta Sans', sans-serif"
+                  cursor: 'pointer'
                 }}
               />
-              {!isSimulatedDateLocked ? (
+              {simulatedToday && (
                 <button
+                  type="button"
                   onClick={() => {
-                    setSimulatedToday(tempSimulatedDate);
-                    localStorage.setItem(`simulatedToday_${schoolId}`, tempSimulatedDate);
-                    setIsSimulatedDateLocked(true);
-                  }}
-                  style={{
-                    padding: '4px 10px',
-                    background: '#34a853',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(52,168,83,0.2)'
-                  }}
-                >
-                  Bestätigen
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    const today = new Date();
-                    const yyyy = today.getFullYear();
-                    const mm = String(today.getMonth() + 1).padStart(2, '0');
-                    const dd = String(today.getDate()).padStart(2, '0');
-                    const todayStr = `${yyyy}-${mm}-${dd}`;
-                    
                     setSimulatedToday('');
-                    localStorage.removeItem(`simulatedToday_${schoolId}`);
-                    setTempSimulatedDate(todayStr);
-                    setIsSimulatedDateLocked(false);
+                    localStorage.removeItem('groovelab_simulated_date');
+                    localStorage.removeItem('groovelab_simulated_start_timestamp');
+                    if (schoolId) {
+                      localStorage.removeItem(`simulatedToday_${schoolId}`);
+                    }
+                    window.dispatchEvent(new Event('storage'));
+                    window.dispatchEvent(new CustomEvent('groovelab_simulated_date_changed'));
                   }}
                   style={{
-                    padding: '4px 8px',
-                    background: '#ef4444',
-                    color: '#ffffff',
                     border: 'none',
-                    borderRadius: '6px',
+                    background: '#fef08a',
+                    color: '#854d0e',
                     fontSize: '0.68rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 4px rgba(239,68,68,0.2)'
+                    fontWeight: 900,
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
                   }}
-                  title="Zurücksetzen auf heute"
+                  title="Auf heutiges Datum zurücksetzen"
                 >
-                  ✕
+                  Heute
                 </button>
               )}
             </div>
 
-            {/* Integrated School & User Pill */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              background: 'rgba(234, 67, 53, 0.04)', 
-              padding: '8px 16px', 
-              borderRadius: '12px', 
-              border: '1px solid rgba(234, 67, 53, 0.12)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
-              <div style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ color: '#1e293b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <School size={14} color="#ea4335" />
-                  <span>{schoolName || 'Meine Musikschule'}</span>
-                </span>
-                <div style={{ width: '1px', height: '14px', background: 'rgba(234, 67, 53, 0.18)', margin: '0 4px' }} />
-                <span style={{ color: '#334155', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <User size={14} color="#ea4335" />
-                  <span>
-                    {currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Verwaltung'}
-                  </span>
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    if (onRoleSwitched) {
-                      onRoleSwitched('teacher');
-                    }
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '4px',
-                    color: '#ea4335',
-                    borderRadius: '50%',
-                    marginLeft: '4px',
-                    transition: 'background 0.2s, transform 0.2s',
-                  }}
-                  title="Zum Lehrer-Dashboard wechseln"
-                  className="hover-scale"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(234, 67, 53, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  <RefreshCw size={14} color="#ea4335" />
-                </button>
-              </div>
-            </div>
+            {/* Elegant Switch to Teacher Dashboard Button (Green button replacing red Verwaltung button) */}
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (onRoleSwitched) {
+                  onRoleSwitched('teacher');
+                }
+              }}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                gap: '6px', 
+                background: '#e6f4ea', 
+                border: '1.5px solid #34a853', 
+                height: '40px', 
+                padding: '0 14px', 
+                borderRadius: '12px', 
+                color: '#34a853', 
+                fontWeight: 800, 
+                fontSize: '0.8rem', 
+                cursor: 'pointer', 
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', 
+                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)', 
+                flexShrink: 0 
+              }}
+              className="hover-scale"
+              title="Zum Lehrer-Dashboard wechseln"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#d1fae5';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#e6f4ea';
+              }}
+            >
+              <GraduationCap size={15} color="#34a853" />
+              <span>Lehrer</span>
+            </button>
           </div>
         </div>
         
@@ -15147,7 +15214,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 
                 {/* LEFT COLUMN: MAIN CONTENT AREA */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  
+                  {/* Community Update & Helden-Moment Hero */}
+                  <UpdateAnnouncementHero userId={userId} activePlatform={activeTab} />
+
                   {/* ⏳ Active Audio-Tresor Termination & Grace Period Monitor */}
                   {(() => {
                     const termStatus = currentSchoolProfile?.storage_termination_status;
@@ -25375,15 +25444,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               })()}
 
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(115px, 1fr))', gap: '12px' }}>
-                                {[
-                                  { gb: 0, fee: 0, label: 'Standard', sublabel: '1 GB Basis', desc: '0,00 € / Mo.', IconComponent: HardDrive },
-                                  { gb: 5, fee: 1.49, label: '+5 GB', sublabel: 'Bis 100 Schüler', desc: '1,49 € / Mo.', IconComponent: Cloud },
-                                  { gb: 10, fee: 2.99, label: '+10 GB', sublabel: 'Bis 250 Schüler', desc: '2,99 € / Mo.', IconComponent: Zap },
-                                  { gb: 20, fee: 5.49, label: '+20 GB', sublabel: 'Bis 500 Schüler', desc: '5,49 € / Mo.', IconComponent: Rocket },
-                                  { gb: 50, fee: 9.99, label: '+50 GB', sublabel: 'Große Schulen', desc: '9,99 € / Mo.', IconComponent: Crown },
-                                  { gb: 100, fee: 16.99, label: '+100 GB', sublabel: 'Konservatorien', desc: '16,99 € / Mo.', IconComponent: Database },
-                                  { gb: 250, fee: 34.99, label: '+250 GB', sublabel: 'Kreis-Schulen', desc: '34,99 € / Mo.', IconComponent: Sparkles }
-                                ].map(tier => {
+                                {(masterPricing.storageTiers || DEFAULT_STORAGE_TIERS).map((tier: StorageTier) => {
+                                  const iconMapping: Record<number, any> = {
+                                    0: HardDrive,
+                                    5: Cloud,
+                                    10: Zap,
+                                    20: Rocket,
+                                    50: Crown,
+                                    100: Database,
+                                    250: Sparkles
+                                  };
+                                  const IconCmp = iconMapping[tier.gb] || Sparkles;
                                   const isSel = selectedStorageAddonGb === tier.gb;
                                   const activeBookedGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
                                   const isCurrentlyActive = activeBookedGb === tier.gb;
@@ -25393,7 +25464,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
                                   const usedGb = usedBytes / (1024 * 1024 * 1024);
                                   const isDowngradeBlocked = usedGb > tierCapGb;
-                                  const IconCmp = tier.IconComponent;
 
                                   return (
                                     <div
@@ -25404,7 +25474,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           return;
                                         }
                                         setSelectedStorageAddonGb(tier.gb);
-                                        setSelectedStorageAddonFee(tier.fee);
+                                        setSelectedStorageAddonFee(tier.price);
                                       }}
                                       style={{
                                         display: 'flex',
@@ -30185,6 +30255,15 @@ status: status,
                   gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
                   shadowColor: 'rgba(239, 68, 68, 0.40)',
                   icon: ShieldAlert
+                },
+                {
+                  id: 'feedback',
+                  title: 'Ideenschmiede',
+                  subtitle: 'Wünsche & Fehler melden',
+                  badge: 'Mitgestalten',
+                  gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                  shadowColor: 'rgba(236, 72, 153, 0.40)',
+                  icon: Lightbulb
                 }
               ].map((module) => {
                 const IconComp = module.icon;
@@ -30192,6 +30271,10 @@ status: status,
                   <div
                     key={module.id}
                     onClick={() => {
+                      if (module.id === 'feedback') {
+                        setIsFeedbackModalOpen(true);
+                        return;
+                      }
                       if (module.id === 'general' || module.id === 'sync' || module.id === 'security_privacy' || module.id === 'backup') {
                         setSettingsTab(module.id as any);
                       }
@@ -31205,8 +31288,26 @@ status: status,
                           Alle Schüler- und Lehrer-Profile, Avatare, Wochenstundenpläne, Unterrichtsstunden, gebildeten Bands und Chathistorien werden <strong>unwiderruflich gelöscht</strong>. 
                           Lediglich Ihr Administrator-Konto bleibt aktiv, sodass Sie die Schule sofort von null auf neu aufbauen können.
                         </span>
+
+                        <div style={{
+                          background: 'rgba(255, 255, 255, 0.75)',
+                          border: '1px solid #fed7d7',
+                          borderRadius: '10px',
+                          padding: '12px 14px',
+                          fontSize: '0.75rem',
+                          color: '#742a2a',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          lineHeight: '1.45'
+                        }}>
+                          <CheckCircle size={16} color="#34a853" style={{ flexShrink: 0 }} />
+                          <span>
+                            <strong>Hinweis zum Abonnement:</strong> Ihr gebuchtes Infrastruktur- & Cloud-Hosting bleibt aktiv. Variable Schülergebühren pausieren automatisch, bis Sie neue Schülerprofile anlegen.
+                          </span>
+                        </div>
                         
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
                           <button
                             type="button"
                             onClick={() => {
@@ -31289,6 +31390,18 @@ status: status,
                 </div>
               </div>
             )}
+
+            {/* Feedback & Ideenschmiede Modal */}
+            <FeedbackHubModal
+              isOpen={isFeedbackModalOpen}
+              onClose={() => setIsFeedbackModalOpen(false)}
+              userRole="secretary"
+              userId={userId}
+              userName={schoolName ? `${schoolName} Sekretariat` : 'Sekretariat'}
+              schoolId={currentSchoolProfile?.id || schoolId}
+              schoolName={schoolName}
+              activePlatform="admin_desk"
+            />
           </div>
         )}
         {activeTab === 'secretary' && secretarySubTab === 'duties' && renderDutiesBoard()}
@@ -32859,20 +32972,21 @@ status: status,
 
               {/* Tier Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
-                {[
-                  { gb: 0, fee: 0, label: 'Standard', sublabel: '1 GB Basis', desc: '0,00 €', IconCmp: HardDrive },
-                  { gb: 5, fee: 1.49, label: '+5 GB', sublabel: 'Bis 100 Schüler', desc: '1,49 € / Mo.', IconCmp: Cloud },
-                  { gb: 10, fee: 2.99, label: '+10 GB', sublabel: 'Bis 250 Schüler', desc: '2,99 € / Mo.', IconCmp: Zap },
-                  { gb: 20, fee: 5.49, label: '+20 GB', sublabel: 'Bis 500 Schüler', desc: '5,49 € / Mo.', IconCmp: Rocket },
-                  { gb: 50, fee: 9.99, label: '+50 GB', sublabel: 'Große Schulen', desc: '9,99 € / Mo.', IconCmp: Crown },
-                  { gb: 100, fee: 16.99, label: '+100 GB', sublabel: 'Konservatorien', desc: '16,99 € / Mo.', IconCmp: Database },
-                  { gb: 250, fee: 34.99, label: '+250 GB', sublabel: 'Kreis-Schulen', desc: '34,99 € / Mo.', IconCmp: Sparkles }
-                ].map(tier => {
+                {(masterPricing.storageTiers || DEFAULT_STORAGE_TIERS).map((tier: StorageTier) => {
                   const isSel = selectedStorageAddonGb === tier.gb;
                   const isCurrent = activeBookedGb === tier.gb;
                   const tierCapGb = baseGb + tier.gb;
                   const isDowngradeBlocked = usedGb > tierCapGb;
-                  const Icon = tier.IconCmp;
+                  const iconMapping: Record<number, any> = {
+                    0: HardDrive,
+                    5: Cloud,
+                    10: Zap,
+                    20: Rocket,
+                    50: Crown,
+                    100: Database,
+                    250: Sparkles
+                  };
+                  const Icon = iconMapping[tier.gb] || Sparkles;
 
                   return (
                     <div
@@ -32883,7 +32997,7 @@ status: status,
                           return;
                         }
                         setSelectedStorageAddonGb(tier.gb);
-                        setSelectedStorageAddonFee(tier.fee);
+                        setSelectedStorageAddonFee(tier.price);
                       }}
                       style={{
                         padding: '14px 10px',
@@ -33579,9 +33693,9 @@ status: status,
                   </div>
 
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG &amp; GEWÄHRLEISTUNG</h4>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG &amp; GEWÄHRLEISTUNG (§ 535 BGB)</h4>
                     <p style={{ margin: 0 }}><strong>1. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Vorsatz, grobe Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf vertragstypisch vorhersehbare Schäden.</p>
-                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwareüberlassung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Haftungsausschluss im Übrigen:</strong> Eine weitergehende Haftung für leichte Fahrlässigkeit, entgangenen Gewinn oder sonstige mittelbare Mängelfolgeschäden ist ausgeschlossen. Die zwingenden Bestimmungen des Produkthaftungsgesetzes und der DSGVO (Art. 82) bleiben unberührt.</p>
                   </div>
 
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
@@ -33591,8 +33705,8 @@ status: status,
                   </div>
 
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 GEBÜHRENFREIHEIT DER SOFTWARE &amp; NUTZUNGSRECHTE</h4>
-                    <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software.</p>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 NUTZUNGSRECHTE &amp; SCHUTZRECHTE</h4>
+                    <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software im Rahmen des gebuchten Cloud-Betriebs.</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>2. Schutzrechte:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zurückzuentwickeln (Reverse Engineering) oder zu modifizieren.</p>
                   </div>
 

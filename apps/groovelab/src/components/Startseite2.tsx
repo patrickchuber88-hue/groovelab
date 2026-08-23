@@ -33,6 +33,8 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
     kombi: masterPricing.priceKombi,
     teacher: masterPricing.priceTeacher,
     student: masterPricing.priceStudent,
+    passiveStudent: masterPricing.pricePassiveStudent ?? 0.09,
+    storageAddon: masterPricing.priceStorageAddon ?? 2.99,
     freeMonthsPerYear: masterPricing.freeMonthsPerYear,
     billingMonthsPerYear: masterPricing.billingMonthsPerYear,
     kombiSavings: masterPricing.kombiSavings,
@@ -67,7 +69,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
       },
       {
         q: 'Gibt es eine Regelung für Familien mit wenig Einkommen oder mehreren Kindern?',
-        a: 'Ja! Bei der Campus-Aktivierung gilt unser autom. Geschwister-Vorteil: Für Familien mit mehreren Kindern sind alle weiteren Kinder ab dem 3. Kind 100 % KOSTENLOS für die Eltern (0,00 €/Monat). Die Musikschule übernimmt hierbei lediglich den passiven Server-Beitrag von 0,09 €/Monat. Zusätzlich schaltet unser Solidaritätsversprechen für je 20 aktive Schüler 1 kostenfreie Freischaltung für Härtefälle frei.'
+        a: `Ja! Bei der Campus-Aktivierung gilt unser autom. Geschwister-Vorteil: Für Familien mit mehreren Kindern sind alle weiteren Kinder ab dem 3. Kind 100 % KOSTENLOS für die Eltern (0,00 €/Monat). Die Musikschule übernimmt hierbei lediglich den passiven Server-Beitrag von ${(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Monat. Zusätzlich schaltet unser Solidaritätsversprechen für je 20 aktive Schüler 1 kostenfreie Freischaltung für Härtefälle frei.`
       }
     ],
     directors: [
@@ -1437,7 +1439,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 lineHeight: 1.6,
                 fontWeight: 550
               }}>
-                Keine Einrichtungsgebühr und keine Softwaregebühren (Software dauerhaft zu 100% kostenlos). Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab 4,99 € / Mo.) und aktive Profile.
+                Keine Einrichtungsgebühr und keine Softwaregebühren (Software dauerhaft zu 100% kostenlos). Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab {Math.min(pricing.campus, pricing.groovelab).toFixed(2).replace('.', ',')} € / Mo.) und aktive Profile.
               </p>
             </div>
 
@@ -1666,7 +1668,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span>• <strong>Vollständig:</strong> Eltern zahlen {pricing.student.toFixed(2).replace('.', ',')} €/Mo. Schule zahlt 0,00 € Schülergebühr.</span>
-                      <span>• <strong>Teilweise:</strong> Eltern zahlen 0,40 €/Mo, Schule stützt mit 0,09 €/Mo.</span>
+                      <span>• <strong>Teilweise:</strong> Eltern zahlen {Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)).toFixed(2).replace('.', ',')} €/Mo, Schule stützt mit {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Mo.</span>
                     </div>
 
                     {/* Solidaritätsversprechen Highlight Box */}
@@ -2106,9 +2108,9 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG &amp; GEWÄHRLEISTUNG</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG &amp; GEWÄHRLEISTUNG (§ 535 BGB)</h4>
                         <p style={{ margin: 0 }}><strong>1. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Vorsatz, grobe Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf vertragstypisch vorhersehbare Schäden.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwareüberlassung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Haftungsausschluss im Übrigen:</strong> Eine weitergehende Haftung für leichte Fahrlässigkeit, entgangenen Gewinn oder sonstige mittelbare Mängelfolgeschäden ist ausgeschlossen. Die zwingenden Bestimmungen des Produkthaftungsgesetzes und der DSGVO (Art. 82) bleiben unberührt.</p>
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
@@ -2118,8 +2120,8 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 GEBÜHRENFREIHEIT DER SOFTWARE &amp; NUTZUNGSRECHTE</h4>
-                        <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software.</p>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 NUTZUNGSRECHTE &amp; SCHUTZRECHTE</h4>
+                        <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software im Rahmen des gebuchten Cloud-Betriebs.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Schutzrechte:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zurückzuentwickeln (Reverse Engineering) oder zu modifizieren.</p>
                       </div>
 
@@ -2129,8 +2131,8 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Basis-Software:</strong> Die Bereitstellung der Basis-Software von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Bereitstellungen und aktive Schüler-Freischaltungen.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ {pricing.campus.toFixed(2).replace('.', ',')} € und für das Modul „GrooveLab“ {pricing.groovelab.toFixed(2).replace('.', ',')} €. Werden beide Module gebucht, gilt der Kombi-Vorteil von {pricing.kombi.toFixed(2).replace('.', ',')} € (Ersparnis von {pricing.kombiSavings.toFixed(2).replace('.', ',')} €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit {pricing.teacher.toFixed(2).replace('.', ',')} €/Monat berechnet.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
-                          <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit 0,49 €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
-                          <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern (0,49 €/Monat bzw. 5,88 € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen 0,40 €/Monat, Schule trägt 0,09 €/Monat). <strong>Geschwister-Vorteil:</strong> Bei Verknüpfung von Geschwisterkindern sind alle weiteren Kinder ab dem 3. Kind für die Eltern 100 % kostenlos (0,00 €/Monat; die Schule trägt lediglich den passiven Server-Beitrag von 0,09 €/Monat). Härtefälle können von der Schule manuell befreit werden.
+                          <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit {pricing.student.toFixed(2).replace('.', ',')} €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
+                          <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern ({pricing.student.toFixed(2).replace('.', ',')} €/Monat bzw. {(pricing.student * 12).toFixed(2).replace('.', ',')} € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen {Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)).toFixed(2).replace('.', ',')} €/Monat, Schule trägt {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Monat). <strong>Geschwister-Vorteil:</strong> Bei Verknüpfung von Geschwisterkindern sind alle weiteren Kinder ab dem 3. Kind für die Eltern 100 % kostenlos (0,00 €/Monat; die Schule trägt lediglich den passiven Server-Beitrag von {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Monat). Härtefälle können von der Schule manuell befreit werden.
                           <br /><em>Hinweis:</em> GrooveLab-Schülerfreischaltungen werden immer vollumfänglich von der Musikschule getragen (keine Direktabrechnung mit Eltern).
                         </p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>5. Schüler-Deaktivierung:</strong> Bei monatlicher Abrechnung entfällt die Gebühr ab dem Folgemonat der Deaktivierung. Bei jährlicher Vorauszahlung verbleiben das Profil und alle Funktionen bis zum Ende des laufenden Schuljahres aktiv und erlöschen erst zum Schuljahreswechsel.</p>

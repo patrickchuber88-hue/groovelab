@@ -22,7 +22,10 @@ import {
   ChevronUp, 
   Award,
   BookOpen,
-  Sparkles
+  Sparkles,
+  HardDrive,
+  Info,
+  AlertTriangle
 } from 'lucide-react';
 
 interface Invoice {
@@ -164,6 +167,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
     }
     localStorage.setItem(`paid_invoices_${schoolId}`, JSON.stringify(updated));
     setTick(t => t + 1);
+    fetchBillingData();
   };
 
   const getSchoolInvoices = (schoolId: string, currentInvoiceAmount: number, schoolStatus?: string) => {
@@ -553,6 +557,11 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
       let totalUnpaid = 0;
       calculatedInvoices.forEach(inv => {
+        // Exclude schools that are 100% free, trial or in bypass mode
+        if (inv.total <= 0 || inv.status === 'bypass' || inv.status === 'trial') {
+          return;
+        }
+
         const schoolInvoicesFromDb = realInvoices.filter(i => i.school_id === inv.schoolId);
         const storedDate = localStorage.getItem(`contractStartDate_${inv.schoolId}`) || localStorage.getItem('contractStartDate');
         const contractDateObj = storedDate ? new Date(storedDate) : new Date('2026-07-01T12:00:00Z');
@@ -566,9 +575,22 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         let m = startMonth;
         while (y < currentYear || (y === currentYear && m <= currentMonth)) {
           const monthStr = m < 10 ? `0${m}` : `${m}`;
-          const invId = `RE-${y}-${monthStr}`;
-          
-          const dbMatch = schoolInvoicesFromDb.find(i => i.id === invId || i.id === `INV-${y}-${monthStr}`);
+          const numId = inv.schoolId ? inv.schoolId.replace(/[^0-9]/g, '').substring(0, 3) || '104' : '104';
+          const yy = String(y).slice(-2);
+          const lastDay = new Date(y, m, 0).getDate();
+          const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
+          const isCreated = systemDate.getTime() >= creationTime.getTime();
+
+          // Canonical GoBD Invoice IDs and legacy aliases
+          const canonicalInvId = `RE-${numId}-${yy}${monthStr}-01`;
+          const legacyInvId = `RE-${y}-${monthStr}`;
+          const previewId = `VS-${numId}-${yy}${monthStr}`;
+          const invId = isCreated ? canonicalInvId : previewId;
+
+          const dbMatch = schoolInvoicesFromDb.find(i => 
+            i.id === canonicalInvId || i.id === legacyInvId || i.id === `INV-${y}-${monthStr}` || i.id === invId
+          );
+
           let paidInvoicesList: string[] = [];
           try {
             const raw = localStorage.getItem(`paid_invoices_${inv.schoolId}`);
@@ -577,9 +599,14 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           } catch {
             paidInvoicesList = [];
           }
-          const isMarkedPaid = paidInvoicesList.includes(invId);
-          
-          let status = 'open';
+
+          const isMarkedPaid = 
+            paidInvoicesList.includes(canonicalInvId) || 
+            paidInvoicesList.includes(legacyInvId) || 
+            paidInvoicesList.includes(previewId) ||
+            paidInvoicesList.includes(invId);
+
+          let status = isCreated ? 'Versendet' : 'Vorschau';
           let amount = inv.total;
           if (dbMatch) {
             status = dbMatch.status;
@@ -587,11 +614,13 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           } else if (isMarkedPaid) {
             status = 'paid';
           }
-          
-          if (status !== 'paid' && status !== 'cancelled' && status !== 'Bezahlt') {
+
+          // GoBD & Accounting Standard: Only past, closed/created invoices can be outstanding receivables.
+          // Running month previews (isCreated === false, e.g. August before 31.08.) are not yet due/closed!
+          if (isCreated && status !== 'paid' && status !== 'cancelled' && status !== 'Bezahlt') {
             totalUnpaid += amount;
           }
-          
+
           m++;
           if (m > 12) {
             m = 1;
@@ -791,20 +820,27 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(0, 0, 0, 0.08)',
-            borderRadius: '10px',
-            padding: '8px 16px',
-            fontWeight: 600,
-            fontSize: '0.8rem',
-            color: '#334155',
+            backgroundColor: '#ffffff',
+            border: '1px solid rgba(15, 23, 42, 0.08)',
+            borderRadius: '12px',
+            padding: '10px 18px',
+            fontWeight: 800,
+            fontSize: '0.88rem',
+            color: '#475569',
             cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)'
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: '0 2px 8px rgba(15, 23, 42, 0.03)'
           }}
-          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#e6f4ea'; e.currentTarget.style.color = '#34a853'; e.currentTarget.style.borderColor = 'rgba(52, 168, 83, 0.2)'; }}
-          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.8)'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.16)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.06)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(15, 23, 42, 0.03)';
+          }}
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           Aktualisieren
@@ -1007,21 +1043,30 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                 type="button"
                 onClick={handleExportCSV}
                 style={{
-                  background: 'transparent',
-                  border: '1px solid rgba(52, 168, 83, 0.2)',
+                  background: '#ffffff',
+                  border: '1px solid rgba(52, 168, 83, 0.25)',
                   borderRadius: '10px',
-                  padding: '8px 12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  color: '#34a853',
+                  padding: '8px 14px',
+                  fontSize: '0.80rem',
+                  fontWeight: 800,
+                  color: '#059669',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  transition: 'all 0.2s'
+                  boxShadow: '0 2px 6px rgba(5, 150, 105, 0.06)',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#e6f4ea'; }}
-                onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ecfdf5';
+                  e.currentTarget.style.borderColor = '#10b981';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = 'rgba(52, 168, 83, 0.25)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
               >
                 CSV Export
               </button>
@@ -1395,7 +1440,19 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                       {/* Header */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '22px' }}>🎙️</span>
+                          <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            background: '#f1f5f9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#475569',
+                            flexShrink: 0
+                          }}>
+                            <HardDrive size={18} />
+                          </div>
                           <div>
                             <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>Audio-Tresor &amp; Cloud-Speicher Kontingent</h4>
                             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
@@ -1415,12 +1472,12 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                       </div>
 
                       {/* Dynamic Progress Bar */}
-                      <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: '6px', overflow: 'hidden', marginBottom: '16px' }}>
+                      <div style={{ width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
                         <div style={{
                           height: '100%',
                           width: `${usagePct}%`,
-                          background: isFull ? '#ef4444' : isHighUsage ? '#f59e0b' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
-                          borderRadius: '6px',
+                          background: isFull ? '#ef4444' : isHighUsage ? '#f59e0b' : '#34a853',
+                          borderRadius: '4px',
                           transition: 'width 0.4s ease-in-out'
                         }} />
                       </div>
@@ -1435,16 +1492,20 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                           border: `1px solid ${isFull ? '#f87171' : '#fcd34d'}`,
                           fontSize: '0.76rem',
                           color: isFull ? '#991b1b' : '#92400e',
-                          lineHeight: 1.4
+                          lineHeight: 1.4,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
                         }}>
-                          ⚠️ <strong>{isFull ? 'Speicher voll!' : 'Speicher zu 80 % belegt!'}</strong> {isFull ? 'Der Audio-Tresor deiner Schule ist voll.' : 'Der Audio-Tresor deiner Schule ist zu 80 % belegt.'}
+                          <AlertTriangle size={15} color={isFull ? '#dc2626' : '#d97706'} />
+                          <span><strong>{isFull ? 'Speicher voll!' : 'Speicher zu 80 % belegt!'}</strong> {isFull ? 'Der Audio-Tresor deiner Schule ist voll.' : 'Der Audio-Tresor deiner Schule ist zu 80 % belegt.'}</span>
                         </div>
                       )}
 
                       {/* Read-Only Status Info for Master Admin */}
                       <div style={{
                         background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
+                        border: '1px solid #f1f5f9',
                         borderRadius: '12px',
                         padding: '12px 16px',
                         display: 'flex',
@@ -1455,7 +1516,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                         color: '#475569'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '1.1rem' }}>ℹ️</span>
+                          <Info size={15} color="#64748b" style={{ flexShrink: 0 }} />
                           <span>
                             <strong>Speicherverwaltung:</strong> Zusatz-Speicherpakete (+5 GB bis +40 GB) werden eigenständig von der Musikschule im eigenen Sekretariat gebucht und hier im Financial Control als Übersicht verwaltet.
                           </span>

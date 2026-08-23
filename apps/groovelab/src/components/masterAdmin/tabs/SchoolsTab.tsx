@@ -95,9 +95,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
 
     if (!s.is_trial && !s.subscription_bypass && !s.is_paused && s.status === 'active') {
       const rates = masterPricing?.getSchoolRates ? masterPricing.getSchoolRates(s) : {
-        priceCampus: s.custom_price_campus ?? masterPricing?.priceCampus ?? 7.99,
-        priceGroovelab: s.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 4.99,
-        priceKombi: s.custom_price_kombi ?? masterPricing?.priceKombi ?? 9.99,
+        priceCampus: s.custom_price_campus ?? masterPricing?.priceCampus ?? 14.90,
+        priceGroovelab: s.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 9.90,
+        priceKombi: s.custom_price_kombi ?? masterPricing?.priceKombi ?? 19.90,
         priceTeacher: s.custom_price_teacher ?? masterPricing?.priceTeacher ?? 0.49,
         priceStudent: s.custom_price_student ?? masterPricing?.priceStudent ?? 0.49,
         pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
@@ -201,9 +201,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
       const passiveStudents = Math.max(0, totalStudents - activeStudents);
 
       const rates = masterPricing?.getSchoolRates ? masterPricing.getSchoolRates(s) : {
-        priceCampus: s.custom_price_campus ?? masterPricing?.priceCampus ?? 7.99,
-        priceGroovelab: s.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 4.99,
-        priceKombi: s.custom_price_kombi ?? masterPricing?.priceKombi ?? 9.99,
+        priceCampus: s.custom_price_campus ?? masterPricing?.priceCampus ?? 14.90,
+        priceGroovelab: s.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 9.90,
+        priceKombi: s.custom_price_kombi ?? masterPricing?.priceKombi ?? 19.90,
         priceTeacher: s.custom_price_teacher ?? masterPricing?.priceTeacher ?? 0.49,
         priceStudent: s.custom_price_student ?? masterPricing?.priceStudent ?? 0.49,
         pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
@@ -358,9 +358,19 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)'
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
-            className="hover-scale-mini"
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.06)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = '#e2e8f0';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.03)';
+            }}
           >
             <Download size={14} color="#059669" /> CSV Export
           </button>
@@ -370,7 +380,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
             onClick={onRefresh}
             disabled={loading}
             style={{
-              padding: '10px 16px',
+              padding: '10px 18px',
               borderRadius: '12px',
               background: '#ffffff',
               border: '1px solid rgba(15, 23, 42, 0.08)',
@@ -381,9 +391,19 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)'
+              boxShadow: '0 2px 8px rgba(15, 23, 42, 0.03)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
-            className="hover-scale-mini"
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.16)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.06)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(15, 23, 42, 0.03)';
+            }}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Aktualisieren
           </button>
@@ -461,10 +481,10 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '0.70rem', color: '#475569', fontWeight: 700, flexWrap: 'wrap' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px' }}>
-              🟢 {activeCount} Aktiv
+              <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> {activeCount} Aktiv
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px' }}>
-              ⏱️ {trialCount} Test
+              <Clock size={11} color="#64748b" /> {trialCount} Test
             </span>
           </div>
         </div>
@@ -491,7 +511,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '0.70rem', color: '#475569', fontWeight: 700, flexWrap: 'wrap' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#ecfdf5', color: '#059669', padding: '2px 7px', borderRadius: '8px' }}>
-              ⚡ {totalActiveStudentsCount} Aktiv App
+              <Sparkles size={11} color="#059669" /> {totalActiveStudentsCount} Aktiv App
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px' }}>
               {totalPassiveStudentsCount} Basis
@@ -576,10 +596,10 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
           }}>
             {[
               { id: 'all', label: `Alle (${sanitizedSchools.length})` },
-              { id: 'active', label: `🟢 Aktiv (${activeCount})` },
-              { id: 'trial', label: `⏱️ Testphase (${trialCount})` },
-              { id: 'pending', label: `⏳ Freigabe (${pendingCount})` },
-              { id: 'archived', label: `⏸️ Archiv (${archivedCount})` }
+              { id: 'active', label: `Aktiv (${activeCount})` },
+              { id: 'trial', label: `Testphase (${trialCount})` },
+              { id: 'pending', label: `Freigabe (${pendingCount})` },
+              { id: 'archived', label: `Archiv (${archivedCount})` }
             ].map(tab => {
               const isSel = statusTab === tab.id;
               return (
@@ -723,9 +743,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
 
                 // MRR calculation
                 const rates = masterPricing?.getSchoolRates ? masterPricing.getSchoolRates(school) : {
-                  priceCampus: school.custom_price_campus ?? masterPricing?.priceCampus ?? 7.99,
-                  priceGroovelab: school.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 4.99,
-                  priceKombi: school.custom_price_kombi ?? masterPricing?.priceKombi ?? 9.99,
+                  priceCampus: school.custom_price_campus ?? masterPricing?.priceCampus ?? 14.90,
+                  priceGroovelab: school.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 9.90,
+                  priceKombi: school.custom_price_kombi ?? masterPricing?.priceKombi ?? 19.90,
                   priceTeacher: school.custom_price_teacher ?? masterPricing?.priceTeacher ?? 0.49,
                   priceStudent: school.custom_price_student ?? masterPricing?.priceStudent ?? 0.49,
                   pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
@@ -786,20 +806,20 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
 
                         {/* Status Badges */}
                         {isPending ? (
-                          <span style={{ fontSize: '0.68rem', background: '#f59e0b', color: '#ffffff', padding: '2px 8px', borderRadius: '100px', fontWeight: 800 }}>
-                            ⏳ Freigabe ausstehend
+                          <span style={{ fontSize: '0.68rem', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '100px', fontWeight: 800 }}>
+                            Freigabe ausstehend
                           </span>
                         ) : isPaused ? (
                           <span style={{ fontSize: '0.68rem', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '100px', fontWeight: 800 }}>
-                            ⏸️ Pausiert
+                            Pausiert
                           </span>
                         ) : isTrial ? (
                           <span style={{ fontSize: '0.68rem', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '100px', fontWeight: 800 }}>
-                            ⏱️ Testphase
+                            Testphase
                           </span>
                         ) : (
-                          <span style={{ fontSize: '0.68rem', background: '#ecfdf5', color: '#059669', padding: '2px 8px', borderRadius: '100px', fontWeight: 800 }}>
-                            ● Aktiv
+                          <span style={{ fontSize: '0.68rem', background: '#ecfdf5', color: '#059669', padding: '2px 8px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }} /> Aktiv
                           </span>
                         )}
 
@@ -822,7 +842,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                             alignItems: 'center',
                             gap: '4px'
                           }}>
-                            💰 MRR: {mrr.toFixed(2)} € / Mo.
+                            MRR: {mrr.toFixed(2)} € / Mo.
                           </span>
 
                           {/* MRR Canonical Breakdown Tooltip */}
@@ -871,7 +891,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                       </div>
 
                       <div style={{ fontSize: '0.76rem', color: '#64748b', marginBottom: '6px' }}>
-                        📍 {school.zip_code || ''} {school.city || 'Standort hinterlegt'} • {teachers} Lehrer • {activeStudents} Aktiv ({campusActive} Campus, {groovelabActive} GrooveLab) • {passiveStudents} Passiv ({totalStudents} Reg.)
+                        {school.zip_code || ''} {school.city || 'Standort hinterlegt'} • {teachers} Lehrer • {activeStudents} Aktiv ({campusActive} Campus, {groovelabActive} GrooveLab) • {passiveStudents} Passiv ({totalStudents} Reg.)
                       </div>
 
                       {/* Module Tags */}
@@ -912,10 +932,13 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                             border: 'none',
                             fontSize: '0.74rem',
                             fontWeight: 800,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
                           }}
                         >
-                          ✅ Freischalten
+                          <CheckCircle2 size={13} /> Freischalten
                         </button>
                       )}
 

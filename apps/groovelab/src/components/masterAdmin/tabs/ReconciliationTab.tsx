@@ -272,8 +272,8 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
               setShowCsvModal(true);
             }}
             style={{
-              padding: '8px 14px',
-              borderRadius: '8px',
+              padding: '9px 16px',
+              borderRadius: '10px',
               background: '#0f172a',
               color: '#ffffff',
               border: 'none',
@@ -283,7 +283,16 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 2px 8px rgba(15, 23, 42, 0.15)'
+              boxShadow: '0 2px 8px rgba(15, 23, 42, 0.15)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(15, 23, 42, 0.25)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(15, 23, 42, 0.15)';
             }}
           >
             <Upload size={14} /> Bank-CSV abgleichen
@@ -294,8 +303,8 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
             onClick={onRefresh}
             disabled={loadingPending}
             style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
+              padding: '9px 14px',
+              borderRadius: '10px',
               background: '#ffffff',
               border: '1px solid #cbd5e1',
               color: '#475569',
@@ -304,7 +313,17 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '6px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = '#94a3b8';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
             <RefreshCw size={13} className={loadingPending ? 'animate-spin' : ''} /> Aktualisieren
@@ -314,7 +333,14 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
 
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
-        <div style={{ background: '#ffffff', borderRadius: '14px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.02)' }}>
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '14px',
+          padding: '16px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+        }} className="hover-scale-mini">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <Clock size={14} color="#f59e0b" /> Offene Zahlungen
           </div>
@@ -324,7 +350,14 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', borderRadius: '14px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.02)' }}>
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '14px',
+          padding: '16px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+        }} className="hover-scale-mini">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <CheckCircle size={14} color="#10b981" /> Gematcht & Aktiv
           </div>
@@ -334,7 +367,14 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', borderRadius: '14px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.02)' }}>
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '14px',
+          padding: '16px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+        }} className="hover-scale-mini">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <Shield size={14} color="#3b82f6" /> Härtefälle / Befreit
           </div>
@@ -344,7 +384,14 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', borderRadius: '14px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.02)' }}>
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '14px',
+          padding: '16px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+        }} className="hover-scale-mini">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <Tag size={14} color="#64748b" /> GoBD Referenzschema
           </div>

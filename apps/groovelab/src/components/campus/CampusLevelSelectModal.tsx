@@ -58,10 +58,10 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
       badgeBg: 'rgba(2, 132, 199, 0.15)',
       recommended: true,
       features: [
-        'Aufgeräumte Übersicht',
-        'Aufgaben-Checklisten & Audio-Memos',
-        'Fokus-Timer mit Quick-Presets ⏱️',
-        'XP-Levels & Streak-Flammen 🔥'
+        'Aufgeräumte Studio-Übersicht',
+        'Track-Checklisten & Audio-Memos 🎙️',
+        'Flow-Timer mit Quick-Presets ⏱️',
+        'XP-Score, Badges & Streak-Flammen 🔥'
       ]
     },
     {

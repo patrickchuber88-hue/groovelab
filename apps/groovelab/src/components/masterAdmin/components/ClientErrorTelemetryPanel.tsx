@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   AlertTriangle, CheckCircle2, RefreshCw, Trash2, 
   Search, Smartphone, Monitor, Tablet, Copy, Check, 
-  X, Terminal
+  X, Terminal, ShieldAlert, Activity
 } from 'lucide-react';
 import { 
   ClientErrorLog, fetchErrorLogs, markErrorResolved, 
@@ -177,8 +177,21 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
           }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '10px',
+                  background: '#fee2e2',
+                  color: '#dc2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <ShieldAlert size={16} />
+                </div>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                  🚨 Client Error-Stream &amp; Incident Monitor
+                  Client Error-Stream &amp; Incident Monitor
                 </h3>
                 <span style={{
                   background: '#fef2f2',
@@ -198,79 +211,84 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
             </div>
 
             {/* Action Toolbar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
+                type="button"
                 onClick={loadLogs}
-                disabled={loading}
                 style={{
-                  background: '#ffffff',
-                  border: '1.5px solid #cbd5e1',
-                  color: '#334155',
-                  padding: '8px 14px',
-                  borderRadius: '12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  padding: '7px 14px',
+                  borderRadius: '10px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#475569',
+                  cursor: 'pointer'
                 }}
-                className="hover-scale-mini"
               >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Aktualisieren
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                <span>Aktualisieren</span>
               </button>
 
-              <button
-                onClick={handleClearAll}
-                style={{
-                  background: '#fff1f2',
-                  border: '1px solid #fecdd3',
-                  color: '#e11d48',
-                  padding: '8px 14px',
-                  borderRadius: '12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-                className="hover-scale-mini"
-              >
-                <Trash2 size={14} /> Logs leeren
-              </button>
+              {logs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    padding: '7px 14px',
+                    borderRadius: '10px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    color: '#dc2626',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Trash2 size={13} />
+                  <span>Alle löschen</span>
+                </button>
+              )}
             </div>
           </div>
 
         {/* Filter Bar */}
         <div style={{
-          padding: '16px 28px',
-          background: '#fafbfc',
-          borderBottom: '1px solid #e2e8f0',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: '12px',
           flexWrap: 'wrap',
-          gap: '12px'
+          padding: '16px 28px',
+          borderBottom: '1px solid #f1f5f9'
         }}>
           {/* Search Input */}
-          <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
-            <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+          <div style={{
+            position: 'relative',
+            flex: '1 1 240px',
+            minWidth: '200px'
+          }}>
+            <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
-              placeholder="Fehler, Route, Browser filtern..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Log durchsuchen (Fehler, URL, OS)..."
               style={{
                 width: '100%',
-                padding: '9px 14px 9px 38px',
-                borderRadius: '12px',
-                border: '1.5px solid #e2e8f0',
-                fontSize: '0.82rem',
+                padding: '7px 10px 7px 32px',
+                borderRadius: '10px',
+                border: '1px solid #e2e8f0',
+                fontSize: '0.78rem',
                 outline: 'none',
                 background: '#ffffff',
-                fontWeight: 600,
-                color: '#0f172a'
+                boxSizing: 'border-box'
               }}
             />
           </div>
@@ -285,9 +303,9 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
                 style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', outline: 'none', cursor: 'pointer' }}
               >
                 <option value="ALL">Alle Schweregrade</option>
-                <option value="CRITICAL">🔴 Critical</option>
-                <option value="WARNING">🟡 Warning</option>
-                <option value="INFO">🔵 Info</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="WARNING">Warning</option>
+                <option value="INFO">Info</option>
               </select>
             </div>
 
@@ -556,7 +574,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
                 </div>
                 <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                   <span style={{ color: '#64748b', fontWeight: 600 }}>Schweregrad &amp; Status:</span><br />
-                  <strong>{selectedLog.severity} • {selectedLog.resolved ? '✅ Behoben' : '🔴 Offen'}</strong>
+                  <strong>{selectedLog.severity} • {selectedLog.resolved ? 'Behoben' : 'Offen'}</strong>
                 </div>
               </div>
 
@@ -657,11 +675,12 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
                   }}
                   className="hover-scale-mini"
                 >
-                  <Check size={16} /> Als behoben markieren
+                  <CheckCircle2 size={15} />
+                  <span>Als behoben markieren</span>
                 </button>
               ) : (
-                <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 800 }}>
-                  ✅ Incident wurde als behoben markiert
+                <span style={{ color: '#059669', fontSize: '0.82rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CheckCircle2 size={15} /> Incident wurde als behoben markiert
                 </span>
               )}
 

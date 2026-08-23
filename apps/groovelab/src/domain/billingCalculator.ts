@@ -1,9 +1,9 @@
 // Pure Domain Billing & Infrastructure Calculator for Campus-Groovelab
 // Strictly enforces AGENTS.md pricing rules and DSGVO data minimization:
 // - Software base is 100% free of charge ("100% kostenlos").
-// - Campus Module: 7,99 € / Mo. flat rate per music school.
-// - GrooveLab Module: 4,99 € / Mo. flat rate per music school.
-// - Kombi-Vorteil Bundle: 9,99 € / Mo. flat rate per music school (saves 2,99 € / Mo.).
+// - Campus Module: 14,90 € / Mo. flat rate per music school.
+// - GrooveLab Module: 9,90 € / Mo. flat rate per music school.
+// - Kombi-Vorteil Bundle: 19,90 € / Mo. flat rate per music school (saves 4,90 € / Mo.).
 // - Service Fee: 0,49 € / Mo. per active admin/teacher profile (Admin & Secretary profiles are included free).
 // - Student Activations: 0,49 € / Mo. per active student (with 10% annual discount or 20% September start discount).
 // - Direct Parent Billing (Campus only): Full (0,49 €) or Partial (0,40 € parent / 0,09 € school).
@@ -66,9 +66,9 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
     rates = {}
   } = input;
 
-  const rateCampus = rates.priceCampus ?? 7.99;
-  const rateGroovelab = rates.priceGroovelab ?? 4.99;
-  const rateKombi = rates.priceKombi ?? 9.99;
+  const rateCampus = rates.priceCampus ?? 14.90;
+  const rateGroovelab = rates.priceGroovelab ?? 9.90;
+  const rateKombi = rates.priceKombi ?? 19.90;
   const rateTeacher = rates.priceTeacher ?? 0.49;
   const rateStudent = rates.priceStudent ?? 0.49;
 
@@ -191,9 +191,9 @@ export function resolveEffectiveSchoolRates(
   const locked = school?.locked_contract_pricing || {};
 
   return {
-    priceCampus: school?.custom_price_campus ?? locked.priceCampus ?? master.priceCampus ?? 7.99,
-    priceGroovelab: school?.custom_price_groovelab ?? locked.priceGroovelab ?? master.priceGroovelab ?? 4.99,
-    priceKombi: school?.custom_price_kombi ?? locked.priceKombi ?? master.priceKombi ?? 9.99,
+    priceCampus: school?.custom_price_campus ?? locked.priceCampus ?? master.priceCampus ?? 14.90,
+    priceGroovelab: school?.custom_price_groovelab ?? locked.priceGroovelab ?? master.priceGroovelab ?? 9.90,
+    priceKombi: school?.custom_price_kombi ?? locked.priceKombi ?? master.priceKombi ?? 19.90,
     priceTeacher: school?.custom_price_teacher ?? locked.priceTeacher ?? master.priceTeacher ?? 0.49,
     priceStudent: school?.custom_price_student ?? locked.priceStudent ?? master.priceStudent ?? 0.49,
     pricePassiveStudent: school?.custom_price_passive_student ?? locked.pricePassiveStudent ?? master.pricePassiveStudent ?? 0.09,

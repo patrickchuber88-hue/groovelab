@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, Coffee, Clock, Timer, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, VolumeX, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, CalendarX, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
-  Mic, Disc, Trash2, Download, Key, Delete, Headphones, ArrowRight, Sliders, Compass, Palette
+  Mic, Disc, Trash2, Download, Key, Delete, Headphones, ArrowRight, Sliders, Compass, Palette, Lightbulb
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -16,6 +16,8 @@ import { createPortal } from 'react-dom';
 import Confetti from 'react-confetti';
 import { QRCodeModal } from './QRCodeModal';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive, ALL_STICKERS, getUnifiedStickersMap, getUnifiedStickerStatus } from './MeisterwerkDocumentationModal';
+import { FeedbackHubModal } from './feedback/FeedbackHubModal';
+import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
 import { cleanHomeworkNotesText, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
@@ -1433,15 +1435,15 @@ function MobileBriefingView({
                                   gap: '3px',
                                   padding: '2px 6px',
                                   borderRadius: '6px',
-                                  background: isConsumed ? 'rgba(2, 132, 199, 0.12)' : (isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
-                                  border: isConsumed ? '1px solid #38bdf8' : (isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
-                                  color: isConsumed ? '#0284c7' : (isShieldActive ? '#0369a1' : '#b45309'),
+                                  background: isConsumed ? '#f1f5f9' : (isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
+                                  border: isConsumed ? '1px solid #cbd5e1' : (isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
+                                  color: isConsumed ? '#64748b' : (isShieldActive ? '#0369a1' : '#b45309'),
                                   fontSize: '0.62rem',
                                   fontWeight: 850
                                 }}
                                 title={isConsumed ? `Schutzschild ${shieldNum} wurde am ${dayLabel} als Glut-Schutz eingesetzt` : `Schutzschild ${shieldNum} bereit`}
                               >
-                                <Shield size={9} color={isConsumed || isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : (isConsumed ? '#38bdf8' : 'none')} />
+                                <Shield size={9} color={isConsumed ? '#64748b' : (isShieldActive ? '#0284c7' : '#d97706')} fill={isConsumed ? '#94a3b8' : (isShieldActive ? '#0284c7' : 'none')} />
                                 <span>{isConsumed ? `${shieldNum} (${dayLabel})` : `${shieldNum}`}</span>
                               </div>
                             );
@@ -2750,6 +2752,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
 
 export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
   const [studentUser, setStudentUser] = useState<any>(() => initialUser || null);
+  const currentPlatform: 'campus' | 'groovelab' = parentActiveTab === 'campus' ? 'campus' : (parentActiveTab === 'groovelab' ? 'groovelab' : ((typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus') === 'groovelab' ? 'groovelab' : 'campus'));
 
   // 3-Level Adaptive UI State ('junior' | 'teen' | 'pro')
   const [studentUiLevel, setStudentUiLevel] = useState<CampusUiLevel | null>(() => {
@@ -2759,6 +2762,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return null;
   });
   const [showLevelModal, setShowLevelModal] = useState<boolean>(false);
+
+  // Adult Student Resolver (18+ or explicit is_adult flag) for Adaptive Legal Governance
+  const isAdultStudent = useMemo(() => {
+    if (studentUser?.is_adult === true) return true;
+    const rawBirthdate = (studentUser as any)?.birthdate || (studentUser as any)?.birth_date;
+    if (rawBirthdate) {
+      const bd = new Date(rawBirthdate);
+      if (!isNaN(bd.getTime())) {
+        const ageDiffMs = Date.now() - bd.getTime();
+        const ageDate = new Date(ageDiffMs);
+        const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+        if (age >= 18) return true;
+      }
+    }
+    return false;
+  }, [studentUser]);
 
   // Collapsible Right Sidebar State for Student Briefing Dashboard (Default: Collapsed)
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState<boolean>(() => {
@@ -2951,6 +2970,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
   const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal' | 'overview'>('parent_controls');
   const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal' | null>(null);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [pinFormNew, setPinFormNew] = useState('');
   const [pinFormConfirm, setPinFormConfirm] = useState('');
   const [pinFormError, setPinFormError] = useState('');
@@ -3283,8 +3303,27 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     window.location.search = `?student=${targetStudentId}`;
   };
 
-  const handleOpenSettingsModule = (moduleId: 'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal') => {
+  const handleOpenSettingsModule = (moduleId: 'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal' | 'feedback' | any) => {
+    if (moduleId === 'feedback') {
+      setIsFeedbackModalOpen(true);
+      return;
+    }
+
     if (moduleId === 'notifications') {
+      setSettingsSubTab(moduleId);
+      setActiveStudentSettingsModal(moduleId);
+      return;
+    }
+
+    // Adult Self-Management: Full direct access without parental PIN gate
+    if (isAdultStudent) {
+      if (moduleId === 'security') {
+        setFirstPinActiveField('new');
+        setPinFormNew('');
+        setPinFormConfirm('');
+        setPinFormError('');
+        setPinFormSuccess('');
+      }
       setSettingsSubTab(moduleId);
       setActiveStudentSettingsModal(moduleId);
       return;
@@ -4688,6 +4727,50 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           .update({ status: 'scheduled', student_acknowledged: true })
           .eq('id', occ.id);
       }
+
+      // Send system message to Direct Messages & Alerts
+      try {
+        const studentUserId = studentId || studentUser?.id || occ.student_id;
+        const teacherUserId = occ.teacher_id || occ.teacher?.id;
+        const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
+
+        const [y, m, d] = String(occ.date).split('-').map(Number);
+        const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
+        const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+        const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        const timeLabel = (occ.start_time || '16:30').slice(0, 5);
+
+        const notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr.`;
+
+        if (studentUserId && teacherUserId) {
+          await supabase.from('campus_direct_messages').insert({
+            sender_id: studentUserId,
+            recipient_id: teacherUserId,
+            content: notificationMessage,
+            occurrence_id: targetOccId,
+            is_system: true,
+            message_type: 'cancellation_reset'
+          });
+        }
+
+        // Also add system alert
+        const { data: userData } = await supabase
+          .from('users')
+          .select('first_name, last_name')
+          .eq('id', studentUserId)
+          .single();
+        const userName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
+
+        await supabase.from('system_alerts').insert({
+          school_id: occ.schedule?.school_id || studentUser?.school_id || null,
+          teacher_id: teacherUserId,
+          type: 'Termin wiederhergestellt',
+          message: `✅ Reaktiviert: Schüler ${userName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`
+        });
+      } catch (notifErr) {
+        console.warn('Could not create system notification on undo cancel:', notifErr);
+      }
+
       fetchSchedule();
       fetchSchoolYearSchedule();
       alert('Der Termin wurde erfolgreich reaktiviert.');
@@ -4746,6 +4829,29 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         type: 'Termin abgesagt',
         message: `❌ Absage: ${studentName} hat den Termin am ${formattedDate} um ${occ.start_time?.substring(0,5)} Uhr abgesagt.`
       });
+
+      // Send a system message to Direct Messages
+      try {
+        const [y, m, d] = String(occ.date).split('-').map(Number);
+        const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
+        const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+        const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        const timeLabel = (occ.start_time || '16:30').slice(0, 5);
+        const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
+
+        if (studentId && occ.teacher_id) {
+          await supabase.from('campus_direct_messages').insert({
+            sender_id: studentId,
+            recipient_id: occ.teacher_id,
+            content: `Dein Unterrichtstermin am ${shortDay} ${shortDate} um ${timeLabel} Uhr fällt aus.`,
+            occurrence_id: targetOccId,
+            is_system: true,
+            message_type: 'reschedule_notification'
+          });
+        }
+      } catch (dmErr) {
+        console.warn('Could not insert cancellation system message into campus_direct_messages:', dmErr);
+      }
 
       fetchSchedule();
       fetchSchoolYearSchedule();
@@ -6345,6 +6451,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const [schoolFokusLevels, setSchoolFokusLevels] = useState<any>(null);
 
+  const getExactLogSeconds = useCallback((log: any): number => {
+    if (!log) return 0;
+    if (typeof log.duration_seconds === 'number' && log.duration_seconds > 0) {
+      return log.duration_seconds;
+    }
+    if (typeof log.duration_minutes === 'number' && log.duration_minutes > 0) {
+      return log.duration_minutes * 60;
+    }
+    return 0;
+  }, []);
+
+  const secondsToDisplayMinutes = useCallback((totalSeconds: number): number => {
+    if (!totalSeconds || totalSeconds <= 0) return 0;
+    return Math.floor(totalSeconds / 60);
+  }, []);
+
   const getFlameCategory = (streak: number): 'kleine' | 'mittlere' | 'helden' => {
     if (streak >= 9) return 'helden';
     if (streak >= 4) return 'mittlere';
@@ -6352,11 +6474,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   };
 
   const totalPracticeMinutes = useMemo(() => {
-    return (fokusLogs || []).reduce((acc, log) => {
-      const mins = log.duration_minutes || Math.round((log.duration_seconds || 0) / 60);
-      return acc + mins;
+    const totalSecs = (fokusLogs || []).reduce((acc, log) => {
+      return acc + getExactLogSeconds(log);
     }, 0);
-  }, [fokusLogs]);
+    return secondsToDisplayMinutes(totalSecs);
+  }, [fokusLogs, getExactLogSeconds, secondsToDisplayMinutes]);
 
   const effectiveLevel = useMemo(() => {
     const dbLevel = avatar?.evolution_level || 1;
@@ -6999,37 +7121,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   });
 
-  const [kudosState, setKudosState] = useState<Record<string, { applause: number; fire: number; rock: number; userVoted: string[] }>>(() => {
-    try {
-      const saved = localStorage.getItem('campus_class_kudos');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
-  const handleToggleKudo = (highlightKey: string, kudoType: 'applause' | 'fire' | 'rock') => {
-    setKudosState(prev => {
-      const current = prev[highlightKey] || { applause: 3, fire: 2, rock: 4, userVoted: [] };
-      const hasVoted = current.userVoted.includes(kudoType);
-      const newCount = hasVoted ? Math.max(0, current[kudoType] - 1) : current[kudoType] + 1;
-      const newVoted = hasVoted ? current.userVoted.filter(v => v !== kudoType) : [...current.userVoted, kudoType];
-      const updated = {
-        ...prev,
-        [highlightKey]: {
-          ...current,
-          [kudoType]: newCount,
-          userVoted: newVoted
-        }
-      };
-      try {
-        localStorage.setItem('campus_class_kudos', JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Could not save kudos to localStorage', e);
-      }
-      return updated;
-    });
-  };
 
   const formatMins = (mins: number) => {
     if (mins < 60) return `${Math.round(mins)} Min.`;
@@ -9233,9 +9324,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           return sk.user_id === student.id && skillDate >= startOfCurrentMonth && skillDate <= now;
         });
 
-        const monthlyMins = studentLogs.reduce((sum: number, log: any) => {
-          return sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0));
-        }, 0);
+        const monthlyMins = secondsToDisplayMinutes(studentLogs.reduce((sum: number, log: any) => {
+          return sum + getExactLogSeconds(log);
+        }, 0));
 
         // Monthly Streak (weeks with practice)
         const monthlyWeeks = new Set();
@@ -9303,20 +9394,20 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         return logDate >= startOfCurrentMonth && logDate <= now;
       });
 
-      let classMinsVal = 0;
-      let otherClassMinsVal = 0;
+      let classSecsVal = 0;
+      let otherClassSecsVal = 0;
 
       filteredFocusLogs.forEach((log: any) => {
-        const mins = log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0);
+        const secs = getExactLogSeconds(log);
         if (classmateIdsSet.has(log.user_id)) {
-          classMinsVal += mins;
+          classSecsVal += secs;
         } else {
-          otherClassMinsVal += mins;
+          otherClassSecsVal += secs;
         }
       });
 
-      setClassMins(classMinsVal);
-      setOtherClassMins(otherClassMinsVal);
+      setClassMins(secondsToDisplayMinutes(classSecsVal));
+      setOtherClassMins(secondsToDisplayMinutes(otherClassSecsVal));
 
       // 6. Calculate weekly focus minutes for classmates and current student (last 7 days)
       const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -9327,15 +9418,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         return logDate >= oneWeekAgo && logDate <= now;
       });
       
-      const classWeeklySum = weeklyLogs.filter(log => classmateIdsSet.has(log.user_id)).reduce((sum, log) => {
-        return sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0));
+      const classWeeklySecs = weeklyLogs.filter(log => classmateIdsSet.has(log.user_id)).reduce((sum, log) => {
+        return sum + getExactLogSeconds(log);
       }, 0);
-      const myWeeklySum = weeklyLogs.filter(log => log.user_id === studentId).reduce((sum, log) => {
-        return sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0));
+      const myWeeklySecs = weeklyLogs.filter(log => log.user_id === studentId).reduce((sum, log) => {
+        return sum + getExactLogSeconds(log);
       }, 0);
       
-      setClassWeeklyFocus(classWeeklySum);
-      setMyWeeklyFocus(myWeeklySum);
+      setClassWeeklyFocus(secondsToDisplayMinutes(classWeeklySecs));
+      setMyWeeklyFocus(secondsToDisplayMinutes(myWeeklySecs));
 
       setClassHighlights(highlights);
       highlightsLoadedRef.current = true;
@@ -13396,7 +13487,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   <ShieldCheck size={11} color="#16a34a" />
                                   <span>Lokal gesichert &amp; Cloud-Sync aktiv</span>
                                 </span>
-                                <span>Alle Einträge DSGVO-konform verschlüsselt</span>
+                                <span 
+                                  title="Verschlüsselungs- &amp; Sicherheitsarchitektur: TLS 1.3 Transport- und AES-256 Server-Verschlüsselung nach Art. 32 DSGVO. Privacy-by-Default (0 E-Mails, 0 Passwörter) &amp; Postgres Row-Level Security (RLS) Mandantentrennung."
+                                  style={{ cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <Lock size={10} color="#94a3b8" />
+                                  <span>TLS 1.3 &amp; AES-256 verschlüsselt (Art. 32 DSGVO)</span>
+                                </span>
                               </div>
                             </div>
                           );
@@ -13406,41 +13503,41 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       {/* 🌟 TIER 2: ERFOLGS-STREAM (PURE PRAXIS-ERFOLGE) */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         
-                        {/* 🏆 HEUTE-HERO-KARTE IN INDIGO-LILA (XP BELOHNUNGS-ZONE) */}
+                        {/* 🏆 HEUTE-HERO-KARTE IN SMARAGDGRÜN (GEMEISTERTE TAGES-FLAMME) */}
                         {todayHasMastered ? (
                           <div style={{
-                            background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-                            border: '1.5px solid #6366f1',
+                            background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                            border: '1.5px solid #34a853',
                             borderRadius: '20px',
                             padding: '14px 16px',
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
-                            boxShadow: '0 4px 14px rgba(99, 102, 241, 0.12)'
+                            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.12)'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <div style={{
                                 width: '38px',
                                 height: '38px',
                                 borderRadius: '12px',
-                                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                background: 'linear-gradient(135deg, #34a853 0%, #16a34a 100%)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                boxShadow: '0 2px 8px rgba(99, 102, 241, 0.35)'
+                                boxShadow: '0 2px 8px rgba(52, 168, 83, 0.35)'
                               }}>
                                 <Flame size={20} color="#ffffff" fill="#ffffff" />
                               </div>
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#4338ca' }}>
+                                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#166534' }}>
                                     Heute ({dayNamesFull[now.getDay()]})
                                   </span>
-                                  <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#6366f1', color: '#ffffff', padding: '1px 7px', borderRadius: '100px', textTransform: 'uppercase' }}>
+                                  <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#34a853', color: '#ffffff', padding: '1px 7px', borderRadius: '100px', textTransform: 'uppercase' }}>
                                     Gemeistert
                                   </span>
                                 </div>
-                                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', fontWeight: 700, color: '#4f46e5' }}>
+                                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', fontWeight: 700, color: '#15803d' }}>
                                   {(() => {
                                     const focusSecs = todayGroup?.focusSeconds || (todayHasMastered ? 180 : 0);
                                     const extraSecs = todayGroup?.extraSeconds || Math.max(0, todayTotalSecs - focusSecs);
@@ -13454,7 +13551,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 </p>
                               </div>
                             </div>
-                            <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#4338ca', background: '#ffffff', border: '1px solid #c4b5fd', padding: '4px 10px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(99, 102, 241, 0.1)' }}>
+                            <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#166534', background: '#ffffff', border: '1px solid #bbf7d0', padding: '4px 10px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(52, 168, 83, 0.1)' }}>
                               +{(() => {
                                 const extraSecs = todayGroup?.extraSeconds || Math.max(0, todayTotalSecs - 180);
                                 const extraXp = Math.floor(extraSecs / 60);
@@ -13564,6 +13661,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               return `${dayNamesFull[d.getDay()]}, ${day}. ${monthNamesShort[monthIndex]}`;
             };
 
+            const weekMetrics = getDeterministicWeekMetrics();
+            const { weekDays } = weekMetrics;
+
             let shieldDatesArr: string[] = [];
             try {
               shieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${studentId}`) || '[]');
@@ -13574,16 +13674,29 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             if (studentUser?.joker_used_at) {
               shieldDatesArr.push(toLocalYYYYMMDD(new Date(studentUser.joker_used_at)));
             }
+
+            const shieldedDaysMap = new Map<string, number>();
+            weekDays.forEach(d => {
+              if (d.isJoker) {
+                shieldedDaysMap.set(d.dateStr, d.shieldNumber || 1);
+                if (!shieldDatesArr.includes(d.dateStr)) {
+                  shieldDatesArr.push(d.dateStr);
+                }
+              }
+            });
+            shieldDatesArr.forEach((sd, idx) => {
+              if (!shieldedDaysMap.has(sd)) {
+                shieldedDaysMap.set(sd, idx + 1);
+              }
+            });
             const shieldDatesSet = new Set(shieldDatesArr);
 
             const rawGrouped = getGroupedLogs();
             const pastPracticedLogs = rawGrouped.filter(g => {
               const totalSecs = (g.focusSeconds || 0) + (g.extraSeconds || 0);
-              const isJoker = Boolean(shieldDatesSet.has((() => {
-                const parts = g.date.split('.');
-                if (parts.length < 3) return '';
-                return `20${parts[2]}-${parts[1]}-${parts[0]}`;
-              })()));
+              const parts = g.date.split('.');
+              const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
+              const isJoker = Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
               return g.date !== todayDateStr && (totalSecs > 0 || isJoker);
             });
 
@@ -13673,6 +13786,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       }));
                     };
 
+                    const shieldedCount = month.entries.filter(e => {
+                      const p = e.date.split('.');
+                      const iso = p.length === 3 ? `20${p[2]}-${p[1]}-${p[0]}` : '';
+                      return shieldedDaysMap.has(iso) || shieldDatesSet.has(iso);
+                    }).length;
+
                     return (
                       <div key={month.key} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {/* Month Header Accordion */}
@@ -13717,7 +13836,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               padding: '3px 10px',
                               borderRadius: '100px'
                             }}>
-                              {month.practiceDays} {month.practiceDays === 1 ? 'Übetag' : 'Übetage'} • {month.totalMins}m
+                              {month.practiceDays} {month.practiceDays === 1 ? 'Übetag' : 'Übetage'}{shieldedCount > 0 ? ` (${shieldedCount} geschützt)` : ''} • {month.totalMins}m
                             </span>
                           </div>
                         </div>
@@ -13731,11 +13850,86 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               </div>
                             ) : (
                               month.entries.map((entry, eIdx) => {
+                                const parts = entry.date.split('.');
+                                const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
+                                const isShielded = Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
+                                const shieldNumber = shieldedDaysMap.get(isoDateStr) || (shieldDatesArr.indexOf(isoDateStr) !== -1 ? shieldDatesArr.indexOf(isoDateStr) + 1 : 1);
+
                                 const fSecs = entry.focusSeconds || 0;
                                 const eSecs = entry.extraSeconds || 0;
                                 const totalSecs = fSecs + eSecs;
                                 const totalMins = Math.floor(totalSecs / 60);
                                 const xp = totalMins;
+
+                                if (isShielded) {
+                                  return (
+                                    <div
+                                      key={eIdx}
+                                      style={{
+                                        background: '#ffffff',
+                                        border: '1px solid #bae6fd',
+                                        borderRadius: '16px',
+                                        padding: '12px 16px',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        boxShadow: '0 2px 6px rgba(2, 132, 199, 0.04)',
+                                        borderLeft: '4px solid #0284c7'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{
+                                          width: '34px',
+                                          height: '34px',
+                                          borderRadius: '10px',
+                                          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                                          border: '1px solid #bae6fd',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          boxShadow: '0 2px 6px rgba(2, 132, 199, 0.12)'
+                                        }}>
+                                          <Shield size={17} color="#0284c7" fill="#0284c7" />
+                                        </div>
+                                        <div>
+                                          <span style={{ fontSize: '0.8rem', fontWeight: 850, color: '#1e293b' }}>
+                                            {formatFriendlyDate(entry.date)}
+                                          </span>
+                                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
+                                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0369a1', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                              <Shield size={10} color="#0284c7" fill="#0284c7" />
+                                              Schild {shieldNumber} eingesetzt (Glut-Schutz)
+                                            </span>
+                                            {totalSecs > 0 && (
+                                              <>
+                                                <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>•</span>
+                                                <span style={{ fontSize: '0.7rem', fontWeight: 650, color: '#64748b' }}>
+                                                  ⏱️ {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
+                                                </span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <span style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        color: '#0369a1',
+                                        background: '#e0f2fe',
+                                        padding: '3px 10px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #bae6fd',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        <Shield size={10} color="#0284c7" fill="#0284c7" />
+                                        Schild {shieldNumber} geschützt
+                                      </span>
+                                    </div>
+                                  );
+                                }
 
                                 return (
                                   <div
@@ -14575,9 +14769,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               {/* Top Section: Header & Contribution */}
               {(() => {
                 const brandColor = studentUser?.schools?.brand_color || '#34a853';
-                const activeSessionMins = sessionActive ? Math.round(secondsElapsed / 60) : 0;
-                const liveClassMins = classMins + activeSessionMins;
-                const liveClassWeeklyFocus = classWeeklyFocus + activeSessionMins;
+                const activeSessionSecs = sessionActive ? secondsElapsed : 0;
+                const liveClassMins = classMins + secondsToDisplayMinutes(activeSessionSecs);
+                const liveClassWeeklyFocus = classWeeklyFocus + secondsToDisplayMinutes(activeSessionSecs);
 
                 const totalSchoolMins = liveClassMins + otherClassMins;
                 const contributionPercent = totalSchoolMins > 0 
@@ -14597,19 +14791,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                 const classmateAndSelfIds = Array.from(new Set([...(classmateIds || []), studentId]));
 
-                const currentMonthMins = classFocusLogs.filter(log => {
+                const currentMonthSecs = classFocusLogs.filter(log => {
                   if (!log.created_at) return false;
                   const d = new Date(log.created_at);
                   const isClassmateOrSelf = classmateAndSelfIds.includes(log.user_id);
                   return isClassmateOrSelf && d >= startOfCurrentMonth && d <= now;
-                }).reduce((sum, log) => sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0)), 0) + activeSessionMins;
+                }).reduce((sum, log) => sum + getExactLogSeconds(log), 0) + activeSessionSecs;
+                const currentMonthMins = secondsToDisplayMinutes(currentMonthSecs);
 
-                const previousMonthMins = classFocusLogs.filter(log => {
+                const previousMonthSecs = classFocusLogs.filter(log => {
                   if (!log.created_at) return false;
                   const d = new Date(log.created_at);
                   const isClassmateOrSelf = classmateAndSelfIds.includes(log.user_id);
                   return isClassmateOrSelf && d >= startOfPreviousMonth && d <= limitOfPreviousMonth;
-                }).reduce((sum, log) => sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0)), 0);
+                }).reduce((sum, log) => sum + getExactLogSeconds(log), 0);
+                const previousMonthMins = secondsToDisplayMinutes(previousMonthSecs);
 
                 const momPercent = previousMonthMins > 0
                   ? Math.round(((currentMonthMins - previousMonthMins) / previousMonthMins) * 100)
@@ -14635,11 +14831,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   ? Math.round((activeThisWeekCount / effectiveClassCount) * 100)
                   : 0;
 
-                const classAnnualMins = classFocusLogs.filter(log => {
+                const classAnnualSecs = classFocusLogs.filter(log => {
                   if (!log.created_at) return false;
                   const isClassmateOrSelf = classmateAndSelfIds.includes(log.user_id);
                   return isClassmateOrSelf;
-                }).reduce((sum, log) => sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0)), 0) + activeSessionMins;
+                }).reduce((sum, log) => sum + getExactLogSeconds(log), 0) + activeSessionSecs;
+                const classAnnualMins = secondsToDisplayMinutes(classAnnualSecs);
 
                 const levelThresholds = [
                   { level: 1, mins: 0, title: 'Groove-Starter' },
@@ -15029,7 +15226,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   })()}
                 </div>
 
-                {/* Column 2: Helden-Momente mit Safe Kudos-Reaktionen */}
+                {/* Column 2: Helden-Momente (Klassen-Meilensteine) */}
                 <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', minHeight: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                     <span>✨</span> Helden-Momente
@@ -15051,9 +15248,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       </div>
                     ) : (
                       classHighlights.map((hl: any, idx: number) => {
-                        const highlightKey = hl.id || `hl_${idx}_${hl.studentName}`;
-                        const kudos = kudosState[highlightKey] || { applause: 3, fire: 2, rock: 4, userVoted: [] };
-
                         return (
                           <div 
                             key={idx} 
@@ -15063,72 +15257,35 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               borderRadius: '18px', 
                               border: '1px solid #e2e8f0', 
                               display: 'flex', 
-                              flexDirection: 'column',
-                              gap: '10px'
+                              alignItems: 'center',
+                              gap: '14px',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.01)',
+                              transition: 'all 0.2s ease'
                             }}
                             className="hover-scale"
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <span style={{ fontSize: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                {hl.emoji}
-                              </span>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
-                                    {(() => {
-                                      const name = hl.studentName || '';
-                                      const parts = name.trim().split(/\s+/);
-                                      if (parts.length <= 1) return name;
-                                      const first = parts[0];
-                                      const last = parts[parts.length - 1];
-                                      return `${first} ${last.charAt(0)}.`;
-                                    })()}
-                                  </span>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: studentUser?.schools?.brand_color || '#34a853', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                    {hl.title}
-                                  </span>
-                                </div>
-                                <p style={{ fontSize: '0.78rem', color: '#475569', margin: '2px 0 0 0', lineHeight: 1.3, fontWeight: 550 }}>
-                                  {hl.text}
-                                </p>
+                            <span style={{ fontSize: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              {hl.emoji}
+                            </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '6px' }}>
+                                <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
+                                  {(() => {
+                                    const name = hl.studentName || '';
+                                    const parts = name.trim().split(/\s+/);
+                                    if (parts.length <= 1) return name;
+                                    const first = parts[0];
+                                    const last = parts[parts.length - 1];
+                                    return `${first} ${last.charAt(0)}.`;
+                                  })()}
+                                </span>
+                                <span style={{ fontSize: '0.65rem', fontWeight: 900, color: studentUser?.schools?.brand_color || '#34a853', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                  {hl.title}
+                                </span>
                               </div>
-                            </div>
-
-                            {/* Kudos Reactions Bar */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
-                              {[
-                                { key: 'applause' as const, emoji: '👏', label: 'Applaus', count: kudos.applause },
-                                { key: 'fire' as const, emoji: '🔥', label: 'Stark', count: kudos.fire },
-                                { key: 'rock' as const, emoji: '🎸', label: 'Rockt', count: kudos.rock }
-                              ].map((reaction) => {
-                                const isVoted = kudos.userVoted.includes(reaction.key);
-                                return (
-                                  <button
-                                    key={reaction.key}
-                                    type="button"
-                                    onClick={() => handleToggleKudo(highlightKey, reaction.key)}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      padding: '4px 10px',
-                                      borderRadius: '100px',
-                                      border: isVoted ? '1px solid #34a853' : '1px solid #e2e8f0',
-                                      background: isVoted ? '#e6f4ea' : '#ffffff',
-                                      color: isVoted ? '#166534' : '#475569',
-                                      fontSize: '0.72rem',
-                                      fontWeight: isVoted ? 800 : 600,
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    className="hover-scale"
-                                    title={`${reaction.label} senden`}
-                                  >
-                                    <span>{reaction.emoji}</span>
-                                    <span>{reaction.count}</span>
-                                  </button>
-                                );
-                              })}
+                              <p style={{ fontSize: '0.78rem', color: '#475569', margin: '2px 0 0 0', lineHeight: 1.3, fontWeight: 550 }}>
+                                {hl.text}
+                              </p>
                             </div>
                           </div>
                         );
@@ -15185,14 +15342,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               return isClassmateOrSelf && logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
                             });
                             let totalSecs = logsForMonth.reduce((sum, log) => {
-                              return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
+                              return sum + getExactLogSeconds(log);
                             }, 0);
 
                             if (sessionActive && secondsElapsed > 0 && item.month === now.getMonth() && item.year === now.getFullYear()) {
                               totalSecs += secondsElapsed;
                             }
 
-                            const minutes = Math.round(totalSecs / 60);
+                            const minutes = secondsToDisplayMinutes(totalSecs);
 
                             // Heatmap calculations with WCAG AA compliant contrast
                             let bg = '#f8fafc';
@@ -15500,6 +15657,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             
             {/* MAIN COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              {/* Community Update & Helden-Moment Hero */}
+              <UpdateAnnouncementHero userId={studentId} activePlatform={currentPlatform} />
               
               {/* ========================================================================= */}
               {/* LEVEL 1: JUNIOR (6-10 JAHRE) - RADIKAL AUFGERÄUMT IM ANTON-STIL          */}
@@ -16224,8 +16383,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     }
 
                     const streak = avatar?.streak_flame || 0;
-                    const schoolConfig = schoolFokusLevels?.level1 || { kleine: 3, mittlere: 5, helden: 10 };
-                    const requiredMins = streak >= 9 ? (schoolConfig.helden || 10) : streak >= 4 ? (schoolConfig.mittlere || 5) : (schoolConfig.kleine || 3);
+                    const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
+                    const schoolConfig = (schoolFokusLevels && schoolFokusLevels[levelKey]) || DEFAULT_FOKUS_LEVELS[levelKey];
+                    const kleineMins = schoolConfig.kleine || DEFAULT_FOKUS_LEVELS[levelKey].kleine;
+                    const mittlereMins = schoolConfig.mittlere || DEFAULT_FOKUS_LEVELS[levelKey].mittlere;
+                    const heldenMins = schoolConfig.helden || DEFAULT_FOKUS_LEVELS[levelKey].helden;
+                    const requiredMins = streak >= 9 ? heldenMins : streak >= 4 ? mittlereMins : kleineMins;
 
                     return (
                       <div style={{ 
@@ -19030,91 +19193,240 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               )}
 
               {/* ========================================================================= */}
-              {/* LEVEL 2: TEEN (11-15 JAHRE) - "STUDIO SESSION HUB", GAMIFICATION & FLOW   */}
+              {/* LEVEL 2: TEEN (11-15 JAHRE) - HARMONISCH, JUGENDFREUNDLICH & DEUTSCH       */}
               {/* ========================================================================= */}
               {studentUiLevel === 'teen' && (
                 <>
-                  {/* TEEN: 3 SCHLANKE STUDIO-KPIS */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', width: '100%' }}>
-                    {/* KPI 1: XP Score */}
+                  {/* TEEN: 4 HARMONISCHE KPIS */}
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: '16px', width: '100%' }}>
+                    {/* KPI 1: XP-Punkte */}
                     {xpActive && (
                       <div style={{ 
+                        flex: '1 1 0px',
+                        minWidth: 0,
+                        position: 'relative', overflow: 'hidden',
                         background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                         color: 'white',
-                        borderRadius: '18px',
-                        boxShadow: '0 8px 20px -4px rgba(99, 102, 241, 0.3)',
+                        borderRadius: '20px',
+                        boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.35)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-                        padding: '16px 20px',
-                        minHeight: '82px',
+                        minHeight: '70px',
+                        padding: '16px',
+                        boxSizing: 'border-box',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         border: '1px solid rgba(255, 255, 255, 0.15)'
                       }} className="hover-scale">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.95 }}>
-                            XP Score ⚡
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                          <span style={{ 
+                            fontSize: '0.68rem', 
+                            fontWeight: 900, 
+                            opacity: 0.95, 
+                            textTransform: 'uppercase', 
+                            letterSpacing: '0.08em',
+                            color: 'white'
+                          }}>
+                            XP-Punkte ⚡
                           </span>
-                          <Star size={15} color="white" fill="white" />
+                          <div style={{ 
+                            background: 'rgba(255, 255, 255, 0.2)', 
+                            padding: '6px', 
+                            borderRadius: '10px' 
+                          }}>
+                            <Star size={14} color="white" fill="white" />
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '4px' }}>
-                          <span style={{ fontSize: '1.9rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                          <span style={{ 
+                            fontSize: '1.6rem', 
+                            fontWeight: 950, 
+                            fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                            letterSpacing: '-0.02em',
+                            color: 'white'
+                          }}>
                             {currentXp || 0}
                           </span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800, opacity: 0.9 }}>XP</span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+                            XP
+                          </span>
                         </div>
                       </div>
                     )}
 
-                    {/* KPI 2: Übezeit */}
+                    {/* KPI 2: Songs & Stücke */}
                     <div style={{ 
-                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                      color: '#0f172a',
-                      borderRadius: '18px',
-                      boxShadow: '0 8px 20px -4px rgba(234, 179, 8, 0.35)',
+                      flex: '1 1 0px',
+                      minWidth: 0,
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                      color: 'white',
+                      borderRadius: '20px',
+                      boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.35)',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-                      padding: '16px 20px',
-                      minHeight: '82px',
-                      border: '1px solid rgba(255, 255, 255, 0.3)'
+                      minHeight: '70px',
+                      padding: '16px',
+                      boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)'
                     }} className="hover-scale">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#78350f' }}>
-                          Übezeit ⏱️
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <span style={{ 
+                          fontSize: '0.68rem', 
+                          fontWeight: 900, 
+                          opacity: 0.95, 
+                          textTransform: 'uppercase', 
+                          letterSpacing: '0.08em',
+                          color: 'white'
+                        }}>
+                          Songs &amp; Stücke
                         </span>
-                        <div style={{ background: 'rgba(0, 0, 0, 0.12)', padding: '5px', borderRadius: '8px' }}>
-                          <Clock size={14} color="#451a03" />
+                        <div style={{ 
+                          background: 'rgba(255, 255, 255, 0.2)', 
+                          padding: '6px', 
+                          borderRadius: '10px' 
+                        }}>
+                          <Music size={14} color="white" />
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '4px' }}>
-                        <span style={{ fontSize: '1.9rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#0f172a' }}>
-                          {totalPracticeMinutes || 0}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                        <span style={{ 
+                          fontSize: '1.6rem', 
+                          fontWeight: 950, 
+                          fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                          letterSpacing: '-0.02em',
+                          color: 'white'
+                        }}>
+                          {songStats.masteredCount}/{songStats.assignedCount}
                         </span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#78350f' }}>Minuten</span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+                          Songs
+                        </span>
                       </div>
                     </div>
 
-                    {/* KPI 3: Streak / Tagesserie (Ruby Flame Red) */}
+                    {/* KPI 3: Übeminuten */}
+                    <div style={{ 
+                      flex: '1 1 0px',
+                      minWidth: 0,
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                      color: '#0f172a',
+                      borderRadius: '20px',
+                      boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                      minHeight: '70px',
+                      padding: '16px',
+                      boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.3)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <span style={{ 
+                          fontSize: '0.68rem', 
+                          fontWeight: 900, 
+                          textTransform: 'uppercase', 
+                          letterSpacing: '0.08em',
+                          color: '#78350f'
+                        }}>
+                          Übeminuten
+                        </span>
+                        <div style={{ 
+                          background: 'rgba(0, 0, 0, 0.12)', 
+                          padding: '6px', 
+                          borderRadius: '10px' 
+                        }}>
+                          <Clock size={14} color="#451a03" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                        {(() => {
+                          const dbSecs = (fokusLogs || []).reduce((sum, log) => sum + getExactLogSeconds(log), 0);
+                          const liveSecs = sessionActive ? secondsElapsed : 0;
+                          const totalSecs = dbSecs + liveSecs;
+                          if (totalSecs > 0 && totalSecs < 60) {
+                            return (
+                              <>
+                                <span style={{ 
+                                  fontSize: '1.6rem', 
+                                  fontWeight: 950, 
+                                  fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                                  letterSpacing: '-0.02em',
+                                  color: '#0f172a'
+                                }}>
+                                  {Math.round(totalSecs)}
+                                </span>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#78350f' }}>
+                                  Sek.
+                                </span>
+                              </>
+                            );
+                          }
+                          return (
+                            <>
+                              <span style={{ 
+                                fontSize: '1.6rem', 
+                                fontWeight: 950, 
+                                fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                                letterSpacing: '-0.02em',
+                                color: '#0f172a'
+                              }}>
+                                {secondsToDisplayMinutes(totalSecs)}
+                              </span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#78350f' }}>
+                                Min.
+                              </span>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* KPI 4: Tagesserie (Ruby Flame) */}
                     {flamesActive && (
                       <div style={{ 
+                        flex: '1 1 0px',
+                        minWidth: 0,
+                        position: 'relative', overflow: 'hidden',
                         background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
                         color: 'white',
-                        borderRadius: '18px',
-                        boxShadow: '0 8px 20px -4px rgba(239, 68, 68, 0.35)',
+                        borderRadius: '20px',
+                        boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.35)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-                        padding: '16px 20px',
-                        minHeight: '82px',
+                        minHeight: '70px',
+                        padding: '16px',
+                        boxSizing: 'border-box',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         border: '1px solid rgba(255, 255, 255, 0.2)'
                       }} className="hover-scale">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.95 }}>
-                            Streak 🔥
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                          <span style={{ 
+                            fontSize: '0.68rem', 
+                            fontWeight: 900, 
+                            opacity: 0.95, 
+                            textTransform: 'uppercase', 
+                            letterSpacing: '0.08em',
+                            color: 'white'
+                          }}>
+                            Tagesserie
                           </span>
-                          <div style={{ background: 'rgba(255, 255, 255, 0.25)', padding: '5px', borderRadius: '8px' }}>
+                          <div style={{ 
+                            background: 'rgba(255, 255, 255, 0.25)', 
+                            padding: '6px', 
+                            borderRadius: '10px' 
+                          }}>
                             <Flame size={14} color="white" fill="white" />
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '4px' }}>
-                          <span style={{ fontSize: '1.9rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+                          <span style={{ 
+                            fontSize: '1.6rem', 
+                            fontWeight: 950, 
+                            fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                            letterSpacing: '-0.02em',
+                            color: 'white'
+                          }}>
                             {avatar?.streak_flame || 0}
                           </span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800, opacity: 0.95 }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
                             {(avatar?.streak_flame || 0) === 1 ? 'Tag' : 'Tage'}
                           </span>
                         </div>
@@ -19122,7 +19434,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     )}
                   </div>
 
-                  {/* TEEN: STUDIO HUB HERO-DECK */}
+                  {/* TEEN: HERO-DECK */}
                   <div style={{
                     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.65) 100%)',
                     backdropFilter: 'blur(24px) saturate(1.8)',
@@ -19183,7 +19495,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           letterSpacing: '0.05em',
                           border: '1px solid #c7d2fe'
                         }}>
-                          ⚡ TEEN ARTIST • LEVEL 2
+                          ⚡ TEEN LEVEL • 11–15 JAHRE
                         </div>
                       </div>
 
@@ -19199,16 +19511,27 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         Hi {studentUser?.first_name || 'Musiker'}! 🎧
                       </h3>
                       
-                      <p style={{ 
-                        margin: '8px 0 0 0', 
-                        fontSize: '0.9rem', 
-                        color: '#475569', 
-                        fontWeight: 600, 
-                        lineHeight: 1.45, 
-                        maxWidth: '95%' 
-                      }}>
-                        Tracke deine Songs, halte deinen Flow und starte deine tägliche Session am {studentInstrumentName}!
-                      </p>
+                      {(() => {
+                        const instName = studentInstrumentName || 'an deinem Instrument';
+                        const instPrep = ['Gitarre', 'Blockflöte', 'Querflöte', 'Violine', 'Geige', 'Bratsche', 'Posaune', 'Trompete', 'Harfe', 'Ukulele'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
+                          ? `an der ${instName}`
+                          : ['Klavier', 'Schlagzeug', 'Cello', 'Saxophon', 'Akkordeon', 'Keyboard', 'Horn', 'Fagott'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
+                          ? `am ${instName}`
+                          : `an deinem Instrument`;
+
+                        return (
+                          <p style={{ 
+                            margin: '8px 0 0 0', 
+                            fontSize: '0.9rem', 
+                            color: '#475569', 
+                            fontWeight: 600, 
+                            lineHeight: 1.45, 
+                            maxWidth: '95%' 
+                          }}>
+                            Feile an deinen Songs, halte deine Serie und starte deine heutige Übezeit {instPrep}!
+                          </p>
+                        );
+                      })()}
 
                       {(() => {
                         const nextOcc = (scheduleOccurrences || [])[0] || (schoolYearOccurrences || [])[0];
@@ -19362,7 +19685,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     </div>
                   </div>
 
-                  {/* TEEN: 2-SPALTEN SESSION WORKFLOW */}
+                  {/* TEEN: 3-SPALTEN SESSION WORKFLOW */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', alignItems: 'stretch' }}>
                     
                     {/* Spalte 1: Active Tracks & Lehrwerke 🎧 (Level 2: Teen) */}
@@ -19649,7 +19972,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       return (
                         <div style={{ 
                           background: '#ffffff', 
-                          borderRadius: '22px', 
+                          borderRadius: '24px', 
                           padding: '24px', 
                           boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
                           border: '1px solid rgba(0, 0, 0, 0.04)',
@@ -19830,25 +20153,33 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             className="hover-scale"
                           >
                             <BookOpen size={14} color="#34a853" />
-                            <span>Hausaufgabenheft öffnen →</span>
+                            <span>Alle Hausaufgaben ansehen →</span>
                           </button>
                         </div>
                       );
                     })()}
 
-                    {/* Spalte 2: Daily Focus & Streak Progression ⚡ */}
+                    {/* Spalte 2: Tägliche Übezeit ⚡ */}
                     {flamesActive && (() => {
                       const streak = avatar?.streak_flame || 0;
-                      const schoolConfig = schoolFokusLevels?.level2 || { kleine: 5, mittlere: 10, helden: 15 };
-                      const kleineMins = schoolConfig.kleine || 5;
-                      const mittlereMins = schoolConfig.mittlere || 10;
-                      const heldenMins = schoolConfig.helden || 15;
+                      const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
+                      const schoolConfig = (schoolFokusLevels && schoolFokusLevels[levelKey]) || DEFAULT_FOKUS_LEVELS[levelKey];
+                      const kleineMins = schoolConfig.kleine || DEFAULT_FOKUS_LEVELS[levelKey].kleine;
+                      const mittlereMins = schoolConfig.mittlere || DEFAULT_FOKUS_LEVELS[levelKey].mittlere;
+                      const heldenMins = schoolConfig.helden || DEFAULT_FOKUS_LEVELS[levelKey].helden;
                       const requiredMins = streak >= 9 ? heldenMins : streak >= 4 ? mittlereMins : kleineMins;
+
+                      const instName = studentInstrumentName || 'an deinem Instrument';
+                      const instPrep = ['Gitarre', 'Blockflöte', 'Querflöte', 'Violine', 'Geige', 'Bratsche', 'Posaune', 'Trompete', 'Harfe', 'Ukulele'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
+                        ? `an der ${instName}`
+                        : ['Klavier', 'Schlagzeug', 'Cello', 'Saxophon', 'Akkordeon', 'Keyboard', 'Horn', 'Fagott'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
+                        ? `am ${instName}`
+                        : `an deinem Instrument`;
 
                       return (
                         <div style={{ 
                           background: '#ffffff', 
-                          borderRadius: '22px', 
+                          borderRadius: '24px', 
                           padding: '24px', 
                           boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
                           border: '1px solid rgba(0, 0, 0, 0.04)',
@@ -19857,82 +20188,263 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           justifyContent: 'space-between',
                           gap: '16px'
                         }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{ 
-                                  background: 'rgba(251, 188, 5, 0.12)', 
-                                  color: '#d97706', 
-                                  width: '34px', 
-                                  height: '34px', 
-                                  borderRadius: '10px', 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center' 
-                                }}>
-                                  <Zap size={17} fill="currentColor" />
-                                </div>
-                                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                  Daily Focus Session ⚡
-                                </h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Zap size={16} fill="currentColor" />
                               </div>
-                              <span style={{ 
-                                background: 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
-                                color: '#ea580c', 
-                                fontSize: '0.78rem', 
-                                fontWeight: 950, 
-                                padding: '3px 10px', 
-                                borderRadius: '100px' 
-                              }}>
-                                {streak} {streak === 1 ? 'Tag' : 'Tage'} Serie 🔥
+                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                Dein tägliches Ritual
                               </span>
                             </div>
-
-                            <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45, fontWeight: 550 }}>
-                              Erreiche dein tägliches Mindest-Ziel von {requiredMins} Minuten am {studentInstrumentName}, um deinen Streak zu sichern und neue Skills freizuschalten.
-                            </p>
-
-                            {/* Stepper Übersicht */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 800, color: streak >= 1 ? '#ea580c' : '#94a3b8', background: '#f8fafc', padding: '6px 10px', borderRadius: '8px' }}>
-                                <span>Level 1: Spark (1-3 Tage)</span>
-                                <span>{kleineMins} Min.</span>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 800, color: streak >= 4 ? '#ea580c' : '#94a3b8', background: '#f8fafc', padding: '6px 10px', borderRadius: '8px' }}>
-                                <span>Level 2: Blaze (4-8 Tage)</span>
-                                <span>{mittlereMins} Min.</span>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 800, color: streak >= 9 ? '#ea580c' : '#94a3b8', background: '#f8fafc', padding: '6px 10px', borderRadius: '8px' }}>
-                                <span>Level 3: Inferno (9+ Tage)</span>
-                                <span>{heldenMins} Min.</span>
-                              </div>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                Tägliche Übezeit ⚡
+                              </h4>
+                              <p style={{ margin: '6px 0 0 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.45 }}>
+                                Schön, dass du da bist! Jede Minute, die du heute übst, stärkt deine Fähigkeiten {instPrep} und bringt dich deinen Zielen näher. 🎸✨
+                              </p>
                             </div>
                           </div>
 
-                          <button 
-                            onClick={() => setActiveTab('practice_board')}
-                            style={{ 
-                              background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
-                              color: 'white', 
-                              border: 'none', 
-                              borderRadius: '14px', 
-                              padding: '14px 20px', 
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ background: 'rgba(251, 188, 5, 0.08)', borderRadius: '14px', padding: '10px 14px', border: '1px dashed rgba(251, 188, 5, 0.35)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
+                              <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#854d0e' }}>
+                                Ziel für heute: Mindestens {requiredMins} Min. üben
+                              </span>
+                            </div>
+
+                            <button 
+                              onClick={() => setActiveTab('practice_board')}
+                              style={{ 
+                                background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
+                                color: 'white', 
+                                border: 'none', 
+                                borderRadius: '14px', 
+                                padding: '14px 20px', 
+                                minHeight: '44px',
+                                boxSizing: 'border-box',
+                                fontWeight: 950, 
+                                fontSize: '0.88rem', 
+                                cursor: 'pointer', 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                boxShadow: '0 8px 20px rgba(79, 70, 229, 0.28)', 
+                                transition: 'all 0.2s', 
+                                width: '100%' 
+                              }}
+                              className="hover-scale"
+                            >
+                              <Play size={16} fill="white" />
+                              <span>▶️ {requiredMins} Min. Übe-Timer starten</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Spalte 3: Flammen-Pfad & Schutzschilde 🔥 */}
+                    {flamesActive && (() => {
+                      const streak = avatar?.streak_flame || 0;
+                      const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
+                      const schoolConfig = (schoolFokusLevels && schoolFokusLevels[levelKey]) || DEFAULT_FOKUS_LEVELS[levelKey];
+                      const kleineMins = schoolConfig.kleine || DEFAULT_FOKUS_LEVELS[levelKey].kleine;
+                      const mittlereMins = schoolConfig.mittlere || DEFAULT_FOKUS_LEVELS[levelKey].mittlere;
+                      const heldenMins = schoolConfig.helden || DEFAULT_FOKUS_LEVELS[levelKey].helden;
+
+                      const isTier1Unlocked = streak >= 1;
+                      const isTier2Unlocked = streak >= 4;
+                      const isTier3Unlocked = streak >= 9;
+
+                      const weekMetrics = getDeterministicWeekMetrics();
+                      const currentWeek = getISOWeek(getSimulatedNow());
+                      const availableShields = weekMetrics.availableShields;
+                      const weekShieldedCount = weekMetrics.weekShieldedCount;
+
+                      return (
+                        <div style={{ 
+                          background: '#ffffff', 
+                          borderRadius: '24px', 
+                          padding: '24px', 
+                          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
+                          border: '1px solid rgba(0, 0, 0, 0.04)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 950, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                🔥 Flammen-Pfad
+                              </span>
+                              <button 
+                                onClick={() => setShowRulesModal(true)}
+                                style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}
+                                title="Spielregeln anzeigen"
+                              >
+                                <HelpCircle size={14} />
+                              </button>
+                            </div>
+                            <span style={{ 
+                              background: streak === 0 ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
+                              color: streak === 0 ? '#991b1b' : '#ea580c', 
+                              fontSize: '0.75rem', 
                               fontWeight: 950, 
-                              fontSize: '0.88rem', 
-                              cursor: 'pointer', 
-                              display: 'flex', 
-                              justifyContent: 'center', 
-                              alignItems: 'center', 
-                              gap: '8px', 
-                              boxShadow: '0 8px 20px rgba(79, 70, 229, 0.25)',
-                              transition: 'all 0.2s',
-                              width: '100%'
-                            }}
-                            className="hover-scale"
-                          >
-                            <Play size={16} fill="white" />
-                            <span>⚡ {requiredMins} Min. Session starten</span>
-                          </button>
+                              padding: '4px 10px', 
+                              borderRadius: '100px',
+                              border: streak === 0 ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(249, 115, 22, 0.2)'
+                            }}>
+                              {streak} {streak === 1 ? 'Tag' : 'Tage'} 🔥
+                            </span>
+                          </div>
+
+                          {/* FERIEN-FREEZE ODER 3 SCHUTZSCHILDE */}
+                          {isTodayHoliday ? (
+                            <div style={{
+                              background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                              border: '1.5px solid #a7f3d0',
+                              borderRadius: '14px',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <Palmtree size={15} color="#059669" />
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#065f46' }}>
+                                    Ferienpause aktiv
+                                  </span>
+                                </div>
+                                <span style={{
+                                  fontSize: '0.65rem',
+                                  fontWeight: 900,
+                                  background: '#059669',
+                                  color: '#ffffff',
+                                  padding: '2px 8px',
+                                  borderRadius: '100px'
+                                }}>
+                                  ✨ 2× XP-Booster
+                                </span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.70rem', color: '#047857', lineHeight: 1.35 }}>
+                                Streak ist sicher eingefroren (kein Übezwang). Freiwilliges Üben bringt heute <strong>2× XP</strong>!
+                              </p>
+                            </div>
+                          ) : (
+                            <div style={{
+                              background: '#f8fafc',
+                              borderRadius: '14px',
+                              padding: '10px 12px',
+                              border: '1px solid #e2e8f0',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.70rem', fontWeight: 850, color: '#475569', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <Shield size={12} color="#0284c7" />
+                                  3 Schutzschilde (KW {currentWeek}):
+                                </span>
+                                <span style={{ fontSize: '0.70rem', fontWeight: 900, color: availableShields > 0 ? '#0284c7' : '#b91c1c' }}>
+                                  {availableShields}/3 bereit
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                {[1, 2, 3].map((shieldNum) => {
+                                  const isConsumed = shieldNum <= weekShieldedCount;
+                                  const isShieldActive = shieldNum > weekShieldedCount;
+                                  const shieldedDay = weekMetrics.weekDays.find(d => d.shieldNumber === shieldNum);
+                                  const dayLabel = shieldedDay ? shieldedDay.dayName : '';
+
+                                  return (
+                                    <div key={`teen-shield-${shieldNum}`} style={{
+                                      flex: 1,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '4px',
+                                      padding: '4px 6px',
+                                      borderRadius: '6px',
+                                      background: isConsumed ? '#f1f5f9' : (isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
+                                      border: isConsumed ? '1px solid #cbd5e1' : (isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
+                                      color: isConsumed ? '#64748b' : (isShieldActive ? '#0369a1' : '#b45309'),
+                                      fontSize: '0.65rem',
+                                      fontWeight: 800
+                                    }}>
+                                      <Shield size={10} color={isConsumed ? '#64748b' : (isShieldActive ? '#0284c7' : '#d97706')} fill={isConsumed ? '#94a3b8' : (isShieldActive ? '#0284c7' : 'none')} />
+                                      <span>{isConsumed ? `Schild ${shieldNum} (${dayLabel})` : `Schild ${shieldNum}`}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative', flex: 1, justifyContent: 'center' }}>
+                            <div style={{ position: 'absolute', left: '17px', top: '20px', bottom: '20px', width: '2px', background: '#e2e8f0', zIndex: 1 }} />
+                            <div style={{ position: 'absolute', left: '17px', top: '20px', height: streak >= 9 ? '100%' : streak >= 4 ? '50%' : '0%', width: '2px', background: 'linear-gradient(to bottom, #f97316 0%, #ef4444 100%)', zIndex: 1, transition: 'height 0.5s ease' }} />
+
+                            {/* Tier 1 */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier1Unlocked ? 1 : 0.6 }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier1Unlocked ? '#eab308' : '#cbd5e1', boxShadow: isTier1Unlocked ? '0 0 8px #eab308' : 'none', zIndex: 3 }} />
+                              <div style={{ color: isTier1Unlocked ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                                <Flame size={18} fill={isTier1Unlocked ? 'currentColor' : 'none'} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: isTier1Unlocked ? '#854d0e' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    Stufe 1: Start-Flamme
+                                  </span>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#94a3b8', flexShrink: 0 }}>
+                                    1–3 Tage • {kleineMins}m
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '1px' }}>{streak > 0 ? '🎉 Aktiv!' : 'Bereit zum Start!'}</div>
+                              </div>
+                            </div>
+
+                            {/* Tier 2 */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier2Unlocked ? 1 : 0.6 }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier2Unlocked ? '#f97316' : '#cbd5e1', boxShadow: isTier2Unlocked ? '0 0 8px #f97316' : 'none', zIndex: 3 }} />
+                              <div style={{ color: isTier2Unlocked ? '#f97316' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                                <Flame size={18} fill={isTier2Unlocked ? 'currentColor' : 'none'} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: isTier2Unlocked ? '#9a3412' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    Stufe 2: Power-Flamme
+                                  </span>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#94a3b8', flexShrink: 0 }}>
+                                    4–8 Tage • {mittlereMins}m
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '1px' }}>{isTier2Unlocked ? '🎉 Aktiv!' : `Noch ${Math.max(1, 4 - streak)} Tage`}</div>
+                              </div>
+                            </div>
+
+                            {/* Tier 3 */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier3Unlocked ? 1 : 0.6 }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier3Unlocked ? '#ef4444' : '#cbd5e1', boxShadow: isTier3Unlocked ? '0 0 8px #ef4444' : 'none', zIndex: 3 }} />
+                              <div style={{ color: isTier3Unlocked ? '#ef4444' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                                <Flame size={18} fill={isTier3Unlocked ? 'currentColor' : 'none'} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: isTier3Unlocked ? '#991b1b' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    Stufe 3: Meister-Flamme
+                                  </span>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#94a3b8', flexShrink: 0 }}>
+                                    9+ Tage • {heldenMins}m
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '1px' }}>{isTier3Unlocked ? '🔥 Meister-Flamme aktiv!' : `Noch ${Math.max(1, 9 - streak)} Tage`}</div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       );
                     })()}
@@ -20089,9 +20601,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
                           {(() => {
-                            const dbSecs = (fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                            const dbSecs = (fokusLogs || []).reduce((sum, log) => sum + getExactLogSeconds(log), 0);
                             const liveSecs = sessionActive ? secondsElapsed : 0;
-                            const totalSecs = Math.max(dbSecs + liveSecs, (totalPracticeMinutes || 0) * 60);
+                            const totalSecs = dbSecs + liveSecs;
                             if (totalSecs > 0 && totalSecs < 60) {
                               return (
                                 <>
@@ -20119,7 +20631,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   letterSpacing: '-0.02em',
                                   color: '#0f172a'
                                 }}>
-                                  {Math.floor(totalSecs / 60)}
+                                  {secondsToDisplayMinutes(totalSecs)}
                                 </span>
                                 <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#78350f' }}>
                                   Min.
@@ -20795,230 +21307,46 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         };
                       });
 
-                      const prevWeekItems = (progressItems || []).filter(item => {
-                        const itemW = getItemWeek(item);
-                        return itemW === prevWeekStr && !item.topic_name.startsWith('Hausaufgabe KW ');
-                      });
-
                       const hasActiveHomework = formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0 || currentWeekNotes.length > 0;
-                      const activeUiLevel = (studentUiLevel as string) || 'junior';
 
-                      /* ============================================================
-                         LEVEL 1: JUNIOR (6-10 JAHRE) - KINDGERECHT & SPIELERISCH
-                         ============================================================ */
-                      if (activeUiLevel === 'junior') {
-                        return (
-                          <div style={{ 
-                            background: 'linear-gradient(180deg, #ffffff 0%, #fefce8 100%)', 
-                            borderRadius: '24px', 
-                            padding: '24px', 
-                            boxShadow: '0 10px 30px rgba(234, 179, 8, 0.08)',
-                            border: '2px solid #fef08a',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '16px'
-                          }}>
-                            {/* Junior Header */}
+                      return (
+                        <div style={{ 
+                          background: '#ffffff', 
+                          borderRadius: '24px', 
+                          padding: '24px', 
+                          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
+                          border: '1px solid rgba(0, 0, 0, 0.04)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: '16px'
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div style={{ background: '#fef08a', color: '#b45309', width: '38px', height: '38px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', boxShadow: '0 3px 10px rgba(250, 204, 21, 0.3)' }}>
-                                  🎒
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ 
+                                  background: 'rgba(52, 168, 83, 0.08)', 
+                                  color: '#34a853', 
+                                  width: '34px', 
+                                  height: '34px', 
+                                  borderRadius: '10px', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center' 
+                                }}>
+                                  <BookOpen size={17} />
                                 </div>
                                 <div>
                                   <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                                     Hausaufgaben
                                   </h4>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                    Woche {currentWeekNum} ⭐ Deine Wochen-Mission
-                                  </span>
-                                </div>
-                              </div>
-                              {audioTracks.length > 0 ? (
-                                <div
-                                  onClick={() => handleTabChangeLocal('homework_book')}
-                                  style={{
-                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                                    border: '1px solid #bbf7d0',
-                                    borderRadius: '100px',
-                                    padding: '4px 10px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  className="hover-scale"
-                                  title="Unterrichtsaufnahmen im Aufgabenheft anhören"
-                                >
-                                  <Headphones size={13} color="#15803d" />
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d' }}>
-                                    {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span style={{ background: '#22c55e', color: '#ffffff', fontSize: '0.62rem', fontWeight: 900, padding: '3px 10px', borderRadius: '999px', boxShadow: '0 2px 8px rgba(34, 197, 94, 0.3)' }}>
-                                  Aktiv 🎯
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Junior Content (Komprimiert ohne Bemerkungen) */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, overflowY: 'auto' }}>
-                              {hasActiveHomework ? (
-                                <>
-                                  {formattedActiveBooks.map((item, idx) => {
-                                    const bookGradient = getLehrwerkColor(item.title, lehrwerke);
-                                    return (
-                                      <div key={`junior-book-${idx}`} style={{
-                                        background: '#ffffff',
-                                        padding: '12px 14px',
-                                        borderRadius: '16px',
-                                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: '8px'
-                                      }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                                          <div style={{
-                                            width: '22px',
-                                            height: '26px',
-                                            background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                            borderRadius: '5px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: bookGradient.text,
-                                            flexShrink: 0
-                                          }}>
-                                            <BookOpen size={11} />
-                                          </div>
-                                          <span style={{ fontWeight: 950, color: '#1e293b', fontSize: '0.94rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                            {item.title}
-                                          </span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
-                                          {item.pageNums.map((pNum: number, pIdx: number) => (
-                                            <span key={`junior-p-${pIdx}`} style={{
-                                              fontSize: '0.72rem',
-                                              fontWeight: 900,
-                                              color: '#15803d',
-                                              background: '#dcfce7',
-                                              padding: '2px 8px',
-                                              borderRadius: '6px'
-                                            }}>
-                                              S. {pNum}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-
-                                  {otherActiveHWItems.map((item, idx) => (
-                                    <div key={`junior-song-${idx}`} style={{
-                                      background: '#ffffff',
-                                      padding: '12px 14px',
-                                      borderRadius: '16px',
-                                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px'
-                                    }}>
-                                      <div style={{
-                                        width: '22px',
-                                        height: '22px',
-                                        borderRadius: '6px',
-                                        background: '#e0e7ff',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        flexShrink: 0
-                                      }}>
-                                        <Music size={12} color="#6366f1" />
-                                      </div>
-                                      <span style={{ fontWeight: 900, fontSize: '0.92rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {cleanTitle(item.topic_name || item.title)}
-                                      </span>
-                                    </div>
-                                  ))}
-
-                                  {/* Zusätzliche Bemerkung */}
-                                  {generalNote && (
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                      <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                      <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <div style={{ padding: '20px 10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem', fontStyle: 'italic' }}>
-                                  🎉 Aktuell keine Hausaufgaben eingetragen. Du hast frei oder kannst frei üben!
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Junior Action Button */}
-                            <button
-                              onClick={() => handleTabChangeLocal('homework_book')}
-                              style={{
-                                marginTop: 'auto',
-                                width: '100%',
-                                padding: '12px 16px',
-                                borderRadius: '16px',
-                                border: 'none',
-                                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                                color: '#ffffff',
-                                fontSize: '0.88rem',
-                                fontWeight: 950,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                boxShadow: '0 6px 16px rgba(34, 197, 94, 0.28)',
-                                transition: 'transform 0.15s ease'
-                              }}
-                              className="hover-scale"
-                            >
-                              <span>🚀 Mein Hausaufgabenheft öffnen</span>
-                            </button>
-                          </div>
-                        );
-                      }
-
-                      /* ============================================================
-                         LEVEL 2: TEEN (11-15 JAHRE) - MODERN, CLEAN & DYNAMISCH
-                         ============================================================ */
-                      if (activeUiLevel === 'teen') {
-                        return (
-                          <div style={{ 
-                            background: '#ffffff', 
-                            borderRadius: '24px', 
-                            padding: '24px', 
-                            boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04)',
-                            border: '1px solid #e2e8f0',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '16px'
-                          }}>
-                            {/* Teen Header */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{ background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', width: '34px', height: '34px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <BookOpen size={16} />
-                                </div>
-                                <div>
-                                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    Hausaufgaben
-                                  </h4>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 850, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     KW {currentWeekNum} · Deine Wochenziele
                                   </span>
                                 </div>
                               </div>
+                              
+                              {/* Audio Indicator Pill beside Title */}
                               {audioTracks.length > 0 ? (
                                 <div
                                   onClick={() => handleTabChangeLocal('homework_book')}
@@ -21049,14 +21377,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               )}
                             </div>
 
-                            {/* Teen Content (Komprimiert ohne Bemerkungen) */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               {hasActiveHomework ? (
                                 <>
                                   {formattedActiveBooks.map((item, idx) => {
                                     const bookGradient = getLehrwerkColor(item.title, lehrwerke);
                                     return (
-                                      <div key={`teen-book-${idx}`} style={{
+                                      <div key={`pro-book-${idx}`} style={{
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
@@ -21079,13 +21406,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                           }}>
                                             <BookOpen size={11} />
                                           </div>
-                                          <span style={{ fontWeight: 850, color: item.isDone ? '#94a3b8' : '#0f172a', fontSize: '0.92rem', textDecoration: item.isDone ? 'line-through' : 'none', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                          <span style={{ fontWeight: 850, color: '#0f172a', fontSize: '0.92rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                                             {item.title}
                                           </span>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
                                           {item.pageNums.map((pNum: number, pIdx: number) => (
-                                            <span key={`teen-p-${pIdx}`} style={{
+                                            <span key={`pro-p-${pIdx}`} style={{
                                               fontSize: '0.72rem',
                                               fontWeight: 800,
                                               color: '#15803d',
@@ -21096,301 +21423,78 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                               S. {pNum}
                                             </span>
                                           ))}
-                                          {item.isDone && <Check size={14} color="#34a853" strokeWidth={3} />}
                                         </div>
                                       </div>
                                     );
                                   })}
 
                                   {otherActiveHWItems.map((item, idx) => (
-                                    <div key={`teen-song-${idx}`} style={{
+                                    <div key={`pro-song-${idx}`} style={{
+                                      background: '#f8fafc',
+                                      padding: '10px 12px',
+                                      borderRadius: '12px',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '8px',
-                                      padding: '10px 12px',
-                                      background: '#f8fafc',
-                                      borderRadius: '12px'
+                                      gap: '8px'
                                     }}>
                                       <div style={{
                                         width: '22px',
                                         height: '22px',
                                         borderRadius: '6px',
-                                        background: '#e0f2fe',
+                                        background: '#e0e7ff',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         flexShrink: 0
                                       }}>
-                                        <Music size={12} color="#0284c7" />
+                                        <Music size={12} color="#4338ca" />
                                       </div>
-                                      <span style={{ fontWeight: 850, fontSize: '0.90rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {cleanTitle(item.topic_name || item.title)}
+                                      <span style={{ fontWeight: 850, color: '#0f172a', fontSize: '0.90rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {cleanTitle(item.title || item.topic_name)}
                                       </span>
                                     </div>
                                   ))}
 
-                                  </>
+                                  {/* Zusätzliche Bemerkung */}
+                                  {generalNote && (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                      <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                      <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                                    </div>
+                                  )}
+                                </>
                               ) : (
-                                <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  Noch keine Aufgaben für diese Woche eingetragen
+                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                  Keine offenen Aufgaben für diese Woche erfasst
                                 </div>
                               )}
                             </div>
-
-                            {/* Vorwoche */}
-                            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-                              <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-                                Vorwoche (KW {prevWeekNum || '?'})
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', opacity: 0.7 }}>
-                                {prevWeekItems.length > 0 ? (
-                                  prevWeekItems.map((item: any, idx: number) => (
-                                    <div key={`prev-teen-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#64748b' }}>
-                                      <BookOpen size={11} color="#94a3b8" />
-                                      <span style={{ fontWeight: 700 }}>{cleanTitle(item.topic_name)}</span>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine Aufgaben erfasst</div>
-                                )}
-                              </div>
-                            </div>
-
-                            <button
-                              onClick={() => handleTabChangeLocal('homework_book')}
-                              style={{
-                                marginTop: 'auto',
-                                width: '100%',
-                                padding: '10px 14px',
-                                borderRadius: '14px',
-                                border: '1.5px solid #e2e8f0',
-                                background: '#f8fafc',
-                                color: '#0f172a',
-                                fontSize: '0.80rem',
-                                fontWeight: 900,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                transition: 'all 0.2s'
-                              }}
-                              className="hover-scale"
-                            >
-                              <BookOpen size={14} color="#34a853" />
-                              <span>Hausaufgabenheft öffnen →</span>
-                            </button>
-                          </div>
-                        );
-                      }
-
-                      /* ============================================================
-                         LEVEL 3: PRO (16+ JAHRE & ERWACHSENE) - HIGH PRECISION
-                         ============================================================ */
-                      return (
-                        <div style={{ 
-                          background: '#ffffff', 
-                          borderRadius: '24px', 
-                          padding: '24px', 
-                          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-                          border: '1px solid rgba(0, 0, 0, 0.04)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '16px'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <BookOpen size={16} />
-                              </div>
-                              <div>
-                                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                  Hausaufgaben
-                                </h4>
-                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                  Deine Wochenziele
-                                </span>
-                              </div>
-                            </div>
-                            {audioTracks.length > 0 ? (
-                              <div
-                                onClick={() => handleTabChangeLocal('homework_book')}
-                                style={{
-                                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                                  border: '1px solid #bbf7d0',
-                                  borderRadius: '100px',
-                                  padding: '4px 10px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                className="hover-scale"
-                                title="Unterrichtsaufnahmen im Aufgabenheft anhören"
-                              >
-                                <Headphones size={13} color="#15803d" />
-                                <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d' }}>
-                                  {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
-                                </span>
-                              </div>
-                            ) : (
-                              <span style={{ background: '#e6f4ea', color: '#34a853', fontSize: '0.58rem', fontWeight: 900, padding: '2px 8px', borderRadius: '6px' }}>
-                                Aktiv
-                              </span>
-                            )}
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto' }}>
-                            <div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                  Aktuell (KW {currentWeekNum || '?'})
-                                </span>
-                              </div>
-                              
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {hasActiveHomework ? (
-                                  <>
-                                    {formattedActiveBooks.map((item, idx) => {
-                                      const bookGradient = getLehrwerkColor(item.title, lehrwerke);
-                                      return (
-                                        <div key={`pro-book-${idx}`} style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'space-between',
-                                          gap: '8px',
-                                          padding: '10px 12px',
-                                          background: '#f8fafc',
-                                          borderRadius: '12px'
-                                        }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                                            <div style={{
-                                              width: '22px',
-                                              height: '26px',
-                                              background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
-                                              borderRadius: '5px',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              color: bookGradient.text,
-                                              flexShrink: 0
-                                            }}>
-                                              <BookOpen size={11} />
-                                            </div>
-                                            <span style={{ fontWeight: 850, color: item.isDone ? '#94a3b8' : '#0f172a', fontSize: '0.92rem', textDecoration: item.isDone ? 'line-through' : 'none', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                              {item.title}
-                                            </span>
-                                          </div>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flexShrink: 0 }}>
-                                            {item.pageNums.map((pNum: number, pIdx: number) => (
-                                              <span key={`pro-p-${pIdx}`} style={{
-                                                fontSize: '0.75rem',
-                                                fontWeight: 800,
-                                                color: '#15803d',
-                                                background: '#dcfce7',
-                                                padding: '4px 10px',
-                                                minHeight: '28px',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                borderRadius: '8px',
-                                                border: '1px solid rgba(21, 128, 61, 0.15)'
-                                              }}>
-                                                S. {pNum}
-                                              </span>
-                                            ))}
-                                            {item.isDone && <Check size={16} color="#34a853" strokeWidth={3} />}
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-
-                                    {otherActiveHWItems.map((item, idx) => (
-                                      <div key={`pro-song-${idx}`} style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        padding: '10px 12px',
-                                        background: '#f8fafc',
-                                        borderRadius: '12px'
-                                      }}>
-                                        <div style={{
-                                          width: '24px',
-                                          height: '24px',
-                                          borderRadius: '6px',
-                                          background: '#e0e7ff',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          flexShrink: 0
-                                        }}>
-                                          <Music size={13} color="#4338ca" />
-                                        </div>
-                                        <span style={{ fontWeight: 850, fontSize: '0.90rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {cleanTitle(item.topic_name || item.title)}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </>
-                                ) : (
-                                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                    Noch keine Aufgaben für diese Woche eingetragen
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Vorwoche */}
-                            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                              <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                                Letzte Woche (KW {prevWeekNum || '?'})
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', opacity: 0.7 }}>
-                                {prevWeekItems.length > 0 ? (
-                                  prevWeekItems.map((item: any, idx: number) => (
-                                    <div key={`prev-item-${idx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.75rem' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                                        <BookOpen size={11} color="#94a3b8" />
-                                        <span style={{ fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                          {cleanTitle(item.topic_name)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic' }}>Keine Aufgaben erfasst</div>
-                                )}
-                              </div>
-                            </div>
-
-                            <button
-                              onClick={() => handleTabChangeLocal('homework_book')}
-                              style={{
-                                marginTop: 'auto',
-                                width: '100%',
-                                minHeight: '44px',
-                                padding: '12px 16px',
-                                borderRadius: '14px',
-                                border: '1.5px solid #e2e8f0',
-                                background: '#f8fafc',
-                                color: '#0f172a',
-                                fontSize: '0.78rem',
-                                fontWeight: 900,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                transition: 'all 0.2s'
-                              }}
-                              className="hover-scale"
-                            >
-                              <BookOpen size={15} color="#34a853" />
-                              <span>Alle Aufgaben im Heft ansehen →</span>
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => handleTabChangeLocal('homework_book')}
+                            style={{
+                              width: '100%',
+                              padding: '10px 14px',
+                              borderRadius: '14px',
+                              border: '1.5px solid #e2e8f0',
+                              background: '#f8fafc',
+                              color: '#0f172a',
+                              fontSize: '0.80rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              transition: 'all 0.2s'
+                            }}
+                            className="hover-scale"
+                          >
+                            <BookOpen size={14} color="#34a853" />
+                            <span>Hausaufgabenheft öffnen →</span>
+                          </button>
                         </div>
                       );
                     })()}
@@ -21598,13 +21702,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       gap: '4px',
                                       padding: '4px 6px',
                                       borderRadius: '6px',
-                                      background: isConsumed ? 'rgba(2, 132, 199, 0.12)' : (isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
-                                      border: isConsumed ? '1px solid #38bdf8' : (isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
-                                      color: isConsumed ? '#0284c7' : (isShieldActive ? '#0369a1' : '#b45309'),
+                                      background: isConsumed ? '#f1f5f9' : (isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
+                                      border: isConsumed ? '1px solid #cbd5e1' : (isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
+                                      color: isConsumed ? '#64748b' : (isShieldActive ? '#0369a1' : '#b45309'),
                                       fontSize: '0.65rem',
                                       fontWeight: 800
                                     }}>
-                                      <Shield size={10} color={isConsumed || isShieldActive ? '#0284c7' : '#d97706'} fill={isShieldActive ? '#0284c7' : (isConsumed ? '#38bdf8' : 'none')} />
+                                      <Shield size={10} color={isConsumed ? '#64748b' : (isShieldActive ? '#0284c7' : '#d97706')} fill={isConsumed ? '#94a3b8' : (isShieldActive ? '#0284c7' : 'none')} />
                                       <span>{isConsumed ? `Schild ${shieldNum} (${dayLabel})` : `Schild ${shieldNum}`}</span>
                                     </div>
                                   );
@@ -24156,12 +24260,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div>
                 <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
-                  {isJuniorOrTeen ? '🛡️ Elternbereich' : '⚙️ Einstellungen'}
+                  {isAdultStudent ? '⚙️ Mein Account & Einstellungen' : (isJuniorOrTeen ? '🛡️ Elternbereich' : '⚙️ Einstellungen & Eltern-Zone')}
                 </h2>
                 <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
-                  {isJuniorOrTeen 
-                    ? 'Schutz- & Freigabefunktionen, Benachrichtigungen und Sicherheit für Eltern.' 
-                    : 'Verwalte deine Push-Benachrichtigungen, persönliche PIN, Abrechnungsbelege und Datenschutz-Einstellungen.'}
+                  {isAdultStudent 
+                    ? 'Verwalte deine App-Designs, Push-Benachrichtigungen, persönliche PIN, Abrechnungsbelege und Datenschutz-Einstellungen eigenständig.' 
+                    : (isJuniorOrTeen 
+                      ? 'Schutz- & Freigabefunktionen, Benachrichtigungen und Sicherheit für Eltern.' 
+                      : 'Verwalte deine Push-Benachrichtigungen, persönliche PIN, Abrechnungsbelege und Erziehungsberechtigten-Freigaben.')}
                 </p>
               </div>
 
@@ -24175,12 +24281,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               {[
                 {
                   id: 'parent_controls',
-                  title: 'Eltern-Kontrollzentrum',
-                  subtitle: 'Altersstufe & Freigaben',
-                  badge: 'Master-PIN Schutz',
+                  title: isAdultStudent ? 'App- & Design-Stufe' : 'Eltern-Kontrollzentrum',
+                  subtitle: isAdultStudent ? 'Benutzeroberfläche & Boards' : 'Altersstufe & Freigaben',
+                  badge: isAdultStudent ? 'Self-Management' : 'Master-PIN Schutz',
                   gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                   shadowColor: 'rgba(2, 132, 199, 0.40)',
-                  icon: ShieldCheck
+                  icon: isAdultStudent ? Compass : ShieldCheck
                 },
                 {
                   id: 'notifications',
@@ -24193,7 +24299,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 },
                 {
                   id: 'security',
-                  title: 'PIN & Sicherheit',
+                  title: isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Sicherheit',
                   subtitle: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : '4-stellige PIN festlegen',
                   badge: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? 'Geschützt' : 'Empfohlen',
                   gradient: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
@@ -24202,7 +24308,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 },
                 {
                   id: 'billing',
-                  title: 'Belege & Bereitstellung',
+                  title: isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung',
                   subtitle: '100% freie App & Belege',
                   badge: '100% Kostenlos',
                   gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
@@ -24217,6 +24323,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
                   shadowColor: 'rgba(100, 116, 139, 0.40)',
                   icon: ShieldCheck
+                },
+                {
+                  id: 'feedback',
+                  title: 'Ideenschmiede',
+                  subtitle: 'Wünsche & Fehler melden',
+                  badge: 'Mitgestalten',
+                  gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                  shadowColor: 'rgba(236, 72, 153, 0.40)',
+                  icon: Lightbulb
                 }
               ].map((module) => {
                 const IconComp = module.icon;
@@ -24680,7 +24795,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         justifyContent: 'center',
                         boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
                       }}>
-                        {activeStudentSettingsModal === 'parent_controls' && <ShieldCheck size={20} color="#ffffff" />}
+                        {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? <Compass size={20} color="#ffffff" /> : <ShieldCheck size={20} color="#ffffff" />)}
                         {activeStudentSettingsModal === 'notifications' && <Bell size={20} color="#ffffff" />}
                         {activeStudentSettingsModal === 'security' && <Lock size={20} color="#ffffff" />}
                         {activeStudentSettingsModal === 'billing' && <FileText size={20} color="#ffffff" />}
@@ -24688,17 +24803,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       </div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          {activeStudentSettingsModal === 'parent_controls' && 'Eltern-Kontrollzentrum'}
+                          {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? 'App- & Design-Einstellungen' : 'Eltern-Kontrollzentrum')}
                           {activeStudentSettingsModal === 'notifications' && 'Mitteilungen & Benachrichtigungen'}
-                          {activeStudentSettingsModal === 'security' && 'PIN & Sicherheit'}
-                          {activeStudentSettingsModal === 'billing' && 'Belege & Bereitstellung'}
+                          {activeStudentSettingsModal === 'security' && (isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Sicherheit')}
+                          {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung')}
                           {activeStudentSettingsModal === 'legal' && 'Rechtliches & Datenschutz'}
                         </h3>
                         <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                          {activeStudentSettingsModal === 'parent_controls' && 'Schutz-, Design- & Freigabefunktionen für dein Kind.'}
+                          {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? 'Passe Benutzeroberfläche und Funktionen nach deinen Wünschen an.' : 'Schutz-, Design- & Freigabefunktionen für dein Kind.')}
                           {activeStudentSettingsModal === 'notifications' && 'Passe an, worüber und wie wir dich informieren.'}
-                          {activeStudentSettingsModal === 'security' && '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & persönliches Profil).'}
-                          {activeStudentSettingsModal === 'billing' && 'Übersicht über 100% freie App, Bereitstellung & Zahlungsnachweise.'}
+                          {activeStudentSettingsModal === 'security' && (isAdultStudent ? '4-stellige persönliche PIN für schnellen und sicheren Login.' : '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & persönliches Profil).')}
+                          {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Übersicht über deine gebuchten Module und Zahlungsnachweise.' : 'Übersicht über 100% freie App, Bereitstellung & Zahlungsnachweise.')}
                           {activeStudentSettingsModal === 'legal' && 'Transparente Informationen zu Datenschutz, DSGVO & Jugendschutz.'}
                         </p>
                       </div>
@@ -25906,6 +26021,18 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           </div>
         );
       })()}
+
+      {/* Feedback & Ideenschmiede Modal */}
+      <FeedbackHubModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        userRole="student"
+        userId={studentId}
+        userName={studentUser?.first_name || 'Schüler'}
+        schoolId={studentUser?.school_id}
+        schoolName={(studentUser as any)?.school_name}
+        activePlatform={currentPlatform}
+      />
     </div>
 
       {/* Junior-Optimized Song Detail Modal */}
@@ -27766,7 +27893,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       gap: '5px'
                     }}>
                       <ShieldCheck size={13} color="#ffffff" />
-                      <span>100% DSGVO-konform • End-to-End verschlüsselt</span>
+                      <span>100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
                     </span>
                   </div>
                 </div>

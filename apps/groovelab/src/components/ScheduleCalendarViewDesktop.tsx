@@ -1603,31 +1603,36 @@ export function ScheduleCalendarViewDesktop({
             const oldDbDate = originalOcc ? originalOcc.date : origDateStr;
             const oldDbTime = originalOcc ? originalOcc.start_time : origTimeStr;
             const timeActuallyChanged = change.date !== oldDbDate || change.start_time.substring(0, 5) !== oldDbTime.substring(0, 5);
+            
+            const isNowCancelled = ['cancelled', 'canceled_by_student'].includes(change.status);
+            const wasCancelled = originalOcc ? ['cancelled', 'canceled_by_student'].includes(originalOcc.status) : false;
+            const isReset = (wasCancelled && !isNowCancelled) || (timeActuallyChanged && change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5) && !isNowCancelled);
 
-            if (timeActuallyChanged) {
-              if (['cancelled', 'canceled_by_student'].includes(change.status)) {
-                const shortOrigDay = origDayLabel.substring(0, 2) + '.';
-                const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
-                notificationMessage = `Dein Unterrichtstermin am ${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr fällt aus.`;
-              } else {
-                const isReset = change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5);
-                const shortNewDay = newDayLabel.substring(0, 2) + '.';
-                const shortNewDate = `${String(newDate.getDate()).padStart(2, '0')}.${String(newDate.getMonth() + 1).padStart(2, '0')}.${String(newDate.getFullYear()).substring(2, 4)}`;
-                if (isReset) {
-                  notificationMessage = `Der verschobene Termin wurde auf den regulären Termin zurückgesetzt:\n${shortNewDay} ${shortNewDate} um ${newTimeLabel} Uhr.`;
-                } else {
-                  const shortOrigDay = origDayLabel.substring(0, 2) + '.';
-                  const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
-                  notificationMessage = `Dein Termin wurde verschoben: ${shortOrigDay} ${shortOrigDate} ${origTimeLabel} Uhr -> ${shortNewDay} ${shortNewDate} ${newTimeLabel} Uhr. Bitte bestätige den neuen Termin.`;
-                }
-              }
+            if (isNowCancelled && !wasCancelled) {
+              const shortOrigDay = origDayLabel.substring(0, 2) + '.';
+              const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
+              notificationMessage = `Dein Unterrichtstermin am ${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr fällt aus.`;
+            } else if (isReset) {
+              const shortNewDay = newDayLabel.substring(0, 2) + '.';
+              const shortNewDate = `${String(newDate.getDate()).padStart(2, '0')}.${String(newDate.getMonth() + 1).padStart(2, '0')}.${String(newDate.getFullYear()).substring(2, 4)}`;
+              notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortNewDay} ${shortNewDate} um ${newTimeLabel} Uhr.`;
+            } else if (timeActuallyChanged && !isNowCancelled) {
+              const shortOrigDay = origDayLabel.substring(0, 2) + '.';
+              const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
+              const shortNewDay = newDayLabel.substring(0, 2) + '.';
+              const shortNewDate = `${String(newDate.getDate()).padStart(2, '0')}.${String(newDate.getMonth() + 1).padStart(2, '0')}.${String(newDate.getFullYear()).substring(2, 4)}`;
+              notificationMessage = `Dein Termin wurde verschoben: ${shortOrigDay} ${shortOrigDate} ${origTimeLabel} Uhr -> ${shortNewDay} ${shortNewDate} ${newTimeLabel} Uhr. Bitte bestätige den neuen Termin.`;
             }
 
             if (notificationMessage) {
+              const targetOccId = change.schedule_id ? `virtual-${change.schedule_id}-${change.date}` : change.id;
               await supabase.from('campus_direct_messages').insert({
                 sender_id: userId,
                 recipient_id: change.student_id,
-                content: notificationMessage
+                content: notificationMessage,
+                occurrence_id: targetOccId,
+                is_system: true,
+                message_type: isReset ? 'cancellation_reset' : 'reschedule_notification'
               });
 
               try {
@@ -7547,6 +7552,32 @@ return (
                                     .eq('date', occ.date);
                                   window.dispatchEvent(new CustomEvent('refresh-bookings'));
                                 } catch (roomErr) {}
+
+                                // Send system notification that appointment was reset to regular status
+                                try {
+                                  if (occ.student_id && occ.student_id !== 'vacant') {
+                                    const origDateStr = occ.original_date || occ.date;
+                                    const origTimeStr = occ.original_start_time || occ.start_time;
+                                    const origDate = new Date(origDateStr);
+                                    const shortOrigDay = origDate.toLocaleDateString('de-DE', { weekday: 'short' });
+                                    const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
+                                    const origTimeLabel = origTimeStr.substring(0, 5);
+
+                                    const notificationMessage = `Der verschobene oder abgesagte Termin wurde auf den regulären Termin zurückgesetzt:\n${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr.`;
+                                    const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
+
+                                    await supabase.from('campus_direct_messages').insert({
+                                      sender_id: userId,
+                                      recipient_id: occ.student_id,
+                                      content: notificationMessage,
+                                      occurrence_id: targetOccId,
+                                      is_system: true,
+                                      message_type: 'reschedule_notification'
+                                    });
+                                  }
+                                } catch (notifErr) {
+                                  console.warn('Error sending reset occurrence notification:', notifErr);
+                                }
 
                                 await loadOccurrences();
                                 await showAlert('Termin(e) erfolgreich auf den Stammtermin zurückgesetzt.');

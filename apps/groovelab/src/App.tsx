@@ -1803,9 +1803,9 @@ function App() {
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG &amp; GEWÄHRLEISTUNG</h4>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG &amp; GEWÄHRLEISTUNG (§ 535 BGB)</h4>
                         <p style={{ margin: 0 }}><strong>1. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Vorsatz, grobe Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf vertragstypisch vorhersehbare Schäden.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwareüberlassung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Haftungsausschluss im Übrigen:</strong> Eine weitergehende Haftung für leichte Fahrlässigkeit, entgangenen Gewinn oder sonstige mittelbare Mängelfolgeschäden ist ausgeschlossen. Die zwingenden Bestimmungen des Produkthaftungsgesetzes und der DSGVO (Art. 82) bleiben unberührt.</p>
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
@@ -1815,8 +1815,8 @@ function App() {
                       </div>
 
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 GEBÜHRENFREIHEIT DER SOFTWARE &amp; NUTZUNGSRECHTE</h4>
-                        <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software.</p>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 NUTZUNGSRECHTE &amp; SCHUTZRECHTE</h4>
+                        <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software im Rahmen des gebuchten Cloud-Betriebs.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>2. Schutzrechte:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zurückzuentwickeln (Reverse Engineering) oder zu modifizieren.</p>
                       </div>
 
@@ -2224,8 +2224,24 @@ function App() {
       localStorage.removeItem('groovelab_install_prompt_dismissed');
     }
 
-    // Register service worker immediately to ensure PWA installability and update checking
-    if ('serviceWorker' in navigator) {
+    // Check if running on localhost / local development environment
+    const isLocalhost = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.endsWith('.local')
+    );
+
+    // In local development, unregister any stale service worker to prevent cached index.html from freezing Vite HMR!
+    if (isLocalhost) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        }).catch(() => {});
+      }
+    } else if ('serviceWorker' in navigator) {
+      // Register service worker in production to ensure PWA installability and update checking
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then((reg) => {
           console.log('Service Worker registered successfully on load:', reg.scope);
@@ -2434,13 +2450,21 @@ function App() {
     const handlePermissionChange = () => {
       setParentPermissionsVersion(v => v + 1);
     };
+    const handleSimDateSync = () => {
+      const s = localStorage.getItem('groovelab_simulated_date');
+      setSimulatedDate(s || null);
+    };
     window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
     window.addEventListener('groovelab_parent_mode_changed', handleParentModeChange);
     window.addEventListener('campus_board_permission_changed', handlePermissionChange);
+    window.addEventListener('storage', handleSimDateSync);
+    window.addEventListener('groovelab_simulated_date_changed', handleSimDateSync);
     return () => {
       window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
       window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChange);
       window.removeEventListener('campus_board_permission_changed', handlePermissionChange);
+      window.removeEventListener('storage', handleSimDateSync);
+      window.removeEventListener('groovelab_simulated_date_changed', handleSimDateSync);
     };
   }, []);
 
@@ -2750,38 +2774,108 @@ function App() {
     const ghostSchoolId = ghostUrlParams.get('school_id') || 
                           ghostUrlParams.get('ghost_school_id') || 
                           sessionStorage.getItem('groovelab_ghost_school_id');
+    const ghostUserId = ghostUrlParams.get('ghost_user_id') || 
+                        sessionStorage.getItem('groovelab_ghost_impersonated_user_id');
+    const ghostTicketId = ghostUrlParams.get('ticket_id');
     const ghostRole = ghostUrlParams.get('role') || 
                       sessionStorage.getItem('groovelab_ghost_active_role') || 
                       'admin';
 
-    if (isGhostParam && ghostSchoolId) {
+    if (isGhostParam && (ghostSchoolId || ghostUserId)) {
       sessionStorage.setItem('groovelab_support_ghost', 'true');
-      sessionStorage.setItem('groovelab_ghost_school_id', ghostSchoolId);
-      sessionStorage.setItem('groovelab_ghost_active_role', ghostRole);
+      if (ghostSchoolId) sessionStorage.setItem('groovelab_ghost_school_id', ghostSchoolId);
+      if (ghostUserId) sessionStorage.setItem('groovelab_ghost_impersonated_user_id', ghostUserId);
+      if (ghostRole) sessionStorage.setItem('groovelab_ghost_active_role', ghostRole);
 
-      supabase.from('schools').select('*').eq('id', ghostSchoolId).single().then(({ data: ghostSchool }) => {
-        if (ghostSchool) {
-          sessionStorage.setItem('groovelab_ghost_school_name', ghostSchool.name);
+      const resolveGhostIdentity = async () => {
+        let realUser: any = null;
+        let schoolData: any = null;
+
+        // 1. If explicit user ID provided (e.g. from Ticket or Persona switcher)
+        if (ghostUserId) {
+          const { data: uData } = await supabase
+            .from('users')
+            .select('*, schools(*)')
+            .eq('id', ghostUserId)
+            .maybeSingle();
+          if (uData) realUser = uData;
+        }
+
+        // 2. If no user yet, but school ID present -> resolve primary admin or teacher
+        if (!realUser && ghostSchoolId) {
+          const { data: uData } = await supabase
+            .from('users')
+            .select('*, schools(*)')
+            .eq('school_id', ghostSchoolId)
+            .eq('role', ghostRole === 'teacher' ? 'teacher' : 'admin')
+            .limit(1)
+            .maybeSingle();
+          if (uData) realUser = uData;
+        }
+
+        // 3. School metadata
+        if (realUser?.schools) {
+          schoolData = Array.isArray(realUser.schools) ? realUser.schools[0] : realUser.schools;
+        } else if (ghostSchoolId) {
+          const { data: sData } = await supabase.from('schools').select('*').eq('id', ghostSchoolId).maybeSingle();
+          schoolData = sData;
+        }
+
+        if (schoolData?.name) {
+          sessionStorage.setItem('groovelab_ghost_school_name', schoolData.name);
+        }
+
+        if (realUser) {
+          sessionStorage.setItem('groovelab_ghost_impersonated_user_id', realUser.id);
+          sessionStorage.setItem('groovelab_ghost_shadowed_teacher_id', realUser.id);
+          const targetRole = realUser.role || ghostRole;
+          sessionStorage.setItem('groovelab_ghost_active_role', targetRole);
+
+          const impersonatedUserObj = {
+            ...realUser,
+            is_ghost_mode: true,
+            ghost_ticket_id: ghostTicketId,
+            schools: schoolData || realUser.schools
+          };
+
+          setUserRaw(impersonatedUserObj);
+          setLoggedInUserId(realUser.id);
+
+          try {
+            sessionStorage.setItem('groovelab_cached_user', JSON.stringify(impersonatedUserObj));
+          } catch (e) {}
+
+          const targetPlatform: 'campus' | 'groovelab' = (realUser.is_groovelab_active && !realUser.is_campus_active) ? 'groovelab' : 'campus';
+          const targetWorkspace = targetRole === 'admin' || targetRole === 'secretary' ? 'secretary' : (targetRole === 'teacher' ? 'teacher' : 'student');
+          const targetTab = targetRole === 'student' ? 'homework_book' : (targetRole === 'teacher' ? 'briefing' : 'briefing');
+
+          setActivePlatform(targetPlatform);
+          setActiveStudentTab(targetTab);
+          try {
+            sessionStorage.setItem('groovelab_active_workspace', targetWorkspace);
+            sessionStorage.setItem('groovelab_active_platform', targetPlatform);
+            localStorage.setItem('campus_active_tab', targetTab);
+          } catch (e) {}
+        } else if (schoolData) {
+          // Fallback if zero users in DB for school
           const ghostUser = {
             id: 'master-support-id',
-            school_id: ghostSchool.id,
+            school_id: schoolData.id,
             role: ghostRole,
-            first_name: 'Master',
-            last_name: 'Support',
+            first_name: `${schoolData.name} Support`,
+            last_name: '',
             is_master_admin: false,
             is_ghost_mode: true,
-            schools: ghostSchool
+            schools: schoolData
           };
           setUserRaw(ghostUser);
           setLoggedInUserId('master-support-id');
           setActivePlatform('campus');
           setActiveStudentTab('briefing');
-          try {
-            localStorage.setItem('groovelab_active_workspace', ghostRole);
-            localStorage.setItem('campus_active_tab', 'briefing');
-          } catch (e) {}
         }
-      });
+      };
+
+      resolveGhostIdentity();
     }
   }, []);
 
@@ -10010,11 +10104,18 @@ function App() {
                     if (val) {
                       localStorage.setItem('groovelab_simulated_date', val);
                       localStorage.setItem('groovelab_simulated_start_timestamp', String(Date.now()));
+                      if (school?.id) {
+                        localStorage.setItem(`simulatedToday_${school.id}`, val);
+                      }
                     } else {
                       localStorage.removeItem('groovelab_simulated_date');
                       localStorage.removeItem('groovelab_simulated_start_timestamp');
+                      if (school?.id) {
+                        localStorage.removeItem(`simulatedToday_${school.id}`);
+                      }
                     }
                     window.dispatchEvent(new Event('storage'));
+                    window.dispatchEvent(new CustomEvent('groovelab_simulated_date_changed'));
                   }}
                   style={{
                     border: 'none',
@@ -10033,7 +10134,11 @@ function App() {
                       setSimulatedDate(null);
                       localStorage.removeItem('groovelab_simulated_date');
                       localStorage.removeItem('groovelab_simulated_start_timestamp');
+                      if (school?.id) {
+                        localStorage.removeItem(`simulatedToday_${school.id}`);
+                      }
                       window.dispatchEvent(new Event('storage'));
+                      window.dispatchEvent(new CustomEvent('groovelab_simulated_date_changed'));
                     }}
                     style={{
                       border: 'none',

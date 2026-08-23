@@ -194,7 +194,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
         }}>
           <AlertTriangle style={{ color: '#ca8a04', flexShrink: 0 }} size={20} />
           <div style={{ fontSize: '0.8rem', color: '#854d0e', lineHeight: 1.4, fontWeight: 550 }}>
-            <strong>Rechtlicher Hinweis:</strong> Da diese Softwareüberlassung unentgeltlich erfolgt, greift das gesetzliche Haftungsprivileg (§ 599 BGB). Die Software wird ohne Zusicherung von Verfügbarkeit oder Gewährleistung bereitgestellt. Für kostenpflichtig gebuchte Hosting-Infrastruktur gelten die Bestimmungen der B2B-AGB.
+            <strong>Rechtlicher Hinweis:</strong> Für die unentgeltliche Pilot- und Testphase gilt die Haftungsbegrenzung gemäß den B2B-Nutzungsbedingungen (unbeschränkte Haftung bei Vorsatz, grober Fahrlässigkeit und Körperschäden; Begrenzung bei einfacher Fahrlässigkeit).
           </div>
         </div>
 
@@ -242,7 +242,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
               style={{ accentColor: '#34a853', marginTop: '3px' }}
             />
             <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
-              <strong>Haftungsausschluss (§ 599 BGB):</strong> Ich bestätige, dass der Betreiber während der kostenlosen Nutzung nur für Vorsatz und grobe Fahrlässigkeit haftet. Eine Haftung für einfache Fahrlässigkeit, Datenverlust oder Systemausfälle ist ausgeschlossen.
+              <strong>Haftungsvereinbarung (Pilotphase):</strong> Ich bestätige, dass der Betreiber während der unentgeltlichen Testphase gemäß den B2B-AGB haftet (volle Haftung für Vorsatz, grobe Fahrlässigkeit und Kardinalpflichten).
             </span>
           </label>
 

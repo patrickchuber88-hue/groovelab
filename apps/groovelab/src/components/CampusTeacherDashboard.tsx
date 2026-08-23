@@ -29,9 +29,12 @@ import {
   Bell,
   Flame,
   ChevronLeft,
-  RefreshCw
+  RefreshCw,
+  Lightbulb
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
+import { FeedbackHubModal } from './feedback/FeedbackHubModal';
+import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 
 const timeToMinutes = (timeStr: string): number => {
   if (!timeStr) return 0;
@@ -63,6 +66,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
 
   // Navigation State
   const [activeBoard, setActiveBoard] = useState<'compass' | 'classes' | 'schedule' | 'bypass' | 'setup' | 'rooms'>(initialBoard);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   // Teacher Profile Data
   const [teacher, setTeacher] = useState<any>(null);
@@ -2095,6 +2099,9 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
         {/* Board 1: TAGESKOMPASS */}
         {activeBoard === 'compass' && (
           <div className="p-8 max-w-5xl w-full mx-auto space-y-6">
+            {/* Community Update & Helden-Moment Hero */}
+            <UpdateAnnouncementHero userId={userId} activePlatform="campus" />
+
             {/* Premium Greeting Banner in Dark Mode */}
             <div className="bg-slate-900/60 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl backdrop-blur-md">
               <div className="flex items-center gap-4">
@@ -2833,6 +2840,36 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                       <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950"></div>
                     </label>
                   </div>
+                </div>
+              </div>
+
+              {/* Ideenschmiede & Community-Feedback */}
+              <div className="space-y-4 border-t border-slate-800 pt-6">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                    <Lightbulb size={16} className="text-pink-400" /> Ideenschmiede & Feature-Wünsche
+                  </h3>
+                  <p className="text-xs text-slate-400 font-semibold leading-relaxed">
+                    Reiche eigene Vorschläge, Song-Wünsche oder Fehlerberichte ein und gestalte Campus-Groovelab aktiv mit!
+                  </p>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-850">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center font-bold">
+                      💡
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Community-Vorschläge & Release-Radar</div>
+                      <div className="text-[11px] text-slate-400">Abstimmen, Feedback geben & Helden-Momente entdecken</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsFeedbackModalOpen(true)}
+                    className="px-4 py-2 bg-pink-500 hover:bg-pink-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-lg shadow-pink-500/20"
+                  >
+                    <Lightbulb size={14} /> Ideenschmiede öffnen
+                  </button>
                 </div>
               </div>
 
@@ -3633,6 +3670,18 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
         onClose={() => setShowPushSoftPrompt(false)}
         userId={userId}
         onSuccess={() => setPushEnabled(true)}
+      />
+
+      {/* Feedback & Ideenschmiede Modal */}
+      <FeedbackHubModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        userRole="teacher"
+        userId={userId}
+        userName={formatTeacherFullName(teacher) || 'Lehrkraft'}
+        schoolId={teacher?.school_id || school?.id}
+        schoolName={school?.name}
+        activePlatform="campus"
       />
     </div>
   );

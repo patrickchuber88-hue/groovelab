@@ -15,7 +15,7 @@ interface WormLogEntry {
   actorRole: string;
   actorName: string;
   action: string;
-  category: 'SECURITY' | 'DATA_PRIVACY' | 'RLS_POLICY' | 'USER_LIFECYCLE' | 'LEGAL_TAKEDOWN';
+  category: 'ACCESS_TRANSPARENCY' | 'SECURITY' | 'DATA_PRIVACY' | 'RLS_POLICY' | 'USER_LIFECYCLE' | 'LEGAL_TAKEDOWN';
   target: string;
   status: 'VERIFIED_WORM' | 'AUDITED';
   hash: string;
@@ -114,7 +114,40 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
     }
   ];
 
-  const filteredLogs = logs.filter(log => {
+  // Dynamic Access Transparency / Support Logs
+  const dynamicLogs: WormLogEntry[] = (() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('campus_ghost_audit_trail');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item: any, idx: number) => {
+            const date = item.timestamp ? new Date(item.timestamp) : new Date();
+            const timeStr = formatGermanTime(date);
+            const roleName = item.role === 'teacher' ? 'Lehrkraft (Shadow)' : 'Verwaltung';
+            const durMin = Math.max(1, Math.round((item.durationSeconds || 60) / 60));
+            return {
+              id: item.id || `WORM-SUP-${10500 + idx}`,
+              timestamp: timeStr,
+              actorRole: 'MASTER_ADMIN',
+              actorName: `Patrick Huber (${item.operator || 'Platform Lead'})`,
+              action: `Support- & Diagnose-Sitzung (Access Transparency gem. Art. 28 DSGVO): Perspektive ${roleName}, Dauer: ${durMin} Min.`,
+              category: 'ACCESS_TRANSPARENCY' as const,
+              target: `Mandant ${item.schoolName || cleanSchoolName}`,
+              status: 'VERIFIED_WORM' as const,
+              hash: 'c8f1e290' + Math.abs((item.id || '').split('').reduce((a: any, b: any) => ((a << 5) - a) + b.charCodeAt(0), 0)).toString(16).padStart(56, 'f')
+            };
+          });
+        }
+      }
+    } catch (e) {}
+    return [];
+  })();
+
+  const allLogs: WormLogEntry[] = [...dynamicLogs, ...logs];
+
+  const filteredLogs = allLogs.filter(log => {
     const matchesSearch = log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           log.actorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           log.id.toLowerCase().includes(searchQuery.toLowerCase());
@@ -450,6 +483,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                       }}
                     >
                       <option value="ALL">Alle Ereignis-Kategorien</option>
+                      <option value="ACCESS_TRANSPARENCY">Support-Zugriffe (Art. 28 DSGVO)</option>
                       <option value="DATA_PRIVACY">Datenschutz & Maskierung</option>
                       <option value="RLS_POLICY">Mandantentrennung (RLS)</option>
                       <option value="SECURITY">Sicherheit & Hardware</option>
@@ -558,14 +592,14 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                         </td>
                         <td style={{ padding: '18px 24px' }}>
                           <span style={{
-                            background: log.category === 'DATA_PRIVACY' ? '#e6f4ea' : log.category === 'SECURITY' ? '#eff6ff' : '#fef3c7',
-                            color: log.category === 'DATA_PRIVACY' ? '#047857' : log.category === 'SECURITY' ? '#1d4ed8' : '#b45309',
+                            background: log.category === 'ACCESS_TRANSPARENCY' ? '#ecfeff' : log.category === 'DATA_PRIVACY' ? '#e6f4ea' : log.category === 'SECURITY' ? '#eff6ff' : '#fef3c7',
+                            color: log.category === 'ACCESS_TRANSPARENCY' ? '#0891b2' : log.category === 'DATA_PRIVACY' ? '#047857' : log.category === 'SECURITY' ? '#1d4ed8' : '#b45309',
                             padding: '4px 10px',
                             borderRadius: '8px',
                             fontSize: '0.68rem',
                             fontWeight: 800
                           }}>
-                            {log.category}
+                            {log.category === 'ACCESS_TRANSPARENCY' ? 'SUPPORT (ART. 28 DSGVO)' : log.category}
                           </span>
                         </td>
                         <td style={{ padding: '18px 24px' }}>

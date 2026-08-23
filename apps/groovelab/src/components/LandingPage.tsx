@@ -33,6 +33,8 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
     kombi: masterPricing.priceKombi,
     teacher: masterPricing.priceTeacher,
     student: masterPricing.priceStudent,
+    passiveStudent: masterPricing.pricePassiveStudent ?? 0.09,
+    storageAddon: masterPricing.priceStorageAddon ?? 2.99,
     freeMonthsPerYear: masterPricing.freeMonthsPerYear,
     billingMonthsPerYear: masterPricing.billingMonthsPerYear,
     kombiSavings: masterPricing.kombiSavings,
@@ -1347,7 +1349,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 lineHeight: 1.6,
                 fontWeight: 550
               }}>
-                Keine Einrichtungsgebühr und keine Softwaregebühren (Software dauerhaft zu 100% kostenlos). Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab 4,99 € / Mo.) und aktive Profile.
+                Keine Einrichtungsgebühr und keine Softwaregebühren (Software dauerhaft zu 100% kostenlos). Verwaltungs- und Sekretariats-Nutzer sowie inaktive Profile in der Datenbank sind 100% kostenlos. Sie bezahlen ausschließlich das dedizierte Server-Hosting (ab {Math.min(pricing.campus, pricing.groovelab).toFixed(2).replace('.', ',')} € / Mo.) und aktive Profile.
               </p>
             </div>
 
@@ -1576,7 +1578,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span>• <strong>Vollständig:</strong> Eltern zahlen {pricing.student.toFixed(2).replace('.', ',')} €/Mo. Schule zahlt 0,00 € Schülergebühr.</span>
-                      <span>• <strong>Teilweise:</strong> Eltern zahlen 0,40 €/Mo, Schule stützt mit 0,09 €/Mo.</span>
+                      <span>• <strong>Teilweise:</strong> Eltern zahlen {Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)).toFixed(2).replace('.', ',')} €/Mo, Schule stützt mit {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Mo.</span>
                     </div>
 
                     {/* Solidaritätsversprechen Highlight Box */}

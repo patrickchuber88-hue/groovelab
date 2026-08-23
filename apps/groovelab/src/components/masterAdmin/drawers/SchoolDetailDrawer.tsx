@@ -4,6 +4,8 @@ import {
   Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles
 } from 'lucide-react';
 import { DpoAuditPortal } from '../../DpoAuditPortal';
+import { supabase } from '../../../lib/supabase';
+import { StorageTier, DEFAULT_STORAGE_TIERS, getStorageTierByGb } from '../../../domain/pricingEngine';
 
 interface SchoolDetailDrawerProps {
   school: any;
@@ -68,15 +70,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   // ═══════════════════════════════════════════════════════════════════════════
   // 🎙️ CANONICAL AUDIO-TRESOR QUOTA CALCULATION
   // ═══════════════════════════════════════════════════════════════════════════
-  const STORAGE_PACKAGES = [
-    { gb: 0, price: 0, label: '1 GB Basis', sublabel: 'Standard Inklusiv', desc: '0,00 € / Mo.' },
-    { gb: 5, price: 1.49, label: '+5 GB', sublabel: 'Bis 100 Schüler', desc: '1,49 € / Mo.' },
-    { gb: 10, price: 2.99, label: '+10 GB', sublabel: 'Bis 250 Schüler', desc: '2,99 € / Mo.' },
-    { gb: 20, price: 5.49, label: '+20 GB', sublabel: 'Bis 500 Schüler', desc: '5,49 € / Mo.' },
-    { gb: 50, price: 9.99, label: '+50 GB', sublabel: 'Bis 1.000 Schüler', desc: '9,99 € / Mo.' },
-    { gb: 100, price: 16.99, label: '+100 GB', sublabel: 'Konservatorien', desc: '16,99 € / Mo.' },
-    { gb: 250, price: 34.99, label: '+250 GB', sublabel: 'Groß-Institute', desc: '34,99 € / Mo.' }
-  ];
+  const STORAGE_PACKAGES = masterPricing?.storageTiers || DEFAULT_STORAGE_TIERS;
 
   const baseStorageGb = 1.0;
   const totalStorageGb = baseStorageGb + extraStorageGb;
@@ -91,7 +85,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
     : `${usedStorageGb.toFixed(2).replace('.', ',')} GB`;
   const formattedStoragePct = storageUsedBytes > 0 && storagePercentage < 1 ? '< 1%' : `${storagePercentage}%`;
 
-  const currentAddonPackage = STORAGE_PACKAGES.find(p => p.gb === extraStorageGb) || {
+  const currentAddonPackage = STORAGE_PACKAGES.find((p: StorageTier) => p.gb === extraStorageGb) || {
     gb: extraStorageGb,
     price: extraStorageGb === 20 ? 5.49 : extraStorageGb === 10 ? 2.99 : extraStorageGb === 5 ? 1.49 : Number((extraStorageGb * 0.25).toFixed(2)),
     label: `+${extraStorageGb} GB`,
@@ -140,11 +134,24 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   };
 
   // Open Ghost Session in New Tab
-  const handleTriggerGhostTab = () => {
+  const handleTriggerGhostTab = async () => {
     if (onStartGhostMode) {
       onStartGhostMode(school);
     } else {
-      window.open(`${window.location.origin}/?support_ghost=true&school_id=${school.id}&role=admin`, '_blank');
+      let targetUserId = '';
+      try {
+        const { data: adminUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('school_id', school.id)
+          .eq('role', 'admin')
+          .limit(1)
+          .maybeSingle();
+        if (adminUser?.id) targetUserId = adminUser.id;
+      } catch (e) {}
+
+      const userParam = targetUserId ? `&ghost_user_id=${targetUserId}` : '';
+      window.open(`${window.location.origin}/?support_ghost=true&school_id=${school.id}&role=admin${userParam}`, '_blank');
     }
   };
 
@@ -241,7 +248,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   color: isTrial ? '#d97706' : status === 'active' ? '#059669' : '#64748b',
                   border: `1px solid ${isTrial ? '#fde68a' : status === 'active' ? '#a7f3d0' : '#cbd5e1'}`
                 }}>
-                  {isTrial ? '⏱️ Testphase' : status === 'active' ? '● Aktiv' : 'Pausiert'}
+                  {isTrial ? 'Testphase' : status === 'active' ? '● Aktiv' : 'Pausiert'}
                 </span>
               </div>
               <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>
@@ -261,10 +268,10 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
           border: '1px solid #e2e8f0'
         }}>
           {[
-            { id: 'overview', label: '🏢 Stammdaten', icon: Building },
-            { id: 'licenses', label: '📜 Module &amp; Tarife', icon: Sliders },
-            { id: 'quotas', label: `🎙️ Audio-Tresor (${totalStorageGb} GB)`, icon: HardDrive },
-            { id: 'avv', label: '🛡️ DSGVO &amp; AVV', icon: ShieldCheck }
+            { id: 'overview', label: 'Stammdaten', icon: Building },
+            { id: 'licenses', label: 'Module & Tarife', icon: Sliders },
+            { id: 'quotas', label: `Audio-Tresor (${totalStorageGb} GB)`, icon: HardDrive },
+            { id: 'avv', label: 'DSGVO & AVV', icon: ShieldCheck }
           ].map((tab) => {
             const isSel = activeTab === tab.id;
             const Icon = tab.icon;
@@ -619,7 +626,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   cursor: 'pointer'
                 }}>
                   <div>
-                    <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem' }}>🏫 Modul Campus (7,99 € / Mo.)</div>
+                    <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem' }}>
+                      Modul Campus ({(masterPricing?.priceCampus ?? 14.90).toFixed(2).replace('.', ',')} € / Mo.)
+                    </div>
                     <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
                       Stundenplan-Designer, Raumplaner, Schüler-Protokoll, Übe-Timer &amp; Loopstation.
                     </div>
@@ -643,7 +652,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   cursor: 'pointer'
                 }}>
                   <div>
-                    <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem' }}>🎸 Modul GrooveLab (4,99 € / Mo.)</div>
+                    <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem' }}>
+                      Modul GrooveLab ({(masterPricing?.priceGroovelab ?? 9.90).toFixed(2).replace('.', ',')} € / Mo.)
+                    </div>
                     <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
                       Band-Verwaltung, Song-Bibliotheken, Repertoire-Planer &amp; Musiker-Avatare.
                     </div>
@@ -669,9 +680,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   justifyContent: 'space-between'
                 }}>
                   <div style={{ fontSize: '0.80rem', fontWeight: 800, color: '#065f46' }}>
-                    ✨ Kombi-Vorteilsrabatt aktiv (Infrastruktur-Bündel: 9,99 € statt 12,98 €)
+                    Kombi-Vorteilsrabatt aktiv (Infrastruktur-Bündel: 19,90 € statt 24,80 €)
                   </div>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#059669' }}>-2,99 € / Mo.</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#059669' }}>-4,90 € / Mo.</span>
                 </div>
               )}
             </div>
@@ -846,7 +857,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
-                  {STORAGE_PACKAGES.map((pkg) => {
+                  {STORAGE_PACKAGES.map((pkg: StorageTier) => {
                     const isSel = extraStorageGb === pkg.gb;
                     return (
                       <button
@@ -932,14 +943,14 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 </div>
 
                 <div style={{ marginTop: '8px', padding: '12px 14px', borderRadius: '12px', background: '#ecfdf5', border: '1px solid #a7f3d0', fontSize: '0.74rem', color: '#065f46', lineHeight: '1.5' }}>
-                  🛡️ <strong>DSGVO Art. 17 Physische Löschung:</strong> Alle gelöschten Audio-Einträge werden sofort physisch aus dem Hetzner-Tresor entfernt. Inaktive Demo-Files unterliegen einer 90-Tage-Retention.
+                  <strong>DSGVO Art. 17 Physische Löschung:</strong> Alle gelöschten Audio-Einträge werden sofort physisch aus dem Hetzner-Tresor entfernt. Inaktive Demo-Files unterliegen einer 90-Tage-Retention.
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* 🛡️ TAB 4: DSGVO & AVV */}
+        {/* TAB 4: DSGVO & AVV */}
         {activeTab === 'avv' && (
           <div style={{
             background: '#ffffff',
@@ -1041,7 +1052,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 }}
               >
                 <ShieldCheck size={18} color="#34a853" />
-                <span>🛡️ DSB- &amp; Audit-Portal für diese Schule öffnen</span>
+                <span>DSB- &amp; Audit-Portal für diese Schule öffnen</span>
               </button>
             </div>
           </div>

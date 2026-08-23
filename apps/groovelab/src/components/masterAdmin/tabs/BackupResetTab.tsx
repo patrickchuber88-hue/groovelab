@@ -6,7 +6,7 @@ import {
   ShieldAlert, Check, Copy, ArrowRight, Eye, Shield, Server, FileCheck,
   Play, X, ChevronRight, CheckCircle, ArrowLeft, Disc3, Mic, Music,
   Sliders, UserCheck, AlertOctagon, Activity, Zap, Info, ExternalLink,
-  Cpu, Award, ShieldQuestion
+  Cpu, Award, ShieldQuestion, RotateCcw
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 
@@ -328,8 +328,8 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
       setRestoring(false);
       setRestoreSuccessMessage(
         restoreScope === 'tenant'
-          ? `Mandant "${schools.find(s => s.id === selectedTenantForRestore)?.name || 'Schule'}" wurde erfolgreich auf Stand von ${selectedSnapshotForRestore?.id} zurückgesetzt! (🛡️ Dual-Plane Streak-Schutz & 48h Disaster Grace-Period aktiv)`
-          : `Der gesamte Datenbank-Cluster wurde erfolgreich auf Snapshot ${selectedSnapshotForRestore?.id} (${selectedSnapshotForRestore?.label}) wiederhergestellt! (🛡️ Dual-Plane Streak-Schutz & 48h Disaster Grace-Period aktiv)`
+          ? `Mandant "${schools.find(s => s.id === selectedTenantForRestore)?.name || 'Schule'}" wurde erfolgreich auf Stand von ${selectedSnapshotForRestore?.id} zurückgesetzt! (Dual-Plane Streak-Schutz & 48h Disaster Grace-Period aktiv)`
+          : `Der gesamte Datenbank-Cluster wurde erfolgreich auf Snapshot ${selectedSnapshotForRestore?.id} (${selectedSnapshotForRestore?.label}) wiederhergestellt! (Dual-Plane Streak-Schutz & 48h Disaster Grace-Period aktiv)`
       );
 
       const newAudit: AuditEntry = {
@@ -542,9 +542,13 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               borderRadius: '100px',
               background: '#ecfdf5',
               color: '#059669',
-              border: '1px solid #a7f3d0'
+              border: '1px solid #a7f3d0',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px'
             }}>
-              🟢 Tägliche Sicherung aktiv (03:00 Uhr)
+              <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+              Tägliche Sicherung aktiv (03:00 Uhr)
             </span>
           </div>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.95rem', color: '#64748b', fontWeight: 550 }}>
@@ -569,9 +573,19 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
-            className="hover-scale-mini"
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = '#0284c7';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(2, 132, 199, 0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.02)';
+            }}
           >
             <FolderArchive size={16} color="#0284c7" />
             <span>Schul-Vollarchiv exportieren</span>
@@ -593,22 +607,28 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
+              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
-            className="hover-scale-mini"
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 6px 18px rgba(16, 185, 129, 0.35)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(16, 185, 129, 0.25)';
+            }}
           >
             <Database size={16} />
-            <span>{creatingSnapshot ? 'Erstelle Snapshot...' : '⚡ Jetzt Sofort-Snapshot erstellen'}</span>
+            <span>{creatingSnapshot ? 'Erstelle Snapshot...' : 'Jetzt Sofort-Snapshot erstellen'}</span>
           </button>
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 📊 TIER-1 ENTERPRISE KPI RIBBON: RTO, RPO & DISASTER RECOVERY READINESS */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* KPI RIBBON: RTO, RPO & DISASTER RECOVERY READINESS */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
         gap: '16px'
       }}>
         {/* KPI 1: RPO */}
@@ -621,16 +641,23 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             border: '1px solid #e2e8f0',
             boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
             cursor: 'pointer',
-            transition: 'all 0.18s ease'
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
-          className="hover-scale-mini"
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(5, 150, 105, 0.08)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.02)';
+          }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Recovery Point (RPO)
             </span>
             <span style={{ fontSize: '0.68rem', fontWeight: 900, background: '#ecfdf5', color: '#059669', padding: '2px 8px', borderRadius: '100px', border: '1px solid #a7f3d0' }}>
-              SLA &lt; 6h 🟢
+              SLA &lt; 6h
             </span>
           </div>
           <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
@@ -652,16 +679,23 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             border: '1px solid #e2e8f0',
             boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
             cursor: 'pointer',
-            transition: 'all 0.18s ease'
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
-          className="hover-scale-mini"
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(29, 78, 216, 0.08)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.02)';
+          }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Recovery Time (RTO)
             </span>
             <span style={{ fontSize: '0.68rem', fontWeight: 900, background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '100px', border: '1px solid #bfdbfe' }}>
-              Hot-Standby ⚡
+              Hot-Standby
             </span>
           </div>
           <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
@@ -683,9 +717,16 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             border: '1px solid #a7f3d0',
             boxShadow: '0 4px 16px rgba(16,185,129,0.06)',
             cursor: 'pointer',
-            transition: 'all 0.18s ease'
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
-          className="hover-scale-mini"
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(5, 150, 105, 0.12)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(16,185,129,0.06)';
+          }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -697,7 +738,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             100 / 100
           </div>
           <div style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 700, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span>AES-256 &amp; Geo-Redundant ✓</span>
+            <span>AES-256 &amp; Geo-Redundant</span>
             <ChevronRight size={12} color="#059669" />
           </div>
         </div>
@@ -712,9 +753,16 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             border: '1px solid #e2e8f0',
             boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
             cursor: 'pointer',
-            transition: 'all 0.18s ease'
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
-          className="hover-scale-mini"
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(15, 23, 42, 0.08)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.02)';
+          }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -745,10 +793,10 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
         border: '1px solid #e2e8f0'
       }}>
         {[
-          { id: 'snapshots', label: `💾 Cloud-Snapshots & Simulator (${snapshots.length})`, icon: Database },
-          { id: 'export', label: '📦 DSGVO Art. 20 Datenexport', icon: Archive },
-          { id: 'reset', label: '🛡️ 3-Stufen Safe Reset Engine', icon: ShieldAlert },
-          { id: 'audit', label: `📜 Compliance Audit Trail (${auditLogs.length})`, icon: FileCheck }
+          { id: 'snapshots', label: `Cloud-Snapshots & Simulator (${snapshots.length})`, icon: Database },
+          { id: 'export', label: 'DSGVO Art. 20 Datenexport', icon: Archive },
+          { id: 'reset', label: '3-Stufen Safe Reset Engine', icon: ShieldAlert },
+          { id: 'audit', label: `Compliance Audit Trail (${auditLogs.length})`, icon: FileCheck }
         ].map((tab) => {
           const isSel = activeSubTab === tab.id;
           const Icon = tab.icon;
@@ -770,7 +818,13 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                 alignItems: 'center',
                 gap: '8px',
                 boxShadow: isSel ? '0 2px 8px rgba(0, 0, 0, 0.05)' : 'none',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}
+              onMouseOver={(e) => {
+                if (!isSel) e.currentTarget.style.color = '#0f172a';
+              }}
+              onMouseOut={(e) => {
+                if (!isSel) e.currentTarget.style.color = '#64748b';
               }}
             >
               <Icon size={15} color={isSel ? '#047857' : '#64748b'} />
@@ -781,7 +835,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 💾 SUB-TAB 1: CLOUD-SNAPSHOTS & RESTORE-SIMULATOR                      */}
+      {/* SUB-TAB 1: CLOUD-SNAPSHOTS & RESTORE-SIMULATOR                         */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {activeSubTab === 'snapshots' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
@@ -836,10 +890,14 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                   fontSize: '0.78rem',
                   fontWeight: backupWizardViewMode === 'wizard' ? 850 : 600,
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
                   boxShadow: backupWizardViewMode === 'wizard' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none'
                 }}
               >
-                ✨ Einfach (Assistent)
+                <Sparkles size={13} color={backupWizardViewMode === 'wizard' ? '#059669' : '#64748b'} />
+                <span>Einfach (Assistent)</span>
               </button>
               <button
                 type="button"
@@ -853,16 +911,20 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                   fontSize: '0.78rem',
                   fontWeight: backupWizardViewMode === 'expert' ? 850 : 600,
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
                   boxShadow: backupWizardViewMode === 'expert' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none'
                 }}
               >
-                🛠️ Experten-Tabelle
+                <Sliders size={13} color={backupWizardViewMode === 'expert' ? '#0f172a' : '#64748b'} />
+                <span>Experten-Tabelle</span>
               </button>
             </div>
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════════ */}
-          {/* ✨ WIZARD MODE: 3-SCHRITTE ASSISTENT                                 */}
+          {/* WIZARD MODE: 3-SCHRITTE ASSISTENT                                   */}
           {/* ═══════════════════════════════════════════════════════════════════ */}
           {backupWizardViewMode === 'wizard' ? (
             <div style={{
@@ -894,11 +956,21 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                       color: backupWizardAction === 'backup' ? '#065f46' : '#334155',
                       textAlign: 'left',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      boxShadow: backupWizardAction === 'backup' ? '0 2px 8px rgba(5, 150, 105, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = backupWizardAction === 'backup' ? '0 2px 8px rgba(5, 150, 105, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)';
                     }}
                   >
                     <div style={{ fontWeight: 900, fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      💾 Neues Backup erstellen
+                      <Database size={16} color={backupWizardAction === 'backup' ? '#059669' : '#64748b'} />
+                      <span>Neues Backup erstellen</span>
                     </div>
                     <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '3px' }}>
                       Sichert den aktuellen Stand in Echtzeit (0 Sek. Ausfall)
@@ -916,11 +988,21 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                       color: backupWizardAction === 'restore' ? '#92400e' : '#334155',
                       textAlign: 'left',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      boxShadow: backupWizardAction === 'restore' ? '0 2px 8px rgba(217, 119, 6, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = backupWizardAction === 'restore' ? '0 2px 8px rgba(217, 119, 6, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)';
                     }}
                   >
                     <div style={{ fontWeight: 900, fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      ⏪ Datenstand wiederherstellen
+                      <RotateCcw size={16} color={backupWizardAction === 'restore' ? '#d97706' : '#64748b'} />
+                      <span>Datenstand wiederherstellen</span>
                     </div>
                     <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '3px' }}>
                       Rollback auf einen früheren Snapshot mit Revert-Garantie
@@ -938,11 +1020,21 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                       color: backupWizardAction === 'export' ? '#0369a1' : '#334155',
                       textAlign: 'left',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      boxShadow: backupWizardAction === 'export' ? '0 2px 8px rgba(2, 132, 199, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = backupWizardAction === 'export' ? '0 2px 8px rgba(2, 132, 199, 0.1)' : '0 1px 3px rgba(0,0,0,0.02)';
                     }}
                   >
                     <div style={{ fontWeight: 900, fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      📦 Schuldaten exportieren
+                      <Archive size={16} color={backupWizardAction === 'export' ? '#0284c7' : '#64748b'} />
+                      <span>Schuldaten exportieren</span>
                     </div>
                     <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '3px' }}>
                       DSGVO Art. 20 Datenarchiv für Schulleitungen
@@ -979,7 +1071,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                           cursor: 'pointer'
                         }}
                       >
-                        🏫 Einzelne Musikschule
+                        Einzelne Musikschule
                       </button>
                       <button
                         type="button"
@@ -996,7 +1088,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                           cursor: 'pointer'
                         }}
                       >
-                        🌐 Gesamte Plattform
+                        Gesamte Plattform
                       </button>
                     </div>
                   </div>
@@ -1034,7 +1126,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                 {/* Integrated Streak-Immunity Badges */}
                 <div style={{ marginTop: '14px', padding: '12px 14px', borderRadius: '12px', background: '#ecfdf5', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.76rem', color: '#065f46', fontWeight: 700 }}>
                   <ShieldCheck size={16} />
-                  <span>🛡️ <strong>Dual-Plane Schutz &amp; Streak-Immunität aktiv:</strong> Übefortschritte, Streaks &amp; Hausaufgaben der Kinder sind automatisch vor Verlust geschützt.</span>
+                  <span><strong>Dual-Plane Schutz &amp; Streak-Immunität aktiv:</strong> Übefortschritte, Streaks &amp; Hausaufgaben der Kinder sind automatisch vor Verlust geschützt.</span>
                 </div>
               </div>
 
@@ -1085,7 +1177,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                         cursor: 'pointer'
                       }}
                     >
-                      <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>🟢 Heute 03:00 Uhr</div>
+                      <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>Heute 03:00 Uhr</div>
                       <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>Letztes automatisches Backup</div>
                     </button>
 
@@ -1102,7 +1194,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                         cursor: 'pointer'
                       }}
                     >
-                      <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>🟡 Gestern 03:00 Uhr</div>
+                      <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>Gestern 03:00 Uhr</div>
                       <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>Stand des Vortages</div>
                     </button>
 
@@ -1119,7 +1211,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                         cursor: 'pointer'
                       }}
                     >
-                      <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>⚡ Release Pre-Update</div>
+                      <div style={{ fontWeight: 900, fontSize: '0.80rem' }}>Release Pre-Update</div>
                       <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>Stand vor letztem Release</div>
                     </button>
                   </div>
@@ -1135,12 +1227,12 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               {/* ZUSAMMENFASSUNG & 1-KLICK AUSFÜHRUNG */}
               <div style={{ background: '#ecfdf5', borderRadius: '18px', padding: '18px', border: '1px solid #a7f3d0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ fontWeight: 850, color: '#065f46', fontSize: '0.86rem' }}>
-                  📋 Zusammenfassung deiner Auswahl:
+                  Zusammenfassung deiner Auswahl:
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#065f46', lineHeight: '1.6' }}>
-                  • <strong>Aktion:</strong> {backupWizardAction === 'backup' ? '💾 Neues Cloud-Snapshot anlegen' : backupWizardAction === 'restore' ? '⏪ Datenstand zurücksetzen (Live-Simulation)' : '📦 DSGVO Art. 20 Export'}<br />
-                  • <strong>Geltungsbereich:</strong> {backupWizardScope === 'tenant' ? `🏫 Schule: ${schools.find(s => s.id === backupWizardTenant)?.name || 'Gewählte Schule'}` : '🌐 Gesamter Plattform-Cluster'}<br />
-                  • <strong>Streak-Schutz:</strong> 🛡️ Dual-Plane Gamification-Isolation &amp; 48h Disaster Grace-Period aktiv.
+                  • <strong>Aktion:</strong> {backupWizardAction === 'backup' ? 'Neues Cloud-Snapshot anlegen' : backupWizardAction === 'restore' ? 'Datenstand zurücksetzen (Live-Simulation)' : 'DSGVO Art. 20 Export'}<br />
+                  • <strong>Geltungsbereich:</strong> {backupWizardScope === 'tenant' ? `Schule: ${schools.find(s => s.id === backupWizardTenant)?.name || 'Gewählte Schule'}` : 'Gesamter Plattform-Cluster'}<br />
+                  • <strong>Streak-Schutz:</strong> Dual-Plane Gamification-Isolation &amp; 48h Disaster Grace-Period aktiv.
                 </div>
 
                 <button
@@ -1187,10 +1279,10 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                   {creatingSnapshot || exporting ? <RefreshCw size={16} className="animate-spin" /> : <Sparkles size={16} />}
                   <span>
                     {backupWizardAction === 'backup'
-                      ? (creatingSnapshot ? 'Sichere Snapshot...' : '🪄 Cloud-Backup jetzt sofort erstellen')
+                      ? (creatingSnapshot ? 'Sichere Snapshot...' : 'Cloud-Backup jetzt sofort erstellen')
                       : backupWizardAction === 'restore'
-                      ? '🪄 Live Restore-Simulator sicher starten'
-                      : (exporting ? 'Exportiere Daten...' : '🪄 DSGVO Datenexport jetzt herunterladen')}
+                      ? 'Live Restore-Simulator sicher starten'
+                      : (exporting ? 'Exportiere Daten...' : 'DSGVO Datenexport jetzt herunterladen')}
                   </span>
                 </button>
               </div>
@@ -1299,9 +1391,9 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '12px', gap: '3px' }}>
                 {[
                   { id: 'all', label: `Alle (${snapshots.length})` },
-                  { id: 'hot', label: '🟢 Hot Tier (7 Tage)' },
-                  { id: 'warm', label: '🟡 Warm Tier (4 Wochen)' },
-                  { id: 'cold', label: '🔵 Cold Vault (12 Mo.)' }
+                  { id: 'hot', label: 'Hot Tier (7 Tage)', dotColor: '#059669' },
+                  { id: 'warm', label: 'Warm Tier (4 Wochen)', dotColor: '#d97706' },
+                  { id: 'cold', label: 'Cold Vault (12 Mo.)', dotColor: '#0284c7' }
                 ].map((tier) => (
                   <button
                     key={tier.id}
@@ -1316,10 +1408,17 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                       fontSize: '0.76rem',
                       fontWeight: retentionTierFilter === tier.id ? 850 : 600,
                       cursor: 'pointer',
-                      boxShadow: retentionTierFilter === tier.id ? '0 1px 4px rgba(0,0,0,0.06)' : 'none'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      boxShadow: retentionTierFilter === tier.id ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    {tier.label}
+                    {tier.dotColor && (
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: tier.dotColor }} />
+                    )}
+                    <span>{tier.label}</span>
                   </button>
                 ))}
               </div>
@@ -1354,7 +1453,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                           color: snap.type === 'automated_nightly' ? '#15803d' : '#1d4ed8',
                           border: `1px solid ${snap.type === 'automated_nightly' ? '#bbf7d0' : '#bfdbfe'}`
                         }}>
-                          {snap.type === 'automated_nightly' ? '🤖 Tägliche Routine' : '⚡ Manuelles Pre-Update'}
+                          {snap.type === 'automated_nightly' ? 'Tägliche Routine' : 'Manuelles Pre-Update'}
                         </span>
                         <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>{snap.operator}</div>
                       </td>
@@ -1501,7 +1600,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
 
               {/* SLA Metrics Explanation */}
               <div style={{ background: '#ecfdf5', borderRadius: '16px', padding: '18px', border: '1px solid #a7f3d0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ fontWeight: 900, color: '#065f46', fontSize: '0.90rem' }}>🛡️ Garantierte Notfall-Kennzahlen (SLAs):</div>
+                <div style={{ fontWeight: 900, color: '#065f46', fontSize: '0.90rem' }}>Garantierte Notfall-Kennzahlen (SLAs):</div>
                 <div style={{ fontSize: '0.80rem', color: '#065f46', lineHeight: '1.6' }}>
                   • <strong>Recovery Point Objective (RPO):</strong> Garantiert maximal 6 Stunden Datenstand-Differenz bei totalem physischem RZ-Ausfall.<br />
                   • <strong>Recovery Time Objective (RTO):</strong> Automatisierter DNS- &amp; Container-Failover in unter 15 Minuten einsatzbereit.<br />

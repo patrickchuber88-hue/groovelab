@@ -15,8 +15,13 @@ export default defineConfig({
     host: true, // Listen on all network addresses (0.0.0.0, 127.0.0.1, localhost)
     port: 5173,
     strictPort: true,
+    cors: true,
     // Alle URL-Pfade (wie /qr/:token) auf index.html fallbacken — SPA-Routing
     historyApiFallback: true,
+    watch: {
+      // Ignoriere Build-Output und temporäre Verzeichnisse, damit Dev-Server bei Hintergrund-Builds nicht einfriert
+      ignored: ['**/dist/**', '**/.git/**', '**/coverage/**', '**/*.log', '**/.system_generated/**']
+    }
   },
   build: {
     sourcemap: false, // Strict block on production source maps
