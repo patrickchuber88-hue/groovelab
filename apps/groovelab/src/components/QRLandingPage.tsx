@@ -9511,8 +9511,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         </div>
                         <span style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.35, fontWeight: 500 }}>
                           {isPartial 
-                            ? 'Deine Musikschule bezuschusst deinen Zugang. Die Cloud-Bereitstellung wird als transparente Einmalzahlung für das Schuljahr abgerechnet (keine automatische Verlängerung, keine gesonderten Lizenzgebühren).' 
-                            : 'Cloud- & Modul-Bereitstellung für deinen vollen Campus-Zugang (Einmalzahlung für das Schuljahr, keine automatische Verlängerung, keine gesonderten Lizenzgebühren).'}
+                            ? 'Deine Musikschule bezuschusst deinen Zugang. Die Cloud-Bereitstellung wird als transparente Einmalzahlung für das Schuljahr abgerechnet (keine automatische Verlängerung, keine gesonderten Lizenzkaufgebühren).' 
+                            : 'Cloud- & Modul-Bereitstellung für deinen vollen Campus-Zugang (Einmalzahlung für das Schuljahr, keine automatische Verlängerung, keine gesonderten Lizenzkaufgebühren).'}
                         </span>
 
                         {/* 🛡️ Treue-Preisgarantie Badge */}
@@ -9529,6 +9529,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           <ShieldCheck size={16} color="#16a34a" style={{ flexShrink: 0 }} />
                           <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 700, lineHeight: 1.3 }}>
                             <strong style={{ color: '#166534' }}>🛡️ Treue-Preisgarantie:</strong> Solange dein Profil aktiv bleibt, ist dein Preis von {monthlyPrice} / Mo. dauerhaft geschützt! Bei Kündigung erlischt der Treuepreis.
+                          </span>
+                        </div>
+
+                        {/* 🟢 30-Tage Gratis-Testphase Info-Pill */}
+                        <div style={{
+                          marginTop: '6px',
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '8px'
+                        }}>
+                          <Sparkles size={16} color="#22c55e" style={{ flexShrink: 0, marginTop: '2px' }} />
+                          <span style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.35 }}>
+                            <strong style={{ color: '#0f172a' }}>30 Tage kostenfrei testen:</strong> Die ersten 30 Tage sind 100% kostenfrei (0,00 €). Sie können die Testphase jederzeit im Dashboard mit 1 Klick beenden.
                           </span>
                         </div>
                       </div>

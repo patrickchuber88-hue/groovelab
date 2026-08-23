@@ -154,8 +154,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           name: 'Kombi-Vorteilsrabatt (Infrastruktur-Bündel)',
           description: 'Preisvorteil bei paralleler Bereitstellung von Campus + GrooveLab',
           quantity: 1,
-          unitPrice: -2.99,
-          totalPrice: -2.99,
+          unitPrice: -masterPricing.kombiSavings,
+          totalPrice: -masterPricing.kombiSavings,
           vatPercent: 0
         });
       }
@@ -512,8 +512,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                             <span style={{ fontSize: '0.68rem', color: '#137333' }}>Preisvorteil bei paralleler Bereitstellung von Campus + GrooveLab</span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right' }}>1 Monat</td>
-                          <td style={{ padding: '8px', textAlign: 'right' }}>-2,99 €</td>
-                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700 }}>-2,99 €</td>
+                          <td style={{ padding: '8px', textAlign: 'right' }}>-{masterPricing.kombiSavings.toFixed(2).replace('.', ',')} €</td>
+                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700 }}>-{masterPricing.kombiSavings.toFixed(2).replace('.', ',')} €</td>
                         </tr>
                       )}
 
@@ -623,8 +623,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                           <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Modul Campus (Sammelabrechnung)</strong>
                           <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
                             {studentBillingOption === 'option2' 
-                              ? `Monatliche Cloud-Bereitstellung für Schüler-Profile (Umlagesatz = ${masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo.). Keine gesonderten Lizenzgebühren.`
-                              : `Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = ${((invoice.studentFee || 4.80) / (invoice.restmonate || 12)).toFixed(2).replace('.', ',')} € / Mo. für ${invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzgebühren.`
+                              ? `Monatliche Cloud-Bereitstellung für Schüler-Profile (Umlagesatz = ${masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo.). Keine gesonderten Lizenzkaufgebühren.`
+                              : `Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = ${((invoice.studentFee || 4.80) / (invoice.restmonate || 12)).toFixed(2).replace('.', ',')} € / Mo. für ${invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzkaufgebühren.`
                             }
                             {studentBillingOption === 'option3_2' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
                             {studentBillingOption === 'option3_3' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}

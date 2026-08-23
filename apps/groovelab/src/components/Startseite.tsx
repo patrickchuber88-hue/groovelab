@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Search, School, MapPin, Loader2, ArrowRight } from 'lucide-react';
+import { Sparkles, Search, School, MapPin, Loader2, ArrowRight, ShieldCheck, Lock, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface StartseiteProps {
@@ -22,6 +22,24 @@ export const Startseite: React.FC<StartseiteProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Secret Master Admin Modal State
+  const [showMasterModal, setShowMasterModal] = useState(false);
+  const [isLoggingInMaster, setIsLoggingInMaster] = useState(false);
+  const [masterAuthError, setMasterAuthError] = useState<string | null>(null);
+  const bgClicksRef = useRef<{ count: number; lastTime: number }>({ count: 0, lastTime: 0 });
+
+  // Secret Keyboard Shortcut: Ctrl + Shift + M or Cmd + Shift + M
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'M' || e.key === 'm')) {
+        e.preventDefault();
+        setShowMasterModal(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Close results when clicking outside
   useEffect(() => {
@@ -170,21 +188,71 @@ export const Startseite: React.FC<StartseiteProps> = ({
     }
   };
 
-  const handleLogoDoubleClick = () => {
-    if (typeof window !== 'undefined') {
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if (isLocalhost) {
-        window.location.href = `http://${window.location.hostname}:${window.location.port}/login?platform=campus`;
-      } else {
-        const parts = window.location.hostname.replace('www.', '').split('.');
-        const baseDomain = parts.slice(-2).join('.');
-        window.location.href = `${window.location.protocol}//${baseDomain}/login?platform=campus`;
+  const handleBackgroundClick = (e: React.MouseEvent | React.TouchEvent) => {
+    // Only count clicks on the background canvas, ignoring search inputs, results, buttons, footer links, and modals
+    const target = e.target as HTMLElement;
+    if (target.closest('.magic-search-container, .footer-link, .search-result-item, .master-auth-modal, input, button')) {
+      return;
+    }
+    const now = Date.now();
+    // Ignore synthetic click right after touch
+    if (now - bgClicksRef.current.lastTime < 60) return;
+
+    if (now - bgClicksRef.current.lastTime < 1800) {
+      bgClicksRef.current.count += 1;
+    } else {
+      bgClicksRef.current.count = 1;
+    }
+    bgClicksRef.current.lastTime = now;
+
+    if (bgClicksRef.current.count >= 5) {
+      bgClicksRef.current.count = 0;
+      setShowMasterModal(true);
+    }
+  };
+
+  const handleMasterLogin = async () => {
+    setIsLoggingInMaster(true);
+    setMasterAuthError(null);
+    try {
+      sessionStorage.removeItem('groovelab_is_master_admin');
+
+      // Query for master admin user in Supabase
+      const { data: adminUsers, error } = await supabase
+        .from('users')
+        .select('id, role, is_master_admin, school_id, first_name, last_name')
+        .limit(30);
+
+      if (error) throw error;
+
+      let targetUser: any = null;
+      if (adminUsers && adminUsers.length > 0) {
+        targetUser = adminUsers.find((u: any) => u.is_master_admin === true) ||
+                     adminUsers.find((u: any) => u.first_name?.toLowerCase().includes('patrick') && u.role === 'admin') ||
+                     adminUsers.find((u: any) => u.role === 'admin') ||
+                     adminUsers[0];
       }
+
+      const targetId = targetUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90';
+
+      sessionStorage.setItem('groovelab_user_id', targetId);
+      sessionStorage.setItem('groovelab_is_master_admin', 'true');
+      sessionStorage.removeItem('groovelab_qr_token');
+
+      // Refresh to load Master Cockpit
+      window.location.href = '/';
+    } catch (err: any) {
+      console.error('Master admin auth error:', err);
+      setMasterAuthError(err.message || 'Authentifizierungsfehler');
+      setIsLoggingInMaster(false);
     }
   };
 
   return (
-    <div style={{
+    <div 
+      onClick={handleBackgroundClick}
+      onTouchEnd={handleBackgroundClick}
+      style={{
       minHeight: '100vh',
       background: '#050505', // Deep absolute dark
       fontFamily: '"Outfit", "Inter", system-ui, -apple-system, sans-serif',
@@ -390,7 +458,6 @@ export const Startseite: React.FC<StartseiteProps> = ({
         {/* Header / Brand */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', marginBottom: '16px' }}>
           <div 
-            onDoubleClick={handleLogoDoubleClick}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -405,7 +472,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
               boxShadow: '0 4px 12px rgba(16, 185, 129, 0.05)',
-              cursor: 'pointer',
+              cursor: 'default',
               userSelect: 'none'
             }}>
             <Sparkles size={14} style={{ color: '#facc15' }} />
@@ -549,6 +616,167 @@ export const Startseite: React.FC<StartseiteProps> = ({
         <div className="footer-link" onClick={() => onShowAgb?.()}>AGB</div>
         <div className="footer-link" onClick={() => onShowImpressum?.()}>Impressum</div>
       </div>
+
+      {/* Secret Master Admin Authentication Modal */}
+      {showMasterModal && (
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowMasterModal(false);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(0, 0, 0, 0.82)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div 
+            className="master-auth-modal"
+            style={{
+              background: 'linear-gradient(145deg, #141418 0%, #0a0a0d 100%)',
+              border: '1px solid rgba(234, 179, 8, 0.35)',
+              borderRadius: '24px',
+              padding: '36px 32px 32px',
+              maxWidth: '440px',
+              width: '100%',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(234, 179, 8, 0.12)',
+              position: 'relative',
+              textAlign: 'center',
+              color: '#ffffff'
+            }}
+          >
+            <button
+              onClick={() => setShowMasterModal(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#a1a1aa',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <X size={16} />
+            </button>
+
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '18px',
+              background: 'rgba(234, 179, 8, 0.12)',
+              border: '1px solid rgba(234, 179, 8, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px auto',
+              color: '#facc15'
+            }}>
+              <ShieldCheck size={30} />
+            </div>
+
+            <div style={{
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: '#facc15',
+              marginBottom: '6px'
+            }}>
+              Privilegierter Systemzugang
+            </div>
+
+            <h3 style={{
+              fontSize: '1.45rem',
+              fontWeight: 800,
+              margin: '0 0 8px 0',
+              color: '#ffffff'
+            }}>
+              Master Cockpit Login
+            </h3>
+
+            <p style={{
+              fontSize: '0.85rem',
+              color: '#94a3b8',
+              lineHeight: 1.5,
+              margin: '0 0 24px 0'
+            }}>
+              Direkte Authentifizierung als Plattform-Masteradministrator für Wartung, Instanzverwaltung & Systemtelemetrie.
+            </p>
+
+            {masterAuthError && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#fca5a5',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                fontSize: '0.82rem',
+                marginBottom: '16px'
+              }}>
+                {masterAuthError}
+              </div>
+            )}
+
+            <button
+              onClick={handleMasterLogin}
+              disabled={isLoggingInMaster}
+              style={{
+                width: '100%',
+                padding: '15px 20px',
+                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                color: '#000000',
+                border: 'none',
+                borderRadius: '16px',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                cursor: isLoggingInMaster ? 'not-allowed' : 'pointer',
+                boxShadow: '0 8px 24px rgba(234, 179, 8, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s',
+                opacity: isLoggingInMaster ? 0.7 : 1
+              }}
+            >
+              {isLoggingInMaster ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Authentifiziere Master Cockpit...
+                </>
+              ) : (
+                <>
+                  <Lock size={18} />
+                  Master Cockpit starten
+                </>
+              )}
+            </button>
+
+            <div style={{
+              fontSize: '0.72rem',
+              color: '#64748b',
+              marginTop: '18px',
+              fontWeight: 500
+            }}>
+              Shortcut: <code style={{ color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }}>Ctrl + Shift + M</code> oder 5× Hintergrundklick
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

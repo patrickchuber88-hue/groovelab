@@ -437,7 +437,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     <td style={{ padding: dynamicTdPadding }}>
                       <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Modul Campus (Sammelabrechnung)</strong>
                       <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                        Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = 0,40 € / Mo. für {invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzgebühren.
+                        Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = 0,40 € / Mo. für {invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzkaufgebühren.
                         {school.studentBillingOption === 'option3_2' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
                         {school.studentBillingOption === 'option3_3' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
                       </span>

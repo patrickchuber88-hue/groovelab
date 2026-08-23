@@ -129,5 +129,15 @@
 - **Deterministic State Reflection (Keine UI-Inferenz-Drifts)**:
   - Frontend-Komponenten dürfen niemals heuristische Defaults (wie `?? true`) verwenden, die den tatsächlichen Datenbankzustand verschleiern. Der in der UI angezeigte und abgerechnete Zustand muss immer der exakte, unmanipulierte Boolean-Wert (`Boolean(u.is_campus_active)`) aus der Datenbank sein.
 
+## Legal & Business Model Alignment (Single Source of Truth)
+- **Kanonisches Legal-Wording Dictionary**: Alle juristischen, preislichen und geschäftsmodellbezogenen Formulierungen müssen zwingend aus `apps/groovelab/src/constants/legalMasterWording.ts` (`LEGAL_MASTER_WORDING`) bezogen werden.
+- **Die 5 Unumstößlichen Geschäftsmodell-Axiome**:
+  1. **Basis-Software:** `0,00 € (Inklusive)` – Keine Einrichtungsgebühr, keine Lizenzkaufgebühr.
+  2. **Absolute Modularität:** Campus (14,90 €), GrooveLab (9,90 €) und Kombi (19,90 €) sind **immer modular wählbar**. Es darf niemals suggeriert werden, dass beide Module zwingend zusammen gebucht werden müssen.
+  3. **Zero-Mail-Architektur:** Logins, Ausweise, Notfall-PINs und Gerätewechsel laufen rein clientseitig / per QR-Code / Passkey / AirDrop – niemals mit Mail-Server-Zwang.
+  4. **Sammelzahler vs. Direktabrechnung:** GrooveLab wird **immer** vollständig von der Schule getragen. Nur für Campus gibt es optional die Eltern-Direktabrechnung.
+  5. **Admin-Identität:** Schulleitung & Sekretariat (`admin`, `secretary`) haben **immer** `/campus_login_hero.png` und niemals Musiker-Avatare.
+
+
 
 

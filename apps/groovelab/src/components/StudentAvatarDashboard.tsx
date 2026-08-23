@@ -2174,8 +2174,44 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
   const [loading, setLoading] = useState(true);
   const [operatorDetails, setOperatorDetails] = useState<any>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [showCancelConfirmModal, setShowCancelConfirmModal] = useState<boolean>(false);
+  const [isCancellingTrial, setIsCancellingTrial] = useState<boolean>(false);
+  const [trialCancelledSuccess, setTrialCancelledSuccess] = useState<boolean>(false);
   const lastFetchRef = useRef<number>(0);
   const invoicesLoadedRef = useRef<boolean>(false);
+
+  // 30-Tage Gratis-Testphase Berechnung & Status
+  const actDate = studentUser?.activated_at ? new Date(studentUser.activated_at) : new Date(studentUser?.created_at || Date.now());
+  const trialEndDate = new Date(actDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const daysRemaining = Math.max(0, Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+  const isInTrial = daysRemaining > 0 && Boolean(studentUser?.is_campus_active);
+  const isCancelled = !studentUser?.is_campus_active && (studentUser?.cancellation_reason || !studentUser?.is_active);
+
+  const handleCancelTrial = async () => {
+    setIsCancellingTrial(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          is_campus_active: false,
+          cancellation_reason: 'Widerruf / Kündigung in 30-Tage Testphase durch Nutzer',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', studentId);
+
+      if (error) throw error;
+      setTrialCancelledSuccess(true);
+      setShowCancelConfirmModal(false);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1400);
+    } catch (err) {
+      console.error('Error cancelling trial:', err);
+      alert('Fehler beim Beenden der Testphase. Bitte wende dich an den Support.');
+    } finally {
+      setIsCancellingTrial(false);
+    }
+  };
 
   useEffect(() => {
     const fetchBillingData = async () => {
@@ -2292,8 +2328,92 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
         <FileText size={18} color="#34a853" /> Abrechnung & Rechnungen
       </h3>
       <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '16px', fontWeight: 600, lineHeight: '1.4' }}>
-        Hier findest du die Rechnungen für deine Cloud- & Modul-Bereitstellung (Rest-Schuljahrespauschale). Die Software-Nutzung ist im gebuchten Bereitstellungspaket ohne gesonderte Lizenzgebühren enthalten.
+        Hier findest du die Rechnungen für deine Cloud- & Modul-Bereitstellung (Rest-Schuljahrespauschale). Die Software-Nutzung ist im gebuchten Bereitstellungspaket ohne gesonderte Lizenzkaufgebühren enthalten.
       </p>
+
+      {/* 🟢 30-Tage Gratis-Testphase Hero Card */}
+      {isInTrial ? (
+        <div style={{
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+          border: '1.5px solid #86efac',
+          borderRadius: '18px',
+          padding: '18px 20px',
+          marginBottom: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          boxShadow: '0 4px 14px rgba(34, 197, 94, 0.08)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Sparkles size={20} color="#15803d" />
+              <strong style={{ fontSize: '0.92rem', color: '#14532d', fontWeight: 850 }}>
+                30-Tage Gratis-Testphase aktiv (Noch {daysRemaining} {daysRemaining === 1 ? 'Tag' : 'Tage'})
+              </strong>
+            </div>
+            <span style={{
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              padding: '4px 10px',
+              borderRadius: '8px',
+              background: '#22c55e',
+              color: '#ffffff',
+              letterSpacing: '0.02em'
+            }}>
+              0,00 € (KOSTENFREI)
+            </span>
+          </div>
+
+          <p style={{ margin: 0, fontSize: '0.78rem', color: '#166534', lineHeight: 1.45, fontWeight: 550 }}>
+            Du und deine Eltern nutzen Campus-Groovelab in den ersten 30 Tagen völlig kostenfrei (0,00 €). Du kannst alle Funktionen unverbindlich nutzen. Während dieser 30 Tage kannst du die Testphase jederzeit mit 1 Klick beenden – ohne Kosten und ohne Pflichten (§ 312k BGB).
+          </p>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '4px' }}>
+            <button
+              type="button"
+              onClick={() => setShowCancelConfirmModal(true)}
+              style={{
+                background: '#ffffff',
+                border: '1.5px solid #fca5a5',
+                color: '#dc2626',
+                borderRadius: '10px',
+                padding: '7px 14px',
+                fontSize: '0.74rem',
+                fontWeight: 750,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <RotateCcw size={13} color="#dc2626" />
+              <span>Testphase beenden (Widerruf)</span>
+            </button>
+          </div>
+        </div>
+      ) : isCancelled ? (
+        <div style={{
+          background: '#fef2f2',
+          border: '1.5px solid #fecaca',
+          borderRadius: '18px',
+          padding: '16px 20px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <AlertTriangle size={20} color="#dc2626" />
+          <div>
+            <strong style={{ fontSize: '0.88rem', color: '#991b1b', display: 'block' }}>
+              Testphase beendet / Profil stillgelegt
+            </strong>
+            <span style={{ fontSize: '0.74rem', color: '#b91c1c', marginTop: '2px', display: 'block' }}>
+              Dieser Account wurde während der 30-tägigen Testphase kostenfrei stillgelegt. Es sind keine Gebühren angefallen.
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       {invoices.length === 0 ? (
         <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '18px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
@@ -2744,6 +2864,119 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 🛑 Self-Service Cancellation Confirmation Modal */}
+      {showCancelConfirmModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '26px',
+            boxShadow: '0 25px 60px rgba(15, 23, 42, 0.25)',
+            border: '1px solid #e2e8f0',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            <div style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '50%',
+              background: '#fee2e2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto'
+            }}>
+              <RotateCcw size={26} color="#dc2626" />
+            </div>
+
+            <div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
+                Testphase kostenfrei beenden?
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
+                Möchtest du deine 30-tägige Testphase wirklich beenden? Dein Profil wird sofort stillgelegt. Es sind <strong>keine Gebühren (0,00 €)</strong> angefallen und es entstehen dir keinerlei Kosten.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setShowCancelConfirmModal(false)}
+                disabled={isCancellingTrial}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  borderRadius: '12px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen &amp; Weiter testen
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelTrial}
+                disabled={isCancellingTrial}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.84rem',
+                  cursor: isCancellingTrial ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isCancellingTrial ? 'Wird beendet...' : 'Ja, Testphase beenden'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 Success Toast */}
+      {trialCancelledSuccess && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          background: '#0f172a',
+          color: '#ffffff',
+          padding: '14px 20px',
+          borderRadius: '14px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+          zIndex: 99999,
+          fontSize: '0.84rem',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
+        }}>
+          <CheckCircle size={18} color="#22c55e" />
+          <span>Testphase erfolgreich beendet. Dein Profil wurde kostenfrei stillgelegt.</span>
         </div>
       )}
     </div>
@@ -25932,7 +26165,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             ⚖️ Campus-Groovelab Bereitstellung
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
-                            Die Campus-Groovelab Software ist ohne gesonderte Lizenzgebühren im Bereitstellungspaket enthalten (Reine Cloud- &amp; Hosting-Infrastruktur).
+                            Die Campus-Groovelab Software ist ohne gesonderte Lizenzkaufgebühren im Bereitstellungspaket enthalten (Reine Cloud- &amp; Hosting-Infrastruktur).
                           </p>
                         </div>
 
