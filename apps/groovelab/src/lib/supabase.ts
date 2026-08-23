@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { dbCircuitBreaker } from '../utils/circuitBreaker';
 
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://supabase.campus-groovelab.de';
 export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwNDE3ODE1LCJleHAiOjQ5MzQwMTc4MTV9.zOsuxweIlQBi7doeBoUqg9aTR6-qzOr0sjsa0Oee5cc';
@@ -95,6 +96,12 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     headers: rawHeaders
   };
   
+  // Fast failover if circuit breaker is currently OPEN to protect connection poolers
+  if (dbCircuitBreaker.getState() === 'OPEN') {
+    console.warn('[Supabase Fetch] Circuit is OPEN. Fast-failing transient request to activate local cache fallback.');
+    throw new Error('DATABASE_CIRCUIT_OPEN: DB-Verbindungspool ist ausgelastet. Lokaler Offline-Modus aktiv.');
+  }
+
   const maxAttempts = 2;
   let lastError: any = null;
   
@@ -111,12 +118,22 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
 
       const response = await fetch(input, fetchInit);
       if (timeoutId) clearTimeout(timeoutId);
+      
+      // If server returned 503 / 504 / 429, record circuit failure
+      if (response.status === 503 || response.status === 504 || response.status === 429) {
+        dbCircuitBreaker.recordFailure(new Error(`HTTP ${response.status} from Supabase`));
+      } else if (response.status < 500) {
+        dbCircuitBreaker.recordSuccess();
+      }
+
       return response;
     } catch (err: any) {
       if (timeoutId) clearTimeout(timeoutId);
       lastError = err;
       const errMsg = err?.message || String(err);
       
+      dbCircuitBreaker.recordFailure(err);
+
       // Check for transient network/CORS/WebKit errors that are safe to retry
       const isNetworkError = 
         errMsg.includes('Load failed') || 
