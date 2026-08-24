@@ -1302,15 +1302,33 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         loadedActiveDraftId = 'default';
       }
 
-      // Rename legacy 'Standard-Entwurf' to 'Entwurf 1' and filter out any students not explicitly assigned to this teacher (leaving an empty gap)
+      const validStudentIds = new Set(Array.from(studentMap.keys()));
+
+      // Rename legacy 'Standard-Entwurf' to 'Entwurf 1' and filter out any students not explicitly assigned to this teacher (eliminating orphan drafts)
       loadedDrafts = loadedDrafts.map(d => ({
         ...d,
         name: d.name === 'Standard-Entwurf' ? 'Entwurf 1' : d.name,
         boards: (d.boards || []).map(b => ({
           ...b,
           students: (b.students || []).filter(s => {
-            if (s.isBreak || s.isVacant || s.isGroup || (s.id && s.id.startsWith('group-'))) return true;
-            return matchesTeacher(s.teacher_id, s.id);
+            if (s.isBreak || s.isVacant) return true;
+            if (s.isGroup || (s.id && s.id.startsWith('group-')) || (s.groupStudents && s.groupStudents.length > 0)) {
+              if (s.groupStudents && Array.isArray(s.groupStudents)) {
+                const validMembers = s.groupStudents.filter((gs: any) => gs && gs.id && validStudentIds.has(gs.id));
+                if (validMembers.length === 0) return false;
+                s.groupStudents = validMembers;
+                if (validMembers.length === 1) {
+                  const m = validMembers[0];
+                  s.isGroup = false;
+                  s.id = m.id;
+                  s.first_name = m.first_name;
+                  s.last_name = m.last_name;
+                }
+                return true;
+              }
+              return false;
+            }
+            return Boolean(s.id && validStudentIds.has(s.id));
           })
         }))
       }));

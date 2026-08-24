@@ -6454,7 +6454,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                 }
 
-                // 1. Fetch genuine teacher (role === 'teacher' and NOT master admin)
+                // 1. Fetch teacher for school, explicitly prioritizing Severin Landenberger / Severin L.
                 let targetUser: any = null;
                 if (targetSchoolId) {
                   const { data: schoolUsers } = await supabase
@@ -6463,13 +6463,33 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     .eq('school_id', targetSchoolId);
 
                   if (schoolUsers && schoolUsers.length > 0) {
-                    targetUser = schoolUsers.find((u: any) => u.role === 'teacher' && !u.is_master_admin) ||
-                                 schoolUsers.find((u: any) => u.role === 'teacher') ||
-                                 schoolUsers[0];
+                    targetUser = schoolUsers.find((u: any) => 
+                      u.role === 'teacher' && 
+                      (u.first_name?.toLowerCase().includes('severin') || u.last_name?.toLowerCase().includes('landenberger') || u.last_name?.toLowerCase() === 'l.' || u.last_name?.toLowerCase() === 'l')
+                    ) ||
+                    schoolUsers.find((u: any) => u.role === 'teacher' && !u.is_master_admin) ||
+                    schoolUsers.find((u: any) => u.role === 'teacher') ||
+                    schoolUsers[0];
                   }
                 }
 
-                // 2. Global fallback across all teachers
+                // 2. Global explicit lookup for Severin across all users
+                if (!targetUser || !targetUser.first_name?.toLowerCase().includes('severin')) {
+                  const { data: severinUsers } = await supabase
+                    .from('users')
+                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
+                    .ilike('first_name', '%severin%')
+                    .limit(10);
+                  
+                  if (severinUsers && severinUsers.length > 0) {
+                    const severinTeacher = severinUsers.find((u: any) => u.role === 'teacher') || severinUsers[0];
+                    if (severinTeacher) {
+                      targetUser = severinTeacher;
+                    }
+                  }
+                }
+
+                // 3. Fallback across all teachers
                 if (!targetUser) {
                   const { data: allUsers } = await supabase
                     .from('users')
@@ -6512,7 +6532,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '8px'
             }}
           >
-            🔓 BYPASS: LEHRER ({schoolData?.name || 'Musäk Bad Säckingen'})
+            🔓 BYPASS: LEHRER (Severin L. • {schoolData?.name || 'Musäk Bad Säckingen'})
           </button>
 
           {/* Schüler Bypass (Student) */}

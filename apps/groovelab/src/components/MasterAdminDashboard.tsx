@@ -3549,8 +3549,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             CPU &amp; RAM
                           </span>
                         </div>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: cpuVal >= 1.5 ? '#d97706' : '#10b981' }}>
-                          {Math.round((cpuVal / 2.0) * 100)}% Last
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: cpuVal >= 1.7 ? '#dc2626' : (cpuVal >= 1.4 ? '#d97706' : '#10b981') }}>
+                          {Math.min(100, Math.round((cpuVal / 2.0) * 100))}% Last
                         </span>
                       </div>
                       <div>

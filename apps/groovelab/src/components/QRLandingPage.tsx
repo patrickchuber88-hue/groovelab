@@ -206,6 +206,7 @@ interface ProfileData {
   campus_ui_level?: 'junior' | 'teen' | 'pro' | string;
   streak_flame?: number;
   total_practice_minutes?: number;
+  teacher_id?: string | null;
 }
 
 export function QRLandingPage({ token }: QRLandingPageProps) {
@@ -1821,8 +1822,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         }
       });
 
-      // Also check planned_boards of all teachers in the school as fallback/complement
-      const teachersWithPlanned = teachersRes.data || [];
+      // Also check planned_boards of assigned teacher as fallback/complement
+      const teachersWithPlanned = (teachersRes.data || []).filter((t: any) => !profile.teacher_id || t.id === profile.teacher_id);
       teachersWithPlanned.forEach((teacher: any) => {
         const rawPlanned = teacher.planned_boards || teacher.campus_räume || teacher.groovelab_räume;
         let boards: any[] = [];
@@ -1841,9 +1842,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             const isStudentMatch = 
               studentIds.has(s.id) ||
               (s.id && s.id === profile.id) ||
-              (s.first_name && profile.first_name && 
+              (s.first_name && profile.first_name && s.last_name && profile.last_name &&
                s.first_name.trim().toLowerCase() === profile.first_name.trim().toLowerCase() && 
-               (!s.last_name || !profile.last_name || s.last_name.trim().toLowerCase().startsWith(profile.last_name.trim().toLowerCase().substring(0, 1))));
+               s.last_name.trim().toLowerCase() === profile.last_name.trim().toLowerCase());
 
             if (isStudentMatch) {
               const existingIndex = schData.findIndex((existing: any) => existing.day_of_week === board.dayOfWeek);

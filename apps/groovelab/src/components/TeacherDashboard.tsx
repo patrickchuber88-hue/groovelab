@@ -4367,7 +4367,7 @@ export function TeacherDashboard({
                        roomId: todayBoard.roomId || null,
                        room: boardRoomName,
                        rooms: { id: todayBoard.roomId || null, name: boardRoomName } as any,
-                       student: (matchedStudent ? {
+                       student: matchedStudent ? {
                          id: matchedStudent.id,
                          name: `${matchedStudent.first_name} ${maskLastName(matchedStudent.last_name, showRealNames)}`.trim(),
                          first_name: matchedStudent.first_name,
@@ -4376,16 +4376,7 @@ export function TeacherDashboard({
                          instrument: resolvedInstrument,
                          birth_date: matchedStudent.birth_date,
                          avatars: matchedStudent.avatars
-                       } : {
-                         id: s.id || `temp-${s.first_name || 'student'}`,
-                         name: `${s.first_name || s.name || 'Schüler'} ${maskLastName(s.last_name || '', showRealNames)}`.trim(),
-                         first_name: s.first_name || s.name?.split(' ')[0] || 'Schüler',
-                         last_name: s.last_name || s.name?.split(' ').slice(1).join(' ') || '',
-                         is_app_user: false,
-                         instrument: resolvedInstrument,
-                         birth_date: null,
-                         avatars: []
-                       }) as any
+                       } : null
                      });
                    });
                  }
@@ -4500,29 +4491,29 @@ export function TeacherDashboard({
 
            const { data: dbOccurrences } = await occQuery;
 
-           // Also collect local occurrences from localStorage for todayStr
+           // Also collect local occurrences from localStorage strictly for targetTeacherId and todayStr
            const localOccursForToday: any[] = [];
            try {
-             const pendingSaved = typeof window !== 'undefined' ? ((targetTeacherId ? localStorage.getItem(`groovelab_pending_schedule_changes_${targetTeacherId}`) : null) || localStorage.getItem('groovelab_pending_schedule_changes')) : null;
+             const pendingSaved = typeof window !== 'undefined' && targetTeacherId ? localStorage.getItem(`groovelab_pending_schedule_changes_${targetTeacherId}`) : null;
              if (pendingSaved) {
                const parsedPending = JSON.parse(pendingSaved);
                Object.values(parsedPending).forEach((item: any) => {
                  if (item && (item.date === todayStr || item.original_date === todayStr)) {
                    const itemTeacherId = item.teacher_id || item.teacherId;
-                   if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(targetTeacherId).replace(/^teacher-/i, '')) {
+                   if (itemTeacherId && String(itemTeacherId).replace(/^teacher-/i, '') === String(targetTeacherId).replace(/^teacher-/i, '')) {
                      localOccursForToday.push(item);
                    }
                  }
                });
              }
-             const latestSaved = typeof window !== 'undefined' ? (targetTeacherId ? localStorage.getItem('groovelab_calendar_active_occurrences_' + targetTeacherId) : null) : null;
+             const latestSaved = typeof window !== 'undefined' && targetTeacherId ? localStorage.getItem('groovelab_calendar_active_occurrences_' + targetTeacherId) : null;
              if (latestSaved) {
                const parsedLatest = JSON.parse(latestSaved);
                if (Array.isArray(parsedLatest)) {
                  parsedLatest.forEach((item: any) => {
                    if (item && (item.date === todayStr || item.original_date === todayStr)) {
                      const itemTeacherId = item.teacher_id || item.teacherId;
-                     if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(targetTeacherId).replace(/^teacher-/i, '')) {
+                     if (itemTeacherId && String(itemTeacherId).replace(/^teacher-/i, '') === String(targetTeacherId).replace(/^teacher-/i, '')) {
                        localOccursForToday.push(item);
                      }
                    }

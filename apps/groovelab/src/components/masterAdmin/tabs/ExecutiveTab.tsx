@@ -141,9 +141,11 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
   const currentYear = new Date().getFullYear();
 
   const latestMetric = serverMetrics[0] || { cpu_load: 0.12, mem_used_mb: 1420, mem_total_mb: 4096, active_connections: 4 };
-  const cpuPercent = Math.round((latestMetric.cpu_load || 0) * 100);
+  // On Hetzner CX23 / standard VPS instances (2 vCPUs), cpu_load is Unix 1-minute load average.
+  // We normalize by the 2 vCPU cores and cap at 100% for realistic cluster load representation.
+  const cpuPercent = Math.min(100, Math.round(((latestMetric.cpu_load || 0) / 2.0) * 100));
   const ramPercent = Math.round(((latestMetric.mem_used_mb || 0) / (latestMetric.mem_total_mb || 4096)) * 100);
-  const isHighLoad = cpuPercent > 80 || ramPercent > 85 || (latestMetric.active_connections || 0) > 35;
+  const isHighLoad = cpuPercent > 85 || ramPercent > 85 || (latestMetric.active_connections || 0) > 40;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
@@ -551,10 +553,13 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
             <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
-              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>CPU Auslastung</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>CPU Auslastung</span>
+                <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>Load: {(latestMetric.cpu_load || 0).toFixed(2)}</span>
+              </div>
               <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>{cpuPercent}%</div>
               <div style={{ background: '#e2e8f0', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                <div style={{ width: `${cpuPercent}%`, height: '100%', background: cpuPercent > 80 ? '#ef4444' : '#10b981' }} />
+                <div style={{ width: `${cpuPercent}%`, height: '100%', background: cpuPercent > 85 ? '#ef4444' : '#10b981' }} />
               </div>
             </div>
 

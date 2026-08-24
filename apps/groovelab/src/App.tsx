@@ -7057,8 +7057,13 @@ function App() {
       }
     }
 
+    const existingWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
     const currentRole = userToLogin?.role?.toLowerCase() || 'teacher';
-    if (currentRole === 'admin' || currentRole === 'secretary') {
+    if (existingWorkspace === 'teacher') {
+      sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+    } else if (existingWorkspace === 'master_admin') {
+      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+    } else if (currentRole === 'admin' || currentRole === 'secretary') {
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');
       if (currentRole === 'secretary') {
         sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
@@ -7462,8 +7467,19 @@ function App() {
   const isGhostParam = ghostUrlParams.get('support_ghost') === 'true' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
   const ghostSchoolId = ghostUrlParams.get('school_id') || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_ghost_school_id') : null);
 
-  const isMasterAdminSession = (user?.is_master_admin === true || 
-                               sessionStorage.getItem('groovelab_is_master_admin') === 'true') && !(isGhostParam && ghostSchoolId);
+  const currentActiveWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
+  const isMasterSessionFlag = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_is_master_admin') === 'true';
+
+  // SECURITY ISOLATION:
+  // MasterAdminDashboard (Leitstand) is exclusively accessible if:
+  // 1. Session was explicitly authenticated via Master-Admin login / Leitstand bypass (isMasterSessionFlag === true)
+  // 2. Active workspace is 'master_admin' (never 'teacher', 'secretary', 'admin', 'student')
+  // 3. User is not in support-ghost session mode
+  const isMasterAdminSession = Boolean(
+    isMasterSessionFlag && 
+    currentActiveWorkspace === 'master_admin' && 
+    (user?.is_master_admin === true || !user?.school_id)
+  ) && !(isGhostParam && ghostSchoolId);
 
   // Enterprise+ Tier 3: Master Admin Ephemeral Session Lease TTL Guard (Zero Standing Privileges)
   useEffect(() => {

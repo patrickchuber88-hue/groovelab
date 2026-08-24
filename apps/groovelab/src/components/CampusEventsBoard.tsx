@@ -3264,15 +3264,13 @@ export function CampusEventsBoard({
         }
 
         if (loadedDrafts.length === 0) {
-          // Check localstorage keys matching ScheduleBoard.tsx
+          // Check strictly teacher-scoped localstorage keys matching ScheduleBoard.tsx
           const keysToTry = [
             `groovelab_teacher_draft_state_campus_${userId}`,
             `groovelab_teacher_draft_state_groovelab_${userId}`,
             `groovelab_teacher_boards_campus_${userId}`,
             `groovelab_teacher_boards_groovelab_${userId}`,
-            `groovelab_teacher_boards_${userId}`,
-            `groovelab_schedule_boards`,
-            `planned_boards`
+            `groovelab_teacher_boards_${userId}`
           ];
 
           for (const k of keysToTry) {
@@ -3299,63 +3297,6 @@ export function CampusEventsBoard({
               } catch (e) {}
             }
           }
-        }
-
-        // Global localStorage scan fallback
-        if (loadedDrafts.length === 0) {
-          try {
-            for (let i = 0; i < localStorage.length; i++) {
-              const k = localStorage.key(i);
-              if (!k) continue;
-              if (k.includes('board') || k.includes('draft') || k.includes('schedule') || k.includes('planned') || k.includes('räume')) {
-                const stored = localStorage.getItem(k);
-                if (stored) {
-                  try {
-                    let parsed = JSON.parse(stored);
-                    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-                    if (parsed && parsed.drafts && Array.isArray(parsed.drafts) && parsed.drafts.length > 0) {
-                      loadedDrafts = parsed.drafts;
-                      loadedActiveDraftId = parsed.activeDraftId || 'default';
-                      loadedSubmittedDraftId = parsed.submittedDraftId || '';
-                      break;
-                    } else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.dayOfWeek) {
-                      loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: parsed }];
-                      break;
-                    }
-                  } catch (e) {}
-                }
-              }
-            }
-          } catch (e) {}
-        }
-
-        // Fallback to query all teachers in the school for planned_boards
-        if (loadedDrafts.length === 0 && effectiveSchoolId) {
-          try {
-            const { data: allTeachers } = await supabase
-              .from('users')
-              .select('id, planned_boards, campus_räume, groovelab_räume')
-              .eq('school_id', effectiveSchoolId)
-              .not('planned_boards', 'is', null);
-
-            if (allTeachers && allTeachers.length > 0) {
-              for (const t of allTeachers) {
-                let rp = t.planned_boards || t.campus_räume || t.groovelab_räume;
-                if (typeof rp === 'string') {
-                  try { rp = JSON.parse(rp); if (typeof rp === 'string') rp = JSON.parse(rp); } catch(e){}
-                }
-                if (rp && typeof rp === 'object' && !Array.isArray(rp) && (rp as any).drafts) {
-                  loadedDrafts = (rp as any).drafts;
-                  loadedActiveDraftId = (rp as any).activeDraftId || 'default';
-                  loadedSubmittedDraftId = (rp as any).submittedDraftId || '';
-                  break;
-                } else if (Array.isArray(rp) && rp.length > 0) {
-                  loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: rp }];
-                  break;
-                }
-              }
-            }
-          } catch (e) {}
         }
 
         if (loadedDrafts.length > 0) {

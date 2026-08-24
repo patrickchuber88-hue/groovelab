@@ -181,6 +181,75 @@ export async function deleteStudentFully(
     await safeDeleteIds('students', 'id');
     await safeDeleteIds('users', 'id');
 
+    // Clean up JSON planned_boards across all teachers in the school to prevent orphan drafts
+    if (schId) {
+      try {
+        const { data: teachersWithBoards } = await supabase
+          .from('users')
+          .select('id, planned_boards')
+          .eq('school_id', schId)
+          .not('planned_boards', 'is', null);
+
+        if (teachersWithBoards && teachersWithBoards.length > 0) {
+          for (const t of teachersWithBoards) {
+            let modified = false;
+            let rawPlanned = t.planned_boards;
+            if (typeof rawPlanned === 'string') {
+              try { rawPlanned = JSON.parse(rawPlanned); } catch (e) {}
+            }
+
+            if (rawPlanned && typeof rawPlanned === 'object') {
+              const cleanBoardsList = (boardsList: any[]) => {
+                if (!Array.isArray(boardsList)) return boardsList;
+                return boardsList.map(b => {
+                  if (!b || !Array.isArray(b.students)) return b;
+                  const filteredStudents = b.students.filter((s: any) => {
+                    if (s.isBreak || s.isVacant) return true;
+                    if (allTargetIds.has(s.id)) {
+                      modified = true;
+                      return false;
+                    }
+                    if (fName && s.first_name && s.first_name.trim().toLowerCase() === fName.trim().toLowerCase()) {
+                      modified = true;
+                      return false;
+                    }
+                    if (s.groupStudents && Array.isArray(s.groupStudents)) {
+                      const prevLen = s.groupStudents.length;
+                      s.groupStudents = s.groupStudents.filter((gs: any) => !allTargetIds.has(gs.id) && (!fName || gs.first_name?.trim().toLowerCase() !== fName.trim().toLowerCase()));
+                      if (s.groupStudents.length !== prevLen) {
+                        modified = true;
+                      }
+                      if (s.groupStudents.length === 0) return false;
+                    }
+                    return true;
+                  });
+                  return { ...b, students: filteredStudents };
+                });
+              };
+
+              if (Array.isArray(rawPlanned.drafts)) {
+                rawPlanned.drafts = rawPlanned.drafts.map((d: any) => ({
+                  ...d,
+                  boards: cleanBoardsList(d.boards)
+                }));
+              } else if (Array.isArray(rawPlanned)) {
+                rawPlanned = cleanBoardsList(rawPlanned);
+              }
+
+              if (modified) {
+                await supabase
+                  .from('users')
+                  .update({ planned_boards: rawPlanned })
+                  .eq('id', t.id);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[studentDeletionService] Warning cleaning planned_boards:', err);
+      }
+    }
+
     return { success: true, softDeleted: false };
   } catch (err: any) {
     console.error('[studentDeletionService] Failed to delete student:', err);
