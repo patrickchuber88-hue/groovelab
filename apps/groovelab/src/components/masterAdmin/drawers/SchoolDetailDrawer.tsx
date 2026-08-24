@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   X, Check, RefreshCw, Eye, HardDrive, Building, 
-  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert
+  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert, BookOpen
 } from 'lucide-react';
 import { DpoAuditPortal } from '../../DpoAuditPortal';
 import { supabase } from '../../../lib/supabase';
@@ -921,41 +921,90 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 flexDirection: 'column',
                 gap: '16px'
               }}>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                  Speicher-Verteilung nach Modulen
-                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                    Audio-Tresor Speicherverteilung (Campus-Modul)
+                  </h4>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: '#dcfce7', color: '#166534' }}>
+                    100% Campus-Exklusiv
+                  </span>
+                </div>
+
+                {/* Apple-Style Stacked Segmented Bar */}
+                <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', background: '#f1f5f9' }}>
+                  <div style={{ width: '48%', background: '#10b981', transition: 'width 0.3s ease' }} title="Audio-Biografie (48%)" />
+                  <div style={{ width: '32%', background: '#3b82f6', transition: 'width 0.3s ease' }} title="Loopstation (32%)" />
+                  <div style={{ width: '14%', background: '#f59e0b', transition: 'width 0.3s ease' }} title="Hausaufgaben (14%)" />
+                  <div style={{ width: '6%', background: '#8b5cf6', transition: 'width 0.3s ease' }} title="Meisterwerke (6%)" />
+                </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* 1. Platz: Audio-Biografie & Schüler-Protokoll (48%) */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Disc3 size={16} color="#059669" />
-                      <span style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Loopstation &amp; Übe-Timer Aufnahmen</span>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+                      <BookOpen size={16} color="#059669" />
+                      <div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Audio-Biografie &amp; Schüler-Protokoll</div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Wöchentliches Unterrichts- &amp; Meilenstein-Archiv</div>
+                      </div>
                     </div>
-                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>{(usedStorageGb * 0.45).toFixed(2).replace('.', ',')} GB</span>
+                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
+                      {usedStorageGb < 1.0 
+                        ? `${(usedStorageGb * 1024 * 0.48).toFixed(1).replace('.', ',')} MB (48 %)` 
+                        : `${(usedStorageGb * 0.48).toFixed(2).replace('.', ',')} GB (48 %)`}
+                    </span>
                   </div>
 
+                  {/* 2. Platz: Loopstation & Übe-Studio (32%) */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }} />
+                      <Disc3 size={16} color="#2563eb" />
+                      <div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Loopstation &amp; Übe-Studio Aufnahmen</div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Mehrspurige Loops &amp; selbstständige Übe-Sessions</div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
+                      {usedStorageGb < 1.0 
+                        ? `${(usedStorageGb * 1024 * 0.32).toFixed(1).replace('.', ',')} MB (32 %)` 
+                        : `${(usedStorageGb * 0.32).toFixed(2).replace('.', ',')} GB (32 %)`}
+                    </span>
+                  </div>
+
+                  {/* 3. Platz: Hausaufgaben- & Unterrichtsaufnahmen (14%) */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }} />
                       <Mic size={16} color="#d97706" />
-                      <span style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Hausaufgaben-Sprachmemos</span>
+                      <div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Hausaufgaben- &amp; Unterrichtsaufnahmen</div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Sprachmemos der Lehrkräfte &amp; Übe-Vorgaben</div>
+                      </div>
                     </div>
-                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>{(usedStorageGb * 0.20).toFixed(2).replace('.', ',')} GB</span>
+                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
+                      {usedStorageGb < 1.0 
+                        ? `${(usedStorageGb * 1024 * 0.14).toFixed(1).replace('.', ',')} MB (14 %)` 
+                        : `${(usedStorageGb * 0.14).toFixed(2).replace('.', ',')} GB (14 %)`}
+                    </span>
                   </div>
 
+                  {/* 4. Platz: Meisterwerk-Dokumentation (6%) */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Music size={16} color="#ca8a04" />
-                      <span style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>GrooveLab Band-Rooms &amp; Live Lab</span>
-                    </div>
-                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>{(usedStorageGb * 0.25).toFixed(2).replace('.', ',')} GB</span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#8b5cf6' }} />
                       <Sparkles size={16} color="#7c3aed" />
-                      <span style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Meisterwerk-Dokumentation (Master-Audios)</span>
+                      <div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Meisterwerk-Dokumentation (Master-Audios)</div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Kuratiertes Jahresvorspiel-Portfolio &amp; Master-Tracks</div>
+                      </div>
                     </div>
-                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>{(usedStorageGb * 0.10).toFixed(2).replace('.', ',')} GB</span>
+                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
+                      {usedStorageGb < 1.0 
+                        ? `${(usedStorageGb * 1024 * 0.06).toFixed(1).replace('.', ',')} MB (6 %)` 
+                        : `${(usedStorageGb * 0.06).toFixed(2).replace('.', ',')} GB (6 %)`}
+                    </span>
                   </div>
                 </div>
 
