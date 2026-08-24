@@ -25450,6 +25450,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     5: Cloud,
                                     10: Zap,
                                     20: Rocket,
+                                    25: Rocket,
                                     50: Crown,
                                     100: Database,
                                     250: Sparkles
@@ -26656,7 +26657,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           {/* Audio-Tresor Cloud-Speicher Card */}
                                           {(() => {
                                             const addonGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
-                                            const addonFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 2.99 : addonGb === 20 ? 5.49 : addonGb === 50 ? 9.99 : addonGb === 100 ? 16.99 : addonGb === 250 ? 34.99 : 0));
+                                            const addonFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 1.99 : addonGb === 20 ? 3.99 : addonGb === 25 ? 3.99 : addonGb === 50 ? 6.99 : addonGb === 100 ? 11.99 : addonGb === 250 ? 24.99 : 0));
                                             const totalCapGb = 1.0 + addonGb;
                                             const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
                                             const usedGb = usedBytes / (1024 * 1024 * 1024);
@@ -26711,7 +26712,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         {/* Kombi-Vorteil Notice Banner */}
                                         <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#475569', lineHeight: '1.45', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                           <span style={{ color: '#34a853', fontWeight: 800 }}>✓</span>
-                                          <span><strong>Schuljahr 2026/2027 aktiv:</strong> Durch die Kombination von Campus &amp; GrooveLab spart eure Musikschule jeden Monat <strong>2,99 € Kombi-Vorteil</strong>.</span>
+                                          <span><strong>Schuljahr 2026/2027 aktiv:</strong> Durch die Kombination von Campus &amp; GrooveLab spart eure Musikschule jeden Monat <strong>{((effectiveSchoolRates.priceCampus + effectiveSchoolRates.priceGroovelab) - effectiveSchoolRates.priceKombi).toFixed(2).replace('.', ',')} € Kombi-Vorteil</strong>.</span>
                                         </div>
                                       </div>
 
@@ -26825,6 +26826,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                 </div>
                                               )}
 
+                                              {passiveStudentsCount_global > 0 && (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                  <span>Basis-Bereitstellung ({passiveStudentsCount_global} Schüler × 0,09 €):</span>
+                                                  <strong>{subscriptionBypass ? '0,00 € (Freigestellt)' : `${(passiveStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                                </div>
+                                              )}
+
                                               {!subscriptionBypass && activeStudentsCount_global > 0 && isSammelzahler && (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                                   <span>Cloud- & Modul-Bereitstellung: Campus ({activeStudentsCount_global} Schüler × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
@@ -26839,19 +26847,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                 </div>
                                               )}
 
-                                              {passiveStudentsCount_global > 0 && (
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>Basis-Bereitstellung ({passiveStudentsCount_global} Schüler × 0,09 €):</span>
-                                                  <strong>{subscriptionBypass ? '0,00 € (Freigestellt)' : `${(passiveStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
-                                                </div>
-                                              )}
-
                                               {/* Tresor Storage Add-on Line Item & Mini Progress Bar - Always shown for full transparency */}
                                               {(() => {
                                                 const addonGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
                                                 const addonStatus = currentSchoolProfile?.storage_addon_status || 'active';
                                                 const addonPendingGb = Number(currentSchoolProfile?.storage_addon_pending_gb || 0);
-                                                const addonMonthlyFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || selectedStorageAddonFee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 2.99 : addonGb === 20 ? 5.49 : addonGb === 50 ? 9.99 : 0));
+                                                const addonMonthlyFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || selectedStorageAddonFee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 1.99 : addonGb === 20 ? 3.99 : addonGb === 25 ? 3.99 : addonGb === 50 ? 6.99 : addonGb === 100 ? 11.99 : addonGb === 250 ? 24.99 : 0));
                                                 
                                                 const baseGb = 1.0;
                                                 const totalCapGb = baseGb + addonGb;
@@ -33018,6 +33019,7 @@ status: status,
                     5: Cloud,
                     10: Zap,
                     20: Rocket,
+                    25: Rocket,
                     50: Crown,
                     100: Database,
                     250: Sparkles

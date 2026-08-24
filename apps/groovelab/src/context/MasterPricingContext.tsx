@@ -72,7 +72,7 @@ const defaultPricing: MasterPricingData = {
     priceTeacher: 0.49,
     priceStudent: 0.49,
     pricePassiveStudent: 0.09,
-    priceStorageAddon: 2.99,
+    priceStorageAddon: 1.99,
     priceChangeScope: 'new_only',
   }),
   getStorageTier: (gb) => getStorageTierByGb(gb, DEFAULT_STORAGE_TIERS),
@@ -104,13 +104,13 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
         let g = rawG !== null && rawG !== undefined ? Number(rawG) : 9.90;
         let k = rawK !== null && rawK !== undefined ? Number(rawK) : 19.90;
 
-        if (Math.abs(c - 7.99) < 0.01) c = 14.90;
-        if (Math.abs(g - 4.99) < 0.01) g = 9.90;
-        if (Math.abs(k - 9.99) < 0.01) k = 19.90;
+        if (Math.abs(c - 7.99) < 0.01 || Math.abs(c - 14.99) < 0.01) c = 14.90;
+        if (Math.abs(g - 4.99) < 0.01 || Math.abs(g - 9.99) < 0.01) g = 9.90;
+        if (Math.abs(k - 9.99) < 0.01 || Math.abs(k - 19.99) < 0.01) k = 19.90;
         const t = (data.price_user_teacher !== null && data.price_user_teacher !== undefined) ? Number(data.price_user_teacher) : 0.49;
         const s = (data.price_user_student !== null && data.price_user_student !== undefined) ? Number(data.price_user_student) : 0.49;
         const ps = (data.price_user_passive_student !== null && data.price_user_passive_student !== undefined) ? Number(data.price_user_passive_student) : 0.09;
-        const sa = (data.price_storage_addon !== null && data.price_storage_addon !== undefined) ? Number(data.price_storage_addon) : 2.99;
+        const sa = (data.price_storage_addon !== null && data.price_storage_addon !== undefined) ? Number(data.price_storage_addon) : 1.99;
         const freeMonths = (data.free_months_per_year !== null && data.free_months_per_year !== undefined) ? Number(data.free_months_per_year) : 0;
         const billingMonths = Math.max(1, 12 - freeMonths);
         const scope = (data.price_change_scope as 'new_only' | 'school_year_start' | 'immediate') || 'new_only';
@@ -120,9 +120,9 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
         const storageTiersOverride = Array.isArray(data.special_offers)
           ? data.special_offers.find((o: any) => o?.id === '__cg_storage_tiers__')?.tiers
           : null;
-        const tiers: StorageTier[] = (Array.isArray(storageTiersOverride) && storageTiersOverride.length > 0)
+        const tiers: StorageTier[] = (Array.isArray(storageTiersOverride) && storageTiersOverride.length > 0 && storageTiersOverride.some((t: any) => t.gb === 25))
           ? storageTiersOverride
-          : (data.storage_tiers || DEFAULT_STORAGE_TIERS);
+          : (data.storage_tiers && Array.isArray(data.storage_tiers) && data.storage_tiers.some((t: any) => t.gb === 25) ? data.storage_tiers : DEFAULT_STORAGE_TIERS);
 
         const singleTotal = c + g;
         const savings = Math.max(0, singleTotal - k);

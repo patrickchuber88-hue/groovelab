@@ -58,7 +58,7 @@ export const LOAD_TIERS: LoadTier[] = [
     peakUsers: 75,
     targetRps: 15,
     totalRequests: 450,
-    badge: '1.500 User',
+    badge: '1.500 Nutzer',
     hardwareFit: '🟢 Hetzner CX23 (Ideal)',
     recommendedHardware: 'Hetzner Cloud CX23 (2 vCPU, 4 GB RAM) arbeitet im optimalen Ruhezustand (CPU-Last ca. 12%).',
     description: 'Regionale Musikschul-Kooperation mit 3 Standorten.'
@@ -71,7 +71,7 @@ export const LOAD_TIERS: LoadTier[] = [
     peakUsers: 250,
     targetRps: 50,
     totalRequests: 1500,
-    badge: '5.000 User',
+    badge: '5.000 Nutzer',
     hardwareFit: '🟢 Hetzner CX23 (Optimal)',
     recommendedHardware: 'Hetzner Cloud CX23 (2 vCPU, 4 GB RAM) meistert 5.000 User mühelos (CPU-Last ca. 28%).',
     description: 'Kreisverband / städtischer Verbund mit 10 aktiven Musikschulen.'
@@ -84,7 +84,7 @@ export const LOAD_TIERS: LoadTier[] = [
     peakUsers: 1250,
     targetRps: 250,
     totalRequests: 7500,
-    badge: '25.000 Schüler',
+    badge: '25.000 Nutzer',
     hardwareFit: '🟡 Hetzner CX23 (Gute Auslastung)',
     recommendedHardware: 'Hetzner Cloud CX23 läuft bei ca. 65% Auslastung. Spitzenzeiten werden stabil verarbeitet.',
     description: 'Großstadt-Netzwerk / Landesverband mit 25.000 Schülern.'
@@ -97,7 +97,7 @@ export const LOAD_TIERS: LoadTier[] = [
     peakUsers: 2500,
     targetRps: 500,
     totalRequests: 15000,
-    badge: '50.000 Schüler',
+    badge: '50.000 Nutzer',
     hardwareFit: '🟠 Upgrade auf CX32 empfohlen',
     recommendedHardware: 'Hetzner Cloud CX32 (4 vCPU, 8 GB RAM) wird für 100 Schulen und 50.000 Schüler für P95 < 25ms empfohlen.',
     description: 'Bundeslandweites Musikschul-Portal mit 50.000 Schülern.'
@@ -110,7 +110,7 @@ export const LOAD_TIERS: LoadTier[] = [
     peakUsers: 12500,
     targetRps: 2500,
     totalRequests: 75000,
-    badge: '250.000 Schüler',
+    badge: '250.000 Nutzer',
     hardwareFit: '🟣 Dedicated Cluster (Hetzner AX)',
     recommendedHardware: 'Dedicated Server Cluster (Hetzner AX-Linie mit Load-Balancer) für 250.000 Schüler empfohlen.',
     description: 'Bundesweites Verbands-Ökosystem mit 250.000 Schülern.'
@@ -318,12 +318,17 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [priceTeacher, setPriceTeacher] = useState<number | string>(0.49);
   const [priceStudent, setPriceStudent] = useState<number | string>(0.49);
   const [pricePassiveStudent, setPricePassiveStudent] = useState<number | string>(0.09);
-  const [priceStorageAddon, setPriceStorageAddon] = useState<number | string>(2.99);
+  const [priceStorageAddon, setPriceStorageAddon] = useState<number | string>(1.99);
   const [storageTiersList, setStorageTiersList] = useState<StorageTier[]>(() => {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('cg_storage_tiers');
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.some((t: any) => t.gb === 25)) {
+            return parsed;
+          }
+        }
       } catch (e) {}
     }
     return DEFAULT_STORAGE_TIERS;
@@ -1051,9 +1056,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         let k = rawK !== null && rawK !== undefined ? Number(rawK) : 19.90;
 
         // Auto-upgrade legacy default test values
-        if (Math.abs(c - 7.99) < 0.01) c = 14.90;
-        if (Math.abs(g - 4.99) < 0.01) g = 9.90;
-        if (Math.abs(k - 9.99) < 0.01) k = 19.90;
+        if (Math.abs(c - 7.99) < 0.01 || Math.abs(c - 14.99) < 0.01) c = 14.90;
+        if (Math.abs(g - 4.99) < 0.01 || Math.abs(g - 9.99) < 0.01) g = 9.90;
+        if (Math.abs(k - 9.99) < 0.01 || Math.abs(k - 19.99) < 0.01) k = 19.90;
 
         const t = data.price_user_teacher ?? overrides?.price_user_teacher ?? (localStorage.getItem('cg_price_user_teacher') ? Number(localStorage.getItem('cg_price_user_teacher')) : 0.49);
         const s = data.price_user_student ?? overrides?.price_user_student ?? (localStorage.getItem('cg_price_user_student') ? Number(localStorage.getItem('cg_price_user_student')) : 0.49);
@@ -1062,22 +1067,22 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         const td = data.default_trial_days ?? overrides?.default_trial_days ?? (localStorage.getItem('cg_default_trial_days') ? Number(localStorage.getItem('cg_default_trial_days')) : 30);
         const scope = data.price_change_scope || overrides?.price_change_scope || localStorage.getItem('cg_price_change_scope') || 'new_only';
 
-        setPriceCampus(c);
-        setPriceGroovelab(g);
-        setPriceKombi(k);
-        setPriceTeacher(t);
-        setPriceStudent(s);
-        setPricePassiveStudent(ps);
-        setPriceStorageAddon(sa);
+        setPriceCampus(Number(c).toFixed(2));
+        setPriceGroovelab(Number(g).toFixed(2));
+        setPriceKombi(Number(k).toFixed(2));
+        setPriceTeacher(Number(t).toFixed(2));
+        setPriceStudent(Number(s).toFixed(2));
+        setPricePassiveStudent(Number(ps).toFixed(2));
+        setPriceStorageAddon(Number(sa).toFixed(2));
         setDefaultTrialDays(td);
         setPriceChangeScope(scope as any);
 
         const storageTiersOverride = Array.isArray(data.special_offers)
           ? data.special_offers.find((o: any) => o?.id === '__cg_storage_tiers__')?.tiers
           : null;
-        const tiers: StorageTier[] = (Array.isArray(storageTiersOverride) && storageTiersOverride.length > 0)
+        const tiers: StorageTier[] = (Array.isArray(storageTiersOverride) && storageTiersOverride.length > 0 && storageTiersOverride.some((t: any) => t.gb === 25))
           ? storageTiersOverride
-          : (data.storage_tiers || DEFAULT_STORAGE_TIERS);
+          : (data.storage_tiers && Array.isArray(data.storage_tiers) && data.storage_tiers.some((t: any) => t.gb === 25) ? data.storage_tiers : DEFAULT_STORAGE_TIERS);
         setStorageTiersList(tiers);
 
         const dbOffers = Array.isArray(data.special_offers) ? data.special_offers : [];
@@ -3542,8 +3547,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             Hetzner VPS
                           </span>
                         </div>
-                        <span style={{ fontSize: '0.70rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: '#d1fae5', color: '#065f46' }}>
-                          🟢 Optimal
+                        <span style={{ fontSize: '0.70rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: '#d1fae5', color: '#065f46', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Check size={11} strokeWidth={3} /> Optimal
                         </span>
                       </div>
                       <div>
@@ -3576,9 +3581,23 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             CPU &amp; RAM
                           </span>
                         </div>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: cpuVal >= 1.7 ? '#dc2626' : (cpuVal >= 1.4 ? '#d97706' : '#10b981') }}>
-                          {Math.min(100, Math.round((cpuVal / 2.0) * 100))}% Last
-                        </span>
+                        {(() => {
+                          const cpuLoadPct = cpuVal > 2.0 
+                            ? Math.min(100, Math.round(cpuVal > 10 ? cpuVal : (cpuVal / 2.0) * 100))
+                            : Math.min(100, Math.round((cpuVal / 2.0) * 100));
+                          return (
+                            <span style={{
+                              fontSize: '0.70rem',
+                              fontWeight: 800,
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              background: cpuLoadPct >= 85 ? '#fee2e2' : (cpuLoadPct >= 70 ? '#fef3c7' : '#d1fae5'),
+                              color: cpuLoadPct >= 85 ? '#dc2626' : (cpuLoadPct >= 70 ? '#b45309' : '#065f46')
+                            }}>
+                              CPU: {cpuLoadPct}%
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div>
                         <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
@@ -3587,6 +3606,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         <div style={{ height: '5px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden', marginTop: '6px' }}>
                           <div style={{ height: '100%', width: `${Math.min(ramPct, 100)}%`, background: '#6366f1' }} />
                         </div>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
+                          RAM: {Math.round(ramPct)}% • 2 vCPU stabil
+                        </p>
                       </div>
                     </div>
 
@@ -4064,6 +4086,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               min="0"
                               value={priceCampus}
                               onChange={(e) => setPriceCampus(e.target.value.replace(',', '.'))}
+                              onBlur={() => {
+                                if (priceCampus !== '') setPriceCampus(Number(priceCampus).toFixed(2));
+                              }}
                               style={{
                                 width: '100%',
                                 border: 'none',
@@ -4089,6 +4114,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               min="0"
                               value={priceGroovelab}
                               onChange={(e) => setPriceGroovelab(e.target.value.replace(',', '.'))}
+                              onBlur={() => {
+                                if (priceGroovelab !== '') setPriceGroovelab(Number(priceGroovelab).toFixed(2));
+                              }}
                               style={{
                                 width: '100%',
                                 border: 'none',
@@ -4130,6 +4158,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               min="0"
                               value={priceKombi}
                               onChange={(e) => setPriceKombi(e.target.value.replace(',', '.'))}
+                              onBlur={() => {
+                                if (priceKombi !== '') setPriceKombi(Number(priceKombi).toFixed(2));
+                              }}
                               style={{
                                 width: '100%',
                                 border: 'none',
@@ -4163,6 +4194,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               min="0"
                               value={priceTeacher}
                               onChange={(e) => setPriceTeacher(e.target.value.replace(',', '.'))}
+                              onBlur={() => {
+                                if (priceTeacher !== '') setPriceTeacher(Number(priceTeacher).toFixed(2));
+                              }}
                               style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.95rem', fontWeight: 800, outline: 'none' }}
                             />
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>€</span>
@@ -4170,7 +4204,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         </div>
 
                         <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                          <label style={{ display: 'block', fontSize: '0.66rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                          <label style={{ display: 'block', fontSize: '0.66rem', color: '#16a34a', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
                             Aktiv-Schüler
                           </label>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
@@ -4180,14 +4214,17 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               min="0"
                               value={priceStudent}
                               onChange={(e) => setPriceStudent(e.target.value.replace(',', '.'))}
+                              onBlur={() => {
+                                if (priceStudent !== '') setPriceStudent(Number(priceStudent).toFixed(2));
+                              }}
                               style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.95rem', fontWeight: 800, outline: 'none' }}
                             />
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>€</span>
                           </div>
                         </div>
 
-                        <div style={{ background: '#f0f9ff', padding: '10px 12px', borderRadius: '12px', border: '1.5px solid #0284c7' }}>
-                          <label style={{ display: 'block', fontSize: '0.66rem', color: '#0369a1', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
+                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                          <label style={{ display: 'block', fontSize: '0.66rem', color: '#0284c7', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
                             Passiv-Schüler
                           </label>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
@@ -4197,9 +4234,12 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               min="0"
                               value={pricePassiveStudent}
                               onChange={(e) => setPricePassiveStudent(e.target.value.replace(',', '.'))}
-                              style={{ width: '100%', border: 'none', background: 'transparent', color: '#0369a1', fontSize: '0.95rem', fontWeight: 900, outline: 'none' }}
+                              onBlur={() => {
+                                if (pricePassiveStudent !== '') setPricePassiveStudent(Number(pricePassiveStudent).toFixed(2));
+                              }}
+                              style={{ width: '100%', border: 'none', background: 'transparent', color: '#0f172a', fontSize: '0.95rem', fontWeight: 800, outline: 'none' }}
                             />
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284c7' }}>€</span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>€</span>
                           </div>
                         </div>
 
@@ -4524,7 +4564,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         ) : (
                           <>
                             <CheckCircle size={18} />
-                            <span>💾 Standardpreise jetzt speichern</span>
+                            <span>Standardpreise jetzt speichern</span>
                           </>
                         )}
                       </button>
@@ -4560,8 +4600,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.02)';
                         }}
                       >
-                        <Zap size={16} color="#d97706" />
-                        <span>📊 MRR-Simulation</span>
+                        <TrendingUp size={16} color="#d97706" />
+                        <span>MRR-Simulation</span>
                       </button>
                     </div>
                   </form>

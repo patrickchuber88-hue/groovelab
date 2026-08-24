@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import { generateInvoicePDF } from '../utils/pdfGenerator';
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { calculateSchoolEffectiveRates } from '../domain/pricingEngine';
 import { calculateCampusGroovelabBilling } from '../domain/billingCalculator';
@@ -25,7 +26,10 @@ import {
   Sparkles,
   HardDrive,
   Info,
-  AlertTriangle
+  AlertTriangle,
+  Mail,
+  Copy,
+  Check
 } from 'lucide-react';
 
 interface Invoice {
@@ -34,6 +38,7 @@ interface Invoice {
   schoolStreet: string;
   schoolZipCode: string;
   schoolCity: string;
+  billingEmail?: string;
   subscriptionType: 'standard' | 'solo';
   hasCampus: boolean;
   hasGroovelab: boolean;
@@ -142,8 +147,106 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
     [new Date().getFullYear()]: true
   });
 
+  const [emailSentToast, setEmailSentToast] = useState<string | null>(null);
+
   const toggleYearExpanded = (year: number) => {
     setExpandedYears(prev => ({ ...prev, [year]: !prev[year] }));
+  };
+
+  const handleSendInvoiceEmail = (invoice: any, inv: any) => {
+    const isPreview = invoice.status === 'preview' || invoice.status === 'Vorschau' || invoice.id.startsWith('VS-');
+    const invoiceId = isPreview
+      ? invoice.id
+      : (invoice.amount < 0 ? invoice.id.replace('INV-', 'GS-') : invoice.id.replace('INV-', 'RE-'));
+    const schoolName = inv.schoolName || 'Musikschule';
+    const recipientEmail = inv.billingEmail || '';
+    const formattedAmount = Number(invoice.amount || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+    const invoiceDate = invoice.billing_date || new Date().toLocaleDateString('de-DE');
+
+    const subject = `Rechnung ${invoiceId} für Campus-Groovelab Cloud-Infrastruktur – ${schoolName}`;
+
+    const body = `Sehr geehrte Damen und Herren der ${schoolName},
+
+anbei erhalten Sie die Abrechnung ${invoiceId} für die Bereitstellung Ihrer Campus-Groovelab Cloud- und Server-Infrastruktur für den Leistungszeitraum ${invoiceDate}.
+
+──────────────────────────────────────────────────────────
+ABRECHNUNGSDATEN IM ÜBERBLICK
+──────────────────────────────────────────────────────────
+• Rechnungsnummer:   ${invoiceId}
+• Rechnungsdatum:    ${invoiceDate}
+• Rechnungsbetrag:   ${formattedAmount} (Umsatzsteuerbefreit gem. § 19 UStG)
+• Zahlungsziel:      14 Tage
+• Verwendungszweck:  ${invoiceId}
+──────────────────────────────────────────────────────────
+
+LEISTUNGSÜBERSICHT:
+- Campus-Groovelab Software-Bereitstellung: 0,00 € (Inklusive)
+${inv.hasCampus ? `- Cloud- & Datenbank-Hosting: Modul Campus (14,90 € / Mo.)\n` : ''}${inv.hasGroovelab ? `- Cloud- & Datenbank-Hosting: Modul GrooveLab (9,90 € / Mo.)\n` : ''}${inv.hasKombiDiscount ? `- Kombi-Vorteilsrabatt: -4,90 € / Mo.\n` : ''}- Service- & Administrationspauschale für Lehrkräfte
+- Bereitstellung der aktiven Schülerzugänge
+- Basis-Bereitstellung & DSGVO-Hosting
+
+Den detaillierten Beleg entnehmen Sie bitte der beigefügten PDF-Rechnung.
+
+Bitte überweisen Sie den fälligen Betrag unter Angabe des Verwendungszwecks "${invoiceId}" auf folgendes Geschäftskonto:
+
+Empfänger:         ${operatorCompany || 'Campus-Groovelab Plattformbetrieb'}
+IBAN:              ${operatorIban || 'DE00 0000 0000 0000 0000 00'}
+BIC:               ${operatorBic || 'GENODE00XXX'}
+Verwendungszweck:  ${invoiceId}
+
+Bei Fragen zu Ihrer Abrechnung stehen wir Ihnen jederzeit gerne zur Verfügung.
+
+Mit freundlichen Grüßen
+Ihr Campus-Groovelab Abrechnungsteam`;
+
+    // 1. Automatically generate & download the official PDF invoice
+    try {
+      generateInvoicePDF({
+        invoiceId,
+        invoiceDate,
+        amount: invoice.amount,
+        schoolName: inv.schoolName,
+        schoolStreet: inv.schoolStreet,
+        schoolZipCode: inv.schoolZipCode,
+        schoolCity: inv.schoolCity,
+        operatorCompany,
+        operatorContact,
+        operatorStreet,
+        operatorZip,
+        operatorCity,
+        operatorIban,
+        operatorBic,
+        hasCampus: inv.hasCampus,
+        hasGroovelab: inv.hasGroovelab,
+        hasKombiDiscount: inv.hasKombiDiscount,
+        totalTeachersCount: inv.totalTeachersCount,
+        passiveStudentsCount: inv.passiveStudentsCount,
+        activeStudents: inv.activeStudents,
+        storageAddonGb: inv.storageAddonGb,
+        storageAddonMonthlyFee: inv.storageAddonMonthlyFee
+      });
+    } catch (pdfErr) {
+      console.warn('Could not auto-generate invoice PDF:', pdfErr);
+    }
+
+    // 2. Copy text to clipboard as convenient fallback
+    try {
+      navigator.clipboard.writeText(body);
+    } catch (e) {
+      console.warn('Clipboard write failed:', e);
+    }
+
+    // 3. Build mailto URL
+    const mailtoUrl = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    // 4. Open mail client
+    window.location.href = mailtoUrl;
+
+    // 5. Show confirmation toast
+    setEmailSentToast(`📄 Rechnungs-PDF heruntergeladen & E-Mail-Vorlage für ${invoiceId} geöffnet!`);
+    setTimeout(() => {
+      setEmailSentToast(null);
+    }, 4500);
   };
 
   const getPaidInvoices = (schoolId: string): string[] => {
@@ -494,6 +597,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           schoolStreet: school.street ? `${school.street} ${school.house_number || ''}`.trim() : '',
           schoolZipCode: school.zip_code || '',
           schoolCity: school.city || '',
+          billingEmail: school.billing_email || school.email || school.contact_email || '',
           subscriptionType: school.subscription_type === 'solo' ? 'solo' : 'standard',
           hasCampus,
           hasGroovelab,
@@ -1714,7 +1818,11 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                         .sort((a, b) => b - a);
 
                       const renderInvoiceCard = (invoice: any) => {
-                        const isPreview = invoice.status === 'preview' || invoice.status === 'Vorschau';
+                        const isPreview = invoice.status === 'preview' || invoice.status === 'Vorschau' || String(invoice.id || '').startsWith('VS-');
+                        const isPaid = invoice.status === 'paid' || invoice.status === 'Bezahlt';
+                        const isCancelled = invoice.status === 'cancelled' || invoice.status === 'Storniert';
+                        const isDueInvoice = !isPreview && !isPaid && !isCancelled && Number(invoice.amount || 0) > 0;
+
                         return (
                           <div 
                             key={invoice.id} 
@@ -1755,6 +1863,43 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                               </span>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {isDueInvoice && (
+                                  <button
+                                    type="button"
+                                    title={inv.billingEmail ? `Rechnung per E-Mail an ${inv.billingEmail} senden & PDF herunterladen` : 'Rechnung per E-Mail senden & PDF herunterladen (mailto:)'}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSendInvoiceEmail(invoice, inv);
+                                    }}
+                                    style={{
+                                      background: '#ffffff',
+                                      border: '1px solid rgba(0, 0, 0, 0.12)',
+                                      borderRadius: '8px',
+                                      padding: '5px 9px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 700,
+                                      color: '#475569',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      transition: 'all 0.15s ease-in-out'
+                                    }}
+                                    onMouseOver={(e: any) => { 
+                                      e.currentTarget.style.background = '#f0fdf4'; 
+                                      e.currentTarget.style.color = '#15803d';
+                                      e.currentTarget.style.borderColor = '#86efac';
+                                    }}
+                                    onMouseOut={(e: any) => { 
+                                      e.currentTarget.style.background = '#ffffff'; 
+                                      e.currentTarget.style.color = '#475569';
+                                      e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.12)';
+                                    }}
+                                  >
+                                    <Mail size={13} />
+                                  </button>
+                                )}
+
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -1995,6 +2140,33 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           studentBillingOption={viewingInvoice.studentBillingOption}
           onClose={() => setViewingInvoice(null)}
         />
+      )}
+
+      {/* Floating E-Mail Dispatch Toast Feedback */}
+      {emailSentToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          background: '#0f172a',
+          color: '#ffffff',
+          padding: '12px 20px',
+          borderRadius: '14px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          zIndex: 9999,
+          fontSize: '0.82rem',
+          fontWeight: 700,
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Check size={14} color="#ffffff" strokeWidth={3} />
+          </div>
+          <span>{emailSentToast}</span>
+        </div>
       )}
       
     </div>

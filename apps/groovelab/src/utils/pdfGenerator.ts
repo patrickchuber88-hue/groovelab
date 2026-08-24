@@ -1331,6 +1331,305 @@ export const generateGdprDataReportPDF = async (data: GdprReportData) => {
   doc.save(`Campus_Groovelab_DSGVO_Bericht_${cleanName}_${dateFileStr}.pdf`);
 };
 
+export interface InvoicePDFParams {
+  invoiceId: string;
+  invoiceDate: string;
+  dueDateStr?: string;
+  amount: number;
+  schoolName: string;
+  schoolStreet?: string;
+  schoolZipCode?: string;
+  schoolCity?: string;
+  operatorCompany?: string;
+  operatorContact?: string;
+  operatorStreet?: string;
+  operatorZip?: string;
+  operatorCity?: string;
+  operatorIban?: string;
+  operatorBic?: string;
+  hasCampus?: boolean;
+  hasGroovelab?: boolean;
+  hasKombiDiscount?: boolean;
+  totalTeachersCount?: number;
+  passiveStudentsCount?: number;
+  activeStudents?: number;
+  storageAddonGb?: number;
+  storageAddonMonthlyFee?: number;
+}
+
+export const generateInvoicePDF = async (params: InvoicePDFParams) => {
+  const { default: jsPDF } = await import('jspdf');
+  const doc = new jsPDF('p', 'mm', 'a4');
+
+  const cleanInvoiceId = params.invoiceId.startsWith('INV-') ? params.invoiceId.replace('INV-', 'RE-') : params.invoiceId;
+
+  doc.setProperties({
+    title: `Rechnung ${cleanInvoiceId} - Campus-Groovelab`,
+    subject: `Rechnung für Cloud-Infrastruktur ${params.schoolName}`,
+    author: 'Campus-Groovelab Plattformbetrieb',
+    creator: 'Campus-Groovelab Billing Engine'
+  });
+
+  const primaryGreen = [52, 168, 83];
+  const darkSlate = [15, 23, 42];
+  const textMuted = [100, 116, 139];
+  const borderLight = [226, 232, 240];
+
+  // Top Accent Bar
+  doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  doc.rect(0, 0, 210, 6, 'F');
+
+  // Header Left: Platform Name & Info
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text('Campus-Groovelab', 20, 22);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('Cloud- & Bildungs-Infrastruktur für Musikschulen', 20, 27);
+
+  // Header Right: Operator Company
+  const opCompany = params.operatorCompany || 'Patrick Huber (Einzelunternehmer)';
+  const opStreet = params.operatorStreet || 'Karl-Fürstenberg-Str. 59';
+  const opCity = `${params.operatorZip || '79618'} ${params.operatorCity || 'Rheinfelden'}`;
+  
+  doc.setFontSize(8);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text(opCompany, 190, 18, { align: 'right' });
+  doc.text(opStreet, 190, 22.5, { align: 'right' });
+  doc.text(opCity, 190, 27, { align: 'right' });
+
+  // Recipient / School Address Box
+  let y = 45;
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  doc.text('RECHNUNGSEMPFÄNGER', 20, y);
+
+  y += 5;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text(params.schoolName || 'Musikschule', 20, y);
+
+  if (params.schoolStreet) {
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(params.schoolStreet, 20, y);
+  }
+  if (params.schoolZipCode || params.schoolCity) {
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`${params.schoolZipCode || ''} ${params.schoolCity || ''}`.trim(), 20, y);
+  }
+
+  // Invoice Meta Box (Right aligned)
+  const metaY = 45;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+  doc.roundedRect(125, metaY, 65, 28, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text('RECHNUNG', 130, metaY + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('Rechnungs-Nr.:', 130, metaY + 12);
+  doc.text('Datum:', 130, metaY + 17);
+  doc.text('Zahlbar bis:', 130, metaY + 22);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text(cleanInvoiceId, 185, metaY + 12, { align: 'right' });
+  doc.text(params.invoiceDate || new Date().toLocaleDateString('de-DE'), 185, metaY + 17, { align: 'right' });
+  doc.text(params.dueDateStr || '14 Tage', 185, metaY + 22, { align: 'right' });
+
+  // Table of Items
+  y = 85;
+  doc.setFillColor(241, 245, 249);
+  doc.rect(20, y, 170, 7, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('POS', 23, y + 5);
+  doc.text('BEZEICHNUNG / LEISTUNGSUMFANG', 35, y + 5);
+  doc.text('BETRAG', 185, y + 5, { align: 'right' });
+
+  y += 10;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+
+  let pos = 1;
+  const addRow = (title: string, sub: string, amountStr: string, isDiscount = false) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    doc.text(String(pos).padStart(2, '0'), 23, y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(isDiscount ? 21 : darkSlate[0], isDiscount ? 128 : darkSlate[1], isDiscount ? 61 : darkSlate[2]);
+    doc.text(title, 35, y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    doc.text(sub, 35, y + 4);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(isDiscount ? 21 : darkSlate[0], isDiscount ? 128 : darkSlate[1], isDiscount ? 61 : darkSlate[2]);
+    doc.text(amountStr, 185, y, { align: 'right' });
+
+    // Subtle bottom divider
+    doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+    doc.line(20, y + 7, 190, y + 7);
+
+    y += 11;
+    pos++;
+  };
+
+  // Pos 1: Software Provisioning
+  addRow(
+    'Campus-Groovelab Software-Bereitstellung',
+    'Basis-Software inklusive • 0 € Lizenzkaufgebühren',
+    '0,00 € (Inklusive)'
+  );
+
+  // Pos 2: Hosting Campus
+  if (params.hasCampus) {
+    addRow(
+      'Cloud- & Datenbank-Hosting: Modul Campus',
+      'Intelligenter Stundenplan, Raum-Engine & Hausaufgabenheft-Sync',
+      '14,90 € / Mo.'
+    );
+  }
+
+  // Pos 3: Hosting GrooveLab
+  if (params.hasGroovelab) {
+    addRow(
+      'Cloud- & Datenbank-Hosting: Modul GrooveLab',
+      'Band-Management, Repertoire-Planer & Songs meistern',
+      '9,90 € / Mo.'
+    );
+  }
+
+  // Pos 4: Kombi Discount
+  if (params.hasKombiDiscount || (params.hasCampus && params.hasGroovelab)) {
+    addRow(
+      'Kombi-Vorteilsrabatt (Infrastruktur-Bündel)',
+      'Vergünstigter Hosting-Kombipreis bei Doppelbuchung',
+      '-4,90 € / Mo.',
+      true
+    );
+  }
+
+  // Pos 5: Teachers / Admin Pauschale
+  const teachersCount = params.totalTeachersCount || 0;
+  if (teachersCount > 0) {
+    addRow(
+      'Service- & Administrationspauschale',
+      `${teachersCount} aktive Lehrkräfte & Verwaltung × 0,49 € / Mo.`,
+      `${(teachersCount * 0.49).toFixed(2).replace('.', ',')} € / Mo.`
+    );
+  }
+
+  // Pos 6: Passive Students Base Provisioning
+  const passiveCount = params.passiveStudentsCount || 0;
+  if (passiveCount > 0) {
+    addRow(
+      'Basis-Bereitstellung (Schüler-Datenbank)',
+      `${passiveCount} Schülerdatenbank-Profile × 0,09 € / Mo. (QR-Sync & DSGVO-Hosting)`,
+      `${(passiveCount * 0.09).toFixed(2).replace('.', ',')} € / Mo.`
+    );
+  }
+
+  // Pos 7: Active Student Activations
+  const activeCount = params.activeStudents || 0;
+  if (activeCount > 0) {
+    addRow(
+      'Bereitstellung aktiver Schüler-Zugänge',
+      `${activeCount} interaktive Schüleraktivierungen × 0,49 € / Mo.`,
+      `${(activeCount * 0.49).toFixed(2).replace('.', ',')} € / Mo.`
+    );
+  }
+
+  // Pos 8: Storage Addon
+  if (params.storageAddonGb && params.storageAddonGb > 0) {
+    addRow(
+      'Zusatz-Speichervolumen: Audio-Tresor',
+      `+${params.storageAddonGb} GB Cloud-Speicher für Übe- & Bandaufnahmen`,
+      `${(params.storageAddonMonthlyFee || 0).toFixed(2).replace('.', ',')} € / Mo.`
+    );
+  }
+
+  // Total Card
+  y += 4;
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(187, 247, 208);
+  doc.roundedRect(120, y, 70, 18, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(21, 128, 61);
+  doc.text('GESAMTBETRAG:', 125, y + 7);
+
+  doc.setFontSize(13);
+  doc.text(
+    `${Number(params.amount || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}`,
+    185,
+    y + 12,
+    { align: 'right' }
+  );
+
+  y += 24;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('Umsatzsteuerbefreit gem. § 19 UStG (Kleinunternehmerregelung).', 20, y);
+
+  // Bank Transfer Box
+  y += 8;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+  doc.roundedRect(20, y, 170, 24, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text('ZAHLUNGSINFORMATIONEN', 25, y + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text(`Empfänger: ${opCompany}`, 25, y + 11);
+  doc.text(`IBAN: ${params.operatorIban || 'DE89 3704 0044 0532 9482 11'}`, 25, y + 15.5);
+  doc.text(`BIC: ${params.operatorBic || 'WELADED1XYZ'}`, 25, y + 20);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  doc.text(`Verwendungszweck: ${cleanInvoiceId}`, 120, y + 15.5);
+
+  // Bottom Footer
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text('Campus-Groovelab • 100% DSGVO-konformes Cloud-Hosting • www.campus-groovelab.de', 20, 285);
+  doc.text('Seite 1 von 1', 185, 285, { align: 'right' });
+
+  // Trigger Instant Browser Download
+  const sanitizedSchool = (params.schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save(`${cleanInvoiceId}_${sanitizedSchool}.pdf`);
+};
+
 
 
 

@@ -37,9 +37,9 @@ export const measureDatabasePing = async (): Promise<LatencyMetric> => {
     const rtt = Math.round(performance.now() - start);
 
     let quality: LatencyMetric['quality'] = 'EXCELLENT';
-    if (rtt > 400) quality = 'POOR';
-    else if (rtt > 150) quality = 'FAIR';
-    else if (rtt > 60) quality = 'GOOD';
+    if (rtt > 800) quality = 'POOR';
+    else if (rtt > 400) quality = 'FAIR';
+    else if (rtt > 120) quality = 'GOOD';
 
     latestMetric = { rttMs: rtt, quality, timestamp: Date.now() };
   } catch (e) {

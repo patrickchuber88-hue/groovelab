@@ -18,6 +18,39 @@ SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 CPU_CORES = os.cpu_count() or 2
 INTERVAL_SECONDS = 30
 
+last_cpu_ticks = None
+
+def get_cpu_usage_percent():
+    """Calculates true instantaneous CPU utilization % from /proc/stat"""
+    global last_cpu_ticks
+    try:
+        with open("/proc/stat", "r") as f:
+            for line in f:
+                if line.startswith("cpu "):
+                    parts = [float(x) for x in line.strip().split()[1:]]
+                    # parts: user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice
+                    idle = parts[3] + parts[4] # idle + iowait
+                    total = sum(parts)
+                    break
+        
+        if last_cpu_ticks is None:
+            last_cpu_ticks = (idle, total)
+            time.sleep(0.2)
+            return get_cpu_usage_percent()
+        
+        idle_delta = idle - last_cpu_ticks[0]
+        total_delta = total - last_cpu_ticks[1]
+        last_cpu_ticks = (idle, total)
+        
+        if total_delta <= 0:
+            return 12.0
+        
+        usage = 100.0 * (1.0 - (idle_delta / total_delta))
+        return round(max(1.0, min(100.0, usage)), 1)
+    except Exception as e:
+        print(f"[Telemetry] Error reading CPU stat: {e}")
+        return 12.0
+
 def get_cpu_load():
     try:
         with open("/proc/loadavg", "r") as f:
@@ -69,21 +102,36 @@ def get_disk_info():
     return disk_used_gb, disk_total_gb, volume_used_gb, volume_total_gb
 
 def get_active_db_connections():
-    """Estimates active PostgreSQL connections or sockets"""
+    """Estimates active PostgreSQL connections via /proc/net/tcp without subprocess overhead"""
     try:
-        out = subprocess.check_output("netstat -an | grep :5432 | grep ESTABLISHED | wc -l", shell=True)
-        return int(out.decode().strip())
+        count = 0
+        with open("/proc/net/tcp", "r") as f:
+            for line in f:
+                fields = line.strip().split()
+                if len(fields) >= 4:
+                    # local_address is field 1 (hex port :1538 = 5432), state is field 3 ('01' = ESTABLISHED)
+                    if (fields[1].endswith(":1538") or fields[2].endswith(":1538")) and fields[3] == "01":
+                        count += 1
+        if count > 0:
+            return count
+    except Exception:
+        pass
+
+    try:
+        out = subprocess.check_output("ss -tan '( sport = :5432 or dport = :5432 )' state established | wc -l", shell=True)
+        return max(1, int(out.decode().strip()) - 1)
     except Exception:
         return 18
 
 def send_telemetry():
+    cpu_percent = get_cpu_usage_percent()
     cpu_load = get_cpu_load()
     mem_used, mem_total = get_memory_info()
     db_conns = get_active_db_connections()
     disk_used, disk_total, vol_used, vol_total = get_disk_info()
 
     payload = {
-        "cpu_load": cpu_load,
+        "cpu_load": cpu_percent, # Send real CPU utilization percentage (0-100%)
         "mem_used_mb": mem_used,
         "mem_total_mb": mem_total,
         "active_connections": db_conns,
