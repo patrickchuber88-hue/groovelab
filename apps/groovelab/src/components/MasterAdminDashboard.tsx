@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import QRCode from 'react-qr-code';
 import { supabase } from '../lib/supabase';
 import { 
   Shield, ShieldAlert, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap, BookOpen,
   Edit2, Settings, Sliders, Search, Tag, Percent,
   Activity, Cpu, Database, AlertTriangle, HardDrive, Server, Zap, Link, Key, History as HistoryIcon,
-  Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Building2, Building, Eye, Radio, Heart, ShieldCheck,
+  Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Building2, Building, Eye, EyeOff, Radio, Heart, ShieldCheck,
   QrCode, Lock, Smartphone, Laptop, Wrench, Lightbulb, Rocket, Sparkles, RotateCcw, WifiOff, Fingerprint
 } from 'lucide-react';
 import { MaintenanceTab } from './masterAdmin/tabs/MaintenanceTab';
@@ -241,8 +242,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
   // Master Admin Credentials State
   const [adminUser, setAdminUser] = useState<any>(null);
-  const [adminUsername, setAdminUsername] = useState('');
+  const [adminUsername, setAdminUsername] = useState('admin');
   const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [updatingAdmin, setUpdatingAdmin] = useState(false);
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
@@ -398,9 +400,25 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   });
 
   // 🛡️ Security, 2FA & Session State
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('cg_2fa_enabled') === 'true';
+    }
+    return false;
+  });
   const [showTwoFactorModal, setShowTwoFactorModal] = useState<boolean>(false);
-  const [twoFactorSecret, setTwoFactorSecret] = useState<string>('CG-ROOT-SEC-8F92');
+  const [twoFactorSecret, setTwoFactorSecret] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('cg_2fa_secret');
+      if (stored && /^[A-Z2-7]{16,32}$/i.test(stored)) return stored.toUpperCase();
+    }
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let secret = '';
+    for (let i = 0; i < 16; i++) {
+      secret += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return secret;
+  });
   const [twoFactorCodeInput, setTwoFactorCodeInput] = useState<string>('');
   const [showGiroCodeModal, setShowGiroCodeModal] = useState<boolean>(false);
   const [masterKioskToken, setMasterKioskToken] = useState<string>('ROOT_KIOSK_A98F72_MSTR');
@@ -1835,21 +1853,33 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         setTimeout(() => setSaveSuccessToast(null), 3000);
       }
     } else {
+      // Ensure a valid Base32 secret exists
+      if (!twoFactorSecret || !/^[A-Z2-7]{16,32}$/i.test(twoFactorSecret)) {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        let secret = '';
+        for (let i = 0; i < 16; i++) {
+          secret += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        setTwoFactorSecret(secret);
+        localStorage.setItem('cg_2fa_secret', secret);
+      }
       setShowTwoFactorModal(true);
     }
   };
 
   const handleConfirmTwoFactor = (e: React.FormEvent) => {
     e.preventDefault();
-    if (twoFactorCodeInput.trim().length >= 4) {
+    const cleanCode = twoFactorCodeInput.replace(/\s+/g, '');
+    if (cleanCode.length === 6 && /^\d{6}$/.test(cleanCode)) {
       setTwoFactorEnabled(true);
       setShowTwoFactorModal(false);
       setTwoFactorCodeInput('');
       localStorage.setItem('cg_2fa_enabled', 'true');
+      localStorage.setItem('cg_2fa_secret', twoFactorSecret);
       setSaveSuccessToast('🟢 Zwei-Faktor-Schutz (2FA) erfolgreich aktiviert!');
       setTimeout(() => setSaveSuccessToast(null), 4000);
     } else {
-      alert('Bitte geben Sie einen gültigen Bestätigungscode aus Ihrer Authenticator-App ein.');
+      alert('Bitte geben Sie den 6-stelligen Bestätigungscode aus Ihrer Authenticator-App ein (z. B. 482910).');
     }
   };
 
@@ -1931,11 +1961,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         .maybeSingle();
       if (data) {
         setAdminUser(data);
-        setAdminUsername(data.master_admin_username || 'admin');
+        setAdminUsername(data.master_admin_username || data.username || 'admin');
         setAdminPassword('');
+      } else {
+        setAdminUsername('admin');
       }
     } catch (err) {
       console.error('Error fetching admin:', err);
+      setAdminUsername('admin');
     }
   };
 
@@ -6395,7 +6428,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         Root-Benutzername
                       </label>
                       <input
-                        type={usernameFocused ? "text" : "password"}
+                        type="text"
                         value={adminUsername}
                         onChange={(e) => setAdminUsername(e.target.value)}
                         placeholder="admin"
@@ -6412,8 +6445,6 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           fontWeight: 700,
                           outline: 'none'
                         }}
-                        onFocus={() => setUsernameFocused(true)}
-                        onBlur={() => setUsernameFocused(false)}
                       />
                     </div>
 
@@ -6422,35 +6453,60 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         <label style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>
                           Neues Passwort (leer lassen für keine Änderung)
                         </label>
-                        {adminPassword && (
+                        {adminPassword ? (
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: getPasswordStrength(adminPassword).color }}>
                             {getPasswordStrength(adminPassword).label}
                           </span>
+                        ) : (
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <ShieldCheck size={12} color="#16a34a" /> Aktiv & verschlüsselt
+                          </span>
                         )}
                       </div>
-                      <input
-                        type={passwordFocused ? "text" : "password"}
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        placeholder="••••••••••••"
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '11px 13px',
-                          borderRadius: '10px',
-                          background: '#f8fafc',
-                          border: '1px solid #cbd5e1',
-                          color: '#0f172a',
-                          fontSize: '0.90rem',
-                          fontWeight: 700,
-                          outline: 'none'
-                        }}
-                        onFocus={() => setPasswordFocused(true)}
-                        onBlur={() => setPasswordFocused(false)}
-                      />
+                      <div style={{ position: 'relative', width: '100%' }}>
+                        <input
+                          type={showAdminPassword ? "text" : "password"}
+                          value={adminPassword}
+                          onChange={(e) => setAdminPassword(e.target.value)}
+                          placeholder="Neues Master-Passwort eingeben..."
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '11px 40px 11px 13px',
+                            borderRadius: '10px',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            color: '#0f172a',
+                            fontSize: '0.90rem',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPassword(!showAdminPassword)}
+                          aria-label={showAdminPassword ? "Passwort verbergen" : "Passwort anzeigen"}
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '4px'
+                          }}
+                        >
+                          {showAdminPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
 
                       {/* Live Password Entropy Meter */}
-                      {adminPassword && (
+                      {adminPassword ? (
                         <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <div style={{ width: '100%', height: '4px', background: '#e2e8f0', borderRadius: '2px', overflow: 'hidden' }}>
                             <div style={{
@@ -6463,6 +6519,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
                             {getPasswordStrength(adminPassword).hint}
                           </span>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: '4px', fontSize: '0.68rem', color: '#64748b' }}>
+                          Das aktuelle Master-Passwort bleibt unverändert gültig. Nur ausfüllen, wenn Sie ein neues Passwort festlegen möchten.
                         </div>
                       )}
                     </div>
@@ -6592,10 +6652,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     border: '2px solid #0f172a',
                     position: 'relative'
                   }}>
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(masterKioskToken || adminUser?.qr_token || 'ROOT_MASTER_ACCESS')}`}
-                      alt="Master Admin QR Badge"
-                      style={{ width: '150px', height: '150px', display: 'block', borderRadius: '8px' }}
+                    <QRCode 
+                      value={masterKioskToken || adminUser?.qr_token || 'ROOT_MASTER_ACCESS'}
+                      size={150}
+                      style={{ width: '150px', height: '150px', display: 'block' }}
                     />
                   </div>
 
@@ -6930,16 +6990,16 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       Scannen Sie den QR-Code mit einer Authenticator-App (Apple Passwörter, Google Authenticator, 1Password) und geben Sie den 6-stelligen Code ein.
                     </p>
 
-                    <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                      <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(`otpauth://totp/Campus-Groovelab:${adminUsername}?secret=${twoFactorSecret}&issuer=Campus-Groovelab`)}`}
-                        alt="2FA QR Code"
-                        style={{ width: '140px', height: '140px', display: 'block' }}
+                    <div style={{ padding: '16px', background: '#ffffff', borderRadius: '18px', border: '2px solid #0f172a', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
+                      <QRCode 
+                        value={`otpauth://totp/Campus-Groovelab:${encodeURIComponent(adminUsername || 'admin')}?secret=${twoFactorSecret}&issuer=Campus-Groovelab&algorithm=SHA1&digits=6&period=30`}
+                        size={150}
+                        style={{ width: '150px', height: '150px', display: 'block' }}
                       />
                     </div>
 
-                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                      Manueller Schlüssel: <strong style={{ fontFamily: 'monospace', color: '#0f172a' }}>{twoFactorSecret}</strong>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                      Manueller Schlüssel: <strong style={{ fontFamily: 'monospace', color: '#0f172a', letterSpacing: '1.5px', background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px' }}>{twoFactorSecret.match(/.{1,4}/g)?.join(' ') || twoFactorSecret}</strong>
                     </div>
 
                     <form onSubmit={handleConfirmTwoFactor} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
