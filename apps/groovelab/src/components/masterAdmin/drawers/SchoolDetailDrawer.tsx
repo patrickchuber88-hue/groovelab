@@ -11,6 +11,7 @@ interface SchoolDetailDrawerProps {
   school: any;
   schoolStats: any;
   masterPricing: any;
+  operatorCompany?: string;
   onClose: () => void;
   onUpdateSchool: (updatedData: any) => Promise<void>;
   onStartGhostMode: (school: any) => void;
@@ -22,6 +23,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   school,
   schoolStats,
   masterPricing,
+  operatorCompany,
   onClose,
   onUpdateSchool,
   onStartGhostMode,
@@ -1057,7 +1059,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
 
             <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', fontSize: '0.84rem', color: '#475569', lineHeight: '1.7', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div><strong>Vertragspartner:</strong> {school.name}, {street || school.street} {houseNumber || school.house_number}, {zipCode || school.zip_code} {city || school.city}</div>
-              <div><strong>Auftragnehmer:</strong> Campus-Groovelab Cloud Solutions GmbH</div>
+              <div><strong>Auftragnehmer:</strong> {operatorCompany || 'Campus-Groovelab (Einzelunternehmen Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden)'}</div>
               <div><strong>Geltungsbereich:</strong> Hosting, Bereitstellung von Schüler-Protokollen, Terminen, Loopstation &amp; Band-Portalen nach EU-DSGVO.</div>
               {school?.avv_signed_at && (
                 <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', color: '#0f172a' }}>

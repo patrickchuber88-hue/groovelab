@@ -7596,6 +7596,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           school={selectedSchool}
           schoolStats={schoolStats[selectedSchool.id]}
           masterPricing={masterPricing}
+          operatorCompany={billingCompany}
           onClose={() => setSelectedSchool(null)}
           onUpdateSchool={async (updatedData) => {
             await supabase.from('schools').update(updatedData).eq('id', selectedSchool.id);
