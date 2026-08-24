@@ -5,7 +5,7 @@ dotenv.config({ path: 'apps/groovelab/.env.local' });
 
 // We use the real anonymous key and URL to act as the anonymous user
 const SUPABASE_URL = 'https://supabase.campus-groovelab.de';
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwNDE3ODE1LCJleHAiOjQ5MzQwMTc4MTV9.zOsuxweIlQBi7doeBoUqg9aTR6-qzOr0sjsa0Oee5cc';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg3NTU4MDYxLCJleHAiOjIxMDI5MTgwNjF9.FZWOhJ8B7coAqv4IX3dKFYFerKwODGiQm-5IFFKiPIc';
 
 // Let's use Elisabeth's bypass token to fetch her profile and try to cancel a virtual or actual occurrence
 const STUDENT_QR_TOKEN = 'ab4b4f50-04bd-407b-a48e-f7f532b620fc';
