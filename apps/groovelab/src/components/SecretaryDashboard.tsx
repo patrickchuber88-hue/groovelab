@@ -25406,6 +25406,51 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 </p>
                               </div>
 
+                              {/* Pending Provisioning Legal Notice Box */}
+                              {(() => {
+                                const isPendingHetzner = currentSchoolProfile?.storage_addon_status === 'pending_activation' || 
+                                  currentSchoolProfile?.storage_addon_status === 'pending_provisioning' || 
+                                  currentSchoolProfile?.storage_addon_status === 'pending_hetzner' || 
+                                  (Number(currentSchoolProfile?.storage_addon_pending_gb) > 0);
+                                if (!isPendingHetzner) return null;
+
+                                const pendingGb = currentSchoolProfile?.storage_addon_pending_gb || selectedStorageAddonGb || 10;
+                                return (
+                                  <div style={{
+                                    background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                                    border: '1.5px solid #f59e0b',
+                                    borderRadius: '16px',
+                                    padding: '16px 20px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '14px',
+                                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)'
+                                  }}>
+                                    <div style={{
+                                      width: '40px',
+                                      height: '40px',
+                                      borderRadius: '12px',
+                                      background: 'rgba(217, 119, 6, 0.15)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      border: '1px solid rgba(217, 119, 6, 0.25)',
+                                      flexShrink: 0
+                                    }}>
+                                      <Clock size={20} color="#b45309" />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                      <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#78350f' }}>
+                                        ⏳ Speicher-Bereitstellung in Bearbeitung (+{pendingGb} GB)
+                                      </div>
+                                      <div style={{ fontSize: '0.75rem', color: '#92400e', lineHeight: 1.45 }}>
+                                        Dein Auftrag über +{pendingGb} GB Audio-Tresor Cloud-Speicher wird auf dem Server eingerichtet (Bereitstellungszeit: in der Regel 1–2 Werktage). Die monatliche Abrechnung startet erst ab erfolgreicher Freischaltung.
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+
                               {/* Live Storage Meter & Safety Info */}
                               {(() => {
                                 const activeAddonGb = Number(currentSchoolProfile?.storage_addon_gb || 0);

@@ -7,7 +7,7 @@ import {
   Edit2, Settings, Sliders, Search, Tag, Percent,
   Activity, Cpu, Database, AlertTriangle, HardDrive, Server, Zap, Link, Key, History as HistoryIcon,
   Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Building2, Building, Eye, EyeOff, Radio, Heart, ShieldCheck,
-  QrCode, Lock, Smartphone, Laptop, Wrench, Lightbulb, Rocket, Sparkles, RotateCcw, WifiOff, Fingerprint, Download, ArrowRight
+  QrCode, Lock, Smartphone, Laptop, Wrench, Lightbulb, Rocket, Sparkles, RotateCcw, WifiOff, Fingerprint, Download, ArrowRight, ExternalLink
 } from 'lucide-react';
 import { MaintenanceTab } from './masterAdmin/tabs/MaintenanceTab';
 import { SchoolsTab } from './masterAdmin/tabs/SchoolsTab';
@@ -2882,6 +2882,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     };
   };
 
+  const pendingStorageSchools = (schools || []).filter((s: any) => 
+    s && 
+    !s.name?.toLowerCase().includes('groove academy') && 
+    (s.storage_addon_status === 'pending_activation' || 
+     s.storage_addon_status === 'pending_provisioning' || 
+     s.storage_addon_status === 'pending_hetzner' || 
+     (s.storage_addon_pending_gb && Number(s.storage_addon_pending_gb) > 0))
+  );
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -3060,6 +3069,24 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         boxShadow: '0 2px 5px rgba(239, 68, 68, 0.25)'
                       }}>
                         {pendingUsers.length}
+                      </span>
+                    )}
+                    {tab.id === 'executive' && pendingStorageSchools.length > 0 && (
+                      <span style={{
+                        background: '#f59e0b',
+                        color: '#ffffff',
+                        fontSize: '0.72rem',
+                        fontWeight: 900,
+                        padding: '2px 7px',
+                        borderRadius: '10px',
+                        minWidth: '16px',
+                        textAlign: 'center',
+                        boxShadow: '0 2px 5px rgba(245, 158, 11, 0.35)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}>
+                        <HardDrive size={10} /> {pendingStorageSchools.length}
                       </span>
                     )}
                   </button>
@@ -3401,6 +3428,85 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             </div>
           )}
 
+          {/* Persistent Global Hetzner Storage Provisioning Banner */}
+          {pendingStorageSchools.length > 0 && activePortalTab !== 'executive' && (
+            <div style={{
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+              border: '1.5px solid #f59e0b',
+              borderRadius: '16px',
+              padding: '14px 20px',
+              marginBottom: '24px',
+              boxShadow: '0 6px 20px rgba(245, 158, 11, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: '#fef3c7',
+                  border: '1px solid #f59e0b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <HardDrive size={18} color="#b45309" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#78350f' }}>
+                    {pendingStorageSchools.length} Hetzner Audio-Tresor Bereitstellung{pendingStorageSchools.length > 1 ? 'en' : ''} ausstehend
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: '#92400e', fontWeight: 600 }}>
+                    {pendingStorageSchools.map(s => `${s.name} (+${s.storage_addon_pending_gb || 10} GB)`).join(', ')} (Bereitstellung: 1–2 Werktage)
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => window.open('https://console.hetzner.cloud/projects', '_blank')}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #d97706',
+                    color: '#92400e',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <ExternalLink size={12} /> console.hetzner.cloud ↗
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePortalTab('executive')}
+                  style={{
+                    background: '#d97706',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(217, 119, 6, 0.3)'
+                  }}
+                >
+                  Zu den Aufträgen ➔
+                </button>
+              </div>
+            </div>
+          )}
+
           {activePortalTab === 'executive' && (
             <ExecutiveTab
               schools={schools}
@@ -3517,9 +3623,12 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 const ramTotal = latestMetric ? latestMetric.mem_total_mb : 4096;
                 const ramPct = ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 35;
                 const dbConns = latestMetric ? latestMetric.active_connections : 4;
-                const diskUsed = latestMetric?.disk_used_gb ?? 18.2;
-                const diskTotal = latestMetric?.disk_total_gb ?? 40.0;
+                const diskUsed = latestMetric?.disk_used_gb ?? 20.9;
+                const diskTotal = latestMetric?.disk_total_gb ?? 37.0;
                 const diskPct = (diskUsed / diskTotal) * 100;
+                const volumeUsed = latestMetric?.volume_used_gb ?? 2.1;
+                const volumeTotal = latestMetric?.volume_total_gb ?? 14.0;
+                const volumePct = volumeTotal > 0 ? (volumeUsed / volumeTotal) * 100 : 15;
 
                 return (
                   <div style={{
@@ -3612,11 +3721,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       </div>
                     </div>
 
-                    {/* Karte 3: NVMe Speicher & Backup */}
+                    {/* Karte 3: Dual-Disk: System-NVMe (40 GB) & Audio-Tresor Volume (14 GB) */}
                     <div style={{
                       background: '#ffffff',
                       borderRadius: '20px',
-                      padding: '20px 24px',
+                      padding: '18px 22px',
                       border: '1px solid #e2e8f0',
                       boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)',
                       display: 'flex',
@@ -3625,23 +3734,67 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <HardDrive size={18} />
+                          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <HardDrive size={16} />
                           </div>
                           <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            NVMe &amp; Backup
+                            Dual-Disk Storage
                           </span>
                         </div>
-                        <span style={{ fontSize: '0.70rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: '#fef3c7', color: '#92400e' }}>
-                          {Math.round(diskPct)}% Belegt
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: '8px',
+                          background: volumePct >= 80 ? '#fee2e2' : '#d1fae5',
+                          color: volumePct >= 80 ? '#dc2626' : '#065f46'
+                        }}>
+                          {volumePct >= 80 ? '⚠️ Storage prüfen' : '✓ 100% Intakt'}
                         </span>
                       </div>
+
+                      {/* 1. System-NVMe (Root) */}
                       <div>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                          {diskUsed.toFixed(1)} GB <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>/ {diskTotal.toFixed(0)} GB</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '0.74rem', marginBottom: '3px' }}>
+                          <span style={{ fontWeight: 800, color: '#0f172a' }}>
+                            💽 NVMe System (OS)
+                          </span>
+                          <span style={{ fontSize: '0.70rem', fontWeight: 800, color: diskPct >= 80 ? '#dc2626' : '#d97706' }}>
+                            {diskUsed.toFixed(1)} / {diskTotal.toFixed(0)} GB ({Math.round(diskPct)}%)
+                          </span>
                         </div>
-                        <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: '#16a34a', fontWeight: 650 }}>
-                          ✓ Backup 02:00 Uhr intakt (14 GB Volume)
+                        <div style={{ height: '4px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min(diskPct, 100)}%`,
+                            background: diskPct >= 80 ? '#ef4444' : 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                            borderRadius: '2px',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                      </div>
+
+                      {/* 2. Hetzner Volume (Audio-Tresor & Backups) */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '0.74rem', marginBottom: '3px' }}>
+                          <span style={{ fontWeight: 800, color: '#0f172a' }}>
+                            🎙️ Audio-Tresor Volume
+                          </span>
+                          <span style={{ fontSize: '0.70rem', fontWeight: 800, color: volumePct >= 80 ? '#dc2626' : '#16a34a' }}>
+                            {volumeUsed.toFixed(1)} / {volumeTotal.toFixed(0)} GB ({Math.round(volumePct)}%)
+                          </span>
+                        </div>
+                        <div style={{ height: '4px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min(volumePct, 100)}%`,
+                            background: volumePct >= 80 ? '#ef4444' : 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                            borderRadius: '2px',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.68rem', color: '#16a34a', fontWeight: 650 }}>
+                          ✓ Backup 02:00 Uhr • {((volumeTotal - volumeUsed) > 0 ? (volumeTotal - volumeUsed).toFixed(1) : '0')} GB frei
                         </p>
                       </div>
                     </div>

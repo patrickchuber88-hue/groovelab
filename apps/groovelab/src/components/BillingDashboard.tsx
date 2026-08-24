@@ -1383,7 +1383,7 @@ Ihr Campus-Groovelab Abrechnungsteam`;
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Kombi-Vorteilsrabatt</span>
                         <span style={{ fontWeight: 700, color: inv.hasKombiDiscount ? '#34a853' : '#64748b', fontSize: '0.82rem' }}>
-                          {inv.hasKombiDiscount ? 'Aktiv (-2,99 €)' : 'Keiner'}
+                          {inv.hasKombiDiscount ? `Aktiv (-${(masterPricing?.kombiSavings ?? 4.90).toFixed(2).replace('.', ',')} €)` : 'Keiner'}
                         </span>
                       </div>
                     </div>

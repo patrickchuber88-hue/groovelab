@@ -1,5 +1,5 @@
-import React from 'react';
-import { Activity, RefreshCw, AlertTriangle, CheckCircle, Cpu, Users, Layers, ShieldCheck, Tag, Building2, HardDrive } from 'lucide-react';
+import React, { useState } from 'react';
+import { Activity, RefreshCw, AlertTriangle, CheckCircle, Cpu, Users, Layers, ShieldCheck, Tag, Building2, HardDrive, ExternalLink, Copy, Check } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { School, SchoolStat, PendingUser } from '../MasterAdminTypes';
 import { MasterPricingRates, isSchoolBypassActive } from '../../../domain/pricingEngine';
@@ -29,6 +29,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
   onNavigateTab,
   onSelectSchool
 }) => {
+  const [copiedCliId, setCopiedCliId] = useState<string | null>(null);
   const validSchools = schools.filter(s => !s.name?.toLowerCase().includes('groove academy'));
 
   // 1. Committed Base MRR (Fixed School Subscription Flatrates)
@@ -225,10 +226,14 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
           </button>
         </div>
       </div>
-
       {/* Pending Storage Addon Activations Alert Banner */}
       {(() => {
-        const pendingStorageSchools = validSchools.filter((s: any) => s.storage_addon_status === 'pending_activation' || (s.storage_addon_pending_gb && s.storage_addon_pending_gb > 0));
+        const pendingStorageSchools = validSchools.filter((s: any) => 
+          s.storage_addon_status === 'pending_activation' || 
+          s.storage_addon_status === 'pending_provisioning' || 
+          s.storage_addon_status === 'pending_hetzner' || 
+          (s.storage_addon_pending_gb && Number(s.storage_addon_pending_gb) > 0)
+        );
         if (pendingStorageSchools.length === 0) return null;
         return (
           <div style={{
@@ -241,133 +246,221 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             flexDirection: 'column',
             gap: '14px'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
-                  width: '40px',
-                  height: '40px',
+                  width: '42px',
+                  height: '42px',
                   borderRadius: '12px',
                   background: 'rgba(120, 53, 15, 0.12)',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  border: '1px solid rgba(120, 53, 15, 0.2)'
                 }}>
-                  <HardDrive size={20} color="#78350f" />
+                  <HardDrive size={22} color="#78350f" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#78350f', letterSpacing: '-0.02em' }}>
-                    {pendingStorageSchools.length} Ausstehende Speicher-Aktivierung{pendingStorageSchools.length > 1 ? 'en' : ''} (Hetzner Server)
+                  <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 900, color: '#78350f', letterSpacing: '-0.02em' }}>
+                    {pendingStorageSchools.length} Ausstehende Hetzner-Speicherbereitstellung{pendingStorageSchools.length > 1 ? 'en' : ''}
                   </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#92400e', fontWeight: 600 }}>
-                    Schulen haben Zusatz-Speicher für den Audio-Tresor angefordert. Bitte auf Hetzner freischalten &amp; bestätigen.
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.80rem', color: '#92400e', fontWeight: 600 }}>
+                    Schulen haben Zusatz-Speicher für den Audio-Tresor gebucht. Bereitstellungsziel: 1–2 Werktage.
                   </p>
                 </div>
               </div>
-              <span style={{
-                background: '#78350f',
-                color: '#ffffff',
-                padding: '4px 12px',
-                borderRadius: '999px',
-                fontSize: '0.72rem',
-                fontWeight: 900
-              }}>
-                Manuelle Freischaltung erforderlich
-              </span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => window.open('https://console.hetzner.cloud/projects', '_blank')}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #d97706',
+                    color: '#92400e',
+                    padding: '6px 14px',
+                    borderRadius: '10px',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 6px rgba(217, 119, 6, 0.12)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseOver={(e: any) => { e.currentTarget.style.background = '#fffbeb'; }}
+                  onMouseOut={(e: any) => { e.currentTarget.style.background = '#ffffff'; }}
+                >
+                  <ExternalLink size={13} color="#92400e" />
+                  <span>console.hetzner.cloud ↗</span>
+                </button>
+                <span style={{
+                  background: '#78350f',
+                  color: '#ffffff',
+                  padding: '5px 12px',
+                  borderRadius: '999px',
+                  fontSize: '0.72rem',
+                  fontWeight: 900
+                }}>
+                  Manuelle Bereitstellung
+                </span>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
               {pendingStorageSchools.map((school: any) => {
-                const requestedGb = school.storage_addon_pending_gb || 10;
-                const monthlyPrice = requestedGb === 5 ? 1.49 : requestedGb === 10 ? 2.99 : requestedGb === 20 ? 5.49 : 9.99;
+                const requestedGb = Number(school.storage_addon_pending_gb) || 10;
+                const monthlyPrice = requestedGb === 10 ? 1.99 : requestedGb === 25 ? 3.99 : requestedGb === 50 ? 6.99 : requestedGb === 100 ? 11.99 : requestedGb === 250 ? 24.99 : (requestedGb === 5 ? 1.49 : 3.99);
+                const currentGb = Number(school.storage_addon_gb || 0);
+                const newTotalGb = currentGb + requestedGb;
+                const cliCommand = `hcloud volume resize --size ${newTotalGb} groovelab-audio-${String(school.id).substring(0, 8)}`;
+
                 return (
                   <div key={school.id} style={{
                     background: '#ffffff',
-                    border: '1px solid rgba(217, 119, 6, 0.2)',
-                    borderRadius: '14px',
-                    padding: '12px 18px',
+                    border: '1px solid rgba(217, 119, 6, 0.25)',
+                    borderRadius: '16px',
+                    padding: '16px 20px',
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
+                    flexDirection: 'column',
+                    gap: '12px'
                   }}>
-                    <div>
-                      <strong style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: 800 }}>{school.name}</strong>
-                      <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '2px' }}>
-                        Angefordert: <strong style={{ color: '#d97706', fontWeight: 800 }}>+{requestedGb} GB Tresor-Speicher</strong> ({monthlyPrice.toFixed(2).replace('.', ',')} € / Mo.)
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <div>
+                        <strong style={{ fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>{school.name}</strong>
+                        <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '3px' }}>
+                          Angefordert: <strong style={{ color: '#d97706', fontWeight: 800 }}>+{requestedGb} GB Audio-Tresor</strong> ({monthlyPrice.toFixed(2).replace('.', ',')} € / Mo.) • Bisher: {currentGb} GB ➔ Neu: <strong style={{ color: '#0f172a' }}>{newTotalGb} GB</strong>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const { error } = await (supabase as any)
+                                .from('schools')
+                                .update({
+                                  storage_addon_gb: newTotalGb,
+                                  storage_addon_monthly_fee: monthlyPrice,
+                                  storage_addon_pending_gb: 0,
+                                  storage_addon_status: 'active'
+                                })
+                                .eq('id', school.id);
+                              if (error) throw error;
+                              alert(`✅ Speicher (+${requestedGb} GB) für ${school.name} erfolgreich freigeschaltet!`);
+                              onRefresh();
+                            } catch (err: any) {
+                              alert(`Fehler beim Freischalten: ${err.message}`);
+                            }
+                          }}
+                          style={{
+                            background: '#16a34a',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '9px 18px',
+                            fontSize: '0.80rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <CheckCircle size={14} color="#ffffff" />
+                          <span>Auf Hetzner bereitgestellt (Aktivieren)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!confirm(`Möchtest du die Anforderung über +${requestedGb} GB für ${school.name} wirklich stornieren?`)) return;
+                            try {
+                              const { error } = await (supabase as any)
+                                .from('schools')
+                                .update({
+                                  storage_addon_pending_gb: 0,
+                                  storage_addon_status: 'cancelled'
+                                })
+                                .eq('id', school.id);
+                              if (error) throw error;
+                              alert(`Anforderung für ${school.name} wurde storniert.`);
+                              onRefresh();
+                            } catch (err: any) {
+                              alert(`Fehler beim Stornieren: ${err.message}`);
+                            }
+                          }}
+                          style={{
+                            background: '#f1f5f9',
+                            color: '#64748b',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '9px 14px',
+                            fontSize: '0.80rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Ablehnen
+                        </button>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    {/* CLI Snippet Box */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: '#0f172a',
+                      color: '#94a3b8',
+                      padding: '8px 14px',
+                      borderRadius: '10px',
+                      fontSize: '0.74rem',
+                      fontFamily: 'monospace'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                        <span style={{ color: '#38bdf8', fontWeight: 800 }}>$</span>
+                        <span style={{ color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {cliCommand}
+                        </span>
+                      </div>
                       <button
                         type="button"
-                        onClick={async () => {
-                          try {
-                            const newTotalGb = Number(school.storage_addon_gb || 0) + requestedGb;
-                            const { error } = await (supabase as any)
-                              .from('schools')
-                              .update({
-                                storage_addon_gb: newTotalGb,
-                                storage_addon_monthly_fee: monthlyPrice,
-                                storage_addon_pending_gb: 0,
-                                storage_addon_status: 'active'
-                              })
-                              .eq('id', school.id);
-                            if (error) throw error;
-                            alert(`✅ Speicher (+${requestedGb} GB) für ${school.name} erfolgreich freigeschaltet!`);
-                            onRefresh();
-                          } catch (err: any) {
-                            alert(`Fehler beim Freischalten: ${err.message}`);
-                          }
+                        onClick={() => {
+                          navigator.clipboard.writeText(cliCommand);
+                          setCopiedCliId(school.id);
+                          setTimeout(() => setCopiedCliId(null), 2500);
                         }}
                         style={{
-                          background: '#34a853',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
                           color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '10px',
-                          padding: '8px 16px',
-                          fontSize: '0.78rem',
-                          fontWeight: 800,
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '0.70rem',
+                          fontWeight: 700,
                           cursor: 'pointer',
-                          boxShadow: '0 2px 8px rgba(52, 168, 83, 0.25)',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px'
+                          gap: '4px',
+                          marginLeft: '12px',
+                          whiteSpace: 'nowrap'
                         }}
                       >
-                        <CheckCircle size={13} color="#ffffff" />
-                        <span>Auf Hetzner freischalten</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!confirm(`Möchtest du die Anforderung über +${requestedGb} GB für ${school.name} wirklich stornieren?`)) return;
-                          try {
-                            const { error } = await (supabase as any)
-                              .from('schools')
-                              .update({
-                                storage_addon_pending_gb: 0,
-                                storage_addon_status: 'cancelled'
-                              })
-                              .eq('id', school.id);
-                            if (error) throw error;
-                            alert(`Anforderung für ${school.name} wurde storniert.`);
-                            onRefresh();
-                          } catch (err: any) {
-                            alert(`Fehler beim Stornieren: ${err.message}`);
-                          }
-                        }}
-                        style={{
-                          background: '#f1f5f9',
-                          color: '#64748b',
-                          border: 'none',
-                          borderRadius: '10px',
-                          padding: '8px 12px',
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Ablehnen
+                        {copiedCliId === school.id ? (
+                          <>
+                            <Check size={11} color="#4ade80" />
+                            <span style={{ color: '#4ade80' }}>Kopiert!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={11} />
+                            <span>Befehl kopieren</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
