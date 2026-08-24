@@ -7683,8 +7683,7 @@ function App() {
             navigate('/login');
           }} 
           onSignupSuccess={(uid) => {
-            setLoggedInUserId(uid);
-            navigate('/dashboard');
+            handleLogin(uid, false);
           }}
         />
       </Suspense>

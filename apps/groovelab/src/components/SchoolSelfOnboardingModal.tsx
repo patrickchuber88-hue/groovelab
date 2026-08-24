@@ -81,78 +81,130 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
       const candidatePin = Math.floor(100000 + Math.random() * 900000).toString();
       const qrToken = crypto.randomUUID();
 
-      // 1. Create School Record (with complete § 14 UStG address)
-      const { data: school, error: schoolErr } = await supabase
-        .from('schools')
-        .insert({
+      let schoolRecord: any = null;
+      let userRecord: any = null;
+      let effectivePin = candidatePin;
+
+      // 1. Try atomic RPC first (Bypasses all client-side RLS and transaction conflicts)
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('register_school_and_admin', {
+        p_school_name: schoolName.trim(),
+        p_subdomain: slug,
+        p_street: street.trim(),
+        p_house_number: houseNumber.trim() || null,
+        p_zip_code: zipCode.trim(),
+        p_city: city.trim(),
+        p_phone: null,
+        p_school_email: email.trim().toLowerCase(),
+        p_admin_first_name: firstName.trim(),
+        p_admin_last_name: lastName.trim()
+      });
+
+      if (!rpcErr && rpcData?.success) {
+        effectivePin = rpcData.pin;
+        schoolRecord = {
+          id: rpcData.school_id,
           name: schoolName.trim(),
           legal_name: schoolName.trim(),
           subdomain: slug,
-          billing_contact_person: `${firstName.trim()} ${lastName.trim()}`,
-          billing_email: email.trim().toLowerCase(),
-          email: email.trim().toLowerCase(),
+          primary_color: '#34a853',
           street: street.trim(),
           house_number: houseNumber.trim() || null,
           zip_code: zipCode.trim(),
           city: city.trim(),
-          country: 'Deutschland',
-          primary_color: '#34a853',
-          has_campus_subscription: true,
-          has_groovelab_subscription: true,
-          is_trial: true,
-          subscription_bypass: false,
-          status: 'trial',
-          avv_signed_at: new Date().toISOString(),
-          avv_signee_name: `${firstName.trim()} ${lastName.trim()} (Schulleitung)`
-        })
-        .select()
-        .single();
-
-      if (schoolErr) throw schoolErr;
-
-      // 2. Create Admin User Record (Admin photo must be /campus_login_hero.png as per guidelines)
-      const { data: user, error: userErr } = await supabase
-        .from('users')
-        .insert({
-          school_id: school.id,
+          country: 'Deutschland'
+        };
+        userRecord = {
+          id: rpcData.admin_id,
+          school_id: rpcData.school_id,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           email: email.trim().toLowerCase(),
           role: 'admin',
           roles: ['admin'],
-          ausweis_nummer: candidatePin,
-          password_hash: candidatePin,
-          qr_token: qrToken,
+          ausweis_nummer: rpcData.pin,
+          qr_token: rpcData.qr_token,
           photo_url: '/campus_login_hero.png',
-          avatar_url: '/campus_login_hero.png',
-          is_campus_active: true,
-          is_groovelab_active: true,
-          is_active: true,
-          is_pin_activated: true
-        })
-        .select()
-        .single();
+          avatar_url: '/campus_login_hero.png'
+        };
+      } else {
+        if (rpcErr && !rpcErr.message?.includes('not found') && !rpcErr.message?.includes('does not exist')) {
+          console.warn('[SchoolSelfOnboarding] RPC attempt notice:', rpcErr);
+        }
+        // Fallback: Direct table insertion
+        const { data: school, error: schoolErr } = await supabase
+          .from('schools')
+          .insert({
+            name: schoolName.trim(),
+            legal_name: schoolName.trim(),
+            subdomain: slug,
+            billing_contact_person: `${firstName.trim()} ${lastName.trim()}`,
+            billing_email: email.trim().toLowerCase(),
+            email: email.trim().toLowerCase(),
+            street: street.trim(),
+            house_number: houseNumber.trim() || null,
+            zip_code: zipCode.trim(),
+            city: city.trim(),
+            country: 'Deutschland',
+            primary_color: '#34a853',
+            has_campus_subscription: true,
+            has_groovelab_subscription: true,
+            is_trial: true,
+            subscription_bypass: false,
+            status: 'trial',
+            avv_signed_at: new Date().toISOString(),
+            avv_signee_name: `${firstName.trim()} ${lastName.trim()} (Schulleitung)`
+          })
+          .select()
+          .single();
 
-      if (userErr) throw userErr;
+        if (schoolErr) throw schoolErr;
+        schoolRecord = school;
+
+        // 2. Create Admin User Record (Admin photo must be /campus_login_hero.png as per guidelines)
+        const { data: user, error: userErr } = await supabase
+          .from('users')
+          .insert({
+            school_id: school.id,
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            email: email.trim().toLowerCase(),
+            role: 'admin',
+            roles: ['admin'],
+            ausweis_nummer: candidatePin,
+            password_hash: candidatePin,
+            qr_token: qrToken,
+            photo_url: '/campus_login_hero.png',
+            avatar_url: '/campus_login_hero.png',
+            is_campus_active: true,
+            is_groovelab_active: true,
+            is_active: true,
+            is_pin_activated: true
+          })
+          .select()
+          .single();
+
+        if (userErr) throw userErr;
+        userRecord = user;
+      }
 
       // 3. Set Session in LocalStorage & SessionStorage for immediate access
       const sessionData = {
-        user: user,
-        school: school,
+        user: userRecord,
+        school: schoolRecord,
         role: 'admin',
-        token: user.id
+        token: userRecord.id
       };
       localStorage.setItem('groovelab_session', JSON.stringify(sessionData));
-      localStorage.setItem('groovelab_user', JSON.stringify(user));
-      localStorage.setItem('groovelab_school', JSON.stringify(school));
-      sessionStorage.setItem('groovelab_user_id', user.id);
+      localStorage.setItem('groovelab_user', JSON.stringify(userRecord));
+      localStorage.setItem('groovelab_school', JSON.stringify(schoolRecord));
+      sessionStorage.setItem('groovelab_user_id', userRecord.id);
       sessionStorage.setItem('groovelab_location_mode', 'home');
       sessionStorage.setItem('groovelab_active_platform', 'campus');
 
       setCreatedData({
-        school,
-        user,
-        generatedPin: candidatePin
+        school: schoolRecord,
+        user: userRecord,
+        generatedPin: effectivePin
       });
 
       // Transition to Stage 2 (Ausweis & Biometrie Stage)

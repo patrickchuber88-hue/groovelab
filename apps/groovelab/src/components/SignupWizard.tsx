@@ -78,7 +78,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const [city, setCity] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [schoolEmail, setSchoolEmail] = useState('');
-  const [isAccessGranted, setIsAccessGranted] = useState(false);
+  const [isAccessGranted, setIsAccessGranted] = useState(true);
   const [accessCodeInput, setAccessCodeInput] = useState('');
 
   // Step 2: Owner Info
@@ -187,88 +187,123 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         let schoolIdCreated = '';
         // Execute actual database insertions!
         try {
-          const schoolId = crypto.randomUUID();
-          const { error: schoolErr } = await supabase
-            .from('schools')
-            .insert({
-              id: schoolId,
-              name: schoolName.trim(),
-              subdomain: subdomain.trim().toLowerCase(),
-              primary_color: primaryColor,
-              street: street.trim(),
-              house_number: houseNumber.trim(),
-              zip_code: zipCode.trim(),
-              city: city.trim(),
-              phone_number: phoneNumber.trim(),
-              email: schoolEmail.trim(),
-              is_trial: true,
-              trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-              status: 'trial'
-            });
-
-          if (schoolErr) throw schoolErr;
-          schoolIdCreated = schoolId;
-
-          // Generate a unique 6-digit PIN for the administrator
+          let schoolId = '';
+          let adminId = '';
           let generatedAdminPin = '';
-          let pinIsUnique = false;
-          let attempts = 0;
-          while (!pinIsUnique && attempts < 5) {
-            const candidatePin = Math.floor(100000 + Math.random() * 900000).toString();
-            const { data: duplicateUser, error: checkErr } = await supabase
-              .from('users')
-              .select('id')
-              .eq('ausweis_nummer', candidatePin)
-              .maybeSingle();
+          let qrToken = '';
+          const dummyEmail = schoolEmail.trim().toLowerCase() || `${subdomain.trim().toLowerCase()}@campus-groovelab.de`;
 
-            if (!checkErr && !duplicateUser) {
-              generatedAdminPin = candidatePin;
-              pinIsUnique = true;
+          // 1. Try atomic RPC first (Bypasses all client-side RLS and transaction conflicts)
+          const { data: rpcData, error: rpcErr } = await supabase.rpc('register_school_and_admin', {
+            p_school_name: schoolName.trim(),
+            p_subdomain: subdomain.trim().toLowerCase(),
+            p_street: street.trim(),
+            p_house_number: houseNumber.trim() || null,
+            p_zip_code: zipCode.trim(),
+            p_city: city.trim(),
+            p_phone: phoneNumber.trim() || null,
+            p_school_email: schoolEmail.trim().toLowerCase(),
+            p_admin_first_name: adminFirstName.trim(),
+            p_admin_last_name: adminLastName.trim()
+          });
+
+          if (!rpcErr && rpcData?.success) {
+            schoolId = rpcData.school_id;
+            adminId = rpcData.admin_id;
+            generatedAdminPin = rpcData.pin;
+            qrToken = rpcData.qr_token;
+          } else {
+            if (rpcErr && !rpcErr.message?.includes('not found') && !rpcErr.message?.includes('does not exist')) {
+              console.warn('[SignupWizard] RPC attempt notice:', rpcErr);
             }
-            attempts++;
-          }
+            // Fallback: Direct table insertion
+            schoolId = crypto.randomUUID();
+            const { error: schoolErr } = await supabase
+              .from('schools')
+              .insert({
+                id: schoolId,
+                name: schoolName.trim(),
+                legal_name: schoolName.trim(),
+                subdomain: subdomain.trim().toLowerCase(),
+                primary_color: primaryColor,
+                street: street.trim(),
+                house_number: houseNumber.trim() || null,
+                zip_code: zipCode.trim(),
+                city: city.trim(),
+                phone_number: phoneNumber.trim() || null,
+                email: schoolEmail.trim().toLowerCase(),
+                billing_email: schoolEmail.trim().toLowerCase(),
+                billing_contact_person: `${adminFirstName.trim()} ${adminLastName.trim()}`,
+                country: 'Deutschland',
+                has_campus_subscription: true,
+                has_groovelab_subscription: true,
+                subscription_bypass: false,
+                is_trial: true,
+                trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                status: 'trial',
+                avv_signed_at: new Date().toISOString(),
+                avv_signee_name: `${adminFirstName.trim()} ${adminLastName.trim()} (Schulleitung)`
+              });
 
-          // Fallback if loop fails to verify uniqueness
-          if (!generatedAdminPin) {
+            if (schoolErr) throw schoolErr;
+            schoolIdCreated = schoolId;
+
+            // Generate a unique 6-digit Master-PIN for administrator
             generatedAdminPin = Math.floor(100000 + Math.random() * 900000).toString();
+            adminId = crypto.randomUUID();
+            qrToken = crypto.randomUUID();
+            
+            // Insert admin user (Enforcing chalkboard avatar /campus_login_hero.png as per Project Rules)
+            const { error: userErr } = await supabase
+              .from('users')
+              .insert({
+                id: adminId,
+                school_id: schoolId,
+                role: 'admin',
+                roles: ['admin'],
+                first_name: adminFirstName.trim(),
+                last_name: adminLastName.trim(),
+                email: dummyEmail,
+                password_hash: generatedAdminPin, // Auto-generated admin login PIN
+                qr_token: qrToken,
+                ausweis_nummer: generatedAdminPin,
+                photo_url: '/campus_login_hero.png',
+                avatar_url: '/campus_login_hero.png',
+                is_campus_active: true,
+                is_groovelab_active: true,
+                is_active: true,
+                is_pin_activated: true
+              });
+
+            if (userErr) throw userErr;
           }
 
-          const adminId = crypto.randomUUID();
-          const qrToken = crypto.randomUUID();
-          const dummyEmail = `${subdomain.trim().toLowerCase()}@campus-groovelab.de`;
-          
-          // Insert admin user
-          const { error: userErr } = await supabase
-            .from('users')
-            .insert({
-              id: adminId,
-              school_id: schoolId,
-              role: 'admin',
-              first_name: adminFirstName.trim(),
-              last_name: adminLastName.trim(),
-              email: dummyEmail,
-              password_hash: generatedAdminPin, // Auto-generated admin login PIN
-              qr_token: qrToken,
-              ausweis_nummer: generatedAdminPin,
-              is_campus_active: true,
-              is_groovelab_active: true,
-              is_active: true,
-              roles: ['admin']
-            });
-
-          if (userErr) throw userErr;
-
-          // Insert activation_days for the admin user to use as device confirmation PIN
-          const { error: activationErr } = await supabase
-            .from('activation_days')
-            .insert({
-              student_id: adminId,
-              day_of_birth: parseInt(adminBirthDay, 10)
-            });
-
-          if (activationErr) throw activationErr;
-
-          // Automatically log the new user in
+          // Automatically set complete session in localStorage & sessionStorage for immediate access
+          const schoolObj = {
+            id: schoolId,
+            name: schoolName.trim(),
+            subdomain: subdomain.trim().toLowerCase(),
+            primary_color: primaryColor,
+            street: street.trim(),
+            house_number: houseNumber.trim(),
+            zip_code: zipCode.trim(),
+            city: city.trim(),
+            country: 'Deutschland'
+          };
+          const userObj = {
+            id: adminId,
+            school_id: schoolId,
+            role: 'admin',
+            roles: ['admin'],
+            first_name: adminFirstName.trim(),
+            last_name: adminLastName.trim(),
+            email: dummyEmail,
+            photo_url: '/campus_login_hero.png',
+            avatar_url: '/campus_login_hero.png'
+          };
+          localStorage.setItem('groovelab_session', JSON.stringify({ user: userObj, school: schoolObj, role: 'admin', token: adminId }));
+          localStorage.setItem('groovelab_user', JSON.stringify(userObj));
+          localStorage.setItem('groovelab_school', JSON.stringify(schoolObj));
           sessionStorage.setItem('groovelab_user_id', adminId);
           sessionStorage.setItem('groovelab_location_mode', 'home');
           sessionStorage.setItem('groovelab_active_platform', 'campus');
@@ -280,13 +315,13 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             qr_token: qrToken,
             ausweis_nummer: generatedAdminPin,
             schoolName: schoolName.trim(),
-            birthDay: parseInt(adminBirthDay, 10)
+            birthDay: adminBirthDay ? parseInt(adminBirthDay, 10) : undefined
           });
 
           // Transition to Step 3 success view
           setTimeout(() => {
             setStep(3);
-          }, 1500);
+          }, 1200);
 
         } catch (err: any) {
           console.error('Onboarding failed:', err);
@@ -483,66 +518,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         overflowY: 'auto',
         color: '#1e293b'
       }}>
-        {!isAccessGranted ? (
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (accessCodeInput.trim().toLowerCase() === 'campus-test') {
-                setIsAccessGranted(true);
-                setError(null);
-              } else {
-                setError('Ungültiger Zugangscode. Zugriff verweigert.');
-              }
-            }} 
-            style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '20px', marginBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', color: '#ea4335', justifyContent: 'center' }}>
-                  <ShieldCheck size={22} />
-                </div>
-                <div style={{ textAlign: 'left' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Campus-Groovelab</span>
-                  <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', display: 'block', letterSpacing: '-0.02em' }}>Zugangsschutz (Beta-Test)</span>
-                </div>
-              </div>
-            </div>
-
-            {error && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '14px', borderRadius: '16px', color: '#b91c1c', fontSize: '13px', fontWeight: 700, textAlign: 'left' }}>
-                {error}
-              </div>
-            )}
-
-            <p style={{ color: '#475569', fontSize: '0.88rem', lineHeight: '1.5', margin: '0' }}>
-              Diese Plattform befindet sich derzeit in der geschlossenen Entwicklungsphase. Bitte gib das Passwort ein, um die Registrierung freizuschalten.
-            </p>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>Passwort / Zugangscode *</label>
-              <input
-                type="password"
-                required
-                value={accessCodeInput}
-                onChange={(e) => setAccessCodeInput(e.target.value)}
-                placeholder="Passwort eingeben"
-                style={inputStyle}
-                className="signup-input"
-                autoFocus
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <button type="button" onClick={onBackToLogin} style={backButtonStyle} className="signup-btn-back">Zurück</button>
-              <button type="submit" style={nextButtonStyle} className="signup-btn-next">
-                Zugang freischalten <ArrowRight size={16} />
-              </button>
-            </div>
-          </form>
-        ) : (
-          <>
-            {/* Header (except for provisioning step) */}
-            {step < 3 && (
+        {/* Header (except for provisioning step) */}
+        {step < 3 && (
           <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '20px', marginBottom: '24px', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(52, 168, 83, 0.1)', display: 'flex', alignItems: 'center', color: '#34a853', justifyContent: 'center' }}>
@@ -991,8 +968,6 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               </button>
             </div>
           </div>
-        )}
-          </>
         )}
       </div>
     </div>
