@@ -19,6 +19,7 @@ import { generateResilienceAuditPDF } from '../utils/pdfGenerator';
 import { isMasterPasskeyRegistered, registerMasterPasskey, isWebAuthnSupported } from '../utils/webauthn';
 import { getMasterAuditLogs, verifyMasterSessionLease, createMasterSessionLease, revokeMasterSessionLease, MasterAuditEvent } from '../utils/masterAuditLogger';
 import { subscribeLatency, measureDatabasePing, LatencyMetric } from '../utils/latencyMonitor';
+import { verifyTOTP } from '../utils/totp';
 
 interface ServerMetric {
   id: string;
@@ -1026,13 +1027,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         setBillingStreet(data.street || '');
         setBillingZip(data.zip_code || '');
         setBillingCity(data.city || '');
-        setBillingIban(data.iban || '');
+        setBillingIban(formatIbanBlocks(data.iban || ''));
         setBillingBic(data.bic || '');
         setTaxMode(data.tax_mode || (localStorage.getItem('cg_tax_mode') as any) || 'small_business');
         setVatId(data.vat_id || localStorage.getItem('cg_vat_id') || '');
         setTaxNumber(data.tax_number || localStorage.getItem('cg_tax_number') || '');
-        setVatRatePercent(data.vat_rate_percent ?? Number(localStorage.getItem('cg_vat_rate_percent') || 19));
+        setVatRatePercent(data.vat_rate_percent !== null && data.vat_rate_percent !== undefined ? Number(data.vat_rate_percent) : Number(localStorage.getItem('cg_vat_rate_percent') || 19));
         setPriceDisplayMode(data.price_display_mode || (localStorage.getItem('cg_price_display_mode') as any) || 'net_plus_vat');
+        setGrandfatheringActive(data.grandfathering_active !== null && data.grandfathering_active !== undefined ? Boolean(data.grandfathering_active) : (localStorage.getItem('cg_grandfathering_active') !== 'false'));
+        setGrandfatheringCutoffDate(data.grandfathering_cutoff_date || localStorage.getItem('cg_grandfathering_cutoff') || '');
         
         // Read from DB columns, then check for pricing_overrides inside special_offers JSON, then localStorage, then default
         const overrides = Array.isArray(data.special_offers)
@@ -1844,13 +1847,27 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     win.document.close();
   };
 
-  const handleToggleTwoFactor = () => {
+  const handleToggleTwoFactor = async () => {
+    const targetUserId = (currentUser?.id && currentUser.id !== 'master_admin') 
+      ? currentUser.id 
+      : (adminUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90');
+
     if (twoFactorEnabled) {
       if (window.confirm('Möchten Sie den Zwei-Faktor-Schutz (2FA) wirklich deaktivieren?')) {
-        setTwoFactorEnabled(false);
-        localStorage.setItem('cg_2fa_enabled', 'false');
-        setSaveSuccessToast('Zwei-Faktor-Schutz wurde deaktiviert.');
-        setTimeout(() => setSaveSuccessToast(null), 3000);
+        try {
+          await supabase.rpc('update_master_admin_credentials', {
+            p_username: adminUsername || 'admin',
+            p_user_id: targetUserId,
+            p_is_2fa_enabled: false
+          });
+          setTwoFactorEnabled(false);
+          localStorage.setItem('cg_2fa_enabled', 'false');
+          setSaveSuccessToast('Zwei-Faktor-Schutz wurde in der Cloud deaktiviert.');
+          setTimeout(() => setSaveSuccessToast(null), 3000);
+          fetchAdminUser();
+        } catch (err: any) {
+          alert('Fehler beim Deaktivieren: ' + err.message);
+        }
       }
     } else {
       // Ensure a valid Base32 secret exists
@@ -1867,19 +1884,42 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     }
   };
 
-  const handleConfirmTwoFactor = (e: React.FormEvent) => {
+  const handleConfirmTwoFactor = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = twoFactorCodeInput.replace(/\s+/g, '');
-    if (cleanCode.length === 6 && /^\d{6}$/.test(cleanCode)) {
+    if (cleanCode.length !== 6 || !/^\d{6}$/.test(cleanCode)) {
+      alert('Bitte geben Sie den 6-stelligen Bestätigungscode aus Ihrer Authenticator-App ein (z. B. 482910).');
+      return;
+    }
+
+    try {
+      const isValid = await verifyTOTP(cleanCode, twoFactorSecret);
+      if (!isValid) {
+        alert('Der eingegebene 6-stellige Code ist ungültig oder abgelaufen. Bitte prüfen Sie die Uhrzeit auf Ihrem Smartphone.');
+        return;
+      }
+
+      const targetUserId = (currentUser?.id && currentUser.id !== 'master_admin') 
+        ? currentUser.id 
+        : (adminUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90');
+
+      await supabase.rpc('update_master_admin_credentials', {
+        p_username: adminUsername || 'admin',
+        p_user_id: targetUserId,
+        p_two_factor_secret: twoFactorSecret,
+        p_is_2fa_enabled: true
+      });
+
       setTwoFactorEnabled(true);
       setShowTwoFactorModal(false);
       setTwoFactorCodeInput('');
       localStorage.setItem('cg_2fa_enabled', 'true');
       localStorage.setItem('cg_2fa_secret', twoFactorSecret);
-      setSaveSuccessToast('🟢 Zwei-Faktor-Schutz (2FA) erfolgreich aktiviert!');
+      setSaveSuccessToast('🟢 Zwei-Faktor-Schutz (2FA) erfolgreich in der Cloud aktiviert!');
       setTimeout(() => setSaveSuccessToast(null), 4000);
-    } else {
-      alert('Bitte geben Sie den 6-stelligen Bestätigungscode aus Ihrer Authenticator-App ein (z. B. 482910).');
+      fetchAdminUser();
+    } catch (err: any) {
+      alert('Fehler beim Aktivieren von 2FA: ' + err.message);
     }
   };
 
@@ -1893,43 +1933,79 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     e.preventDefault();
     try {
       setUpdatingBilling(true);
-      const payload: any = {
-        company_name: billingCompany.trim(),
-        contact_person: billingContact.trim(),
-        street: billingStreet.trim(),
-        zip_code: billingZip.trim(),
-        city: billingCity.trim(),
-        iban: billingIban.trim(),
-        bic: billingBic.trim(),
-        tax_mode: taxMode,
-        vat_id: vatId.trim(),
-        tax_number: taxNumber.trim(),
-        vat_rate_percent: vatRatePercent,
-        price_display_mode: priceDisplayMode,
-        updated_at: new Date().toISOString()
-      };
-      
-      const { error } = await supabase
-        .from('master_billing_settings')
-        .update(payload)
-        .eq('id', 1);
+      const cleanIban = billingIban.replace(/\s+/g, '').toUpperCase();
+      const cleanBic = billingBic.replace(/\s+/g, '').toUpperCase();
 
-      if (error) {
-        // Fallback: update core fields if additional tax columns don't exist yet
-        const { error: fallbackError } = await supabase
+      // 1. Try atomic security-definer RPC
+      let saved = false;
+      try {
+        const { error: rpcError } = await supabase.rpc('update_master_billing_settings', {
+          p_company_name: billingCompany.trim(),
+          p_contact_person: billingContact.trim(),
+          p_street: billingStreet.trim(),
+          p_zip_code: billingZip.trim(),
+          p_city: billingCity.trim(),
+          p_iban: cleanIban,
+          p_bic: cleanBic,
+          p_tax_mode: taxMode,
+          p_tax_number: taxNumber.trim(),
+          p_vat_id: vatId.trim(),
+          p_vat_rate_percent: Number(vatRatePercent),
+          p_price_display_mode: priceDisplayMode,
+          p_grandfathering_active: Boolean(grandfatheringActive),
+          p_grandfathering_cutoff_date: grandfatheringCutoffDate
+        });
+        if (!rpcError) {
+          saved = true;
+        } else {
+          console.warn('RPC master billing update notice, checking direct query:', rpcError);
+        }
+      } catch (rpcErr) {
+        console.warn('RPC master billing call notice:', rpcErr);
+      }
+
+      // 2. Direct query fallback
+      if (!saved) {
+        const payload: any = {
+          company_name: billingCompany.trim(),
+          contact_person: billingContact.trim(),
+          street: billingStreet.trim(),
+          zip_code: billingZip.trim(),
+          city: billingCity.trim(),
+          tax_mode: taxMode,
+          tax_number: taxNumber.trim(),
+          vat_id: vatId.trim(),
+          vat_rate_percent: Number(vatRatePercent),
+          price_display_mode: priceDisplayMode,
+          grandfathering_active: Boolean(grandfatheringActive),
+          grandfathering_cutoff_date: grandfatheringCutoffDate,
+          iban: cleanIban,
+          bic: cleanBic,
+          updated_at: new Date().toISOString()
+        };
+        
+        const { error } = await supabase
           .from('master_billing_settings')
-          .update({
-            company_name: billingCompany.trim(),
-            contact_person: billingContact.trim(),
-            street: billingStreet.trim(),
-            zip_code: billingZip.trim(),
-            city: billingCity.trim(),
-            iban: billingIban.trim(),
-            bic: billingBic.trim(),
-            updated_at: new Date().toISOString()
-          })
+          .update(payload)
           .eq('id', 1);
-        if (fallbackError) throw fallbackError;
+
+        if (error) {
+          // Additional fallback if specific column is not supported
+          const { error: fallbackError } = await supabase
+            .from('master_billing_settings')
+            .update({
+              company_name: billingCompany.trim(),
+              contact_person: billingContact.trim(),
+              street: billingStreet.trim(),
+              zip_code: billingZip.trim(),
+              city: billingCity.trim(),
+              iban: cleanIban,
+              bic: cleanBic,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', 1);
+          if (fallbackError) throw fallbackError;
+        }
       }
       
       // Also persist tax settings in localStorage as instant reliable backup
@@ -1941,11 +2017,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       localStorage.setItem('cg_grandfathering_active', String(grandfatheringActive));
       localStorage.setItem('cg_grandfathering_cutoff', grandfatheringCutoffDate);
 
-      setSaveSuccessToast('Betreiber-Stammdaten, USt-Status & Bestandskundenschutz erfolgreich aktualisiert!');
+      setBillingIban(formatIbanBlocks(cleanIban));
+      setBillingBic(cleanBic);
+      setSaveSuccessToast('Bankverbindung, Betreiber-Stammdaten & USt-Status erfolgreich in der Cloud gespeichert!');
       setTimeout(() => setSaveSuccessToast(null), 4000);
-      fetchBillingSettings();
+      await fetchBillingSettings();
     } catch (err: any) {
-      alert('Fehler beim Speichern: ' + err.message);
+      console.error('Save billing settings error:', err);
+      alert('Fehler beim Speichern der Bank- und Betreiberdaten: ' + err.message);
     } finally {
       setUpdatingBilling(false);
     }
@@ -1953,12 +2032,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
   const fetchAdminUser = async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('is_master_admin', true)
-        .limit(1)
-        .maybeSingle();
+      let query = supabase.from('users').select('*');
+      if (currentUser?.id && currentUser.id !== 'master_admin') {
+        query = query.eq('id', currentUser.id);
+      } else {
+        query = query.or('is_master_admin.eq.true,master_admin_username.eq.admin,first_name.ilike.%Patrick%').limit(1);
+      }
+      const { data } = await query.maybeSingle();
       if (data) {
         setAdminUser(data);
         setAdminUsername(data.master_admin_username || data.username || 'admin');
@@ -1977,23 +2057,39 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     if (!adminUsername.trim()) return;
     try {
       setUpdatingAdmin(true);
-      const updatePayload: any = {
-        master_admin_username: adminUsername.trim()
-      };
-      if (adminPassword.trim()) {
-        updatePayload.master_admin_password = adminPassword.trim();
+
+      const targetUserId = (currentUser?.id && currentUser.id !== 'master_admin') 
+        ? currentUser.id 
+        : (adminUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90');
+
+      // Call secure SECURITY DEFINER RPC to update master admin credentials
+      const { error: rpcError } = await supabase.rpc('update_master_admin_credentials', {
+        p_username: adminUsername.trim(),
+        p_password: adminPassword.trim() || null,
+        p_user_id: targetUserId
+      });
+
+      if (rpcError) {
+        // Fallback: direct update without modifying is_master_admin flag directly
+        const fallbackPayload: any = {
+          master_admin_username: adminUsername.trim()
+        };
+        if (adminPassword.trim()) {
+          fallbackPayload.master_admin_password = adminPassword.trim();
+        }
+        const { error: updateError } = await supabase
+          .from('users')
+          .update(fallbackPayload)
+          .eq('id', targetUserId);
+        if (updateError) throw updateError;
       }
-      const { error } = await supabase
-        .from('users')
-        .update(updatePayload)
-        .eq('is_master_admin', true);
-      if (error) throw error;
-      setSaveSuccessToast('Master-Admin Zugangsdaten erfolgreich aktualisiert!');
+
+      setSaveSuccessToast('🟢 Master-Admin Zugangsdaten & Passwort erfolgreich gespeichert!');
       setTimeout(() => setSaveSuccessToast(null), 4000);
       setAdminPassword('');
       fetchAdminUser();
     } catch (err: any) {
-      alert('Fehler beim Speichern: ' + err.message);
+      alert('Fehler beim Speichern: ' + (err?.message || err));
     } finally {
       setUpdatingAdmin(false);
     }

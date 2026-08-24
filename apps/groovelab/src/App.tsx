@@ -2712,8 +2712,16 @@ function App() {
           if (nextVal.id) {
             sessionStorage.setItem('groovelab_user_id', nextVal.id);
           }
+          if (nextVal.token_version !== undefined && nextVal.token_version !== null) {
+            sessionStorage.setItem('groovelab_token_version', String(nextVal.token_version));
+          }
+          if (!sessionStorage.getItem('groovelab_session_started_at')) {
+            sessionStorage.setItem('groovelab_session_started_at', String(Date.now()));
+          }
         } else {
           sessionStorage.removeItem('groovelab_cached_user');
+          sessionStorage.removeItem('groovelab_token_version');
+          sessionStorage.removeItem('groovelab_session_started_at');
         }
       }
       return nextVal;
@@ -3804,12 +3812,65 @@ function App() {
       .channel(`realtime_app_sync_${user.id}`)
       .on(
         'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'users_raw', filter: `id=eq.${user.id}` },
+        async (payload: any) => {
+          if (payload.new) {
+            const remoteVersion = payload.new.token_version;
+            const localVersion = Number(sessionStorage.getItem('groovelab_token_version') || 1);
+            if (remoteVersion && remoteVersion > localVersion) {
+              console.warn('[Security] Remote session revocation triggered for current user!');
+              try {
+                navigator.mediaDevices?.getUserMedia({ audio: true }).then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
+              } catch (e) {}
+              sessionStorage.clear();
+              localStorage.removeItem('groovelab_user_id');
+              localStorage.removeItem('groovelab_cached_user');
+              setUser(null);
+              setLoggedInUserId(null);
+              alert('Sitzung widerrufen: Deine Anmeldung wurde aus Sicherheitsgründen durch die Schulleitung oder Administration zentral beendet.');
+              window.location.href = '/';
+              return;
+            }
+          }
+          console.log('[Realtime] Current user profile update detected, refetching...');
+          const { data: updatedUser } = await supabase.from('users').select('*, schools(*)').eq('id', user.id).single();
+          if (updatedUser) {
+            setUser(updatedUser);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` },
         async (payload: any) => {
           console.log('[Realtime] Current user profile update detected, refetching...');
           const { data: updatedUser } = await supabase.from('users').select('*, schools(*)').eq('id', user.id).single();
           if (updatedUser) {
             setUser(updatedUser);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'schools', filter: `id=eq.${schoolId}` },
+        (payload: any) => {
+          if (payload.new && payload.new.sessions_revoked_at) {
+            const schoolRevokedTime = new Date(payload.new.sessions_revoked_at).getTime();
+            const sessionStartTime = Number(sessionStorage.getItem('groovelab_session_started_at') || Date.now());
+            if (schoolRevokedTime > sessionStartTime) {
+              console.warn('[Security] School-wide session revocation triggered!');
+              try {
+                navigator.mediaDevices?.getUserMedia({ audio: true }).then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
+              } catch (e) {}
+              sessionStorage.clear();
+              localStorage.removeItem('groovelab_user_id');
+              localStorage.removeItem('groovelab_cached_user');
+              setUser(null);
+              setLoggedInUserId(null);
+              alert('Sicherheits-Abmeldung: Alle aktiven Sitzungen deiner Musikschule wurden durch die Schulleitung zentral beendet.');
+              window.location.href = '/';
+              return;
+            }
           }
         }
       )

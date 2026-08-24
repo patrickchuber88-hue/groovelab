@@ -5,9 +5,11 @@
     "apps/*",
     "packages/*"
   ],
+  "type": "module",
   "scripts": {
     "dev:groovelab": "npm run dev -w apps/groovelab",
-    "build:groovelab": "npm run build -w apps/groovelab"
+    "build:groovelab": "npm run build -w apps/groovelab",
+    "check:budget": "node scripts/check-bundle-budget.js"
   },
   "dependencies": {
     "ssh2": "^1.17.0"

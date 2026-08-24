@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard, AlertTriangle, ExternalLink, MapPin, Zap } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard, AlertTriangle, ExternalLink, MapPin, Zap, ShieldAlert } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -340,6 +340,25 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     } catch (err: any) {
       console.error('Fehler beim Zurücksetzen der PIN:', err);
       alert('Fehler beim Zurücksetzen der PIN: ' + err.message);
+    }
+  };
+
+  const [revokingStudentSession, setRevokingStudentSession] = useState(false);
+
+  const handleRevokeStudentSession = async () => {
+    const studentDisplayName = student.first_name || student.name || 'dieses Schülers';
+    if (!window.confirm(`Möchtest du alle aktiven Sitzungen für ${studentDisplayName} auf allen Geräten sofort beenden? (Z. B. bei Verlust eines Smartphones oder Tablets)`)) {
+      return;
+    }
+    try {
+      setRevokingStudentSession(true);
+      const { error } = await supabase.rpc('revoke_user_sessions', { p_user_id: student.id });
+      if (error) throw error;
+      alert(`Erfolg: Alle aktiven Anmeldungen für ${studentDisplayName} wurden mit sofortiger Wirkung beendet.`);
+    } catch (err: any) {
+      alert('Fehler beim Widerrufen der Sitzungen: ' + err.message);
+    } finally {
+      setRevokingStudentSession(false);
     }
   };
 
@@ -4827,6 +4846,36 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 >
                   <RefreshCw size={14} />
                   QR-Code sperren &amp; neu generieren
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRevokeStudentSession();
+                  }}
+                  disabled={revokingStudentSession}
+                  style={{
+                    width: '100%',
+                    background: '#fef2f2',
+                    color: '#b91c1c',
+                    border: '1.5px solid #fecaca',
+                    borderRadius: '14px',
+                    padding: '12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-scale"
+                  title="Beendet sofort alle aktiven Logins dieses Schülers auf allen Geräten (z. B. bei Geräteverlust)"
+                >
+                  {revokingStudentSession ? <RefreshCw size={14} className="animate-spin" /> : <ShieldAlert size={14} />}
+                  {revokingStudentSession ? 'Beende Sitzungen...' : 'Notfall-Logout (Sitzung widerrufen)'}
                 </button>
               </div>
             )}

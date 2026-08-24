@@ -4,7 +4,7 @@ import {
   Check, Volume2, Mic, Calendar, Trophy, Music, Sliders, X, ArrowRight
 } from 'lucide-react';
 import Confetti from 'react-confetti';
-import { ALL_STICKERS, getUnifiedStickersMap } from '../MeisterwerkDocumentationModal';
+import { ALL_STICKERS, getUnifiedStickersMap } from '../../domain/stickersAndTresor';
 import { SimpleVoiceRecorder } from './SimpleVoiceRecorder';
 import { cleanHomeworkNotesText } from '../../utils/nameHelper';
 

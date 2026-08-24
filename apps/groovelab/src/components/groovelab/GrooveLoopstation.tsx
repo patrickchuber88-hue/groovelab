@@ -22,7 +22,7 @@ import { supabase } from '../../lib/supabase';
 // @ts-ignore
 import * as lamejs from '@breezystack/lamejs';
 import { processPureRawAudioBuffer, audioBufferToWavBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../../utils/audioMasteringEngine';
-import { checkIsAudioTresorActive } from '../MeisterwerkDocumentationModal';
+import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
 
 export interface Track {
   id: number;

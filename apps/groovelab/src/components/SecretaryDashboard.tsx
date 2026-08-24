@@ -32579,31 +32579,67 @@ status: status,
                   <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#dc2626', display: 'block' }}>Gefahrenzone</span>
                   <span style={{ fontSize: '0.7rem', color: '#991b1b' }}>Diesen Lehrer permanent aus der Schule entfernen.</span>
                 </div>
-                <button 
-                  type="button"
-                  onClick={async () => {
-                    if (confirm('Diesen Mitarbeiter wirklich unwiderruflich löschen?')) {
-                      await handleDeleteUser(manageTeacher.id);
-                      setManageTeacher(null);
-                    }
-                  }}
-                  style={{
-                    background: '#ef4444',
-                    color: 'white',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '12px',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.15)',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
-                >
-                  Löschen
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button 
+                    type="button"
+                    onClick={async () => {
+                      const teacherName = manageTeacher.firstName || manageTeacher.first_name || 'diesen Lehrer';
+                      if (confirm(`Möchtest du alle aktiven Sitzungen von ${teacherName} auf allen Geräten sofort beenden? (Z. B. bei Geräteverlust oder Personalwechsel)`)) {
+                        try {
+                          const { error } = await supabase.rpc('revoke_user_sessions', { p_user_id: manageTeacher.id });
+                          if (error) throw error;
+                          alert(`Erfolg: Alle aktiven Sitzungen von ${teacherName} wurden sofort beendet.`);
+                        } catch (err: any) {
+                          alert('Fehler beim Widerrufen der Sitzungen: ' + err.message);
+                        }
+                      }
+                    }}
+                    style={{
+                      background: '#ffffff',
+                      color: '#dc2626',
+                      border: '1px solid #fecaca',
+                      padding: '8px 14px',
+                      borderRadius: '12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="Beendet sofort alle aktiven Logins dieses Lehrers auf allen Geräten"
+                  >
+                    <ShieldAlert size={14} />
+                    Sitzungen widerrufen
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={async () => {
+                      if (confirm('Diesen Mitarbeiter wirklich unwiderruflich löschen?')) {
+                        await handleDeleteUser(manageTeacher.id);
+                        setManageTeacher(null);
+                      }
+                    }}
+                    style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.15)',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
+                  >
+                    Löschen
+                  </button>
+                </div>
               </div>
             </div>
 

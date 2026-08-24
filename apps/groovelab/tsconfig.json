@@ -12,6 +12,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/.tsbuildinfo",
     "types": ["vite/client"],
     "noUnusedLocals": false,
     "noUnusedParameters": false,

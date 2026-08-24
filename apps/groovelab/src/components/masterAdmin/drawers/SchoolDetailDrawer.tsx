@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   X, Check, RefreshCw, Eye, HardDrive, Building, 
-  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles
+  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert
 } from 'lucide-react';
 import { DpoAuditPortal } from '../../DpoAuditPortal';
 import { supabase } from '../../../lib/supabase';
@@ -32,6 +32,23 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showDpoPortal, setShowDpoPortal] = useState(false);
+  const [revokingSessions, setRevokingSessions] = useState(false);
+
+  const handleRevokeAllSessions = async () => {
+    if (!window.confirm(`Möchtest du wirklich alle aktiven Anmeldungen (Lehrkräfte, Schüler, Kioske) für "${school?.name || 'diese Schule'}" mit sofortiger Wirkung beenden?`)) {
+      return;
+    }
+    try {
+      setRevokingSessions(true);
+      const { data, error } = await supabase.rpc('revoke_school_sessions', { p_school_id: school.id });
+      if (error) throw error;
+      alert(`Erfolg: ${data || 0} aktive Benutzer-Sitzungen der Schule "${school?.name || ''}" wurden mit sofortiger Wirkung beendet.`);
+    } catch (err: any) {
+      alert('Fehler beim Widerrufen der Sitzungen: ' + err.message);
+    } finally {
+      setRevokingSessions(false);
+    }
+  };
 
   // Form states
   const [name, setName] = useState(school?.name || '');
@@ -1076,29 +1093,56 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         flexShrink: 0,
         boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.02)'
       }}>
-        {/* Left: Destructive Action */}
-        <button
-          type="button"
-          onClick={() => onDeleteSchool(school)}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '10px',
-            background: '#fff1f2',
-            border: '1px solid #fecdd3',
-            color: '#e11d48',
-            fontSize: '0.80rem',
-            fontWeight: 800,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.15s ease'
-          }}
-          className="hover-scale-mini"
-        >
-          <Trash2 size={14} />
-          <span>Musikschule löschen</span>
-        </button>
+        {/* Left: Destructive / Security Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={handleRevokeAllSessions}
+            disabled={revokingSessions}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '10px',
+              background: '#fef2f2',
+              border: '1px solid #fee2e2',
+              color: '#dc2626',
+              fontSize: '0.80rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+            title="Beendet sofort alle aktiven Logins und Kiosk-Verbindungen dieser Schule"
+          >
+            {revokingSessions ? <RefreshCw size={14} className="animate-spin" /> : <ShieldAlert size={14} />}
+            <span>{revokingSessions ? 'Beende Sitzungen...' : 'Notfall-Logout (Alle Sitzungen widerrufen)'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onDeleteSchool(school)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              background: '#fff1f2',
+              border: '1px solid #fecdd3',
+              color: '#e11d48',
+              fontSize: '0.80rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+          >
+            <Trash2 size={14} />
+            <span>Musikschule löschen</span>
+          </button>
+        </div>
 
         {/* Right: Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

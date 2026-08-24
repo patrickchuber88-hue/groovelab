@@ -9,6 +9,7 @@ import { LegalTextModal } from './LegalTextModal';
 import { DpoAuditPortal } from './DpoAuditPortal';
 import { validateNewPin } from '../utils/pinValidation';
 import { createMasterSessionLease } from '../utils/masterAuditLogger';
+import { verifyTOTP } from '../utils/totp';
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
@@ -1299,6 +1300,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   // Secret Master Admin click combo state
   const [logoClicks, setLogoClicks] = useState(0);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminAuthStep, setAdminAuthStep] = useState<1 | 2>(1);
+  const [adminPendingUser, setAdminPendingUser] = useState<any>(null);
+  const [adminTotpInput, setAdminTotpInput] = useState<string>('');
   const [adminUsernameInput, setAdminUsernameInput] = useState('');
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminLoginLoading, setAdminLoginLoading] = useState(false);
@@ -1332,24 +1336,59 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         throw new Error('Ungültige Master-Admin Anmeldedaten.');
       }
 
-      console.log('[Login] Master Admin logged in with credentials.');
-      setShowAdminModal(false);
-      
-      // Clean inputs
-      setAdminUsernameInput('');
-      setAdminPasswordInput('');
-      
-      sessionStorage.setItem('groovelab_is_master_admin', 'true');
-      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
-      sessionStorage.setItem('groovelab_active_platform', 'campus');
-      await createMasterSessionLease(user.id, 'master_pin');
+      if (user.is_2fa_enabled && user.two_factor_secret) {
+        setAdminPendingUser(user);
+        setAdminAuthStep(2);
+        setError(null);
+        setAdminLoginLoading(false);
+        return;
+      }
 
-      finalizeLogin(user, null, true);
+      await completeAdminLogin(user);
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setAdminLoginLoading(false);
     }
+  };
+
+  const handleAdminVerifyTotp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!adminPendingUser) return;
+    const cleanCode = adminTotpInput.replace(/\s+/g, '').trim();
+    if (cleanCode.length !== 6 || !/^\d{6}$/.test(cleanCode)) {
+      setError('Bitte den 6-stelligen Code aus der Authenticator-App eingeben.');
+      return;
+    }
+    setAdminLoginLoading(true);
+    setError(null);
+    try {
+      const isValid = await verifyTOTP(cleanCode, adminPendingUser.two_factor_secret);
+      if (!isValid) {
+        throw new Error('Ungültiger 2FA-Code. Bitte aktuellen Code aus der Authenticator-App eingeben.');
+      }
+      await completeAdminLogin(adminPendingUser);
+    } catch (err: any) {
+      setError(err.message || '2FA-Verifikation fehlgeschlagen.');
+      setAdminLoginLoading(false);
+    }
+  };
+
+  const completeAdminLogin = async (user: any) => {
+    console.log('[Login] Master Admin logged in successfully.');
+    setShowAdminModal(false);
+    setAdminUsernameInput('');
+    setAdminPasswordInput('');
+    setAdminAuthStep(1);
+    setAdminTotpInput('');
+    setAdminPendingUser(null);
+    
+    sessionStorage.setItem('groovelab_user_id', user.id);
+    sessionStorage.setItem('groovelab_is_master_admin', 'true');
+    sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+    sessionStorage.setItem('groovelab_active_platform', 'campus');
+    await createMasterSessionLease(user.id, 'master_pin');
+
+    finalizeLogin(user, null, true);
   };
 
   // Onboarding parameters for invited school coaches
@@ -6400,49 +6439,50 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             👑 BYPASS: MASTER-ADMIN (Leitstand)
           </button>
 
-          {/* Severin L. Bypass (Teacher) */}
+          {/* Lehrer Bypass (Teacher) */}
           <button
             type="button"
             onClick={async () => {
               const targetSchoolName = schoolData?.name || 'Musäk Bad Säckingen';
               const targetSchoolId = schoolData?.id;
               try {
-                console.log('[Bypass] Attempting Severin L. (Lehrer) login for school:', targetSchoolName);
+                console.log('[Bypass] Attempting Lehrer login for school:', targetSchoolName);
                 sessionStorage.removeItem('groovelab_is_master_admin');
+                sessionStorage.removeItem('groovelab_support_ghost');
 
                 if (schoolData?.groovelab_kiosk_token) {
                   localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                 }
 
-                // 1. Fetch users from selected school if present
+                // 1. Fetch genuine teacher (role === 'teacher' and NOT master admin)
                 let targetUser: any = null;
                 if (targetSchoolId) {
                   const { data: schoolUsers } = await supabase
                     .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
                     .eq('school_id', targetSchoolId);
 
                   if (schoolUsers && schoolUsers.length > 0) {
-                    targetUser = schoolUsers.find((u: any) => u.first_name?.toLowerCase().includes('severin')) ||
+                    targetUser = schoolUsers.find((u: any) => u.role === 'teacher' && !u.is_master_admin) ||
                                  schoolUsers.find((u: any) => u.role === 'teacher') ||
                                  schoolUsers[0];
                   }
                 }
 
-                // 2. Global fallback across all users
+                // 2. Global fallback across all teachers
                 if (!targetUser) {
                   const { data: allUsers } = await supabase
                     .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
+                    .eq('role', 'teacher')
                     .limit(50);
                   if (allUsers && allUsers.length > 0) {
-                    targetUser = allUsers.find((u: any) => u.first_name?.toLowerCase().includes('severin')) ||
-                                 allUsers.find((u: any) => u.role === 'teacher') ||
-                                 allUsers[0];
+                    targetUser = allUsers.find((u: any) => !u.is_master_admin) || allUsers[0];
                   }
                 }
 
                 if (targetUser) {
+                  sessionStorage.removeItem('groovelab_is_master_admin');
                   sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                   sessionStorage.setItem('groovelab_active_platform', 'campus');
                   sessionStorage.setItem('campus_active_tab', 'live');
@@ -6453,7 +6493,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   alert(`Kein Lehrer-Profil für "${targetSchoolName}" in der Datenbank gefunden.`);
                 }
               } catch (err: any) {
-                console.error('[Bypass] Error logging in as Severin L.:', err);
+                console.error('[Bypass] Error logging in as Lehrer:', err);
                 alert('Bypass Fehler: ' + (err?.message || err));
               }
             }}
@@ -6472,7 +6512,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '8px'
             }}
           >
-            🔓 BYPASS: SEVERIN L. (LEHRER - {schoolData?.name || 'Musäk Bad Säckingen'})
+            🔓 BYPASS: LEHRER ({schoolData?.name || 'Musäk Bad Säckingen'})
           </button>
 
           {/* Schüler Bypass (Student) */}
@@ -6484,6 +6524,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               try {
                 console.log('[Bypass] Attempting Schüler login for school:', targetSchoolName);
                 sessionStorage.removeItem('groovelab_is_master_admin');
+                sessionStorage.removeItem('groovelab_support_ghost');
 
                 if (schoolData?.groovelab_kiosk_token) {
                   localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
@@ -6494,7 +6535,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 if (targetSchoolId) {
                   const { data: schoolUsers } = await supabase
                     .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
                     .eq('school_id', targetSchoolId);
 
                   if (schoolUsers && schoolUsers.length > 0) {
@@ -6506,7 +6547,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 if (!targetUser) {
                   const { data: allUsers } = await supabase
                     .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
                     .limit(50);
                   if (allUsers && allUsers.length > 0) {
                     targetUser = allUsers.find((u: any) => u.role === 'student') || allUsers[0];
@@ -6514,6 +6555,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
 
                 if (targetUser) {
+                  sessionStorage.removeItem('groovelab_is_master_admin');
                   sessionStorage.setItem('groovelab_active_workspace', 'student');
                   sessionStorage.setItem('groovelab_active_platform', 'campus');
                   sessionStorage.setItem('groovelab_user_id', targetUser.id);
@@ -6545,49 +6587,51 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             🔓 BYPASS: SCHÜLER-LOGIN ({schoolData?.name || 'Musäk Bad Säckingen'})
           </button>
 
-          {/* Manuel Wagner Bypass (Verwaltung) */}
+          {/* Verwaltung / Schulleitung Bypass */}
           <button
             type="button"
             onClick={async () => {
               const targetSchoolName = schoolData?.name || 'Musäk Bad Säckingen';
               const targetSchoolId = schoolData?.id;
               try {
-                console.log('[Bypass] Attempting Manuel Wagner (Verwaltung) login for school:', targetSchoolName);
+                console.log('[Bypass] Attempting Verwaltung login for school:', targetSchoolName);
                 sessionStorage.removeItem('groovelab_is_master_admin');
+                sessionStorage.removeItem('groovelab_support_ghost');
 
                 if (schoolData?.groovelab_kiosk_token) {
                   localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                 }
 
-                // 1. Fetch users from selected school if present
+                // 1. Fetch local school admin or secretary (not master admin)
                 let targetUser: any = null;
                 if (targetSchoolId) {
                   const { data: schoolUsers } = await supabase
                     .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
                     .eq('school_id', targetSchoolId);
 
                   if (schoolUsers && schoolUsers.length > 0) {
-                    targetUser = schoolUsers.find((u: any) => u.first_name?.toLowerCase().includes('manuel')) ||
-                                 schoolUsers.find((u: any) => u.role === 'admin' || u.role === 'secretary') ||
-                                 schoolUsers.find((u: any) => u.first_name?.toLowerCase().includes('severin')) ||
+                    targetUser = schoolUsers.find((u: any) => (u.role === 'admin' || u.role === 'secretary') && !u.is_master_admin) ||
                                  schoolUsers.find((u: any) => u.first_name?.toLowerCase().includes('kornelius')) ||
+                                 schoolUsers.find((u: any) => u.role === 'admin' || u.role === 'secretary') ||
                                  schoolUsers[0];
                   }
                 }
 
-                // 2. Global fallback across all users
+                // 2. Global fallback across all admin users
                 if (!targetUser) {
                   const { data: allUsers } = await supabase
                     .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
+                    .in('role', ['admin', 'secretary'])
                     .limit(50);
                   if (allUsers && allUsers.length > 0) {
-                    targetUser = allUsers.find((u: any) => u.role === 'admin' || u.role === 'secretary') || allUsers[0];
+                    targetUser = allUsers.find((u: any) => !u.is_master_admin) || allUsers[0];
                   }
                 }
 
                 if (targetUser) {
+                  sessionStorage.removeItem('groovelab_is_master_admin');
                   sessionStorage.setItem('groovelab_active_workspace', 'secretary');
                   sessionStorage.setItem('groovelab_active_platform', 'campus');
                   sessionStorage.setItem('campus_active_tab', 'briefing');
@@ -6598,14 +6642,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   alert(`Kein Admin/Verwaltungs-Profil für "${targetSchoolName}" in der Datenbank gefunden.`);
                 }
               } catch (err: any) {
-                console.error('[Bypass] Error logging in as Manuel Wagner:', err);
+                console.error('[Bypass] Error logging in as Verwaltung:', err);
                 alert('Bypass Fehler: ' + (err?.message || err));
               }
             }}
             style={{
               background: '#451a03',
               color: '#fde68a',
-              border: '1px solid #b45309',
+              border: '1px solid #d97706',
               borderRadius: '12px',
               padding: '12px 16px',
               fontSize: '0.78rem',
@@ -6617,7 +6661,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '8px'
             }}
           >
-            🔓 BYPASS: MANUEL WAGNER (VERWALTUNG - {schoolData?.name || 'Musäk Bad Säckingen'})
+            🔓 BYPASS: VERWALTUNG / SCHULLEITUNG ({schoolData?.name || 'Musäk Bad Säckingen'})
           </button>
         </div>
       )}
@@ -7656,113 +7700,212 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: adminAuthStep === 2 ? '#dcfce7' : '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: adminAuthStep === 2 ? '#16a34a' : '#eab308' }}>
                 <ShieldCheck size={28} />
               </div>
               <div>
-                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Master-Admin Login</h2>
-                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GrooveLab Master Administration</p>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>
+                  {adminAuthStep === 2 ? '2-Faktor-Authentifizierung' : 'Master-Admin Login'}
+                </h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {adminAuthStep === 2 ? 'Sicherheitsprüfung via Google Authenticator' : 'Campus-Groovelab Master Administration'}
+                </p>
               </div>
             </div>
 
-            <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Benutzername
-                </label>
-                <input
-                  type="text"
-                  value={adminUsernameInput}
-                  onChange={(e) => setAdminUsernameInput(e.target.value)}
-                  placeholder="z.B. admin"
-                  required
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    color: '#000000',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#eab308';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Passwort
-                </label>
-                <input
-                  type="password"
-                  value={adminPasswordInput}
-                  onChange={(e) => setAdminPasswordInput(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    color: '#000000',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#eab308';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                  }}
-                />
-              </div>
-
-              {error && (
-                <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
-                  {error}
+            {adminAuthStep === 1 ? (
+              <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Benutzername
+                  </label>
+                  <input
+                    type="text"
+                    value={adminUsernameInput}
+                    onChange={(e) => setAdminUsernameInput(e.target.value)}
+                    placeholder="z.B. admin"
+                    required
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '14px 16px',
+                      borderRadius: '12px',
+                      background: '#ffffff',
+                      border: '1.5px solid #e2e8f0',
+                      color: '#000000',
+                      fontSize: '0.95rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                      transition: 'all 0.2s'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#eab308';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                    }}
+                  />
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={adminLoginLoading}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '0.95rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  marginTop: '10px'
-                }}
-                
-                
-              >
-                {adminLoginLoading ? 'Verifiziere...' : 'Einloggen'}
-              </button>
-            </form>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Passwort
+                  </label>
+                  <input
+                    type="password"
+                    value={adminPasswordInput}
+                    onChange={(e) => setAdminPasswordInput(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '14px 16px',
+                      borderRadius: '12px',
+                      background: '#ffffff',
+                      border: '1.5px solid #e2e8f0',
+                      color: '#000000',
+                      fontSize: '0.95rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                      transition: 'all 0.2s'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#eab308';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                    }}
+                  />
+                </div>
+
+                {error && (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#dc2626', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={adminLoginLoading}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    marginTop: '10px'
+                  }}
+                >
+                  {adminLoginLoading ? 'Verifiziere...' : 'Weiter zur Authentifizierung'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleAdminVerifyTotp} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', lineHeight: 1.4, textAlign: 'center' }}>
+                  Geben Sie den 6-stelligen Code aus Ihrer <strong>Google Authenticator</strong> App ein.
+                </p>
+
+                <div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={adminTotpInput}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      setAdminTotpInput(val);
+                      if (val.length === 6) {
+                        setTimeout(() => {
+                          handleAdminVerifyTotp();
+                        }, 50);
+                      }
+                    }}
+                    placeholder="000 000"
+                    autoFocus
+                    required
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '14px',
+                      borderRadius: '14px',
+                      background: '#f8fafc',
+                      border: '2px solid #22c55e',
+                      color: '#0f172a',
+                      fontSize: '1.4rem',
+                      fontWeight: 900,
+                      textAlign: 'center',
+                      letterSpacing: '8px',
+                      fontFamily: 'monospace',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {error && (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#dc2626', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={adminLoginLoading || adminTotpInput.length !== 6}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    cursor: (adminLoginLoading || adminTotpInput.length !== 6) ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 8px 24px rgba(22, 163, 74, 0.25)',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    opacity: (adminLoginLoading || adminTotpInput.length !== 6) ? 0.6 : 1
+                  }}
+                >
+                  {adminLoginLoading ? 'Prüfe Code...' : 'Code bestätigen & Leitstand öffnen'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminAuthStep(1);
+                    setAdminTotpInput('');
+                    setError(null);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#64748b',
+                    fontSize: '0.80rem',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    textAlign: 'center'
+                  }}
+                >
+                  ‹ Zurück zur Passworteingabe
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

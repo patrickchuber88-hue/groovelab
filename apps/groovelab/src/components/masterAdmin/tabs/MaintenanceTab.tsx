@@ -49,6 +49,21 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
 
   // --- Audit Log Search & Filter for Tab 3 ---
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [purgingRateLimits, setPurgingRateLimits] = useState(false);
+
+  const handlePurgeRateLimits = async () => {
+    try {
+      setPurgingRateLimits(true);
+      const { data, error } = await supabase.rpc('purge_expired_rate_limits', { p_days_retention: 7 });
+      if (error) throw error;
+      setSaveSuccessToast(`Datenbank-Hygiene abgeschlossen: ${data ?? 0} veraltete Rate-Limit-Einträge gelöscht.`);
+      setTimeout(() => setSaveSuccessToast(null), 4000);
+    } catch (err: any) {
+      alert('Fehler bei der Datenbank-Hygiene: ' + err.message);
+    } finally {
+      setPurgingRateLimits(false);
+    }
+  };
 
   // --- Copy Feedback State ---
   const [pinCopied, setPinCopied] = useState(false);
@@ -3111,6 +3126,65 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               >
                 <Power size={14} />
                 <span>Notfall-Logout aller User</span>
+              </button>
+            </div>
+
+            {/* Card 4: Database Hygiene & Rate Limit Purge */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              padding: '26px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '18px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Sparkles size={18} color="#2563eb" />
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                      Datenbank-Hygiene
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: '100px', background: '#eff6ff', color: '#2563eb' }}>
+                    Maintenance
+                  </span>
+                </div>
+
+                <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                  Rate-Limit Purge
+                </div>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Bereinigt ephemere Login-Rate-Limits älter als 7 Tage zur Vermeidung von Tabellen-Bloat.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handlePurgeRateLimits}
+                disabled={purgingRateLimits}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  color: '#1d4ed8',
+                  fontSize: '0.82rem',
+                  fontWeight: 850,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s'
+                }}
+                className="hover-scale-mini"
+              >
+                {purgingRateLimits ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                <span>{purgingRateLimits ? 'Bereinige...' : 'Rate-Limits bereinigen (< 7 Tage)'}</span>
               </button>
             </div>
           </div>
