@@ -5,7 +5,7 @@
 
 export interface MasterSessionLease {
   userId: string;
-  authMethod: 'passkey_fido2' | 'master_pin' | 'emergency_key';
+  authMethod: 'passkey_fido2' | 'master_pin' | 'emergency_key' | 'bypass_dev';
   issuedAt: number;
   expiresAt: number;
   nonce: string;
@@ -45,7 +45,7 @@ async function generateLeaseSignature(userId: string, issuedAt: number, expiresA
  */
 export async function createMasterSessionLease(
   userId: string,
-  authMethod: 'passkey_fido2' | 'master_pin' | 'emergency_key',
+  authMethod: 'passkey_fido2' | 'master_pin' | 'emergency_key' | 'bypass_dev' = 'master_pin',
   ttlMinutes: number = DEFAULT_TTL_MINUTES
 ): Promise<MasterSessionLease> {
   const now = Date.now();

@@ -21,7 +21,7 @@ import {
 import { supabase } from '../../lib/supabase';
 // @ts-ignore
 import * as lamejs from '@breezystack/lamejs';
-import { processPureRawAudioBuffer, audioBufferToWavBlob } from '../../utils/audioMasteringEngine';
+import { processPureRawAudioBuffer, audioBufferToWavBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../../utils/audioMasteringEngine';
 import { checkIsAudioTresorActive } from '../MeisterwerkDocumentationModal';
 
 export interface Track {
@@ -2549,8 +2549,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           const arrayBuffer = await blob.arrayBuffer();
           if (audioContextRef.current) {
             const decoded = await audioContextRef.current.decodeAudioData(arrayBuffer);
-            // 🎛️ PURE RAW DSP: EBU R128 (-13 LUFS) + DC-Blocker + Loop Seam Crossfade
-            const normalized = processPureRawAudioBuffer(decoded, { targetLufs: -13.0, targetPeakDb: -1.0, isLoop: true });
+            // 🎛️ PURE RAW DSP: EBU R128 (-14.5 LUFS) + DC-Blocker + Loop Seam Crossfade
+            const normalized = processPureRawAudioBuffer(decoded, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP, isLoop: true });
             audioBuffersRef.current[trackId] = normalized;
           }
         } catch (decodeErr) {
@@ -2949,8 +2949,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       });
 
       const renderedBuffer = await offlineCtx.startRendering();
-      // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-13 LUFS)
-      processPureRawAudioBuffer(renderedBuffer, { targetLufs: -13.0, targetPeakDb: -1.0, isLoop: false });
+      // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-14.5 LUFS)
+      processPureRawAudioBuffer(renderedBuffer, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP, isLoop: false });
 
       // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
       let targetSchoolId = 
@@ -3133,8 +3133,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       });
 
       const renderedBuffer = await offlineCtx.startRendering();
-      // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-13 LUFS)
-      processPureRawAudioBuffer(renderedBuffer, { targetLufs: -13.0, targetPeakDb: -1.0, isLoop: false });
+      // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-14.5 LUFS)
+      processPureRawAudioBuffer(renderedBuffer, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP, isLoop: false });
 
       let mixBlob: Blob;
       let fileExt = 'mp3';
@@ -4421,8 +4421,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     source.start(0);
 
                     const renderedBuffer = await offlineCtx.startRendering();
-                    // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-13 LUFS)
-                    processPureRawAudioBuffer(renderedBuffer, { targetLufs: -13.0, targetPeakDb: -1.0, isLoop: false });
+                    // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-14.5 LUFS)
+                    processPureRawAudioBuffer(renderedBuffer, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP, isLoop: false });
 
                     btn.innerText = "KONVERTIERE...";
                     let mixBlob: Blob;

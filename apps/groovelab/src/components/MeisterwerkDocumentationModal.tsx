@@ -9,7 +9,7 @@ import { GrooveLoopstation } from './groovelab/GrooveLoopstation';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
 import { CampusTuner } from './campus/CampusTuner';
 import { AudioBiographyView, CustomPlaylist, CustomPlaylistTrack } from './campus/AudioBiographyView';
-import { processPureRawBlob, processStudioMastering } from '../utils/audioMasteringEngine';
+import { processPureRawBlob, processStudioMastering, TARGET_PURE_RAW_LUFS, TARGET_STUDIO_LUFS, TARGET_PEAK_DBTP } from '../utils/audioMasteringEngine';
 import { storeBlob, getBlob } from '../utils/blobStorage';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
@@ -2289,11 +2289,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         } catch (e) {}
 
         const rawBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-        // 🎙️ 100% PURE RAW + EBU R128 Loudness Matching (-14.0 LUFS / -1.0 dBTP):
+        // 🎙️ 100% PURE RAW + EBU R128 Loudness Calibration (-14.5 LUFS / -1.0 dBTP):
         let blob = rawBlob;
         let url = '';
         try {
-          const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: -14.0, targetPeakDb: -1.0 });
+          const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP });
           blob = pureRawRes.processedBlob;
           url = pureRawRes.processedUrl;
           if (pureRawRes.durationSec) {
@@ -2734,7 +2734,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         if (shareProcessing === 'master') {
           try {
-            const masteredResult = await processStudioMastering(rawBlob, { profile: 'acoustic_audiophile' });
+            const masteredResult = await processStudioMastering(rawBlob, { 
+              profile: 'acoustic_audiophile',
+              targetLufs: TARGET_STUDIO_LUFS,
+              targetPeakDb: TARGET_PEAK_DBTP
+            });
             if (masteredResult && masteredResult.masteredBlob) {
               masterBlob = masteredResult.masteredBlob;
               await storeBlob(`campus_audio_${trackId}_master`, masterBlob);

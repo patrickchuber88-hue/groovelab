@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Volume2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { processPureRawBlob } from '../../utils/audioMasteringEngine';
+import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../../utils/audioMasteringEngine';
 
 interface SimpleVoiceRecorderProps {
   studentId: string;
@@ -108,11 +108,11 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       mediaRecorder.onstop = async () => {
         const rawBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
         
-        // 🌟 3. Universal EBU R128 Pure RAW Loudness Staging (-14.0 LUFS / -1.0 dBTP True-Peak Guard)
+        // 🌟 3. Universal EBU R128 Pure RAW Loudness Calibration (-14.5 LUFS / -1.0 dBTP True-Peak Guard)
         let finalBlob = rawBlob;
         let localUrl = '';
         try {
-          const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: -14.0, targetPeakDb: -1.0 });
+          const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP });
           finalBlob = pureRawRes.processedBlob;
           localUrl = pureRawRes.processedUrl;
           if (pureRawRes.durationSec) {

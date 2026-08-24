@@ -7,7 +7,9 @@ import {
   safeDecodeAudioData, 
   ensureCenteredStereoAudioBuffer, 
   audioBufferToWavBlob, 
-  processPureRawAudioBuffer 
+  processPureRawAudioBuffer,
+  TARGET_PURE_RAW_LUFS,
+  TARGET_PEAK_DBTP
 } from '../../utils/audioMasteringEngine';
 
 // Helper to decode Base64 WAV into AudioBuffer with true header sample rate
@@ -420,7 +422,7 @@ async function mixMicWithDirectBackingBeat(
     };
   } catch (err) {
     console.warn('[mixMicWithDirectBackingBeat] Falling back to pure raw blob:', err);
-    const fallback = await processPureRawBlob(micBlob, { targetLufs: -14.0, targetPeakDb: -1.0 });
+    const fallback = await processPureRawBlob(micBlob, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP });
     return {
       processedBlob: fallback.processedBlob,
       processedUrl: fallback.processedUrl,
@@ -1169,7 +1171,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         } catch (dspErr) {
           console.warn('[GroovePracticeCompanion] Direct Beat Mix fallback:', dspErr);
           try {
-            const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: -14.0, targetPeakDb: -1.0 });
+            const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP });
             finalBlob = pureRawRes.processedBlob;
             blobUrl = pureRawRes.processedUrl;
             if (pureRawRes.durationSec) durationSec = Math.round(pureRawRes.durationSec);

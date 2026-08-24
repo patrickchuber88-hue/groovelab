@@ -28,7 +28,7 @@ import { CampusTeenDashboard } from './campus/CampusTeenDashboard';
 import { CampusLevelSelectModal } from './campus/CampusLevelSelectModal';
 import { AudioTrackCarousel, AudioTrackItem } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
-import { processPureRawBlob } from '../utils/audioMasteringEngine';
+import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../utils/audioMasteringEngine';
 import { downloadStudentAudioBackup } from '../utils/audioBackupHelper';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate } from '../utils/studentProgressEngine';
 import { PushNotificationSoftPromptModal } from './ui/PushNotificationSoftPromptModal';
@@ -6085,8 +6085,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       let saveBlob = juniorRecordedBlob;
       try {
-        // 🌟 Universal EBU R128 Pure RAW Loudness Staging (-14.0 LUFS / -1.0 dBTP True-Peak Guard)
-        const pureRawResult = await processPureRawBlob(juniorRecordedBlob, { targetLufs: -14.0, targetPeakDb: -1.0 });
+        // 🌟 Universal EBU R128 Pure RAW Loudness Calibration (-14.5 LUFS / -1.0 dBTP True-Peak Guard)
+        const pureRawResult = await processPureRawBlob(juniorRecordedBlob, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP });
         saveBlob = pureRawResult.processedBlob;
       } catch (dspErr) {
         console.warn('[saveJuniorRecording] Pure RAW DSP note:', dspErr);

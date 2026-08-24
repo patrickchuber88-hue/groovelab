@@ -5,7 +5,7 @@ import {
   Info, Sliders, Music, Zap, Flame, Heart, Upload, MessageSquare, MessageCircle, ChevronRight,
   ChevronLeft, FileText, X, AlertCircle, ChevronDown, ListMusic, SkipForward, SkipBack, Gift, Bell, Lightbulb,
   Sun, Moon, CheckCircle2, History, Plus, Trash2, Edit3, SlidersHorizontal, Radio, Layers, Download,
-  Folder, FolderOpen, BookOpen, Trophy, Maximize2, ArrowLeft
+  Folder, FolderOpen, BookOpen, Trophy, Maximize2, ArrowLeft, Printer, Home, Landmark
 } from 'lucide-react';
 
 import { supabase } from '../../lib/supabase';
@@ -13,6 +13,9 @@ import {
   processStudioMastering, 
   processDualMastering, 
   processPureRawBlob,
+  TARGET_STUDIO_LUFS,
+  TARGET_PURE_RAW_LUFS,
+  TARGET_PEAK_DBTP,
   DualMasteringResult, 
   MasteringProfile,
   ReverbRoomType,
@@ -2181,8 +2184,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         }
 
         if (audioBlob.size > 0) {
-          setReverbWetSlider(30);
-          await processDualMasteringForModal(audioBlob, recordSeconds, selectedProfile, 30);
+          setReverbWetSlider(8);
+          await processDualMasteringForModal(audioBlob, recordSeconds, selectedProfile, 8);
         } else {
           alert('Keine Audiodaten aufgezeichnet. Bitte versuche es erneut.');
           setIsProcessingMastering(false);
@@ -2273,21 +2276,21 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   const commitFileUpload = async () => {
     if (!uploadFile) return;
-    setReverbWetSlider(22);
-    await processDualMasteringForModal(uploadFile, 0, selectedProfile, 22);
+    setReverbWetSlider(8);
+    await processDualMasteringForModal(uploadFile, 0, selectedProfile, 8);
   };
 
   /**
-   * 🎛️ DUAL MASTERING PIPELINE (Loudness-Matched -14.0 LUFS Classical & Jazz Reference):
+   * 🎛️ DUAL MASTERING PIPELINE (EBU R128 Loudness-Staging: -14.0 LUFS Master / -14.5 LUFS Pure RAW):
    * Erzeugt simultan auf dem exakt gleichen 20-Sekunden-Ausschnitt ab Songmitte (50%):
    * 1. Studio Audio-Processing (-14.0 LUFS, Analog Tube Warmth, Presence Boost & Convolution Reverb)
-   * 2. Pure RAW (-14.0 LUFS Lautheits-Match, 100% unverfälschter Originalklang)
+   * 2. Pure RAW (-14.5 LUFS Wow-Abstand, 100% unverfälschter Originalklang)
    */
   const processDualMasteringForModal = async (
     fileOrBlob: Blob | File, 
     durationSec: number, 
     profileOverride?: MasteringProfile,
-    initialWetMixPercent: number = 22
+    initialWetMixPercent: number = 8
   ) => {
     setIsProcessingMastering(true);
     setPendingDualResult(null);
@@ -2295,8 +2298,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
     const effectiveProfile: MasteringProfile = profileOverride || selectedProfile;
     const isDrum = effectiveProfile === 'drums_percussion';
-    const effectiveWetMix = isDrum ? 0.12 : (initialWetMixPercent / 100);
-    const chosenRoom: ReverbRoomType = initialWetMixPercent <= 18 ? 'small' : initialWetMixPercent <= 38 ? 'medium' : 'large';
+    const effectiveWetMix = isDrum ? 0.05 : (initialWetMixPercent / 100);
+    const chosenRoom: ReverbRoomType = initialWetMixPercent <= 6 ? 'small' : initialWetMixPercent <= 10 ? 'medium' : 'large';
 
     try {
       // ⚡ 1. Extrahiere den 20-Sekunden-Slice exakt ab der Songmitte (50% der Aufnahme)
@@ -2306,27 +2309,16 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       const [masterRes, rawRes] = await Promise.all([
         processStudioMastering(previewSliceBlob, {
           profile: effectiveProfile,
-          targetLufs: -14.0,
-          targetPeakDb: -1.0,
+          targetLufs: TARGET_STUDIO_LUFS,
+          targetPeakDb: TARGET_PEAK_DBTP,
           isDrumPadMode: isDrum,
-          applyAutoGainStage: true,
-          applyAdaptiveHpf: true,
-          applyTransientSoftener: true,
-          applyLowEndResonance: true,
-          applyMidResonance: true,
-          applyTiltEq: true,
-          tiltPivotHz: 1000,
-          applyDeHarsh: true,
-          applyPultecAir: true,
-          applyParallelConsoleBus: true,
-          applyStereoDimension: true,
           applyConvolutionReverb: true,
           reverbRoomType: chosenRoom,
           reverbWetMix: effectiveWetMix
         }),
         processPureRawBlob(previewSliceBlob, {
-          targetLufs: -14.0,
-          targetPeakDb: -1.0,
+          targetLufs: TARGET_PURE_RAW_LUFS,
+          targetPeakDb: TARGET_PEAK_DBTP,
           isLoop: true
         })
       ]);
@@ -2381,23 +2373,12 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         const isDrum = effectiveProfile === 'drums_percussion';
         const newMasterRes = await processStudioMastering(previewSliceBlob, {
           profile: effectiveProfile,
-          targetLufs: -14.0,
-          targetPeakDb: -1.0,
+          targetLufs: TARGET_STUDIO_LUFS,
+          targetPeakDb: TARGET_PEAK_DBTP,
           isDrumPadMode: isDrum,
-          applyAutoGainStage: true,
-          applyAdaptiveHpf: true,
-          applyTransientSoftener: true,
-          applyLowEndResonance: true,
-          applyMidResonance: true,
-          applyTiltEq: true,
-          tiltPivotHz: 1000,
-          applyDeHarsh: true,
-          applyPultecAir: true,
-          applyParallelConsoleBus: true,
-          applyStereoDimension: true,
           applyConvolutionReverb: true,
           reverbRoomType: roomType,
-          reverbWetMix: isDrum ? 0.12 : (wetPercent / 100)
+          reverbWetMix: isDrum ? 0.05 : (wetPercent / 100)
         });
 
         setPendingDualResult(prev => {
@@ -2549,35 +2530,32 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       detail: 'Rendere vollen Song mit 4-Band EQ, Glue-Kompression & 3D Raumakustik'
     });
 
-    // ⚡ 100% Full-Length Re-Mastering beim Speichern der Originalaufnahme
+    // ⚡ 100% Full-Length Processing for both Studio Master & Pure RAW
     if (lastRawInputFile) {
       try {
         const effectiveProfile: MasteringProfile = selectedProfile;
         const isDrum = effectiveProfile === 'drums_percussion';
-        const fullMasterRes = await processStudioMastering(lastRawInputFile, {
-          profile: effectiveProfile,
-          targetLufs: -14.0,
-          targetPeakDb: -1.0,
-          isDrumPadMode: isDrum,
-          applyAutoGainStage: true,
-          applyAdaptiveHpf: true,
-          applyTransientSoftener: true,
-          applyLowEndResonance: true,
-          applyMidResonance: true,
-          applyTiltEq: true,
-          tiltPivotHz: 1000,
-          applyDeHarsh: true,
-          applyPultecAir: true,
-          applyParallelConsoleBus: true,
-          applyStereoDimension: true,
-          applyConvolutionReverb: true,
-          reverbRoomType: chosenRoomType,
-          reverbWetMix: isDrum ? 0.12 : (reverbWetSlider / 100)
-        });
+        const [fullMasterRes, fullRawRes] = await Promise.all([
+          processStudioMastering(lastRawInputFile, {
+            profile: effectiveProfile,
+            targetLufs: TARGET_STUDIO_LUFS,
+            targetPeakDb: TARGET_PEAK_DBTP,
+            isDrumPadMode: isDrum,
+            applyConvolutionReverb: true,
+            reverbRoomType: chosenRoomType,
+            reverbWetMix: isDrum ? 0.05 : (reverbWetSlider / 100)
+          }),
+          processPureRawBlob(lastRawInputFile, {
+            targetLufs: TARGET_PURE_RAW_LUFS,
+            targetPeakDb: TARGET_PEAK_DBTP
+          })
+        ]);
         masterBlob = fullMasterRes.masteredBlob;
         masteredUrl = fullMasterRes.masteredUrl;
+        rawBlob = fullRawRes.processedBlob;
+        rawUrl = fullRawRes.processedUrl;
       } catch (err) {
-        console.warn('Full master render on save fallback:', err);
+        console.warn('Full master and raw render on save fallback:', err);
       }
     }
 
@@ -2828,29 +2806,18 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
         if (rawBlob) {
           const previewSliceBlob = await sliceAudioBlobForPreview(rawBlob, 20);
-          const rawSliceRes = await processPureRawBlob(previewSliceBlob, { targetLufs: -14.0, isLoop: true });
+          const rawSliceRes = await processPureRawBlob(previewSliceBlob, { targetLufs: TARGET_PURE_RAW_LUFS, isLoop: true });
           setEditPreviewRawUrl(rawSliceRes.processedUrl);
 
           const isDrum = selectedProfile === 'drums_percussion';
           const masterSliceRes = await processStudioMastering(previewSliceBlob, {
             profile: selectedProfile,
-            targetLufs: -14.0,
-            targetPeakDb: -1.0,
+            targetLufs: TARGET_STUDIO_LUFS,
+            targetPeakDb: TARGET_PEAK_DBTP,
             isDrumPadMode: isDrum,
-            applyAutoGainStage: true,
-            applyAdaptiveHpf: true,
-            applyTransientSoftener: true,
-            applyLowEndResonance: true,
-            applyMidResonance: true,
-            applyTiltEq: true,
-            tiltPivotHz: 1000,
-            applyDeHarsh: true,
-            applyPultecAir: true,
-            applyParallelConsoleBus: true,
-            applyStereoDimension: true,
             applyConvolutionReverb: true,
             reverbRoomType: initialRoom,
-            reverbWetMix: isDrum ? 0.12 : (initialWet / 100)
+            reverbWetMix: isDrum ? 0.05 : (initialWet / 100)
           });
           setEditTempMasterBlob(masterSliceRes.masteredBlob);
           setEditTempMasterUrl(masterSliceRes.masteredUrl);
@@ -2903,23 +2870,12 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           const isDrum = effectiveProfile === 'drums_percussion';
           const newMasterRes = await processStudioMastering(previewSliceBlob, {
             profile: effectiveProfile,
-            targetLufs: -14.0,
-            targetPeakDb: -1.0,
+            targetLufs: TARGET_STUDIO_LUFS,
+            targetPeakDb: TARGET_PEAK_DBTP,
             isDrumPadMode: isDrum,
-            applyAutoGainStage: true,
-            applyAdaptiveHpf: true,
-            applyTransientSoftener: true,
-            applyLowEndResonance: true,
-            applyMidResonance: true,
-            applyTiltEq: true,
-            tiltPivotHz: 1000,
-            applyDeHarsh: true,
-            applyPultecAir: true,
-            applyParallelConsoleBus: true,
-            applyStereoDimension: true,
             applyConvolutionReverb: true,
             reverbRoomType: roomType,
-            reverbWetMix: isDrum ? 0.12 : (wetPercent / 100)
+            reverbWetMix: isDrum ? 0.05 : (wetPercent / 100)
           });
 
           setEditTempMasterBlob(newMasterRes.masteredBlob);
@@ -3096,23 +3052,12 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         const isDrum = effectiveProfile === 'drums_percussion';
         const fullMasterRes = await processStudioMastering(rawBlob, {
           profile: effectiveProfile,
-          targetLufs: -14.0,
-          targetPeakDb: -1.0,
+          targetLufs: TARGET_STUDIO_LUFS,
+          targetPeakDb: TARGET_PEAK_DBTP,
           isDrumPadMode: isDrum,
-          applyAutoGainStage: true,
-          applyAdaptiveHpf: true,
-          applyTransientSoftener: true,
-          applyLowEndResonance: true,
-          applyMidResonance: true,
-          applyTiltEq: true,
-          tiltPivotHz: 1000,
-          applyDeHarsh: true,
-          applyPultecAir: true,
-          applyParallelConsoleBus: true,
-          applyStereoDimension: true,
           applyConvolutionReverb: true,
           reverbRoomType: editingTrackData.reverbRoomType,
-          reverbWetMix: isDrum ? 0.12 : (editingTrackData.reverbWetMix / 100)
+          reverbWetMix: isDrum ? 0.05 : (editingTrackData.reverbWetMix / 100)
         });
 
         setEditSaveProgress({
@@ -5722,37 +5667,35 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '24px',
-            background: isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.03)',
-            border: isLight ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid rgba(255, 255, 255, 0.06)',
-            borderRadius: '24px',
-            padding: '20px 24px',
+            gap: '20px',
+            background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
+            border: isLight ? '1px solid #e2e8f0' : 'rgba(255, 255, 255, 0.06)',
+            borderRadius: '20px',
+            padding: '18px 20px',
             flexWrap: 'wrap'
           }}>
             {/* Square Album Cover */}
             <div style={{
-              width: '100px',
-              height: '100px',
-              borderRadius: '18px',
+              width: '88px',
+              height: '88px',
+              borderRadius: '16px',
               background: bk.gradient || 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.18)',
               position: 'relative',
               overflow: 'hidden',
               flexShrink: 0
             }}>
-              <span style={{ fontSize: '2.2rem', lineHeight: 1 }}>
-                {bk.title.includes('Weihnacht') ? '🎄' : '🎵'}
-              </span>
-              <span style={{ fontSize: '0.58rem', fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>
+              <Music size={32} color="#ffffff" strokeWidth={2.2} />
+              <span style={{ fontSize: '0.54rem', fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '6px' }}>
                 Meisterwerk
               </span>
             </div>
 
-            <div style={{ flex: 1, minWidth: '240px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ flex: 1, minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span style={{
                   fontSize: '0.66rem',
@@ -5771,120 +5714,132 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 </span>
               </div>
 
-              <h2 style={{ margin: 0, fontSize: '1.65rem', fontWeight: 900, color: colors.textPrimary, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: colors.textPrimary, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                 {bk.title}
               </h2>
 
-              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: colors.textSecondary }}>
+              <span style={{ fontSize: '0.84rem', fontWeight: 800, color: colors.textSecondary }}>
                 von <strong style={{ color: '#10b981' }}>{artistName}</strong> • {instrumentName}
               </span>
             </div>
           </div>
 
-          {/* 🌟 3. Pedagogical Foreword */}
+          {/* 🌟 3. Pedagogical Foreword (Subtle & Inspiring) */}
           <div style={{
-            padding: '14px 18px',
-            borderRadius: '18px',
+            padding: '12px 16px',
+            borderRadius: '14px',
             background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.08)',
-            borderLeft: '4px solid #10b981',
-            fontSize: '0.82rem',
-            lineHeight: 1.5,
-            color: isLight ? '#166534' : '#a7f3d0'
+            border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.2)'}`,
+            fontSize: '0.78rem',
+            lineHeight: 1.45,
+            color: isLight ? '#166534' : '#a7f3d0',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px'
           }}>
-            <strong>Pädagogisches Vorwort:</strong> Dieses digitale Booklet dokumentiert die künstlerische und instrumentale Entwicklung im laufenden Schuljahr. Jeder Song steht für einen gemeisterten Meilenstein, musikalisches Taktgefühl und authentische Spielfreude im Instrumentalunterricht.
+            <Award size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong>Musikalisches Tagebuch:</strong> Dieses digitale Booklet dokumentiert die persönliche Entwicklung und gemeisterte Meilensteine im Instrumentalunterricht.
+            </div>
           </div>
 
           {/* 🌟 4. Track-by-Track Liner Notes Chronicle */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 900, color: colors.textPrimary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <h4 style={{ margin: 0, fontSize: '0.90rem', fontWeight: 900, color: colors.textPrimary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Song-Chronik & Meilensteine:
             </h4>
 
-            {bk.tracks.map((t, idx) => (
-              <div
-                key={idx}
-                style={{
-                  background: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.55)',
-                  border: isLight ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(255, 255, 255, 0.07)',
-                  borderRadius: '20px',
-                  padding: '16px 20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  boxShadow: isLight ? '0 4px 14px rgba(0,0,0,0.03)' : 'none'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{
-                      fontSize: '0.78rem',
-                      fontWeight: 900,
-                      color: '#10b981',
-                      background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.16)',
-                      padding: '3px 9px',
-                      borderRadius: '8px',
-                      fontVariantNumeric: 'tabular-nums'
-                    }}>
-                      #{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
-                    </span>
-                    <strong style={{ fontSize: '0.98rem', fontWeight: 900, color: colors.textPrimary }}>
-                      {t.title}
-                    </strong>
-                  </div>
+            {bk.tracks.map((t, idx) => {
+              // Clean up subtitle from technical jargon
+              let cleanSubtitle = t.subtitle || '';
+              if (cleanSubtitle.toLowerCase().includes('lufs') || cleanSubtitle.toLowerCase().includes('peak') || cleanSubtitle.toLowerCase().includes('match')) {
+                cleanSubtitle = cleanSubtitle.toLowerCase().includes('master') ? '✨ Studio-Klang' : '🎙️ Originalaufnahme';
+              }
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.74rem', color: colors.textSecondary }}>
-                    <span>{t.recordedAt || '16. Aug. 2026'}</span>
-                    <span>•</span>
-                    <span>{formatSeconds(t.duration || 45)} Min.</span>
-                  </div>
-                </div>
-
-                {/* Subtitle / Description */}
-                {t.subtitle && (
-                  <span style={{ fontSize: '0.78rem', color: colors.textSecondary }}>
-                    {t.subtitle}
-                  </span>
-                )}
-
-                {/* Story / Personal Milestone Note */}
-                <div style={{
-                  marginTop: '4px',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)',
-                  border: isLight ? '1px solid rgba(0, 0, 0, 0.04)' : '1px solid rgba(255, 255, 255, 0.05)',
-                  fontSize: '0.80rem',
-                  lineHeight: 1.45,
-                  color: t.personalNote ? colors.textPrimary : colors.textSecondary,
-                  fontStyle: t.personalNote ? 'normal' : 'italic'
-                }}>
-                  {t.personalNote ? (
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                      <span style={{ fontSize: '1rem', lineHeight: 1 }}>💬</span>
-                      <span>„{t.personalNote}“</span>
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    background: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.55)',
+                    border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.07)',
+                    borderRadius: '16px',
+                    padding: '14px 18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.02)' : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 900,
+                        color: '#10b981',
+                        background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.16)',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontVariantNumeric: 'tabular-nums'
+                      }}>
+                        #{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                      </span>
+                      <strong style={{ fontSize: '0.94rem', fontWeight: 900, color: colors.textPrimary }}>
+                        {t.title}
+                      </strong>
+                      {cleanSubtitle && (
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          color: cleanSubtitle.includes('Studio') ? '#10b981' : '#3b82f6',
+                          background: cleanSubtitle.includes('Studio') 
+                            ? (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.15)')
+                            : (isLight ? '#eff6ff' : 'rgba(59, 130, 246, 0.15)'),
+                          padding: '2px 6px',
+                          borderRadius: '6px'
+                        }}>
+                          {cleanSubtitle}
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Sparkles size={13} color="#10b981" />
-                      <span>Erfolgreich im Instrumentalunterricht eingespielt & als dokumentierter Audio-Meilenstein im Tresor verewigt.</span>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: colors.textSecondary, fontWeight: 600 }}>
+                      <span>{t.recordedAt || '16. Aug. 2026'}</span>
+                      <span>•</span>
+                      <span>{formatSeconds(t.duration || 45)} Min.</span>
+                    </div>
+                  </div>
+
+                  {/* Story / Personal Milestone Note (Only rendered if personal note exists) */}
+                  {t.personalNote && (
+                    <div style={{
+                      marginTop: '4px',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)',
+                      border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.05)',
+                      fontSize: '0.78rem',
+                      lineHeight: 1.4,
+                      color: colors.textPrimary
+                    }}>
+                      <span style={{ fontStyle: 'italic' }}>„{t.personalNote}“</span>
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* 🌟 5. Official Credits & Impressum Box */}
           <div style={{
-            marginTop: '8px',
-            padding: '16px 20px',
-            borderRadius: '20px',
-            background: isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.03)',
-            border: isLight ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid rgba(255, 255, 255, 0.06)',
+            marginTop: '6px',
+            padding: '14px 18px',
+            borderRadius: '16px',
+            background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)',
+            border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.06)',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '12px',
-            fontSize: '0.74rem'
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '10px',
+            fontSize: '0.72rem'
           }}>
             <div>
               <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Interpret:</span>
@@ -5895,7 +5850,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               <strong style={{ color: colors.textPrimary }}>{effectiveSchoolName}</strong>
             </div>
             <div>
-              <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Plattform & Cloud-Tresor:</span>
+              <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Plattform & Audio-Tresor:</span>
               <strong style={{ color: colors.textPrimary }}>Campus-Groovelab</strong>
             </div>
             <div>
@@ -5924,7 +5879,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               }}
               className="hover-scale"
             >
-              <span>🖨️ Drucken / Als PDF speichern</span>
+              <Printer size={15} />
+              <span>Drucken / Als PDF speichern</span>
             </button>
 
             <button
@@ -9202,26 +9158,27 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     type="button"
                     onClick={() => setSelectedProfile('acoustic_audiophile')}
                     style={{
-                      padding: '7px 6px',
+                      padding: '8px 6px',
                       borderRadius: '10px',
                       border: 'none',
                       background: selectedProfile === 'acoustic_audiophile' 
                         ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
                         : 'transparent',
                       color: selectedProfile === 'acoustic_audiophile' ? '#ffffff' : colors.textSecondary,
-                      fontSize: '0.70rem',
+                      fontSize: '0.72rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '4px',
+                      gap: '5px',
                       boxShadow: selectedProfile === 'acoustic_audiophile' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
                       transition: 'all 0.15s ease',
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    <span>🎻 Akustik</span>
+                    <Music size={13} />
+                    <span>Akustik</span>
                   </button>
 
                   {/* Option 2: Grand Piano */}
@@ -9229,26 +9186,27 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     type="button"
                     onClick={() => setSelectedProfile('grand_piano')}
                     style={{
-                      padding: '7px 6px',
+                      padding: '8px 6px',
                       borderRadius: '10px',
                       border: 'none',
                       background: selectedProfile === 'grand_piano' 
-                        ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)' 
+                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
                         : 'transparent',
                       color: selectedProfile === 'grand_piano' ? '#ffffff' : colors.textSecondary,
-                      fontSize: '0.70rem',
+                      fontSize: '0.72rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '4px',
-                      boxShadow: selectedProfile === 'grand_piano' ? '0 2px 8px rgba(14, 165, 233, 0.3)' : 'none',
+                      gap: '5px',
+                      boxShadow: selectedProfile === 'grand_piano' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
                       transition: 'all 0.15s ease',
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    <span>🎹 Klavier</span>
+                    <Layers size={13} />
+                    <span>Klavier</span>
                   </button>
 
                   {/* Option 3: Brass & Vocals */}
@@ -9256,26 +9214,27 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     type="button"
                     onClick={() => setSelectedProfile('brass_vocals')}
                     style={{
-                      padding: '7px 6px',
+                      padding: '8px 6px',
                       borderRadius: '10px',
                       border: 'none',
                       background: selectedProfile === 'brass_vocals' 
-                        ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' 
+                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
                         : 'transparent',
                       color: selectedProfile === 'brass_vocals' ? '#ffffff' : colors.textSecondary,
-                      fontSize: '0.70rem',
+                      fontSize: '0.72rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '4px',
-                      boxShadow: selectedProfile === 'brass_vocals' ? '0 2px 8px rgba(139, 92, 246, 0.3)' : 'none',
+                      gap: '5px',
+                      boxShadow: selectedProfile === 'brass_vocals' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
                       transition: 'all 0.15s ease',
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    <span>🎷 Gesang/Bläser</span>
+                    <Zap size={13} />
+                    <span>Gesang / Bläser</span>
                   </button>
 
                   {/* Option 4: Drums */}
@@ -9283,76 +9242,77 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     type="button"
                     onClick={() => setSelectedProfile('drums_percussion')}
                     style={{
-                      padding: '7px 6px',
+                      padding: '8px 6px',
                       borderRadius: '10px',
                       border: 'none',
                       background: selectedProfile === 'drums_percussion' 
-                        ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
                         : 'transparent',
                       color: selectedProfile === 'drums_percussion' ? '#ffffff' : colors.textSecondary,
-                      fontSize: '0.70rem',
+                      fontSize: '0.72rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '4px',
-                      boxShadow: selectedProfile === 'drums_percussion' ? '0 2px 8px rgba(245, 158, 11, 0.3)' : 'none',
+                      gap: '5px',
+                      boxShadow: selectedProfile === 'drums_percussion' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
                       transition: 'all 0.15s ease',
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    <span>🥁 Drums (-12dB)</span>
+                    <Volume2 size={13} />
+                    <span>Drums</span>
                   </button>
                 </div>
 
                 {selectedProfile === 'drums_percussion' && (
                   <div style={{
-                    background: isLight ? '#fffbeb' : 'rgba(245, 158, 11, 0.12)',
-                    border: `1px solid ${isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.3)'}`,
+                    background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.10)',
+                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)'}`,
                     borderRadius: '12px',
                     padding: '8px 12px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px'
                   }}>
-                    <Volume2 size={15} color="#f59e0b" style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.72rem', color: isLight ? '#92400e' : '#fde68a', fontWeight: 600, lineHeight: 1.35 }}>
-                      <b>Drum-Pad aktiv:</b> -12 dB Headroom-Schutz & Kick-Tiefbass (35 Hz). <i>Tipp: Smartphone 1,5 bis 2 Meter vor das Kit stellen.</i>
+                    <Volume2 size={14} color="#10b981" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.72rem', color: isLight ? '#166534' : '#a7f3d0', fontWeight: 600, lineHeight: 1.35 }}>
+                      <b>Schlagzeug-Modus:</b> Headroom-Schutz & Kick-Tiefbass aktiv. (Empfehlung: Smartphone 1,5 bis 2 Meter vor das Drumkit stellen).
                     </span>
                   </div>
                 )}
 
                 {selectedProfile === 'grand_piano' && (
                   <div style={{
-                    background: isLight ? '#f0f9ff' : 'rgba(14, 165, 233, 0.12)',
-                    border: `1px solid ${isLight ? '#bae6fd' : 'rgba(14, 165, 233, 0.3)'}`,
+                    background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.10)',
+                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)'}`,
                     borderRadius: '12px',
                     padding: '8px 12px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px'
                   }}>
-                    <Music size={15} color="#0ea5e9" style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.72rem', color: isLight ? '#0369a1' : '#bae6fd', fontWeight: 600, lineHeight: 1.35 }}>
-                      <b>Flügel-Modus:</b> 118% M/S Stereo-Breite & selektive 220 Hz Entdröhnung für warme, offene Klavierklänge.
+                    <Music size={14} color="#10b981" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.72rem', color: isLight ? '#166534' : '#a7f3d0', fontWeight: 600, lineHeight: 1.35 }}>
+                      <b>Flügel-Modus:</b> Warme Stereobreite und transparente Bass-Entzerrung für Klavieraufnahmen.
                     </span>
                   </div>
                 )}
 
                 {selectedProfile === 'brass_vocals' && (
                   <div style={{
-                    background: isLight ? '#faf5ff' : 'rgba(139, 92, 246, 0.12)',
-                    border: `1px solid ${isLight ? '#e9d5ff' : 'rgba(139, 92, 246, 0.3)'}`,
+                    background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.10)',
+                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)'}`,
                     borderRadius: '12px',
                     padding: '8px 12px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px'
                   }}>
-                    <Zap size={15} color="#8b5cf6" style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.72rem', color: isLight ? '#6b21a8' : '#e9d5ff', fontWeight: 600, lineHeight: 1.35 }}>
-                      <b>Präsenz & De-Harsh:</b> +1.4 dB Stimmpräsenz bei 3.2 kHz & aktiver 6.8 kHz Zischlaut-Schutz.
+                    <Zap size={14} color="#10b981" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.72rem', color: isLight ? '#166534' : '#a7f3d0', fontWeight: 600, lineHeight: 1.35 }}>
+                      <b>Präsenz-Modus:</b> Klare Stimm- und Bläserpräsenz mit aktivem Zischlaut-Schutz.
                     </span>
                   </div>
                 )}
@@ -9453,7 +9413,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     🎛️ Studio Audio-Processing...
                   </span>
                   <span style={{ fontSize: '0.78rem', color: colors.textSecondary, marginTop: '4px', display: 'block' }}>
-                    Erzeuge <b>Studio Audio-Processing</b> & <b>Pure RAW</b> mit exaktem <b>-14.0 LUFS Pegelabgleich</b>
+                    Erzeuge <b>Studio Audio-Processing</b> (-14.0 LUFS) & <b>Pure RAW</b> (-14.5 LUFS)
                   </span>
                 </div>
               </div>
@@ -9465,7 +9425,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     🎵 Aufnahme fertig! Welche Version möchtest du speichern?
                   </span>
                   <span style={{ fontSize: '0.76rem', color: colors.textSecondary, marginTop: '2px', display: 'block', lineHeight: 1.35 }}>
-                    Beide Spuren haben <b>exakt dieselbe Lautheit (-14.0 LUFS)</b>. Du kannst beide vorhören und deine Standard-Version wählen (jederzeit im Player umschaltbar).
+                    Studio Master (<b>-14.0 LUFS</b>) & Pure RAW (<b>-14.5 LUFS</b>). Du kannst beide im direkten A/B-Vergleich vorhören und deine Standard-Version wählen (jederzeit im Player umschaltbar).
                   </span>
                 </div>
 
@@ -9519,7 +9479,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                         )}
                       </div>
                       <div style={{ fontSize: '0.86rem', fontWeight: 900, color: colors.textPrimary }}>
-                        Studio Audio-Processing (-14 LUFS)
+                        Studio Audio-Processing (-14.0 LUFS)
                       </div>
                       <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.3 }}>
                         Festlicher Gala-Konzertsaal-Klang mit edler 3D-Konzertakustik.
@@ -9583,7 +9543,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                         )}
                       </div>
                       <div style={{ fontSize: '0.86rem', fontWeight: 900, color: colors.textPrimary }}>
-                        Originalklang (-14 LUFS)
+                        Originalklang (-14.5 LUFS)
                       </div>
                       <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.3 }}>
                         Unbearbeitete Originalaufnahme mit pegelangepasster Lautheit.
@@ -9857,19 +9817,19 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               <>
                 {/* Content: Live Mic Recording */}
                 {uploadMode === 'mic' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '16px 0' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '12px 0' }}>
 
                     {countDown !== null ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                         <div style={{
-                          width: '90px',
-                          height: '90px',
+                          width: '92px',
+                          height: '92px',
                           borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 0 30px rgba(245, 158, 11, 0.6)',
+                          boxShadow: '0 0 30px rgba(16, 185, 129, 0.5)',
                           animation: 'countInPulse 1s ease-in-out infinite'
                         }}>
                           <span style={{ fontSize: '2.8rem', fontWeight: 900, color: 'white' }}>
@@ -9877,7 +9837,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                           </span>
                         </div>
                         <div style={{ textAlign: 'center' }}>
-                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#f59e0b' }}>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981' }}>
                             Hände ans Instrument!
                           </span>
                           <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: colors.textSecondary }}>
@@ -9887,35 +9847,52 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       </div>
                     ) : (
                       <>
-                        <div style={{
-                          width: '84px',
-                          height: '84px',
-                          borderRadius: '50%',
-                          background: recordingMilestoneId ? 'rgba(239, 68, 68, 0.2)' : (isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.18)'),
-                          border: `2.5px solid ${recordingMilestoneId ? '#ef4444' : '#10b981'}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          animation: recordingMilestoneId ? 'pulse 1.5s infinite' : 'none'
-                        }}>
-                          {recordingMilestoneId ? <Mic size={38} color="#ef4444" /> : <Mic size={38} color="#10b981" />}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={recordingMilestoneId ? () => stopRecording(false) : triggerRecordingCountIn}
+                          style={{
+                            width: '90px',
+                            height: '90px',
+                            borderRadius: '50%',
+                            background: recordingMilestoneId 
+                              ? 'rgba(239, 68, 68, 0.18)' 
+                              : (isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.18)'),
+                            border: `3px solid ${recordingMilestoneId ? '#ef4444' : '#10b981'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            boxShadow: recordingMilestoneId 
+                              ? '0 0 24px rgba(239, 68, 68, 0.4)' 
+                              : '0 6px 20px rgba(16, 185, 129, 0.25)',
+                            animation: recordingMilestoneId ? 'pulse 1.5s infinite' : 'none',
+                            transition: 'all 0.18s ease'
+                          }}
+                          className="hover-scale"
+                          title={recordingMilestoneId ? 'Klicken zum Beenden' : 'Klicken zum Starten'}
+                        >
+                          {recordingMilestoneId ? (
+                            <Square size={34} fill="#ef4444" color="#ef4444" />
+                          ) : (
+                            <Mic size={40} color="#10b981" />
+                          )}
+                        </button>
 
                         <div style={{ textAlign: 'center', width: '100%' }}>
                           <span style={{ 
-                            fontSize: '1.4rem', 
+                            fontSize: '1.35rem', 
                             fontWeight: 900, 
                             color: recordingMilestoneId ? (recordSeconds >= 390 ? '#f59e0b' : '#ef4444') : colors.textPrimary,
                             display: 'block'
                           }}>
                             {recordingMilestoneId ? `${formatSeconds(recordSeconds)} / 7:00 Min.` : 'Bereit zur Aufnahme'}
                           </span>
-                          <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: (recordingMilestoneId && recordSeconds >= 390) ? '#f59e0b' : colors.textSecondary, fontWeight: 600 }}>
+                          <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: (recordingMilestoneId && recordSeconds >= 390) ? '#f59e0b' : colors.textSecondary, fontWeight: 600 }}>
                             {recordingMilestoneId 
                               ? (recordSeconds >= 390 
-                                  ? `⏳ Noch ${420 - recordSeconds}s bis zum automatischen Speichern (7:00 Min. Limit)...` 
+                                  ? `⏳ Noch ${420 - recordSeconds}s bis zum automatischen Speichern...` 
                                   : 'Aufnahme läuft... Spiele deinen Song!') 
-                              : 'Klicke auf den Button, um das 3-Sekunden-Einzählen zu starten.'}
+                              : 'Klicke auf das Mikrofon oder den Button für 3s Einzählen.'}
                           </p>
                         </div>
 
@@ -9924,21 +9901,22 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                             type="button"
                             onClick={() => stopRecording(false)}
                             style={{
-                              padding: '12px 28px',
+                              padding: '11px 26px',
                               borderRadius: '100px',
                               border: 'none',
                               background: '#ef4444',
                               color: 'white',
                               fontWeight: 900,
-                              fontSize: '0.86rem',
+                              fontSize: '0.84rem',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               gap: '8px',
                               boxShadow: '0 4px 16px rgba(239, 68, 68, 0.4)'
                             }}
+                            className="hover-scale"
                           >
-                            <Square size={16} fill="#fff" />
+                            <Square size={15} fill="#fff" />
                             <span>Aufnahme beenden & mastern</span>
                           </button>
                         ) : (
@@ -9946,22 +9924,22 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                             type="button"
                             onClick={triggerRecordingCountIn}
                             style={{
-                              padding: '12px 28px',
+                              padding: '11px 26px',
                               borderRadius: '100px',
                               border: 'none',
                               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                               color: 'white',
                               fontWeight: 900,
-                              fontSize: '0.86rem',
+                              fontSize: '0.84rem',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               gap: '8px',
-                              boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)'
+                              boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)'
                             }}
                             className="hover-scale"
                           >
-                            <Mic size={16} />
+                            <Mic size={15} />
                             <span>Aufnahme starten (3s Vorlauf)</span>
                           </button>
                         )}
@@ -10026,19 +10004,20 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   </div>
                 )}
 
-                {/* Mastering DSP Info Banner */}
+                {/* Streamlined Mastering DSP Info Badge */}
                 <div style={{
-                  background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.12)',
-                  border: `1px solid ${isLight ? '#86efac' : 'rgba(16, 185, 129, 0.3)'}`,
+                  background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.08)',
+                  border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.2)'}`,
                   borderRadius: '12px',
-                  padding: '10px 14px',
+                  padding: '8px 12px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px'
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}>
-                  <SlidersHorizontal size={16} color="#10b981" />
-                  <span style={{ fontSize: '0.74rem', color: isLight ? '#166534' : '#a7f3d0', fontWeight: 700 }}>
-                    Automatischer -14.0 LUFS Pegelabgleich für Studio Audio-Processing & Pure RAW.
+                  <SlidersHorizontal size={14} color="#10b981" />
+                  <span style={{ fontSize: '0.72rem', color: isLight ? '#166534' : '#a7f3d0', fontWeight: 700 }}>
+                    Automatisches Studio-Mastering & Lautheits-Abgleich aktiv
                   </span>
                 </div>
               </>
@@ -10595,7 +10574,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             </div>
 
             <p style={{ margin: 0, fontSize: '0.8rem', color: colors.textSecondary, lineHeight: 1.4 }}>
-              Wähle dein bevorzugtes Format. Beide Spuren sind in verlustfreier Studioqualität (WAV) und auf <b>-14.0 LUFS pegelangeglichen</b>.
+              Wähle dein bevorzugtes Format. Beide Spuren sind in verlustfreier Studioqualität (WAV) nach <b>EBU R128 (-14.0 / -14.5 LUFS)</b> pegelangeglichen.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -10749,23 +10728,23 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '12px',
-                  background: isLight ? '#e0f2fe' : 'rgba(14, 165, 233, 0.2)',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.2)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#0284c7'
+                  color: '#10b981'
                 }}>
-                  <SlidersHorizontal size={20} />
+                  <SlidersHorizontal size={18} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.14rem', fontWeight: 900 }}>
+                  <h3 style={{ margin: 0, fontSize: '1.10rem', fontWeight: 900 }}>
                     Song bearbeiten & Raumklang
                   </h3>
-                  <span style={{ fontSize: '0.76rem', color: colors.textSecondary, fontWeight: 600 }}>
-                    Standard-Version festlegen & Gala-Konzertsaal Hall verfeinern
+                  <span style={{ fontSize: '0.74rem', color: colors.textSecondary, fontWeight: 600 }}>
+                    Standard-Version & Raumakustik anpassen
                   </span>
                 </div>
               </div>
@@ -10814,10 +10793,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       )}
                     </div>
                     <div style={{ fontSize: '0.82rem', fontWeight: 900, color: colors.textPrimary }}>
-                      Studio Audio-Processing
+                      Studio-Klang
                     </div>
                     <p style={{ margin: '3px 0 0 0', fontSize: '0.70rem', color: colors.textSecondary, lineHeight: 1.25 }}>
-                      Gala-Konzertsaal Raumklang & Druck (-14 LUFS).
+                      Voller Konzertsaal-Raumklang & Mastering.
                     </p>
                   </div>
 
@@ -10843,7 +10822,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     }}
                   >
                     {editModalPreviewPlaying === 'master' ? <Pause size={12} /> : <Play size={12} />}
-                    <span>{editModalPreviewPlaying === 'master' ? '🔁 Loop stoppen' : '▶️ Studio vorhören (Loop)'}</span>
+                    <span>{editModalPreviewPlaying === 'master' ? 'Loop stoppen' : 'Studio vorhören'}</span>
                   </button>
                 </div>
 
@@ -10877,10 +10856,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       )}
                     </div>
                     <div style={{ fontSize: '0.82rem', fontWeight: 900, color: colors.textPrimary }}>
-                      Originalklang
+                      Originalaufnahme
                     </div>
                     <p style={{ margin: '3px 0 0 0', fontSize: '0.70rem', color: colors.textSecondary, lineHeight: 1.25 }}>
-                      100% unverfälschte Mikrofon-Aufnahme (-14 LUFS).
+                      Unverfälschter Original-Mikrofonklang.
                     </p>
                   </div>
 
@@ -10906,13 +10885,13 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     }}
                   >
                     {editModalPreviewPlaying === 'raw' ? <Pause size={12} /> : <Play size={12} />}
-                    <span>{editModalPreviewPlaying === 'raw' ? '🔁 Loop stoppen' : '▶️ RAW vorhören (Loop)'}</span>
+                    <span>{editModalPreviewPlaying === 'raw' ? 'Loop stoppen' : 'RAW vorhören'}</span>
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* 🏛️ Apple-Style Spatial Audio Raumakustik (4 Presets + Fein-Tuning Slider) */}
+            {/* Apple-Style Spatial Audio Raumakustik (3 Monochrome Presets + Feintuning) */}
             <div style={{
               background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)',
               borderRadius: '18px',
@@ -10924,12 +10903,13 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Landmark size={16} color="#10b981" />
                   <span style={{ fontSize: '0.82rem', fontWeight: 900, color: colors.textPrimary, letterSpacing: '-0.01em' }}>
-                    🏛️ Raumgröße & Hall
+                    Raumgröße & Hall
                   </span>
                   {isRemasteringEditTrack && (
                     <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 800, animation: 'pulse 1s infinite' }}>
-                      ⏳ Vorschau wird berechnet...
+                      ⏳ Berechne...
                     </span>
                   )}
                 </div>
@@ -10942,21 +10922,26 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   padding: '2px 9px',
                   borderRadius: '100px'
                 }}>
-                  {ROOM_ACOUSTIC_PROFILES[editingTrackData.reverbRoomType]?.emoji || '🏛️'} {ROOM_ACOUSTIC_PROFILES[editingTrackData.reverbRoomType]?.name || 'Mittel'} ({ROOM_ACOUSTIC_PROFILES[editingTrackData.reverbRoomType]?.sub || 'Konzertsaal'}) • {editingTrackData.reverbWetMix}% Wet
+                  {ROOM_ACOUSTIC_PROFILES[editingTrackData.reverbRoomType]?.name || 'Mittel'} ({ROOM_ACOUSTIC_PROFILES[editingTrackData.reverbRoomType]?.sub || 'Konzertsaal'}) • {editingTrackData.reverbWetMix}% Wet
                 </span>
               </div>
 
-              {/* 3 Child-Friendly Room Size Preset Buttons */}
+              {/* 3 Child-Friendly Room Size Preset Buttons with Monochrome Icons */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                {[ROOM_ACOUSTIC_PROFILES.small, ROOM_ACOUSTIC_PROFILES.medium, ROOM_ACOUSTIC_PROFILES.large].map(room => {
+                {[
+                  { ...ROOM_ACOUSTIC_PROFILES.small, Icon: Home },
+                  { ...ROOM_ACOUSTIC_PROFILES.medium, Icon: Landmark },
+                  { ...ROOM_ACOUSTIC_PROFILES.large, Icon: Maximize2 }
+                ].map(room => {
                   const isActive = editingTrackData.reverbRoomType === room.id || (room.id === 'medium' && (editingTrackData.reverbRoomType === 'hall' || editingTrackData.reverbRoomType === 'chamber')) || (room.id === 'small' && editingTrackData.reverbRoomType === 'studio') || (room.id === 'large' && editingTrackData.reverbRoomType === 'cathedral');
+                  const RoomIcon = room.Icon;
                   return (
                     <button
                       key={room.id}
                       type="button"
                       onClick={() => handleEditRoomTypeChange(room.id as any)}
                       style={{
-                        padding: '12px 6px',
+                        padding: '10px 6px',
                         borderRadius: '14px',
                         border: isActive 
                           ? '2px solid #10b981' 
@@ -10970,12 +10955,12 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '4px',
+                        gap: '5px',
                         transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                       }}
                       className="hover-scale"
                     >
-                      <span style={{ fontSize: '1.35rem', lineHeight: 1 }}>{room.emoji}</span>
+                      <RoomIcon size={20} color={isActive ? '#10b981' : colors.textSecondary} />
                       <span style={{
                         fontSize: '0.80rem',
                         fontWeight: 900,
@@ -10999,8 +10984,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               {/* Apple Fine-Tuning Slider Bar */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '2px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: colors.textSecondary, fontWeight: 700 }}>
-                  <span>Feinabstimmung (Raumtiefe & Wet/Dry Mix):</span>
-                  <span style={{ color: '#10b981', fontWeight: 900 }}>{editingTrackData.reverbWetMix}% Wet</span>
+                  <span>Feinabstimmung (Raumtiefe):</span>
+                  <span style={{ color: '#10b981', fontWeight: 900 }}>{editingTrackData.reverbWetMix}%</span>
                 </div>
                 <input
                   type="range"
