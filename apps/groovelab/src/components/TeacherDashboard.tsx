@@ -3080,7 +3080,7 @@ export function TeacherDashboard({
     const uniqueSlotsMap = new Map<string, any[]>();
     briefingData.timeline.forEach((s: any) => {
       if (
-        (s.student || s.students) &&
+        (s.student || (s.students && s.students.length > 0) || s.isGroup) &&
         !s.is_room_booking &&
         !s.isRoomBooking &&
         s.status !== 'canceled_by_student' &&
@@ -3122,7 +3122,7 @@ export function TeacherDashboard({
   const avgStreak = useMemo(() => {
     if (!briefingData?.timeline) return '0.0';
     const activeTimelineStudents = briefingData.timeline.filter((s: any) => 
-      (s.student || s.students) && 
+      (s.student || (s.students && s.students.length > 0) || s.isGroup) && 
       !s.is_room_booking &&
       !s.isRoomBooking &&
       s.status !== 'canceled_by_student' && 
@@ -3143,7 +3143,7 @@ export function TeacherDashboard({
     let totalMins = 0;
     briefingData.timeline.forEach((s: any) => {
       if (
-        (s.student || s.students) &&
+        (s.student || (s.students && s.students.length > 0) || s.isGroup) &&
         !s.is_room_booking &&
         !s.isRoomBooking &&
         s.status !== 'canceled_by_student' &&
@@ -4156,340 +4156,362 @@ export function TeacherDashboard({
       if (!userId) return;
       const simNow = getSimulatedNow();
       const simDateStr = simNow.toLocaleDateString('sv-SE');
-      try {
-        setBriefingLoading(true);
-        const resp = await fetch(`/api/briefing/teacher?userId=${userId}&date=${simDateStr}`);
-        if (resp.ok && resp.headers.get('content-type')?.includes('application/json')) {
-          const data = await resp.json();
-          if (data && data.success) {
-            setRawBriefingData(data);
-            return;
-          }
-        }
-        throw new Error('API offline');
-      } catch (e) {
-        try {
-          const isGhostMode = userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
-          const ghostSchoolId = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_id') || teacher?.school_id) : null;
-          
-          let teacherProfile: any = null;
-          let targetTeacherId = userId;
+      setBriefingLoading(true);
 
-          if (isGhostMode && ghostSchoolId) {
-            let effectiveTeacherId = sessionStorage.getItem('groovelab_ghost_shadowed_teacher_id');
-            if (effectiveTeacherId) {
-              const { data: tp } = await supabase
-                .from('users')
-                .select('id, school_id, instrument, schools(allow_messages_global)')
-                .eq('id', effectiveTeacherId)
-                .maybeSingle();
-              teacherProfile = tp;
-            }
-            if (!teacherProfile) {
-              const { data: tp } = await supabase
-                .from('users')
-                .select('id, school_id, instrument, schools(allow_messages_global)')
-                .eq('school_id', ghostSchoolId)
-                .eq('role', 'teacher')
-                .limit(1)
-                .maybeSingle();
-              teacherProfile = tp;
-              if (teacherProfile?.id) {
-                sessionStorage.setItem('groovelab_ghost_shadowed_teacher_id', teacherProfile.id);
-                effectiveTeacherId = teacherProfile.id;
-              }
-            }
-            if (teacherProfile?.id) {
-              targetTeacherId = teacherProfile.id;
-            } else {
-              const { data: ghostSchool } = await supabase.from('schools').select('*').eq('id', ghostSchoolId).maybeSingle();
-              teacherProfile = {
-                id: 'master-support-id',
-                school_id: ghostSchoolId,
-                instrument: 'Lehrkraft',
-                schools: ghostSchool || { allow_messages_global: true }
-              };
-              targetTeacherId = 'master-support-id';
-            }
-          } else {
+      try {
+        const isGhostMode = userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
+        const ghostSchoolId = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_id') || teacher?.school_id) : null;
+        
+        let teacherProfile: any = null;
+        let targetTeacherId = userId;
+
+        if (isGhostMode && ghostSchoolId) {
+          let effectiveTeacherId = sessionStorage.getItem('groovelab_ghost_shadowed_teacher_id');
+          if (effectiveTeacherId) {
             const { data: tp } = await supabase
               .from('users')
               .select('id, school_id, instrument, schools(allow_messages_global)')
-              .eq('id', userId)
+              .eq('id', effectiveTeacherId)
               .maybeSingle();
             teacherProfile = tp;
           }
-
           if (!teacherProfile) {
-            setRawBriefingData({
-              success: true,
-              allowMessagesGlobal: true,
-              todayWeekday: (simNow.getDay() === 0 ? 7 : simNow.getDay()),
-              timeline: [],
-              prepMirror: null,
-              rescheduledReminders: []
-            });
-            return;
+            const { data: tp } = await supabase
+              .from('users')
+              .select('id, school_id, instrument, schools(allow_messages_global)')
+              .eq('school_id', ghostSchoolId)
+              .eq('role', 'teacher')
+              .limit(1)
+              .maybeSingle();
+            teacherProfile = tp;
+            if (teacherProfile?.id) {
+              sessionStorage.setItem('groovelab_ghost_shadowed_teacher_id', teacherProfile.id);
+              effectiveTeacherId = teacherProfile.id;
+            }
+          }
+          if (teacherProfile?.id) {
+            targetTeacherId = teacherProfile.id;
+          } else {
+            const { data: ghostSchool } = await supabase.from('schools').select('*').eq('id', ghostSchoolId).maybeSingle();
+            teacherProfile = {
+              id: 'master-support-id',
+              school_id: ghostSchoolId,
+              instrument: 'Lehrkraft',
+              schools: ghostSchool || { allow_messages_global: true }
+            };
+            targetTeacherId = 'master-support-id';
+          }
+        } else if (teacher?.school_id && teacher?.id === userId) {
+          // Instant reuse of loaded teacher profile from props
+          teacherProfile = teacher;
+        } else {
+          const { data: tp } = await supabase
+            .from('users')
+            .select('id, school_id, instrument, schools(allow_messages_global)')
+            .eq('id', userId)
+            .maybeSingle();
+          teacherProfile = tp;
+        }
+
+        if (!teacherProfile || !teacherProfile.school_id) {
+          setRawBriefingData({
+            success: true,
+            allowMessagesGlobal: true,
+            todayWeekday: (simNow.getDay() === 0 ? 7 : simNow.getDay()),
+            timeline: [],
+            prepMirror: null,
+            rescheduledReminders: []
+          });
+          return;
+        }
+
+        const schoolData = Array.isArray(teacherProfile.schools) ? teacherProfile.schools[0] : teacherProfile.schools;
+        const allowMessages = schoolData?.allow_messages_global ?? true;
+
+        const rawDay = simNow.getDay();
+        const todayWeekday = rawDay === 0 ? 7 : rawDay;
+
+        const dayNamesMap: Record<number, string> = { 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday' };
+        const dayNameStr = dayNamesMap[todayWeekday] || 'Monday';
+        const todayStr = simDateStr;
+
+        // ─── HIGH-SPEED PARALLEL BATCH QUERY (Single network round-trip) ───
+        let schedQuery = supabase
+          .from('schedules')
+          .select(`
+            id,
+            teacher_id,
+            time_slot,
+            duration,
+            status,
+            day_of_week,
+            instrument,
+            rooms (id, name),
+            student:users!schedules_student_id_fkey (
+              id,
+              first_name,
+              last_name,
+              is_app_user,
+              instrument,
+              birth_date,
+              avatars (avatar_style, evolution_level, xp, streak_flame)
+            )
+          `)
+          .eq('school_id', teacherProfile.school_id)
+          .in('status', ['opened', 'approved', 'published']);
+
+        if (targetTeacherId && targetTeacherId !== 'master-support-id') {
+          schedQuery = schedQuery.eq('teacher_id', targetTeacherId);
+        }
+
+        let occQuery = supabase
+          .from('schedule_occurrences')
+          .select(`
+            id,
+            teacher_id,
+            date,
+            original_date,
+            start_time,
+            status,
+            schedule_id,
+            student_id,
+            student_acknowledged,
+            room_id,
+            schedules (
+              duration,
+              instrument,
+              rooms (id, name)
+            ),
+            student:users!schedule_occurrences_student_id_fkey (
+              id,
+              first_name,
+              last_name,
+              is_app_user,
+              instrument,
+              birth_date,
+              avatars (avatar_style, evolution_level, xp, streak_flame)
+            )
+          `)
+          .eq('school_id', teacherProfile.school_id)
+          .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
+
+        if (targetTeacherId && targetTeacherId !== 'master-support-id') {
+          occQuery = occQuery.eq('teacher_id', targetTeacherId);
+        }
+
+        const [roomsRes, tUserRes, schoolStudentsRes, schedRes, occRes] = await Promise.all([
+          supabase.from('rooms').select('id, name').eq('school_id', teacherProfile.school_id),
+          targetTeacherId !== 'master-support-id' 
+            ? supabase.from('users').select('planned_boards').eq('id', targetTeacherId).maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
+          supabase.from('users').select('id, first_name, last_name, instrument, is_app_user, birth_date, avatars(avatar_style, evolution_level, xp, streak_flame)').eq('school_id', teacherProfile.school_id),
+          schedQuery,
+          occQuery
+        ]);
+
+        const allRooms = roomsRes.data || rooms || [];
+        const schoolStudents = schoolStudentsRes.data || [];
+        const allTeacherSlots = schedRes.data || [];
+        const dbOccurrences = occRes.data || [];
+
+        const slots: any[] = [];
+
+        // 1. Primary Master Blueprint: Load teacher planned_boards (matching ScheduleBoardDesktop.tsx)
+        try {
+          let loadedDrafts: any[] = [];
+          let loadedActiveDraftId = 'default';
+          let loadedSubmittedDraftId = '';
+
+          const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${targetTeacherId}`) || localStorage.getItem(`groovelab_teacher_draft_state_campus_${targetTeacherId}`);
+          const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${targetTeacherId}`) || localStorage.getItem(`groovelab_teacher_boards_${targetTeacherId}`);
+
+          if (storedDraftState) {
+            try {
+              const parsed = JSON.parse(storedDraftState);
+              if (parsed && parsed.drafts) {
+                loadedDrafts = parsed.drafts;
+                loadedActiveDraftId = parsed.activeDraftId || 'default';
+                loadedSubmittedDraftId = parsed.submittedDraftId || '';
+              }
+            } catch (e) {}
           }
 
-          const schoolData = Array.isArray(teacherProfile.schools) ? teacherProfile.schools[0] : teacherProfile.schools;
-          const allowMessages = schoolData?.allow_messages_global ?? true;
+          if (loadedDrafts.length === 0 && storedBoardsState) {
+            try {
+              const parsed = JSON.parse(storedBoardsState);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: parsed }];
+              }
+            } catch (e) {}
+          }
 
-          const rawDay = simNow.getDay();
-          const todayWeekday = rawDay === 0 ? 7 : rawDay;
+          if (loadedDrafts.length === 0 && tUserRes.data?.planned_boards) {
+            const pb = typeof tUserRes.data.planned_boards === 'string' ? JSON.parse(tUserRes.data.planned_boards) : tUserRes.data.planned_boards;
+            if (pb && typeof pb === 'object' && !Array.isArray(pb) && Array.isArray(pb.drafts)) {
+              loadedDrafts = pb.drafts;
+              loadedActiveDraftId = pb.activeDraftId || 'default';
+              loadedSubmittedDraftId = pb.submittedDraftId || '';
+            } else if (Array.isArray(pb)) {
+              loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: pb }];
+            } else if (pb && typeof pb === 'object') {
+              loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: Object.values(pb) }];
+            }
+          }
 
-           const dayNamesMap: Record<number, string> = { 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday' };
-           const dayNameStr = dayNamesMap[todayWeekday] || 'Monday';
+          const activeDraft = loadedDrafts.find((d: any) => d.id === loadedSubmittedDraftId) || 
+                              loadedDrafts.find((d: any) => d.id === loadedActiveDraftId) || 
+                              loadedDrafts[0];
+          const boards: any[] = activeDraft ? activeDraft.boards : [];
 
-           const { data: dbRooms } = await supabase
-             .from('rooms')
-             .select('id, name')
-             .eq('school_id', teacherProfile.school_id);
-           const allRooms = dbRooms || rooms || [];
+          const todayBoards = boards.filter((b: any) => {
+            const dayVal = b.dayOfWeek ?? b.day_of_week ?? b.day;
+            if (dayVal === undefined || dayVal === null) return false;
+            const dStr = String(dayVal).trim();
+            return dStr === String(todayWeekday);
+          });
 
-           const slots: any[] = [];
-           const todayStr = simDateStr;
+          if (todayBoards.length > 0) {
+            for (const todayBoard of todayBoards) {
+              if (todayBoard && Array.isArray(todayBoard.students)) {
+                const boardRoomName = allRooms.find((r: any) => String(r.id) === String(todayBoard.roomId))?.name || todayBoard.roomName || 'Raum 4';
+                const boardStartStr = todayBoard.startTime || '14:00';
+                const [bSh, bSm] = boardStartStr.split(':').map(Number);
+                let currentCumulativeMin = (bSh || 14) * 60 + (bSm || 0);
 
-           // 1. Primary Master Blueprint: Load teacher planned_boards (matching ScheduleBoardDesktop.tsx)
-           try {
-             let loadedDrafts: any[] = [];
-             let loadedActiveDraftId = 'default';
-             let loadedSubmittedDraftId = '';
+                todayBoard.students.forEach((s: any) => {
+                  if (s.isBreak || (!s.first_name && !s.name && !s.isGroup && (!s.groupStudents || s.groupStudents.length === 0))) {
+                    if (s.isBreak) {
+                      currentCumulativeMin += (s.duration || 15);
+                    }
+                    return;
+                  }
 
-             const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${targetTeacherId}`) || localStorage.getItem(`groovelab_teacher_draft_state_campus_${targetTeacherId}`);
-             const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${targetTeacherId}`) || localStorage.getItem(`groovelab_teacher_boards_${targetTeacherId}`);
+                  const rawName = String(s.name || s.first_name || '').trim();
+                  const isGroup = Boolean(
+                    s.isGroup || 
+                    (s.groupStudents && s.groupStudents.length > 1) || 
+                    (s.id && String(s.id).startsWith('group-')) ||
+                    rawName.includes('&') || 
+                    rawName.includes(',') || 
+                    /\bund\b/i.test(rawName)
+                  );
 
-             if (storedDraftState) {
-               try {
-                 const parsed = JSON.parse(storedDraftState);
-                 if (parsed && parsed.drafts) {
-                   loadedDrafts = parsed.drafts;
-                   loadedActiveDraftId = parsed.activeDraftId || 'default';
-                   loadedSubmittedDraftId = parsed.submittedDraftId || '';
-                 }
-               } catch (e) {}
-             }
+                  const groupStudents = s.groupStudents || [];
+                  const subStudents = splitAndNormalizeStudents(
+                    groupStudents.length > 0 ? groupStudents : [s], 
+                    schoolStudents
+                  );
 
-             if (loadedDrafts.length === 0 && storedBoardsState) {
-               try {
-                 const parsed = JSON.parse(storedBoardsState);
-                 if (Array.isArray(parsed) && parsed.length > 0) {
-                   loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: parsed }];
-                 }
-               } catch (e) {}
-             }
+                  const sFn = (s.first_name || s.name?.split(' ')[0] || '').trim().toLowerCase();
+                  const sLn = (s.last_name || s.name?.split(' ').slice(1).join(' ') || '').trim().toLowerCase();
 
-             if (loadedDrafts.length === 0 && targetTeacherId !== 'master-support-id') {
-               const { data: tUser } = await supabase
-                 .from('users')
-                 .select('planned_boards')
-                 .eq('id', targetTeacherId)
-                 .single();
+                  const matchedStudent = (schoolStudents || []).find((st: any) => 
+                    (s.id && st.id === s.id) || 
+                    (st.first_name?.trim().toLowerCase() === sFn && (!sLn || (st.last_name || '').trim().toLowerCase().startsWith(sLn[0])))
+                  );
 
-               if (tUser && tUser.planned_boards) {
-                 const pb = typeof tUser.planned_boards === 'string' ? JSON.parse(tUser.planned_boards) : tUser.planned_boards;
-                 if (pb && typeof pb === 'object' && !Array.isArray(pb) && Array.isArray(pb.drafts)) {
-                   loadedDrafts = pb.drafts;
-                   loadedActiveDraftId = pb.activeDraftId || 'default';
-                   loadedSubmittedDraftId = pb.submittedDraftId || '';
-                 } else if (Array.isArray(pb)) {
-                   loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: pb }];
-                 } else if (pb && typeof pb === 'object') {
-                   loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: Object.values(pb) }];
-                 }
-               }
-             }
+                  let studentTime = s.customStartTime || s.assignedTime || s.startTime;
+                  if (!studentTime) {
+                    const h = Math.floor(currentCumulativeMin / 60) % 24;
+                    const m = currentCumulativeMin % 60;
+                    studentTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                  }
+                  const studentDuration = s.duration || (matchedStudent as any)?.duration || 30;
+                  currentCumulativeMin += studentDuration;
 
-             const activeDraft = loadedDrafts.find((d: any) => d.id === loadedSubmittedDraftId) || 
-                                 loadedDrafts.find((d: any) => d.id === loadedActiveDraftId) || 
-                                 loadedDrafts[0];
-             const boards: any[] = activeDraft ? activeDraft.boards : [];
+                  const resolvedInstrument = resolveStudentInstrument(s.instrument, matchedStudent?.instrument || subStudents[0]?.instrument, teacherProfile?.instrument);
 
-             const todayBoards = boards.filter((b: any) => {
-               const dayVal = b.dayOfWeek ?? b.day_of_week ?? b.day;
-               if (dayVal === undefined || dayVal === null) return false;
-               const dStr = String(dayVal).trim();
-               return dStr === String(todayWeekday);
-             });
+                  const studentObj = matchedStudent ? {
+                    id: matchedStudent.id,
+                    name: `${matchedStudent.first_name} ${maskLastName(matchedStudent.last_name, showRealNames)}`.trim(),
+                    first_name: matchedStudent.first_name,
+                    last_name: matchedStudent.last_name,
+                    is_app_user: matchedStudent.is_app_user,
+                    instrument: resolvedInstrument,
+                    birth_date: matchedStudent.birth_date,
+                    avatars: matchedStudent.avatars
+                  } : (isGroup ? {
+                    id: s.id || `group-${studentTime}`,
+                    name: rawName || 'Gruppentermin',
+                    first_name: rawName || 'Gruppe',
+                    last_name: '',
+                    is_app_user: false,
+                    instrument: resolvedInstrument,
+                    birth_date: null,
+                    avatars: null
+                  } : (rawName ? {
+                    id: s.id || `student-${studentTime}`,
+                    name: rawName,
+                    first_name: rawName.split(' ')[0],
+                    last_name: rawName.split(' ').slice(1).join(' '),
+                    is_app_user: false,
+                    instrument: resolvedInstrument,
+                    birth_date: null,
+                    avatars: null
+                  } : null));
 
-             if (todayBoards.length > 0) {
-               const { data: schoolStudents } = await supabase
-                 .from('users')
-                 .select('id, first_name, last_name, instrument, is_app_user, birth_date, avatars(avatar_style, evolution_level, xp, streak_flame)')
-                 .eq('school_id', teacherProfile.school_id);
+                  slots.push({
+                    id: `board-${todayBoard.id}-${s.id || studentTime}`,
+                    scheduleId: s.id || `board-${todayBoard.id}-${studentTime}`,
+                    time_slot: studentTime,
+                    duration: studentDuration,
+                    status: 'approved',
+                    day_of_week: todayWeekday,
+                    instrument: resolvedInstrument,
+                    isGroup,
+                    groupStudents,
+                    students: subStudents.length > 0 ? subStudents : (studentObj ? [studentObj] : []),
+                    roomId: todayBoard.roomId || null,
+                    room: boardRoomName,
+                    rooms: { id: todayBoard.roomId || null, name: boardRoomName } as any,
+                    student: studentObj
+                  });
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse planned_boards for briefing fallback:', e);
+        }
 
-               for (const todayBoard of todayBoards) {
-                 if (todayBoard && Array.isArray(todayBoard.students)) {
-                   const boardRoomName = allRooms.find((r: any) => String(r.id) === String(todayBoard.roomId))?.name || todayBoard.roomName || 'Raum 4';
-                   const boardStartStr = todayBoard.startTime || '14:00';
-                   const [bSh, bSm] = boardStartStr.split(':').map(Number);
-                   let currentCumulativeMin = (bSh || 14) * 60 + (bSm || 0);
+        // 2. Secondary Fallback: Load from pre-fetched schedules table if no board slots
+        if (slots.length === 0) {
+          const dbSlots = (allTeacherSlots || []).filter((s: any) => {
+            return s.day_of_week === todayWeekday || 
+                   s.day_of_week === dayNameStr || 
+                   String(s.day_of_week) === String(todayWeekday) ||
+                   String(s.day_of_week) === dayNameStr;
+          });
 
-                   todayBoard.students.forEach((s: any) => {
-                     if (s.isBreak || (!s.first_name && !s.name)) {
-                       if (s.isBreak) {
-                         currentCumulativeMin += (s.duration || 15);
-                       }
-                       return;
-                     }
-
-                     const sFn = (s.first_name || s.name?.split(' ')[0] || '').trim().toLowerCase();
-                     const sLn = (s.last_name || s.name?.split(' ').slice(1).join(' ') || '').trim().toLowerCase();
-
-                     const matchedStudent = (schoolStudents || []).find((st: any) => 
-                       (s.id && st.id === s.id) || 
-                       (st.first_name?.trim().toLowerCase() === sFn && (!sLn || (st.last_name || '').trim().toLowerCase().startsWith(sLn[0])))
-                     );
-
-                     let studentTime = s.customStartTime || s.assignedTime || s.startTime;
-                     if (!studentTime) {
-                       const h = Math.floor(currentCumulativeMin / 60) % 24;
-                       const m = currentCumulativeMin % 60;
-                       studentTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                     }
-                     const studentDuration = s.duration || (matchedStudent as any)?.duration || 30;
-                     currentCumulativeMin += studentDuration;
-
-                     const isGroup = Boolean(s.isGroup || (s.groupStudents && s.groupStudents.length > 1) || (s.first_name && s.first_name.includes('&')) || (s.name && s.name.includes('&')));
-                     const groupStudents = s.groupStudents || [];
-                     const resolvedInstrument = resolveStudentInstrument(s.instrument, matchedStudent?.instrument, teacherProfile?.instrument);
-
-                     slots.push({
-                       id: `board-${todayBoard.id}-${s.id || studentTime}`,
-                       scheduleId: s.id || `board-${todayBoard.id}-${studentTime}`,
-                       time_slot: studentTime,
-                       duration: studentDuration,
-                       status: 'approved',
-                       day_of_week: todayWeekday,
-                       instrument: resolvedInstrument,
-                       isGroup,
-                       groupStudents,
-                       roomId: todayBoard.roomId || null,
-                       room: boardRoomName,
-                       rooms: { id: todayBoard.roomId || null, name: boardRoomName } as any,
-                       student: matchedStudent ? {
-                         id: matchedStudent.id,
-                         name: `${matchedStudent.first_name} ${maskLastName(matchedStudent.last_name, showRealNames)}`.trim(),
-                         first_name: matchedStudent.first_name,
-                         last_name: matchedStudent.last_name,
-                         is_app_user: matchedStudent.is_app_user,
-                         instrument: resolvedInstrument,
-                         birth_date: matchedStudent.birth_date,
-                         avatars: matchedStudent.avatars
-                       } : null
-                     });
-                   });
-                 }
-               }
-             }
-           } catch (e) {
-             console.warn('Failed to parse planned_boards for briefing fallback:', e);
-           }
-
-           // 2. Secondary Fallback: Load from schedules table if no board slots
-           if (slots.length === 0) {
-             let schedQuery = supabase
-               .from('schedules')
-               .select(`
-                 id,
-                 time_slot,
-                 duration,
-                 status,
-                 day_of_week,
-                 instrument,
-                 rooms (id, name),
-                 student:users!schedules_student_id_fkey (
-                   id,
-                   first_name,
-                   last_name,
-                   is_app_user,
-                   instrument,
-                   birth_date,
-                   avatars (avatar_style, evolution_level, xp, streak_flame)
-                 )
-               `)
-               .eq('school_id', teacherProfile.school_id)
-               .in('status', ['opened', 'approved', 'published']);
-
-             if (targetTeacherId && targetTeacherId !== 'master-support-id') {
-               schedQuery = schedQuery.eq('teacher_id', targetTeacherId);
-             }
-
-             const { data: allTeacherSlots } = await schedQuery;
-
-             const dbSlots = (allTeacherSlots || []).filter((s: any) => {
-               return s.day_of_week === todayWeekday || 
-                      s.day_of_week === dayNameStr || 
-                      String(s.day_of_week) === String(todayWeekday) ||
-                      String(s.day_of_week) === dayNameStr;
-             });
-
-             dbSlots.forEach((slot: any) => {
-               const student = slot.student;
-               const resolvedRoom = allRooms.find((r: any) => r.id === slot.rooms?.id)?.name || slot.rooms?.name || 'Raum 4';
-               const resolvedInstrument = resolveStudentInstrument(slot.instrument, student?.instrument, teacherProfile?.instrument);
-               slots.push({
-                 id: `sched-${slot.id}-${todayStr}`,
-                 scheduleId: slot.id,
-                 time_slot: slot.time_slot,
-                 duration: slot.duration || 30,
-                 status: slot.status,
-                 day_of_week: todayWeekday,
-                 instrument: resolvedInstrument,
-                 isGroup: false,
-                 roomId: slot.rooms?.id || null,
-                 room: resolvedRoom,
-                 rooms: { id: slot.rooms?.id || null, name: resolvedRoom },
-                 student: student ? {
-                   id: student.id,
-                   name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
-                   first_name: student.first_name,
-                   last_name: student.last_name,
-                   is_app_user: student.is_app_user ?? false,
-                   instrument: resolvedInstrument,
-                   birth_date: student.birth_date,
-                   avatars: student.avatars
-                 } : null
-               });
-             });
-           }
-
-           // Fetch occurrences strictly for target date
-           let occQuery = supabase
-             .from('schedule_occurrences')
-             .select(`
-               id,
-               date,
-               original_date,
-               start_time,
-               status,
-               schedule_id,
-               student_id,
-               student_acknowledged,
-               room_id,
-               schedules (
-                 duration,
-                 instrument,
-                 rooms (id, name)
-               ),
-               student:users!schedule_occurrences_student_id_fkey (
-                 id,
-                 first_name,
-                 last_name,
-                 is_app_user,
-                 instrument,
-                 birth_date,
-                 avatars (avatar_style, evolution_level, xp, streak_flame)
-               )
-             `)
-             .eq('school_id', teacherProfile.school_id)
-             .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
-
-           if (targetTeacherId && targetTeacherId !== 'master-support-id') {
-             occQuery = occQuery.eq('teacher_id', targetTeacherId);
-           }
-
-           const { data: dbOccurrences } = await occQuery;
+          dbSlots.forEach((slot: any) => {
+            const student = slot.student;
+            const resolvedRoom = allRooms.find((r: any) => r.id === slot.rooms?.id)?.name || slot.rooms?.name || 'Raum 4';
+            const resolvedInstrument = resolveStudentInstrument(slot.instrument, student?.instrument, teacherProfile?.instrument);
+            slots.push({
+              id: `sched-${slot.id}-${todayStr}`,
+              scheduleId: slot.id,
+              time_slot: slot.time_slot,
+              duration: slot.duration || 30,
+              status: slot.status,
+              day_of_week: todayWeekday,
+              instrument: resolvedInstrument,
+              isGroup: false,
+              roomId: slot.rooms?.id || null,
+              room: resolvedRoom,
+              rooms: { id: slot.rooms?.id || null, name: resolvedRoom },
+              student: student ? {
+                id: student.id,
+                name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
+                first_name: student.first_name,
+                last_name: student.last_name,
+                is_app_user: student.is_app_user ?? false,
+                instrument: resolvedInstrument,
+                birth_date: student.birth_date,
+                avatars: student.avatars
+              } : null
+            });
+          });
+        }
 
            // Also collect local occurrences from localStorage strictly for targetTeacherId and todayStr
            const localOccursForToday: any[] = [];
@@ -4549,6 +4571,7 @@ export function TeacherDashboard({
                status: slot.status,
                isGroup: Boolean(slot.isGroup),
                groupStudents: slot.groupStudents || [],
+               students: slot.students || (slot.isGroup && student ? [student] : []),
                roomId: slot.roomId || slot.rooms?.id || null,
                room: resolvedRoom,
                instrument: resolvedInstrument,
@@ -4607,6 +4630,7 @@ export function TeacherDashboard({
                    status: occ.status || 'scheduled',
                    isGroup: Boolean(existingItem?.isGroup),
                    groupStudents: existingItem?.groupStudents || [],
+                   students: existingItem?.students || (existingItem?.isGroup && student ? [student] : []),
                    roomId: occ.room_id || occ.schedules?.room_id || existingItem?.roomId || null,
                    room: resolvedRoom,
                    instrument: resolvedInstrument,
@@ -4835,17 +4859,16 @@ export function TeacherDashboard({
             console.warn('Failed to fetch fallback rescheduled reminders', err);
           }
 
-          setRawBriefingData({
-            success: true,
-            allowMessagesGlobal: allowMessages,
-            todayWeekday,
-            timeline,
-            prepMirror,
-            rescheduledReminders
-          });
-        } catch (err) {
-          console.error('Error loading briefing fallback:', err);
-        }
+        setRawBriefingData({
+          success: true,
+          allowMessagesGlobal: allowMessages,
+          todayWeekday,
+          timeline,
+          prepMirror,
+          rescheduledReminders
+        });
+      } catch (err) {
+        console.error('Error loading briefing fallback:', err);
       } finally {
         setBriefingLoading(false);
       }
@@ -8156,8 +8179,8 @@ export function TeacherDashboard({
                   const groupedTimeline: any[] = [];
                   
                   rawTimeline.forEach((slot: any) => {
-                    if (!slot.student) {
-                      groupedTimeline.push({ ...slot, isBreak: true });
+                    if (!slot.student && (!slot.students || slot.students.length === 0) && !slot.isGroup) {
+                      groupedTimeline.push({ ...slot, isBreak: true, isGroup: false, students: [], slots: [slot] });
                     } else if (slot.status === 'rescheduled_away') {
                       // If this slot was rescheduled away to another day, check if there is an active slot for this timeSlot in rawTimeline
                       const hasActiveSlotAtSameTime = rawTimeline.some((other: any) => 
@@ -8239,7 +8262,7 @@ export function TeacherDashboard({
                   let prepIndex = -1;
                   for (let i = 0; i < groupedTimeline.length; i++) {
                     const slot = groupedTimeline[i];
-                    const activeSlots = slot.isGroup ? slot.slots : [slot];
+                    const activeSlots = (slot.isGroup && Array.isArray(slot.slots)) ? slot.slots : (slot.slots || [slot]);
                     const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick');
                     if (!isCanceled) {
                       const slotStart = slot.timeSlot;
@@ -8265,7 +8288,7 @@ export function TeacherDashboard({
                     })();
 
                     const isBreak = slot.isBreak;
-                    const activeSlots = slot.isGroup ? slot.slots : [slot];
+                    const activeSlots = (slot.isGroup && Array.isArray(slot.slots)) ? slot.slots : (slot.slots || [slot]);
                     
                     const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick');
                     const isRescheduledAway = activeSlots.every((s: any) => s.status === 'rescheduled_away');
@@ -11345,10 +11368,9 @@ export function TeacherDashboard({
                           const groupedTimeline: any[] = [];
                           
                           rawTimeline.forEach((slot: any) => {
-                            if (!slot.student) {
-                              groupedTimeline.push({ ...slot, isBreak: true });
+                            if (!slot.student && (!slot.students || slot.students.length === 0) && !slot.isGroup) {
+                              groupedTimeline.push({ ...slot, isBreak: true, isGroup: false, students: [], slots: [slot] });
                             } else if (slot.status === 'rescheduled_away') {
-                              // If this slot was rescheduled away to another day, check if there is an active slot for this timeSlot in rawTimeline
                               const hasActiveSlotAtSameTime = rawTimeline.some((other: any) => 
                                 other !== slot && 
                                 other.timeSlot === slot.timeSlot && 
@@ -11356,7 +11378,6 @@ export function TeacherDashboard({
                                 other.status !== 'canceled_by_student' &&
                                 other.status !== 'cancelled'
                               );
-                              // If there is an active replacement slot at this time, the moved-away slot is superseded in the timeline (it is displayed in the Vorbereitung card)
                               if (!hasActiveSlotAtSameTime) {
                                 groupedTimeline.push({
                                   ...slot,
@@ -11380,7 +11401,6 @@ export function TeacherDashboard({
                                 (slot.student?.first_name && slot.student.first_name.includes('&'))
                               );
 
-                              // Only merge with an existing slot if BOTH are explicitly marked as a group or belong to the same group/schedule:
                               const existing = isExplicitGroup ? groupedTimeline.find(item => 
                                 !item.isBreak && 
                                 item.timeSlot === slot.timeSlot &&
@@ -11425,11 +11445,10 @@ export function TeacherDashboard({
                             }
                           });
 
-                          // Find prepIndex: first slot that is not canceled and not finished
                           let prepIndex = -1;
                           for (let i = 0; i < groupedTimeline.length; i++) {
                             const slot = groupedTimeline[i];
-                            const activeSlots = slot.isGroup ? slot.slots : [slot];
+                            const activeSlots = (slot.isGroup && Array.isArray(slot.slots)) ? slot.slots : (slot.slots || [slot]);
                             const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick');
                             if (!isCanceled) {
                               const slotStart = slot.timeSlot;

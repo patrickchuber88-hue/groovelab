@@ -3245,14 +3245,24 @@ export function AdminDashboard({
 
     let schoolStudents: any[] = [];
     const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
-    const isTeacherMode = admin?.role === 'teacher' || activeWorkspace === 'teacher';
+    const isTeacherMode = admin?.role === 'teacher' || activeWorkspace === 'teacher' || userId === 'teacher';
+    
+    let allSchoolStudentIds: string[] = [];
+
     if (isTeacherMode && admin?.id) {
-      schoolStudents = await fetchTeacherStudentsHelper(admin.id, schoolId, activePlatform);
+      const [teacherStudentsList, allSchoolUsersRes] = await Promise.all([
+        fetchTeacherStudentsHelper(admin.id, schoolId, activePlatform),
+        supabase.from('users').select('id, first_name, last_name, photo_url, teacher_id').eq('school_id', schoolId).eq('role', 'student')
+      ]);
+      schoolStudents = teacherStudentsList || [];
+      const allSchoolUsers = allSchoolUsersRes.data || [];
+      allSchoolStudentIds = Array.from(new Set([...schoolStudents.map((s: any) => s.id), ...allSchoolUsers.map((u: any) => u.id)]));
     } else {
       let studentListSq = supabase.from('users').select('id, first_name, last_name, photo_url, teacher_id').eq('school_id', schoolId).eq('role', 'student');
       if (activePlatform !== 'campus') studentListSq = studentListSq.eq('is_groovelab_active', true);
       const { data } = await studentListSq;
       schoolStudents = data || [];
+      allSchoolStudentIds = (schoolStudents || []).map((s: any) => s.id);
     }
 
     let statsSongsSq = supabase.from('songs').select('level').eq('school_id', schoolId);
@@ -3269,29 +3279,30 @@ export function AdminDashboard({
     }
 
     const studentIds = (schoolStudents || []).map((s: any) => s.id);
+    const queryStudentIds = allSchoolStudentIds.length > 0 ? allSchoolStudentIds : studentIds;
     let sessions: any[] = [];
     let focusLogs: any[] = [];
     let skills: any[] = [];
 
-    if (studentIds.length > 0) {
+    if (queryStudentIds.length > 0) {
       // Fetch sessions, focus logs, and skills filtered by active students and date range
       const sessionsSq = supabase
         .from('sessions')
         .select('check_in_time, check_out_time, station_id, user_id')
-        .in('user_id', studentIds)
+        .in('user_id', queryStudentIds)
         .not('check_out_time', 'is', null)
         .gte('check_in_time', sessionStartDate.toISOString());
 
       const focusLogsSq = supabase
         .from('fokus_logs')
         .select('user_id, duration_minutes, duration_seconds, created_at')
-        .in('user_id', studentIds)
+        .in('user_id', queryStudentIds)
         .gte('created_at', queryStartDate.toISOString());
 
       let skillsSq = supabase
         .from('user_song_skills')
-        .select('user_id, progress_percent, instrument, is_stage_ready, last_practiced_at, songs!inner(title, artist, is_campus_active, is_groovelab_active)')
-        .in('user_id', studentIds);
+        .select('user_id, progress_percent, instrument, is_stage_ready, last_practiced_at, created_at, songs!inner(title, artist, is_campus_active, is_groovelab_active)')
+        .in('user_id', queryStudentIds);
 
       if (activePlatform === 'campus') {
         skillsSq = skillsSq.eq('songs.is_campus_active', true);
@@ -3309,8 +3320,24 @@ export function AdminDashboard({
         skillsSq
       ]);
 
+      let mergedFocusLogs = [...(focusLogsData || [])];
+      try {
+        (schoolStudents || []).forEach((st: any) => {
+          const localLogsKey = `cg_local_fokus_logs_${st.id}`;
+          const localLogsStr = typeof window !== 'undefined' ? localStorage.getItem(localLogsKey) : null;
+          if (localLogsStr) {
+            const parsed = JSON.parse(localLogsStr);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const remoteIds = new Set(mergedFocusLogs.map((l: any) => l.id));
+              const missing = parsed.filter((l: any) => !remoteIds.has(l.id));
+              mergedFocusLogs = [...missing, ...mergedFocusLogs];
+            }
+          }
+        });
+      } catch (e) {}
+
       sessions = sessionsData || [];
-      focusLogs = focusLogsData || [];
+      focusLogs = mergedFocusLogs;
       skills = skillsData || [];
     }
 
@@ -3413,11 +3440,13 @@ export function AdminDashboard({
     // Cooperative and Highlights calculations for Campus platform
     let myClassMins = 0;
     let otherClassMins = 0;
-    const myStudents = (schoolStudents || []).filter((s: any) => s.teacher_id === userId);
+    const myStudents = isTeacherMode 
+      ? (schoolStudents || []) 
+      : (schoolStudents || []).filter((s: any) => s.teacher_id === userId);
     const myStudentIds = new Set(myStudents.map((s: any) => s.id));
 
     filteredFocusLogs.forEach((log: any) => {
-      const mins = log.duration_minutes || 0;
+      const mins = log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0);
       if (myStudentIds.has(log.user_id)) {
         myClassMins += mins;
       } else {
@@ -3444,30 +3473,46 @@ export function AdminDashboard({
       }
     });
 
-    // Calculate highlights (Helden-Momente) - Current Calendar Month
+    // Calculate highlights (Helden-Momente) - Current Calendar Month with getSimulatedNow()
     let classWeeklyMins = 0;
     const highlights: any[] = [];
-    const startOfCurrentMonth = new Date();
-    startOfCurrentMonth.setDate(1);
-    startOfCurrentMonth.setHours(0, 0, 0, 0);
+    const simNow = getSimulatedNow();
+    const highlightMonth = simNow.getMonth();
+    const highlightYear = simNow.getFullYear();
+    const startOfCurrentMonth = new Date(highlightYear, highlightMonth, 1, 0, 0, 0, 0);
+
+    const startOfWeek = new Date(simNow);
+    const day = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+    startOfWeek.setDate(diff);
+    startOfWeek.setHours(0, 0, 0, 0);
 
     myStudents.forEach((student: any) => {
       const studentLogs = studentFocusLogsMap[student.id] || [];
       const studentSkills = studentSkillsMap[student.id] || [];
 
-      // Calculate recent focus minutes (last 7 days - still needed for weekly class target calculation)
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      const recentMins = studentLogs
-        .filter((log: any) => new Date(log.created_at) >= oneWeekAgo)
-        .reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
+      // Calculate recent focus minutes (this week)
+      const weeklyLogs = studentLogs.filter((log: any) => {
+        if (!log.created_at) return false;
+        const logDate = new Date(log.created_at);
+        return logDate >= startOfWeek && logDate <= simNow;
+      });
+      const recentMins = weeklyLogs.reduce((sum: number, log: any) => {
+        return sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0));
+      }, 0);
       classWeeklyMins += recentMins;
 
       // Filter focus logs for current month
-      const monthlyLogs = studentLogs.filter((log: any) => new Date(log.created_at) >= startOfCurrentMonth);
-      const monthlyMins = monthlyLogs.reduce((sum: number, log: any) => sum + (log.duration_minutes || 0), 0);
+      const monthlyLogs = studentLogs.filter((log: any) => {
+        if (!log.created_at) return false;
+        const logDate = new Date(log.created_at);
+        return logDate >= startOfCurrentMonth && logDate <= simNow;
+      });
+      const monthlyMins = monthlyLogs.reduce((sum: number, log: any) => {
+        return sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0));
+      }, 0);
 
-      // Monthly Streak
+      // Monthly Streak (weeks with practice in current month)
       const monthlyWeeks = new Set();
       monthlyLogs.forEach((log: any) => {
         const d = new Date(log.created_at);
@@ -3483,15 +3528,15 @@ export function AdminDashboard({
       const masteredThisMonth = studentSkills.filter((sk: any) => {
         const isMastered = sk.progress_percent === 100 || sk.is_stage_ready;
         if (!isMastered) return false;
-        const date = sk.last_practiced_at ? new Date(sk.last_practiced_at) : null;
-        return date && date >= startOfCurrentMonth;
+        const date = sk.last_practiced_at ? new Date(sk.last_practiced_at) : (sk.created_at ? new Date(sk.created_at) : null);
+        return date && date >= startOfCurrentMonth && date <= simNow;
       });
 
       // Add highlights
       if (monthlyStreak >= 2) {
         highlights.push({
           studentId: student.id,
-          studentName: `${student.first_name} ${student.last_name}`,
+          studentName: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
           type: 'streak',
           value: `${monthlyStreak} Wochen`,
           emoji: '🔥',
@@ -3502,7 +3547,7 @@ export function AdminDashboard({
       if (monthlyMins >= 120) {
         highlights.push({
           studentId: student.id,
-          studentName: `${student.first_name} ${student.last_name}`,
+          studentName: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
           type: 'focus',
           value: `${monthlyMins} Min.`,
           emoji: '⚡',
@@ -3513,24 +3558,24 @@ export function AdminDashboard({
       masteredThisMonth.forEach((sk: any) => {
         highlights.push({
           studentId: student.id,
-          studentName: `${student.first_name} ${student.last_name}`,
+          studentName: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
           type: 'song',
           value: sk.songs?.title || 'Song',
           emoji: '🏆',
-          title: 'Monats-Meilenstein',
-          text: `Hat diesen Monat den Song "${sk.songs?.title || 'Song'}" komplett gemeistert!`
+          title: 'Meilenstein',
+          text: `Hat heute den Song "${sk.songs?.title || 'Song'}" gemeistert!`
         });
       });
     });
 
-    const rawTargets = openingHours?.weekly_targets?.[userId];
+    const rawTargets = openingHours?.weekly_targets?.[userId] || openingHours?.weekly_targets?.default;
     let weeklyTargets: any[] = [];
-    if (Array.isArray(rawTargets)) {
+    if (Array.isArray(rawTargets) && rawTargets.length > 0) {
       weeklyTargets = rawTargets;
     } else if (typeof rawTargets === 'number') {
-      weeklyTargets = [{ id: 'default', title: 'Wochenziel', minutes: rawTargets, deadline: '' }];
+      weeklyTargets = [{ id: 'default', title: 'Klassen-Monats-Quest', minutes: rawTargets, deadline: '' }];
     } else {
-      weeklyTargets = [{ id: 'default', title: 'Wochenziel', minutes: 300, deadline: '' }];
+      weeklyTargets = [{ id: 'default', title: 'Klassen-Monats-Quest', minutes: 100, deadline: '' }];
     }
 
     setStats({
@@ -12629,7 +12674,8 @@ export function AdminDashboard({
         ? Math.round((myClassMins / totalSchoolMins) * 100) 
         : 0;
 
-      const myStudentsList = (students || []).filter((s: any) => s.teacher_id === userId);
+      const isTeacherDashboardMode = admin?.role === 'teacher' || (typeof window !== 'undefined' && (sessionStorage.getItem('groovelab_active_workspace') === 'teacher' || localStorage.getItem('groovelab_active_workspace') === 'teacher')) || userId === 'teacher';
+      const myStudentsList = isTeacherDashboardMode ? (students || []) : (students || []).filter((s: any) => s.teacher_id === userId);
       const classmateIds = myStudentsList.map((s: any) => s.id);
       const classCount = classmateIds.length;
 
@@ -13029,7 +13075,7 @@ export function AdminDashboard({
               </div>
 
               {(() => {
-                const now = new Date();
+                const now = getSimulatedNow();
                 const currentMonth = now.getMonth();
                 const startYear = currentMonth >= 8 ? now.getFullYear() : now.getFullYear() - 1;
                 const monthsList = [
@@ -13047,7 +13093,8 @@ export function AdminDashboard({
                   { month: 7, label: 'Aug', year: startYear + 1 }
                 ];
 
-                const myStudentsList = (students || []).filter((s: any) => s.teacher_id === userId);
+                const isTeacherDashboardMode = admin?.role === 'teacher' || (typeof window !== 'undefined' && (sessionStorage.getItem('groovelab_active_workspace') === 'teacher' || localStorage.getItem('groovelab_active_workspace') === 'teacher')) || userId === 'teacher';
+                const myStudentsList = isTeacherDashboardMode ? (students || []) : (students || []).filter((s: any) => s.teacher_id === userId);
                 const classmateIds = myStudentsList.map((s: any) => s.id);
                 const classFocusLogs = stats?.focusLogs || [];
 

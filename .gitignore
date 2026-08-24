@@ -29,10 +29,15 @@ dist-ssr
 .supabase/functions/
 .supabase/storage/
 *.zip
-*.zip
-*.zip
 dist.tar.gz
 *.tar.gz
 backups/
 backup.sh
 scratch/
+
+# Environment and secrets
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example

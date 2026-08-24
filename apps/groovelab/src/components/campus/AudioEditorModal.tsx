@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Play, Square, Repeat, ChevronLeft, ChevronRight, X, Sparkles, Check, RotateCcw } from 'lucide-react';
+import { Play, Square, Repeat, ChevronLeft, ChevronRight, X, Sparkles, Check, RotateCcw, Music2 } from 'lucide-react';
 import { getBlob, storeBlob } from '../../utils/blobStorage';
 
 interface AudioEditorModalProps {
@@ -477,26 +477,66 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
           </button>
         </div>
 
-        {/* Minimalist Title Field */}
-        <input
-          type="text"
-          value={editLabel}
-          onChange={(e) => setEditLabel(e.target.value)}
-          placeholder="Titel der Aufnahme..."
-          style={{
-            width: '100%',
-            fontSize: '0.88rem',
-            fontWeight: 700,
-            padding: '10px 14px',
-            borderRadius: '12px',
-            border: '1px solid #e2e8f0',
-            background: '#f8fafc',
-            color: '#0f172a',
-            outline: 'none',
-            boxSizing: 'border-box',
-            transition: 'border-color 0.15s ease'
-          }}
-        />
+        {/* Apple Voice Memos Style Title Field with Icon & Clear */}
+        <div style={{ position: 'relative', width: '100%' }}>
+          <div style={{
+            position: 'absolute',
+            left: '12px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            color: '#94a3b8',
+            pointerEvents: 'none'
+          }}>
+            <Music2 size={16} />
+          </div>
+          <input
+            type="text"
+            value={editLabel}
+            onChange={(e) => setEditLabel(e.target.value)}
+            placeholder="Titel der Aufnahme..."
+            style={{
+              width: '100%',
+              fontSize: '0.88rem',
+              fontWeight: 700,
+              padding: '10px 36px 10px 38px',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              color: '#0f172a',
+              outline: 'none',
+              boxSizing: 'border-box',
+              transition: 'all 0.15s ease'
+            }}
+          />
+          {editLabel && (
+            <button
+              type="button"
+              onClick={() => setEditLabel('')}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: '#e2e8f0',
+                border: 'none',
+                borderRadius: '50%',
+                width: '18px',
+                height: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                padding: 0
+              }}
+              title="Titel leeren"
+            >
+              <X size={11} strokeWidth={2.5} />
+            </button>
+          )}
+        </div>
 
         {/* Minimalist Waveform Section */}
         <div style={{
@@ -858,7 +898,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
           </div>
         </div>
 
-        {/* Minimalist Pitch Control: Left Arrow | Number | Right Arrow */}
+        {/* Minimalist Pitch Control: Left Arrow | Number & Description | Right Arrow | Reset */}
         <div style={{
           background: '#f8fafc',
           border: '1px solid #e2e8f0',
@@ -868,11 +908,37 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between'
         }}>
-          <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>
-            Tonhöhe (Pitch)
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>
+              Tonhöhe (Pitch)
+            </span>
+            {semitones !== 0 && (
+              <button
+                type="button"
+                onClick={() => setSemitones(0)}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '2px 6px',
+                  fontSize: '0.66rem',
+                  fontWeight: 750,
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}
+                className="hover-scale-mini"
+                title="Auf Original-Tonhöhe zurücksetzen"
+              >
+                <RotateCcw size={10} />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
 
-          {/* Stepper Capsule: [ < ] [ +1 ] [ > ] */}
+          {/* Stepper Capsule: [ < ] [ +1 Halbton ] [ > ] */}
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -880,7 +946,8 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
             border: '1px solid #cbd5e1',
             borderRadius: '99px',
             padding: '2px 4px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+            gap: '2px'
           }}>
             <button
               type="button"
@@ -905,15 +972,18 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
             </button>
 
             <span style={{
-              fontSize: '0.84rem',
-              fontWeight: 900,
+              fontSize: '0.78rem',
+              fontWeight: 850,
               color: semitones !== 0 ? '#16a34a' : '#475569',
-              minWidth: '42px',
+              minWidth: '76px',
               textAlign: 'center',
               fontVariantNumeric: 'tabular-nums',
-              userSelect: 'none'
+              userSelect: 'none',
+              padding: '0 4px'
             }}>
-              {semitones > 0 ? `+${semitones}` : semitones}
+              {semitones === 0 
+                ? '0 (Original)' 
+                : `${semitones > 0 ? `+${semitones}` : semitones} ${Math.abs(semitones) === 1 ? 'Halbton' : 'Halbtöne'}`}
             </span>
 
             <button

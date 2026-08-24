@@ -14,7 +14,7 @@ import urllib.parse
 import subprocess
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://supabase.campus-groovelab.de")
-SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg3NTU4MDYxLCJleHAiOjIxMDI5MTgwNjF9.FZWOhJ8B7coAqv4IX3dKFYFerKwODGiQm-5IFFKiPIc")
+SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 CPU_CORES = os.cpu_count() or 2
 INTERVAL_SECONDS = 30
 

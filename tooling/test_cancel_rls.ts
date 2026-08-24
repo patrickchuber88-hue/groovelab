@@ -3,9 +3,8 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: 'apps/groovelab/.env.local' });
 
-// We use the real anonymous key and URL to act as the anonymous user
-const SUPABASE_URL = 'https://supabase.campus-groovelab.de';
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg3NTU4MDYxLCJleHAiOjIxMDI5MTgwNjF9.FZWOhJ8B7coAqv4IX3dKFYFerKwODGiQm-5IFFKiPIc';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://supabase.campus-groovelab.de';
+const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Let's use Elisabeth's bypass token to fetch her profile and try to cancel a virtual or actual occurrence
 const STUDENT_QR_TOKEN = 'ab4b4f50-04bd-407b-a48e-f7f532b620fc';

@@ -4413,59 +4413,26 @@ function App() {
           const sidList = Array.from(schoolIds);
 
           if (sidList.length > 0) {
-            for (const sid of sidList) {
-              const [uResExact, uResSchool, uScheds] = await Promise.all([
-                supabase.from('users').select('*').eq('school_id', sid).eq('role', 'student').order('first_name'),
-                supabase.from('users').select('*').eq('school_id', sid).order('first_name'),
-                supabase.from('schedules').select('*, student:users!student_id(*)').eq('school_id', sid)
-              ]);
-              (uResExact.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
-              (uResSchool.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
-              (uScheds.data || []).forEach((sc: any) => {
-                const u = sc.student || sc.users;
-                if (u && u.id) mergedUsersMap.set(u.id, u);
-              });
-            }
-
-            const schoolIdsSet = new Set(sidList);
-
-            const [uRes2, uResAll, uAllScheds] = await Promise.all([
-              supabase.from('users').select('*').in('school_id', sidList).eq('role', 'student').order('first_name'),
-              supabase.from('users').select('*').in('school_id', sidList).order('first_name'),
-              supabase.from('schedules').select('*, student:users!student_id(*)').in('school_id', sidList)
+            const [uRes, pRes] = await Promise.all([
+              supabase
+                .from('users')
+                .select('id, school_id, first_name, last_name, role, roles, instrument, avatar_url, photo_url, is_active, is_campus_active, is_groovelab_active, qr_token, teacher_id, lesson_duration, birth_date, is_app_user')
+                .in('school_id', sidList)
+                .order('first_name'),
+              supabase
+                .from('pending_students_decrypted')
+                .select('id, school_id, first_name, last_name, instrument, qr_token')
+                .in('school_id', sidList)
+                .then(r => r, () => ({ data: [] }))
             ]);
 
-          ((uRes2 as any).data || []).forEach((u: any) => {
-            if (u && u.school_id && schoolIdsSet.has(u.school_id)) {
-              mergedUsersMap.set(u.id, u);
-            }
-          });
-          ((uResAll as any).data || []).forEach((u: any) => {
-            const r = (u.role || '').toLowerCase();
-            if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
-              if (u.school_id && schoolIdsSet.has(u.school_id) && !mergedUsersMap.has(u.id)) {
-                mergedUsersMap.set(u.id, u);
-              }
-            }
-          });
-          ((uAllScheds as any).data || []).forEach((sc: any) => {
-            const u = sc.student || sc.users;
-            if (u && u.id && u.school_id && schoolIdsSet.has(u.school_id)) {
-              mergedUsersMap.set(u.id, u);
-            }
-          });
-          }
-
-          try {
-            const { data: pAll } = sidList.length > 0 
-              ? await supabase.from('pending_students_decrypted').select('*').in('school_id', sidList)
-              : { data: [] };
-            (pAll || []).forEach((p: any) => {
+            (uRes.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
+            (pRes.data || []).forEach((p: any) => {
               if (p && p.id && !mergedUsersMap.has(p.id)) {
                 mergedUsersMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
               }
             });
-          } catch (e) {}
+          }
 
           const allUsers = Array.from(mergedUsersMap.values());
           if (allUsers.length > 0) {

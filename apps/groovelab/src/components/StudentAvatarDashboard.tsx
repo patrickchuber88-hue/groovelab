@@ -9695,10 +9695,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           .select('*')
           .eq('student_id', studentId)
           .maybeSingle(),
-        fetch(`/api/briefing/student?userId=${studentId}`).catch(err => {
-          console.warn('Briefing API offline or failed, falling back:', err);
-          return null;
-        }),
+        Promise.resolve(null),
         Promise.resolve({ data: null, error: null } as any),
         supabase
           .from('student_missions')
@@ -10140,12 +10137,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
         // Process school targets / class goals
         const schoolData = schoolRes.data;
-        const rawTargets = schoolData?.opening_hours?.weekly_targets?.[user.teacher_id];
+        const rawTargets = (user.teacher_id && schoolData?.opening_hours?.weekly_targets?.[user.teacher_id]) ||
+                           schoolData?.opening_hours?.weekly_targets?.default;
         let goals: any[] = [];
-        if (Array.isArray(rawTargets)) {
+        if (Array.isArray(rawTargets) && rawTargets.length > 0) {
           goals = rawTargets;
         } else if (typeof rawTargets === 'number') {
-          goals = [{ id: 'default', title: 'Klassenziel', minutes: rawTargets, deadline: '' }];
+          goals = [{ id: 'default', title: 'Klassen-Monats-Quest', minutes: rawTargets, deadline: '' }];
         }
         setClassGoals(goals);
 
@@ -10189,9 +10187,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       // Stage 3: Read briefing response from Stage 1
       let briefingJsonLoaded = false;
-      if (briefingRes && briefingRes.ok) {
+      if (briefingRes && (briefingRes as any).ok) {
         try {
-          const bd = await briefingRes.json();
+          const bd = await (briefingRes as any).json();
           if (bd && bd.success) {
             setRawBriefingData(bd);
             briefingJsonLoaded = true;

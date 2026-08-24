@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import QRCode from 'react-qr-code';
 import { usePremiumOnboardingTour, TourStartButton } from './PremiumOnboardingTour';
 import { 
   Calendar, 
@@ -13309,17 +13310,24 @@ export function CampusEventsBoard({
                       <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
                         📱 Einfach mit dem Smartphone scannen:
                       </span>
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(feedUrl)}`}
-                        alt="Calendar QR Code"
-                        style={{
-                          width: '130px',
-                          height: '130px',
-                          borderRadius: '8px',
-                          border: '4px solid #ffffff',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-                        }}
-                      />
+                      <div style={{
+                        background: '#ffffff',
+                        padding: '10px',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <QRCode
+                          value={feedUrl}
+                          size={120}
+                          style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                          viewBox={`0 0 120 120`}
+                          level="M"
+                        />
+                      </div>
                       <span style={{ fontSize: '0.62rem', color: '#64748b', textAlign: 'center', lineHeight: 1.3 }}>
                         Unterstützt Apple Kalender, Google Kalender und alle gängigen Kalender-Apps.
                       </span>
@@ -13401,7 +13409,7 @@ export function CampusEventsBoard({
                   </a>
 
                   {/* Copy Link Input Bar */}
-                  <div style={{ display: 'flex', background: '#f5f5f7', borderRadius: '12px', padding: '4px', alignItems: 'center', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '12px', padding: '4px', alignItems: 'center', marginTop: '4px', border: '1px solid #e2e8f0' }}>
                     <input
                       type="text"
                       readOnly
@@ -13411,13 +13419,16 @@ export function CampusEventsBoard({
                         background: 'transparent',
                         border: 'none',
                         padding: '10px 12px',
-                        fontSize: '12px',
-                        color: '#1d1d1f',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+                        fontSize: '11.5px',
+                        color: '#0f172a',
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                        fontVariantNumeric: 'tabular-nums',
                         outline: 'none',
-                        textOverflow: 'ellipsis'
+                        textOverflow: 'ellipsis',
+                        cursor: 'text'
                       }}
                       onClick={e => (e.target as HTMLInputElement).select()}
+                      title="Klicken zum vollständigen Markieren"
                     />
                     <button
                       onClick={() => {
@@ -13427,21 +13438,22 @@ export function CampusEventsBoard({
                       }}
                       style={{
                         border: 'none',
-                        background: copied ? '#34c759' : '#007aff',
+                        background: copied ? '#16a34a' : '#007aff',
                         color: '#ffffff',
                         padding: '10px 16px',
                         borderRadius: '10px',
-                        fontWeight: 600,
+                        fontWeight: 700,
                         fontSize: '13px',
                         cursor: 'pointer',
-                        transition: 'background 0.2s',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        gap: '6px',
+                        boxShadow: copied ? '0 2px 8px rgba(22, 163, 74, 0.3)' : '0 2px 8px rgba(0, 122, 255, 0.25)'
                       }}
                     >
                       {copied ? <Check size={14} strokeWidth={2.5} /> : null}
-                      {copied ? 'Kopiert' : 'Kopieren'}
+                      {copied ? 'Kopiert! ✓' : 'Kopieren'}
                     </button>
                   </div>
                 </div>
