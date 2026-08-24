@@ -7,7 +7,7 @@ import {
   Edit2, Settings, Sliders, Search, Tag, Percent,
   Activity, Cpu, Database, AlertTriangle, HardDrive, Server, Zap, Link, Key, History as HistoryIcon,
   Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Building2, Building, Eye, EyeOff, Radio, Heart, ShieldCheck,
-  QrCode, Lock, Smartphone, Laptop, Wrench, Lightbulb, Rocket, Sparkles, RotateCcw, WifiOff, Fingerprint
+  QrCode, Lock, Smartphone, Laptop, Wrench, Lightbulb, Rocket, Sparkles, RotateCcw, WifiOff, Fingerprint, Download, ArrowRight
 } from 'lucide-react';
 import { MaintenanceTab } from './masterAdmin/tabs/MaintenanceTab';
 import { SchoolsTab } from './masterAdmin/tabs/SchoolsTab';
@@ -1238,6 +1238,33 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     } finally {
       setLoadingPending(false);
     }
+  };
+
+  const handleExportAuditLogsCSV = () => {
+    if (!pricingAuditLogs || pricingAuditLogs.length === 0) return;
+    const headers = ['ID', 'Zeitpunkt', 'Scope', 'Admin', 'Campus Alt', 'Campus Neu', 'GrooveLab Alt', 'GrooveLab Neu', 'Kombi Alt', 'Kombi Neu', 'Betroffene Schulen'];
+    const rows = pricingAuditLogs.map((l: any) => [
+      `AUD-${l.id ? String(l.id).substring(0, 8).toUpperCase() : 'LOG'}`,
+      new Date(l.created_at).toISOString(),
+      l.change_scope === 'immediate' ? 'Sofortige Anpassung' : l.change_scope === 'new_only' ? 'Bestandsschutz' : 'Schuljahresstart',
+      `"${(l.changed_by_name || 'Master Admin Root').replace(/"/g, '""')}"`,
+      Number(l.old_price_campus).toFixed(2),
+      Number(l.new_price_campus).toFixed(2),
+      Number(l.old_price_groovelab).toFixed(2),
+      Number(l.new_price_groovelab).toFixed(2),
+      Number(l.old_price_kombi).toFixed(2),
+      Number(l.new_price_kombi).toFixed(2),
+      l.affected_schools_count || 0
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(e => e.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Campus-Groovelab_Tarif_Audit_Logbuch_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleRollbackPricing = async (logEntry: any) => {
@@ -4548,7 +4575,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   border: '1px solid #e2e8f0',
                   boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                     <div>
                       <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: 0, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <HistoryIcon size={18} color="#2563eb" /> Audit-Logbuch
@@ -4557,9 +4584,36 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         Lückenlose Historie aller Tarifanpassungen (SOC 2) mit 1-Klick Rollback.
                       </p>
                     </div>
-                    <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#1d4ed8', padding: '3px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                      {pricingAuditLogs.length} Einträge
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {pricingAuditLogs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleExportAuditLogsCSV}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            color: '#334155',
+                            fontSize: '0.72rem',
+                            fontWeight: 750,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale-mini"
+                          title="Audit-Logbuch als revisionssichere CSV exportieren"
+                        >
+                          <Download size={13} />
+                          <span>CSV-Export</span>
+                        </button>
+                      )}
+                      <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#1d4ed8', padding: '3px 10px', borderRadius: '100px', fontWeight: 800 }}>
+                        {pricingAuditLogs.length} {pricingAuditLogs.length === 1 ? 'Eintrag' : 'Einträge'}
+                      </span>
+                    </div>
                   </div>
 
                   {pricingAuditLogs.length === 0 ? (
@@ -4572,25 +4626,42 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       {pricingAuditLogs.map((log: any) => (
                         <div key={log.id} style={{
                           padding: '14px 16px',
-                          borderRadius: '14px',
-                          background: '#f8fafc',
+                          borderRadius: '16px',
+                          background: '#ffffff',
                           border: '1px solid #e2e8f0',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '8px'
+                          gap: '10px'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontWeight: 800, fontSize: '0.84rem', color: '#0f172a' }}>
-                              {new Date(log.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr
-                            </span>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{
-                                padding: '2px 8px',
+                                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                color: '#2563eb',
+                                background: '#eff6ff',
+                                padding: '2px 6px',
+                                borderRadius: '6px',
+                                border: '1px solid #dbeafe'
+                              }}>
+                                #AUD-{log.id ? String(log.id).substring(0, 6).toUpperCase() : '2608'}
+                              </span>
+                              <span style={{ fontWeight: 800, fontSize: '0.84rem', color: '#0f172a' }}>
+                                {new Date(log.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr
+                              </span>
+                            </div>
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{
+                                padding: '3px 8px',
                                 borderRadius: '6px',
                                 fontSize: '0.68rem',
                                 fontWeight: 800,
                                 background: log.change_scope === 'immediate' ? '#fee2e2' : log.change_scope === 'new_only' ? '#dcfce7' : '#fef3c7',
-                                color: log.change_scope === 'immediate' ? '#dc2626' : log.change_scope === 'new_only' ? '#15803d' : '#b45309'
+                                color: log.change_scope === 'immediate' ? '#dc2626' : log.change_scope === 'new_only' ? '#15803d' : '#b45309',
+                                border: `1px solid ${log.change_scope === 'immediate' ? '#fca5a5' : log.change_scope === 'new_only' ? '#86efac' : '#fde68a'}`
                               }}>
                                 {log.change_scope === 'immediate' ? 'Sofortige Anpassung' : log.change_scope === 'new_only' ? 'Bestandsschutz' : 'Schuljahresstart'}
                               </span>
@@ -4600,34 +4671,75 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 type="button"
                                 onClick={() => handleRollbackPricing(log)}
                                 style={{
-                                  padding: '3px 8px',
+                                  padding: '3px 9px',
                                   borderRadius: '6px',
                                   background: '#ffffff',
                                   border: '1px solid #cbd5e1',
-                                  color: '#475569',
+                                  color: '#334155',
                                   fontSize: '0.68rem',
                                   fontWeight: 800,
                                   cursor: 'pointer',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '4px'
+                                  gap: '4px',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                  transition: 'all 0.15s ease'
                                 }}
+                                className="hover-scale-mini"
                                 title="Tarife auf diesen vorherigen Stand zurücksetzen"
                               >
-                                <HistoryIcon size={12} /> Rollback
+                                <RotateCcw size={11} color="#64748b" /> <span>Rollback</span>
                               </button>
                             </div>
                           </div>
 
-                          <div style={{ fontSize: '0.78rem', color: '#334155', display: 'flex', gap: '10px', flexWrap: 'wrap', fontWeight: 600 }}>
-                            <span>Campus: <strong>{Number(log.old_price_campus).toFixed(2).replace('.', ',')} € → {Number(log.new_price_campus).toFixed(2).replace('.', ',')} €</strong></span>
-                            <span>GrooveLab: <strong>{Number(log.old_price_groovelab).toFixed(2).replace('.', ',')} € → {Number(log.new_price_groovelab).toFixed(2).replace('.', ',')} €</strong></span>
-                            <span>Kombi: <strong>{Number(log.old_price_kombi).toFixed(2).replace('.', ',')} € → {Number(log.new_price_kombi).toFixed(2).replace('.', ',')} €</strong></span>
+                          {/* Modular 3-Column Price Diff Matrix */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                            gap: '6px',
+                            background: '#f8fafc',
+                            padding: '8px 10px',
+                            borderRadius: '10px',
+                            border: '1px solid #f1f5f9'
+                          }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase' }}>Campus</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
+                                <span style={{ color: '#94a3b8', textDecoration: 'line-through', fontWeight: 600 }}>{Number(log.old_price_campus).toFixed(2).replace('.', ',')} €</span>
+                                <ArrowRight size={11} color="#64748b" />
+                                <span style={{ color: '#16a34a' }}>{Number(log.new_price_campus).toFixed(2).replace('.', ',')} €</span>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase' }}>GrooveLab</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
+                                <span style={{ color: '#94a3b8', textDecoration: 'line-through', fontWeight: 600 }}>{Number(log.old_price_groovelab).toFixed(2).replace('.', ',')} €</span>
+                                <ArrowRight size={11} color="#64748b" />
+                                <span style={{ color: '#16a34a' }}>{Number(log.new_price_groovelab).toFixed(2).replace('.', ',')} €</span>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase' }}>Kombi-Vorteil</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
+                                <span style={{ color: '#94a3b8', textDecoration: 'line-through', fontWeight: 600 }}>{Number(log.old_price_kombi).toFixed(2).replace('.', ',')} €</span>
+                                <ArrowRight size={11} color="#64748b" />
+                                <span style={{ color: '#16a34a' }}>{Number(log.new_price_kombi).toFixed(2).replace('.', ',')} €</span>
+                              </div>
+                            </div>
                           </div>
 
-                          <div style={{ fontSize: '0.70rem', color: '#64748b', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '4px', marginTop: '2px' }}>
-                            <span>Admin: <strong>{log.changed_by_name || 'Master Admin Root'}</strong></span>
-                            <span>{log.affected_schools_count} Schulen betroffen</span>
+                          <div style={{ fontSize: '0.70rem', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '6px', marginTop: '2px' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <ShieldCheck size={12} color="#16a34a" />
+                              Admin: <strong>{log.changed_by_name || 'Master Admin Root'}</strong>
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Building2 size={12} color="#64748b" />
+                              {log.affected_schools_count} {log.affected_schools_count === 1 ? 'Schule betroffen' : 'Schulen betroffen'}
+                            </span>
                           </div>
                         </div>
                       ))}
