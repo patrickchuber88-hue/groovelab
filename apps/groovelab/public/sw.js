@@ -1,4 +1,4 @@
-const CACHE_NAME = 'groovelab-static-v117';
+const CACHE_NAME = 'groovelab-static-v118';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

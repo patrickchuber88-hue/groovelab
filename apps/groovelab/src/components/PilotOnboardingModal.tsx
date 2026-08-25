@@ -324,7 +324,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
               style={{ accentColor: '#15803d', marginTop: '2px', width: '16px', height: '16px', cursor: 'pointer' }}
             />
             <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.4 }}>
-              <strong>2. Schuldatenschutz (Minderjährige):</strong> Ich bestätige die Einhaltung des Schuldatenschutzes: Schülernamen werden ausschließlich datensparsam (Vorname + Nachname-Initial) geführt. Es werden keine E-Mail-Adressen, SEPA- oder Zahlungsdaten von Minderjährigen erfasst.
+              <strong>2. Schuldatenschutz &amp; Kindersicherheit (Art. 5 &amp; 25 DSGVO – Privacy by Design):</strong> Ich bestätige die rechtmäßige Erhebung der Schülerdaten durch die Musikschule (Vorname, Nachname, Geburtstagstag zur 2FA-PIN-Verifikation). Der Unterrichtsbetrieb erfolgt datensparsam mit automatischer Pseudonymisierung (Vorname + Nachname-Initial). Die Plattform verzichtet nach dem Zero-Knowledge-Prinzip vollständig auf Schüler-E-Mails, Telefonnummern sowie Bank- und Zahlungsdaten von Minderjährigen.
             </div>
           </div>
 
