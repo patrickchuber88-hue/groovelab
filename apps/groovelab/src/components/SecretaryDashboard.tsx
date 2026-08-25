@@ -4038,7 +4038,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       }
 
       allUsers?.forEach(u => {
-        if (u.role === 'teacher' || u.role === 'admin' || (u.roles && (u.roles.includes('teacher') || u.roles.includes('admin')))) {
+        const isTeacher = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
+        if (isTeacher) {
           const currentStudentCount = studentsList.filter(s => s.teacher_id === u.id).length;
           if (!u.is_active) {
             bypassList.push({
@@ -4341,7 +4342,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       // Dual-Source Failsafe: Fallback to u.planned_boards / campus_räume / groovelab_räume if schedules table has no entries for teacher
       (allUsers || []).forEach(u => {
-        if (u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary' || (u.roles && u.roles.some((r: string) => ['teacher', 'admin', 'secretary'].includes(r)))) {
+        const isTeacher = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
+        if (isTeacher) {
           const rawPlanned = u.planned_boards || (u as any).campus_räume || (u as any).groovelab_räume;
           let loadedDrafts: any[] = [];
           let loadedSubmittedDraftId = '';

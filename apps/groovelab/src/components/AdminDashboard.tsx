@@ -3051,7 +3051,7 @@ export function AdminDashboard({
           } else {
             setStudents(allUsers.filter(u => u.role === 'student'));
           }
-          setTeachers(allUsers.filter(u => u.role === 'teacher' || u.role === 'admin'));
+          setTeachers(allUsers.filter(u => u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'))));
         }
       } else if (activeTab === 'setup') {
         const { data: rData } = await supabase.from('rooms').select('*').eq('school_id', adminData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true });
