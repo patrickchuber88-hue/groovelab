@@ -1023,7 +1023,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       
       // 2. Fetch assigned student IDs across schedules, occurrences, and bands for selected teacher
       const [{ data: schedData }, { data: occData }, { data: groupData }] = await Promise.all([
-        supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(*)').eq('teacher_id', selectedTeacherId),
+        supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(*)').eq('school_id', schoolId).eq('teacher_id', selectedTeacherId),
         supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', selectedTeacherId),
         supabase.from('bands').select('id').eq('coach_id', selectedTeacherId)
       ]);
@@ -1406,6 +1406,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         setSubmittedDraftId('');
         setScheduleStatus('none');
         setLastSubmittedTime(null);
+        setActiveTab('designer');
       }
 
       // Reconstruct boards based on database planned_boards OR localStorage OR existing schedules

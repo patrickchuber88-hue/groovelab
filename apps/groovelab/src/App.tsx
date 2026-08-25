@@ -7044,15 +7044,15 @@ function App() {
 
     const existingWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
     const currentRole = userToLogin?.role?.toLowerCase() || 'teacher';
-    if (existingWorkspace === 'teacher') {
-      sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-    } else if (existingWorkspace === 'master_admin') {
-      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
-    } else if (currentRole === 'admin' || currentRole === 'secretary') {
+    if (currentRole === 'admin' || currentRole === 'secretary') {
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');
       if (currentRole === 'secretary') {
         sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
       }
+    } else if (existingWorkspace === 'teacher') {
+      sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+    } else if (existingWorkspace === 'master_admin') {
+      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
     } else if (currentRole === 'student') {
       sessionStorage.setItem('groovelab_active_workspace', 'student');
     } else {

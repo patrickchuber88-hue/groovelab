@@ -2019,8 +2019,8 @@ export function ScheduleCalendarViewDesktop({
           supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument)').eq('teacher_id', userId).eq('school_id', schoolId),
           supabase.from('campus_events').select('room_id, event_date, start_time, end_time, title').eq('school_id', schoolId).gte('event_date', startDateStr).lte('event_date', endDateStr).not('room_id', 'is', null),
           supabase.from('room_bookings').select('room_id, date, start_time, end_time, booked_by, user:users(first_name, last_name)').eq('school_id', schoolId).gte('date', startDateStr).lte('date', endDateStr).not('room_id', 'is', null),
-          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id').gte('date', startDateStr).lte('date', endDateStr),
-          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)').gte('date', startDateStr).lte('date', endDateStr).order('date').order('start_time'),
+          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id').eq('teacher_id', userId).gte('date', startDateStr).lte('date', endDateStr),
+          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)').eq('teacher_id', userId).gte('date', startDateStr).lte('date', endDateStr).order('date').order('start_time'),
           supabase.from('students').select('id, user_id, teacher_id').eq('school_id', schoolId),
           supabase.from('users').select('id, teacher_id, first_name, last_name').eq('school_id', schoolId).eq('role', 'student')
         ]);

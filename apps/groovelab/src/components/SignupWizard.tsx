@@ -327,6 +327,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
           localStorage.setItem('groovelab_session', JSON.stringify({ user: userObj, school: schoolObj, role: 'admin', token: adminId }));
           localStorage.setItem('groovelab_user', JSON.stringify(userObj));
           localStorage.setItem('groovelab_school', JSON.stringify(schoolObj));
+          localStorage.setItem('groovelab_active_workspace', 'secretary');
+          sessionStorage.setItem('groovelab_active_workspace', 'secretary');
           sessionStorage.setItem('groovelab_user_id', adminId);
           sessionStorage.setItem('groovelab_location_mode', 'home');
           sessionStorage.setItem('groovelab_active_platform', 'campus');
