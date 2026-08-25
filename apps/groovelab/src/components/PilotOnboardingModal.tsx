@@ -94,52 +94,41 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown';
       const signedAtIso = new Date().toISOString();
 
-      // 2. Insert or update agreement record
+      // 2. Insert or update agreement record (matching exact schema: school_id, user_id, ip_address, user_agent)
       try {
+        const agreementPayload = {
+          school_id: schoolId,
+          user_id: userId,
+          ip_address: ip,
+          user_agent: userAgent
+        };
+
         const { error: upsertErr } = await supabase
           .from('pilot_agreements')
-          .upsert(
-            {
-              school_id: schoolId,
-              user_id: userId,
-              signee_name: signeeName.trim(),
-              ip_address: ip,
-              user_agent: userAgent
-            },
-            { onConflict: 'school_id, user_id' }
-          );
+          .upsert(agreementPayload, { onConflict: 'school_id, user_id' });
 
         if (upsertErr) {
           if (upsertErr.code === '23505' || upsertErr.message?.includes('duplicate key') || upsertErr.message?.includes('unique constraint')) {
             await supabase
               .from('pilot_agreements')
-              .update({ signee_name: signeeName.trim(), ip_address: ip, user_agent: userAgent })
+              .update({ ip_address: ip, user_agent: userAgent })
               .eq('school_id', schoolId);
           } else {
             const { error: insertErr } = await supabase
               .from('pilot_agreements')
-              .insert({
-                school_id: schoolId,
-                user_id: userId,
-                signee_name: signeeName.trim(),
-                ip_address: ip,
-                user_agent: userAgent
-              });
+              .insert(agreementPayload);
             
             if (insertErr && !insertErr.message?.includes('duplicate key') && insertErr.code !== '23505') {
-              throw insertErr;
+              console.warn('pilot_agreements insert error:', insertErr);
             }
           }
         }
       } catch (dbErr: any) {
         console.warn('Agreement DB operation warning:', dbErr);
-        if (!dbErr.message?.includes('duplicate key') && dbErr.code !== '23505') {
-          throw dbErr;
-        }
       }
 
       // 3. Mark school as trial/active AND set AVV digital signature audit trail fields
-      await supabase
+      const { error: schoolErr } = await supabase
         .from('schools')
         .update({ 
           is_trial: true,
@@ -147,6 +136,10 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
           avv_signee_name: signeeName.trim()
         })
         .eq('id', schoolId);
+
+      if (schoolErr) {
+        throw schoolErr;
+      }
 
       onComplete();
     } catch (err: any) {
