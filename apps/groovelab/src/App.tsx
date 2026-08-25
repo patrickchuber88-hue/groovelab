@@ -39,6 +39,7 @@ const CampusPinUnlockModal = lazy(() => import('./components/CampusPinUnlockModa
 const PilotOnboardingModal = lazy(() => import('./components/PilotOnboardingModal').then(m => ({ default: m.PilotOnboardingModal })));
 const GhostSupportCapsule = lazy(() => import('./components/masterAdmin/GhostSupportCapsule').then(m => ({ default: m.GhostSupportCapsule })));
 const SharedAudioBiographyPage = lazy(() => import('./components/campus/SharedAudioBiographyPage').then(m => ({ default: m.SharedAudioBiographyPage })));
+const HelpCenterModal = lazy(() => import('./components/help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
 
 import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import ConfettiModal from './components/ConfettiModal';
@@ -2409,6 +2410,7 @@ function App() {
   const [stationIdFromStorage, setStationIdFromStorage] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null);
   const [isCampusUnlocked, setIsCampusUnlocked] = useState(false);
   const [showCampusPinPrompt, setShowCampusPinPrompt] = useState(false);
+  const [isGlobalHelpCenterOpen, setIsGlobalHelpCenterOpen] = useState(false);
   const [simulatedDate, setSimulatedDate] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('groovelab_simulated_date') || null;
@@ -2444,15 +2446,20 @@ function App() {
       const s = localStorage.getItem('groovelab_simulated_date');
       setSimulatedDate(s || null);
     };
+    const handleOpenHelpCenter = () => {
+      setIsGlobalHelpCenterOpen(true);
+    };
     window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
     window.addEventListener('groovelab_parent_mode_changed', handleParentModeChange);
     window.addEventListener('campus_board_permission_changed', handlePermissionChange);
+    window.addEventListener('campus_open_help_center', handleOpenHelpCenter);
     window.addEventListener('storage', handleSimDateSync);
     window.addEventListener('groovelab_simulated_date_changed', handleSimDateSync);
     return () => {
       window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
       window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChange);
       window.removeEventListener('campus_board_permission_changed', handlePermissionChange);
+      window.removeEventListener('campus_open_help_center', handleOpenHelpCenter);
       window.removeEventListener('storage', handleSimDateSync);
       window.removeEventListener('groovelab_simulated_date_changed', handleSimDateSync);
     };
@@ -10098,6 +10105,40 @@ function App() {
                   </div>
                 </div>
               )}
+              {/* Leitfäden & Akademie Button */}
+              <button 
+                onClick={() => setIsGlobalHelpCenterOpen(true)}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  height: windowWidth <= 768 ? '36px' : '40px', 
+                  padding: windowWidth <= 1024 ? '0 10px' : '0 14px',
+                  borderRadius: '12px', 
+                  background: '#f8fafc', 
+                  border: '1px solid #e2e8f0', 
+                  color: '#475569', 
+                  fontWeight: 750,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  flexShrink: 0
+                }}
+                className="hover-scale"
+                title="Leitfäden & Akademie öffnen"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.color = '#475569';
+                }}
+              >
+                <BookOpen size={15} />
+                {windowWidth > 1024 && <span>Hilfe & Guides</span>}
+              </button>
+
               {/* Elegant Refresh / Reload Button */}
               <button 
                 onClick={() => window.location.reload()}
@@ -14345,6 +14386,19 @@ function App() {
             onComplete={() => setShowPilotAgreementModal(false)}
             onShowPrivacy={() => setShowPrivacy(true)}
             onShowAgb={() => setShowAgb(true)}
+          />
+        </Suspense>
+      )}
+
+      {/* Global Leitfäden & Akademie Modal */}
+      {isGlobalHelpCenterOpen && (
+        <Suspense fallback={null}>
+          <HelpCenterModal
+            isOpen={isGlobalHelpCenterOpen}
+            onClose={() => setIsGlobalHelpCenterOpen(false)}
+            userRole={user?.role || 'admin'}
+            activePlatform={activePlatform as any}
+            schoolName={school?.name || 'Meine Musikschule'}
           />
         </Suspense>
       )}

@@ -22,6 +22,7 @@ import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStude
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { AVVModal } from './AVVModal';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
+import { HelpCenterModal } from './help/HelpCenterModal';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -18989,6 +18990,7 @@ function DeviceSetupScreen({
   const [isSaving, setIsSaving] = useState(false);
   const [copiedKioskLink, setCopiedKioskLink] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [isHelpCenterOpen, setIsHelpCenterOpen] = useState(false);
 
   useEffect(() => {
     if (rooms.length > 0 && !selectedRoomId) {
@@ -19868,6 +19870,56 @@ function DeviceSetupScreen({
               </button>
             </div>
 
+            {/* Sektion: Leitfäden & Akademie (Offizielles Handbuch) */}
+            <div style={{ 
+              background: activePlatform === 'campus' ? '#f0fdf4' : '#fefce8', 
+              borderRadius: '24px', 
+              padding: '20px 24px', 
+              border: `1.5px solid ${activePlatform === 'campus' ? '#bbf7d0' : '#fef08a'}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              marginTop: '8px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: brandColor, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <BookOpen size={20} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: activePlatform === 'campus' ? '#14532d' : '#713f12' }}>
+                      Leitfäden & Akademie (Offizielles Handbuch)
+                    </h4>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: activePlatform === 'campus' ? '#166534' : '#854d0e' }}>
+                      Schritt-für-Schritt-Anleitungen für Schulleitung, Kollegium und Schüler sowie Feature-Guides und FAQ.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsHelpCenterOpen(true)}
+                  style={{
+                    background: brandColor,
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '9px 18px',
+                    borderRadius: '10px',
+                    fontWeight: 800,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: `0 4px 12px ${brandColor}25`,
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale"
+                >
+                  <BookOpen size={14} /> Leitfäden öffnen
+                </button>
+              </div>
+            </div>
+
             {/* Sektion: Ideenschmiede & Feedback */}
             <div style={{ 
               background: '#fdf2f8', 
@@ -19961,8 +20013,6 @@ function DeviceSetupScreen({
                   cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}
-                
-                
               >
                 Wochenplan bereinigen (Datenleichen entfernen)
               </button>
@@ -19985,8 +20035,6 @@ function DeviceSetupScreen({
                   cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}
-                
-                
               >
                 Wochenplan komplett leeren
               </button>
@@ -20028,8 +20076,6 @@ function DeviceSetupScreen({
                   cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}
-                
-                
               >
                 Übe-Statistiken zurücksetzen
               </button>
@@ -20048,6 +20094,19 @@ function DeviceSetupScreen({
         schoolId={effectiveSchool?.id || school?.id}
         schoolName={effectiveSchool?.name}
         activePlatform={activePlatform as any}
+      />
+
+      {/* Leitfäden & Akademie Modal */}
+      <HelpCenterModal
+        isOpen={isHelpCenterOpen}
+        onClose={() => setIsHelpCenterOpen(false)}
+        userRole="admin"
+        activePlatform={activePlatform as any}
+        schoolName={effectiveSchool?.name || school?.name}
+        onOpenFeedbackHub={() => {
+          setIsHelpCenterOpen(false);
+          setIsFeedbackModalOpen(true);
+        }}
       />
     </div>
   );

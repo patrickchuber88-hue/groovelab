@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
+import { HelpCenterModal } from './help/HelpCenterModal';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 
 const timeToMinutes = (timeStr: string): number => {
@@ -67,6 +68,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   // Navigation State
   const [activeBoard, setActiveBoard] = useState<'compass' | 'classes' | 'schedule' | 'bypass' | 'setup' | 'rooms'>(initialBoard);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [isHelpCenterOpen, setIsHelpCenterOpen] = useState(false);
 
   // Teacher Profile Data
   const [teacher, setTeacher] = useState<any>(null);
@@ -2027,6 +2029,14 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               <Settings size={18} />
               <span>Mein Setup</span>
             </button>
+
+            <button
+              onClick={() => setIsHelpCenterOpen(true)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm text-slate-400 hover:text-emerald-400 hover:bg-slate-800/50 transition-all duration-200"
+            >
+              <BookOpen size={18} />
+              <span>Leitfäden & Hilfe</span>
+            </button>
           </nav>
         </div>
 
@@ -3682,6 +3692,19 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
         schoolId={teacher?.school_id || school?.id}
         schoolName={school?.name}
         activePlatform="campus"
+      />
+
+      {/* Leitfäden & Akademie Modal */}
+      <HelpCenterModal
+        isOpen={isHelpCenterOpen}
+        onClose={() => setIsHelpCenterOpen(false)}
+        userRole="teacher"
+        activePlatform="campus"
+        schoolName={school?.name}
+        onOpenFeedbackHub={() => {
+          setIsHelpCenterOpen(false);
+          setIsFeedbackModalOpen(true);
+        }}
       />
     </div>
   );
