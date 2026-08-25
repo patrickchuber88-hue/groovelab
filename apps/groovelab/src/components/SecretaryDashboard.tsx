@@ -25915,13 +25915,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             const passiveStudents = Math.max(0, students.length - activeStudents);
 
                             // Invoice A: Fixkosten
-                            const adminCost = employees.filter((e: any) => e.isActive ?? true).length * masterRates.teacher;
-                            const teacherCost = allTeachers.filter((t: any) => t.isActive ?? true).length * masterRates.teacher;
+                            // Pure management (admin/secretary) is 100% free / inclusive in base hosting.
+                            // Only pure teachers / non-exempt double roles are billed at 0,49 € / Mo.
+                            const teacherCost = billableTeachersCount * effectiveSchoolRates.priceTeacher;
                             const passiveStudentCost = (billingPayer === 'student' && studentBillingOption === 'student_partial')
                               ? (students.length * 0.09)
                               : (passiveStudents * 0.09);
                             const storageAddonCost = selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0);
-                            const totalInvoiceA_monthly = baseModuleCost + adminCost + teacherCost + passiveStudentCost + storageAddonCost;
+                            const totalInvoiceA_monthly = baseModuleCost + teacherCost + passiveStudentCost + storageAddonCost;
                             const totalInvoiceA_restYear = totalInvoiceA_monthly * remainingMonths;
 
                             // Invoice B: Variable active student profiles (from school's perspective)
@@ -25981,8 +25982,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         <strong>{baseModuleCost.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>Cloud-Datenbank &amp; Support (Verwaltung &amp; Lehrer):</span>
-                                        <strong>{((employees.length + allTeachers.length) * masterRates.teacher).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                        <span>Service- &amp; Administrationspauschale:</span>
+                                        <strong>
+                                          {billableTeachersCount > 0 
+                                            ? `${billableTeachersCount} Lehrkräfte × ${effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} € = ${teacherCost.toFixed(2).replace('.', ',')} € / Mo.`
+                                            : '0,00 € (Inklusive)'}
+                                        </strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span>Cloud-Datenbank &amp; Support (Schüler-Datenbankprofile):</span>
@@ -25990,7 +25995,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       </div>
                                       {storageAddonCost > 0 && (
                                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534', fontWeight: 700 }}>
-                                          <span>🎙️ Audio-Tresor Cloud-Speicher (+{selectedStorageAddonGb} GB):</span>
+                                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <HardDrive size={13} color="#166534" />
+                                            <span>Audio-Tresor Cloud-Speicher (+{selectedStorageAddonGb} GB):</span>
+                                          </span>
                                           <strong>{storageAddonCost.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                         </div>
                                       )}
@@ -26000,8 +26008,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       <strong>{finalInvoiceA_monthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                     </div>
                                     {hasCustomBillingAddress && billingPayer !== 'student' && (
-                                      <div style={{ fontSize: '0.62rem', color: '#34a853', borderTop: '1px solid #e6f4ea', paddingTop: '6px', marginTop: '4px' }}>
-                                        📍 Rechnungsadresse: {customBillingName}, {customBillingStreet}, {customBillingZip} {customBillingCity}
+                                      <div style={{ fontSize: '0.62rem', color: '#34a853', borderTop: '1px solid #e6f4ea', paddingTop: '6px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <School size={12} />
+                                        <span>Rechnungsanschrift: {customBillingName}, {customBillingStreet}, {customBillingZip} {customBillingCity}</span>
                                       </div>
                                     )}
                                   </div>
@@ -26071,13 +26080,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         marginTop: '4px',
                                         lineHeight: '1.35'
                                       }}>
-                                        💡 <strong>Umlage-Vorteil aktiv:</strong> Die Eltern zahlen den Jahresbeitrag von {(customUmlageAmount * 12).toFixed(2).replace('.', ',')} € direkt per Überweisung an Campus-Groovelab. Die Musikschule hat dadurch **0,00 € Kosten** und keinen Verwaltungsaufwand.
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <Sparkles size={13} color="#1d4ed8" />
+                                          <span><strong>Umlage-Vorteil aktiv:</strong> Die Eltern zahlen den Jahresbeitrag von {(customUmlageAmount * 12).toFixed(2).replace('.', ',')} € direkt per Überweisung an Campus-Groovelab. Die Musikschule hat dadurch <strong>0,00 € Kosten</strong> und keinen Verwaltungsaufwand.</span>
+                                        </div>
                                       </div>
                                     ) : (
                                       <>
                                         {hasCustomActivationBillingAddress && (
-                                          <div style={{ fontSize: '0.62rem', color: '#1d4ed8', borderTop: '1px solid #bfdbfe', paddingTop: '6px', marginTop: '6px' }}>
-                                            📍 Rechnungsadresse für Aktivierungen: {customActivationBillingName}, {customActivationBillingStreet}, {customActivationBillingZip} {customActivationBillingCity}
+                                          <div style={{ fontSize: '0.62rem', color: '#1d4ed8', borderTop: '1px solid #bfdbfe', paddingTop: '6px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <School size={12} />
+                                            <span>Rechnungsanschrift für Aktivierungen: {customActivationBillingName}, {customActivationBillingStreet}, {customActivationBillingZip} {customActivationBillingCity}</span>
                                           </div>
                                         )}
                                       </>
