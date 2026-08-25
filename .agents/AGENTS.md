@@ -138,6 +138,8 @@
   4. **Sammelzahler vs. Direktabrechnung:** GrooveLab wird **immer** vollständig von der Schule getragen. Nur für Campus gibt es optional die Eltern-Direktabrechnung.
   5. **Admin-Identität:** Schulleitung & Sekretariat (`admin`, `secretary`) haben **immer** `/campus_login_hero.png` und niemals Musiker-Avatare.
 
-
-
-
+## Master Blueprint for Onboarding & Digital ID Badges (Verbindliche Blaupause für Onboarding-Erfolg & Digitale Ausweise)
+- **Zero-Mail IAM & Sofort-Ausstellung**: Alle Onboarding- und Registrierungs-Flows (Musikschul-Self-Onboarding, Lehrer-Einladung, Schüler-Aktivierung) laufen nach der Zero-Mail-Architektur ab. Nach Abschluss der Registrierung wird dem Benutzer sofort der digitale Master-Ausweis (QR-Token, Ausweis-PIN, Geräte-PIN) live auf dem Bildschirm übergeben, ohne dass Bestätigungs-E-Mails abgewartet werden müssen.
+- **2-Spalten-Aktionsleiste für Export-Werkzeuge**: Auf der Onboarding-Erfolgsstufe (`Step 3`) müssen die Download- und Export-Optionen (*QR-Ausweis herunterladen* als JPG und *Apple Wallet Pass* als `.pkpass`) immer kompakt in einem 2-Spalten-Grid (`display: grid; grid-template-columns: 1fr 1fr; gap: 8px;`) nebeneinander gerendert werden. Die biometrische Passkey-Einrichtung (*WebAuthn / Touch ID / Face ID*) steht als primäres Sicherheits-Feature vollflächig darüber. Der Sprung ins Dashboard (*Zum Dashboard fortfahren ➔*) fungiert als unübersehbarer, dominanter Haupt-CTA am Fuß der Karte.
+- **Apple Pass Squircle Design & Lichtkante**: Der digitale Ausweis muss immer als erhabene Karte mit 20px Squircle-Radius, transluzenter oberer Lichtkante (`inset 0 1px 0 rgba(255, 255, 255, 0.45)`), dezentem Diffusionsschatten (`0 12px 28px -4px rgba(52, 168, 83, 0.25)`) und scharfem, weiß hinterlegtem QR-Code-Inlay gerendert werden.
+- **100% Monochrome Icons & Kopier-Ergonomie**: In Hinweis- und Zugangsdaten-Boxen dürfen NIEMALS mehrfarbige Standard-Emojis (wie ⚠️) verwendet werden. Es müssen ausschließlich monochrome Lucide-Icons (z. B. `<ShieldCheck size={14} />`) zum Einsatz kommen. Zugangsdaten (Ausweis-PIN und Geräte-PIN) müssen ein klares Monospace-Formatting aufweisen und optional per Quick-Tap kopierbar sein.

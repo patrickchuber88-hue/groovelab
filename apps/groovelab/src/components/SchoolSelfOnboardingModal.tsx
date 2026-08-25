@@ -428,7 +428,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                {step === 1 ? 'Campus-Groovelab Registrierung' : '🎉 Registrierung erfolgreich!'}
+                {step === 1 ? 'Campus-Groovelab Registrierung' : 'Registrierung erfolgreich!'}
               </h2>
               <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
                 {step === 1 ? 'Kostenfreie Bereitstellung für Ihre Musikschule' : 'Ihr Schulleiter-Zugang ist sofort einsatzbereit'}
@@ -823,7 +823,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 }}
               >
                 {copiedLink ? <Check size={13} /> : <Link size={13} />}
-                {copiedLink ? 'Zugangslink kopiert! (z.B. für Büro-Mac/AirDrop)' : '🔗 Zugangslink kopieren (für Gerätewechsel)'}
+                {copiedLink ? 'Zugangslink kopiert! (z.B. für Büro-Mac/AirDrop)' : 'Zugangslink kopieren (für Gerätewechsel)'}
               </button>
 
               {/* Download Buttons (JPG & Apple Wallet) */}

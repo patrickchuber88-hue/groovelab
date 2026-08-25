@@ -3,7 +3,7 @@ import QRCode from 'react-qr-code';
 import { supabase } from '../lib/supabase';
 import { 
   School, User, Mail, Lock, Phone, MapPin, CheckCircle, 
-  ArrowRight, ArrowLeft, RefreshCw, Key, ShieldCheck, Check, Sparkles, Download, Fingerprint
+  ArrowRight, ArrowLeft, RefreshCw, Key, ShieldCheck, ShieldAlert, Check, Sparkles, Download, Fingerprint, Copy
 } from 'lucide-react';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 import { inlineAllImagesInElement } from './IDBadgeCard';
@@ -18,6 +18,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedCredentials, setCopiedCredentials] = useState(false);
   
   const [createdUser, setCreatedUser] = useState<{
     id: string;
@@ -28,6 +29,14 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     schoolName: string;
     birthDay?: number;
   } | null>(null);
+
+  const handleCopyCredentials = () => {
+    if (!createdUser) return;
+    const text = `Campus-Groovelab Zugangsdaten für ${createdUser.first_name} ${createdUser.last_name}:\nAusweis-PIN: ${createdUser.ausweis_nummer}\nGeräte-PIN: ${String(createdUser.birthDay || '').padStart(2, '0')}`;
+    navigator.clipboard.writeText(text);
+    setCopiedCredentials(true);
+    setTimeout(() => setCopiedCredentials(false), 2500);
+  };
 
   // Biometrische Login-States
   const [biometricsStatus, setBiometricsStatus] = useState<'idle' | 'registering' | 'success' | 'error'>('idle');
@@ -792,13 +801,13 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
         {/* STEP 3: REGISTRATION SUCCESS & QR BADGE PREVIEW */}
         {step === 3 && createdUser && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', marginBottom: '2px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center', position: 'relative' }}>
+            <div style={{ width: '46px', height: '46px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#15803d', marginBottom: '0px', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)' }}>
               <CheckCircle size={24} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#34a853', fontFamily: '"Outfit", sans-serif' }}>Registrierung erfolgreich!</h3>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#15803d', fontFamily: '"Outfit", sans-serif', letterSpacing: '-0.02em' }}>Registrierung erfolgreich!</h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#475569', fontWeight: 600 }}>
                 Die Schule <strong>{createdUser.schoolName}</strong> wurde erfolgreich angelegt.
               </p>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
@@ -806,56 +815,57 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               </p>
             </div>
 
-            {/* Admin ID / QR Card (Branded with Campus-Groovelab gradient) */}
+            {/* Admin ID / QR Card (Apple Squircle & Lichtkante) */}
             <div 
               ref={cardRef}
               style={{
-                background: 'linear-gradient(135deg, #34a853 0%, #fbbc05 100%)',
+                background: 'linear-gradient(135deg, #34a853 0%, #15803d 60%, #eab308 100%)',
                 borderRadius: '20px',
                 padding: '16px',
                 width: '100%',
                 maxWidth: '280px',
-                boxShadow: '0 12px 24px rgba(52, 168, 83, 0.15)',
+                boxShadow: '0 16px 32px -4px rgba(52, 168, 83, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.45)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 color: '#ffffff',
-                border: '1px solid rgba(255,255,255,0.08)',
-                boxSizing: 'border-box'
+                border: '1px solid rgba(255,255,255,0.2)',
+                boxSizing: 'border-box',
+                position: 'relative'
               }}
             >
-              <div style={{ fontSize: '9px', fontWeight: 900, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '12px', opacity: 0.9 }}>
+              <div style={{ fontSize: '9px', fontWeight: 900, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '10px', opacity: 0.95, textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>
                 Campus-Groovelab Ausweis
               </div>
               
-              {/* QR Code */}
+              {/* QR Code Inlay */}
               <div style={{
-                background: 'white',
-                borderRadius: '12px',
+                background: '#ffffff',
+                borderRadius: '14px',
                 padding: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.1)'
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.8)'
               }}>
                 <QRCode
                   id="signup-qr-code-svg"
                   value={`${window.location.origin}/qr/${createdUser.qr_token}`}
-                  size={120}
+                  size={118}
                   style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                   viewBox={`0 0 256 256`}
                 />
               </div>
 
-              <div style={{ marginTop: '10px', fontWeight: 800, fontSize: '0.95rem', fontFamily: '"Outfit", sans-serif', textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>
+              <div style={{ marginTop: '10px', fontWeight: 800, fontSize: '0.95rem', fontFamily: '"Outfit", sans-serif', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
                 {createdUser.first_name} {createdUser.last_name}
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#ffffff', fontWeight: 700, textTransform: 'uppercase', marginTop: '1px', opacity: 0.85 }}>
+              <div style={{ fontSize: '0.68rem', color: '#fef08a', fontWeight: 800, textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.06em' }}>
                 Administrator
               </div>
             </div>
 
-            {/* Credentials Note Box */}
+            {/* Credentials Note Box (Monochrome Icon + Copy Support) */}
             <div style={{
               background: '#fffbeb',
               border: '1.5px solid #fef3c7',
@@ -869,11 +879,34 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               fontSize: '0.78rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '4px',
-              boxShadow: '0 4px 10px rgba(251, 191, 36, 0.03)'
+              gap: '6px',
+              boxShadow: '0 4px 10px rgba(251, 191, 36, 0.04)'
             }}>
-              <div style={{ fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: '0.04em', color: '#b45309' }}>
-                ⚠️ WICHTIGE ZUGANGSDATEN (Bitte sicher abspeichern)
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: '0.04em', color: '#b45309' }}>
+                  <ShieldAlert size={13} color="#b45309" />
+                  <span>WICHTIGE ZUGANGSDATEN</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyCredentials}
+                  title="Zugangsdaten kopieren"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '2px 4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: copiedCredentials ? '#15803d' : '#b45309',
+                    fontSize: '10px',
+                    fontWeight: 700
+                  }}
+                >
+                  {copiedCredentials ? <Check size={12} /> : <Copy size={12} />}
+                  {copiedCredentials ? 'Kopiert!' : 'Kopieren'}
+                </button>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #fde68a', paddingBottom: '3px' }}>
                 <span style={{ fontWeight: 700 }}>Ausweis-PIN:</span>
@@ -885,10 +918,10 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '280px', marginTop: '4px' }}>
+            {/* Action Stack (2-Column Grid for Downloads) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '280px', marginTop: '2px' }}>
               
-              {/* Biometrics Setup Button (Fingerprint) */}
+              {/* Biometrics Setup Button (Full-width prominence) */}
               {isWebAuthnSupported() && (
                 <button
                   onClick={handleRegisterBiometrics}
@@ -908,10 +941,11 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                     justifyContent: 'center',
                     gap: '6px',
                     boxSizing: 'border-box',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
                   }}
                 >
-                  <Fingerprint size={14} />
+                  <Fingerprint size={15} />
                   {biometricsStatus === 'idle' && 'Fingerabdruck / FaceID einrichten'}
                   {biometricsStatus === 'registering' && 'Einrichtung läuft...'}
                   {biometricsStatus === 'success' && 'Biometrischer Login aktiv ✓'}
@@ -925,62 +959,69 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                 </div>
               )}
 
-              <button 
-                onClick={downloadQrCode} 
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  border: '1.5px solid #d1d5db',
-                  background: 'white',
-                  color: '#475569',
-                  fontWeight: 800,
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  boxSizing: 'border-box'
-                }}
-              >
-                <Download size={14} /> QR-Ausweis herunterladen
-              </button>
+              {/* 2-Column Export Actions */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%' }}>
+                <button 
+                  onClick={downloadQrCode} 
+                  style={{
+                    width: '100%',
+                    padding: '9px 10px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #d1d5db',
+                    background: 'white',
+                    color: '#475569',
+                    fontWeight: 800,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    boxSizing: 'border-box',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <Download size={13} /> QR-Ausweis
+                </button>
 
-              <button 
-                onClick={downloadWalletPass} 
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  border: '1.5px solid #d1d5db',
-                  background: 'white',
-                  color: '#475569',
-                  fontWeight: 800,
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  boxSizing: 'border-box'
-                }}
-              >
-                <Key size={14} /> Wallet Pass (.pkpass)
-              </button>
+                <button 
+                  onClick={downloadWalletPass} 
+                  style={{
+                    width: '100%',
+                    padding: '9px 10px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #d1d5db',
+                    background: 'white',
+                    color: '#475569',
+                    fontWeight: 800,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    boxSizing: 'border-box',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <Key size={13} /> Apple Wallet
+                </button>
+              </div>
 
+              {/* Dominant Primary Call-to-Action */}
               <button 
                 onClick={() => onSignupSuccess(createdUser.id)}
                 style={{
                   ...nextButtonStyle,
                   width: '100%',
                   margin: '4px 0 0 0',
-                  padding: '10px 14px',
-                  fontSize: '0.82rem',
-                  boxSizing: 'border-box'
+                  padding: '12px 16px',
+                  fontSize: '0.88rem',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 12px 24px rgba(52, 168, 83, 0.22)'
                 }}
               >
-                Zum Dashboard fortfahren <ArrowRight size={14} />
+                Zum Dashboard fortfahren <ArrowRight size={15} />
               </button>
             </div>
           </div>

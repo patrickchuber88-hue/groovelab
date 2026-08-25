@@ -43,6 +43,10 @@ rsync -avz --delete \
   "$LOCAL_DIST/" \
   "$SERVER:$REMOTE_DIR/"
 
+# 4. Synchronisiere Build-Dateien direkt in den aktiven Web-Container
+echo "🚀 Synchronisiere Live-Web-Container..."
+ssh "$SERVER" "WEB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -v 'supabase\|coolify' | head -n 1); if [ -n \"\$WEB_CONTAINER\" ]; then docker cp $REMOTE_DIR/. \$WEB_CONTAINER:/usr/share/nginx/html/; echo \"  ✓ Live-Web-Container (\$WEB_CONTAINER) erfolgreich aktualisiert.\"; fi"
+
 echo ""
 echo "✅ Deployment abgeschlossen!"
 echo "   Die App ist jetzt erreichbar unter: https://campus-groovelab.de"
