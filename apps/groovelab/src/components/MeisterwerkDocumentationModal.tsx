@@ -2078,8 +2078,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         const saveAudioMetadata = async (audioUrlString: string) => {
           try {
-            const userRoleInSession = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
-            const isStudentSession = userRoleInSession === 'student' || readOnly || (!isTeacherTools && student.id !== 'teacher-self');
+            const isTeacherActor = !readOnly;
+            const isStudentSession = !isTeacherActor;
             
             if (blob) {
               await storeBlob(audioUrlString, blob).catch(() => {});
@@ -2117,16 +2117,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               const creatorRole = 'teacher';
               const initialVisibility = 'shared_with_teacher';
               const smartTitle = generateSmartAudioTitle(true, audioLabel);
-              const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}`;
+              const recDur = durationInSeconds || Math.round(audioDuration) || 1;
+              const audioMetaStr = `AUDIO:${audioUrlString}|${recDur}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}`;
               
               setHomeworkNotesList(prev => {
-                const updated = [...prev, audioMetaStr];
-                syncHomeworkNotes(updated).catch(err => console.warn('[saveAudioMetadata] syncHomeworkNotes note:', err));
-                return updated;
+                const existing = prev || [];
+                const updatedList = [...existing.filter(n => n !== audioMetaStr), audioMetaStr];
+                syncHomeworkNotes(updatedList).catch(err => console.warn('[saveAudioMetadata] sync note:', err));
+                return updatedList;
               });
             }
             
-            await fetchProgress().catch(() => {});
             notifyHomeworkChange();
             setAudioLabel('');
           } catch (saveErr) {
@@ -2249,7 +2250,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const stopRecordingAudio = (activeRecorder?: MediaRecorder) => {
-    const rec = activeRecorder || mediaRecorderInstance;
+    const rec = activeRecorder || mediaRecorderRef.current || mediaRecorderInstance;
     if (rec && rec.state !== 'inactive') {
       try {
         rec.requestData();
@@ -2909,14 +2910,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           try {
             if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
               const parsed = JSON.parse(rawNotes);
-              loadedHomeworkNotesList = parsed;
-              loadedHomeworkNotes = parsed.filter((n: string) => 
-                typeof n === 'string' && 
-                !n.startsWith('AUDIO:') && 
-                !n.startsWith('STICKER:') && 
-                !n.startsWith('FEEDBACK:') && 
-                !n.startsWith('STUDENT_NOTE_')
-              ).join('\n\n');
+              if (Array.isArray(parsed)) {
+                loadedHomeworkNotesList = [...parsed];
+              }
             } else {
               const cleanNotes = rawNotes
                 .split('\n')
@@ -2925,12 +2921,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 .trim();
               if (cleanNotes) {
                 loadedHomeworkNotesList = cleanNotes.split('\n\n').filter(Boolean);
-                loadedHomeworkNotes = cleanNotes;
               }
             }
           } catch (e) {
             loadedHomeworkNotesList = [rawNotes];
-            loadedHomeworkNotes = rawNotes;
           }
         }
         if (currentWeekHomework.teacher_notes) {
@@ -2938,30 +2932,53 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }
       }
 
-      // LocalStorage fallback for instantaneous 100% data preservation
-      if (!loadedHomeworkNotes || loadedHomeworkNotesList.length === 0) {
-        try {
-          const cachedHW = localStorage.getItem(`campus_homework_notes_${student.id}`);
-          if (cachedHW) {
-            if (cachedHW.startsWith('[') && cachedHW.endsWith(']')) {
-              const parsed = JSON.parse(cachedHW);
-              if (loadedHomeworkNotesList.length === 0) loadedHomeworkNotesList = parsed;
-              if (!loadedHomeworkNotes) {
-                loadedHomeworkNotes = parsed.filter((n: string) => 
-                  typeof n === 'string' && 
-                  !n.startsWith('AUDIO:') && 
-                  !n.startsWith('STICKER:') && 
-                  !n.startsWith('FEEDBACK:') && 
-                  !n.startsWith('STUDENT_NOTE_')
-                ).join('\n\n');
-              }
-            } else if (!loadedHomeworkNotes) {
-              loadedHomeworkNotes = cachedHW;
-              if (loadedHomeworkNotesList.length === 0) loadedHomeworkNotesList = [cachedHW];
+      // Check localStorage to ensure all audio items are preserved
+      try {
+        const cachedHW = localStorage.getItem(`campus_homework_notes_${student.id}`);
+        if (cachedHW) {
+          if (cachedHW.startsWith('[') && cachedHW.endsWith(']')) {
+            const parsed = JSON.parse(cachedHW);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((item: any) => {
+                if (typeof item === 'string' && !loadedHomeworkNotesList.includes(item)) {
+                  loadedHomeworkNotesList.push(item);
+                }
+              });
             }
+          } else if (!loadedHomeworkNotesList.includes(cachedHW)) {
+            loadedHomeworkNotesList.push(cachedHW);
           }
-        } catch (lsErr) {}
-      }
+        }
+      } catch (lsErr) {}
+
+      // Check all progress items for any AUDIO: entries
+      (data || []).forEach(item => {
+        if (item.homework_notes && typeof item.homework_notes === 'string' && item.homework_notes.includes('AUDIO:')) {
+          try {
+            if (item.homework_notes.startsWith('[') && item.homework_notes.endsWith(']')) {
+              const p = JSON.parse(item.homework_notes);
+              if (Array.isArray(p)) {
+                p.forEach((n: any) => {
+                  if (typeof n === 'string' && n.includes('AUDIO:') && !loadedHomeworkNotesList.includes(n)) {
+                    loadedHomeworkNotesList.push(n);
+                  }
+                });
+              }
+            } else if (!loadedHomeworkNotesList.includes(item.homework_notes)) {
+              loadedHomeworkNotesList.push(item.homework_notes);
+            }
+          } catch {}
+        }
+      });
+
+      // Filter text notes for the textarea
+      loadedHomeworkNotes = loadedHomeworkNotesList.filter((n: string) => 
+        typeof n === 'string' && 
+        !n.startsWith('AUDIO:') && 
+        !n.startsWith('STICKER:') && 
+        !n.startsWith('FEEDBACK:') && 
+        !n.startsWith('STUDENT_NOTE_')
+      ).join('\n\n');
 
       if (!loadedTeacherNotes) {
         try {
@@ -5406,9 +5423,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         ? songHomeworkNotes.trim()
         : (isLehrwerkPage
             ? pageHomeworkNotes.trim()
-            : (finalTopicName.startsWith('Hausaufgabe KW ')
-                ? combinedHomeworkNotes
-                : JSON.stringify(finalNotesList.filter((n: string) => !n.startsWith('AUDIO:')))));
+            : combinedHomeworkNotes);
 
       const row = {
         student_id: student.id,
@@ -5424,7 +5439,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       // Immediate local backup (only for general homework notes)
       if (!isLehrwerkPage && !isSong) {
         try {
-          localStorage.setItem(`campus_homework_notes_${student.id}`, effectiveGeneralNotes.trim());
+          localStorage.setItem(`campus_homework_notes_${student.id}`, combinedHomeworkNotes);
           localStorage.setItem(`campus_teacher_notes_${student.id}`, effectiveTeacherNotes.trim());
         } catch (lsErr) {
           console.warn('[Meisterwerk] localStorage backup notice:', lsErr);
@@ -14826,19 +14841,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           return { title, pages: info.pages, notes: info.notes };
                         });
 
-                        const audioNotes = homeworkNotesList
-                          .map((note, idx) => ({ note, idx }))
-                          .filter(item => item.note.startsWith("AUDIO:"))
+                        const audioNotes = (homeworkNotesList || [])
+                          .map((note, idx) => ({ note: typeof note === 'string' ? note : String(note || ''), idx }))
+                          .filter(item => item.note.includes("AUDIO:"))
                           .map((item, index) => {
-                            const parts = item.note.substring(6).split('|');
+                            const cleanStr = item.note.startsWith('[') ? item.note.replace(/[\[\]"]/g, '') : item.note;
+                            const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
                             return {
-                              url: parts[0],
+                              url: parts[0]?.trim(),
                               duration: parseInt(parts[1] || '0', 10),
-                              label: parts[3] || `Play-Along #${index + 1}`,
+                              label: parts[3]?.trim() || `Play-Along #${index + 1}`,
                               originalIdx: item.idx,
                               idx: item.idx
                             };
-                          });
+                          })
+                          .filter(a => !!a.url);
 
                         const homeworkNoteItems = getHomeworkNoteItems(generalHomeworkNotes);
                         const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0;
@@ -15852,16 +15869,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     />
                                   </div>
 
-                                  {/* Single Dynamic Textarea */}
+                                  {/* Single Dynamic Textarea (Auto-Expanding with Content) */}
                                   {activeNoteTarget === 'student' ? (
                                     <textarea
+                                      ref={(el) => {
+                                        if (el) {
+                                          el.style.height = 'auto';
+                                          el.style.height = `${Math.max(54, el.scrollHeight)}px`;
+                                        }
+                                      }}
                                       placeholder="Trage hier zusätzliche Bemerkungen zur Hausaufgabe ein..."
                                       value={generalHomeworkNotes}
+                                      onInput={(e) => {
+                                        const target = e.currentTarget;
+                                        target.style.height = 'auto';
+                                        target.style.height = `${Math.max(54, target.scrollHeight)}px`;
+                                      }}
                                       onChange={(e) => {
                                         const val = e.target.value;
                                         latestGeneralHomeworkNotesRef.current = val;
                                         setGeneralHomeworkNotes(val);
-                                        try { localStorage.setItem(`campus_homework_notes_${student.id}`, val); } catch {}
+                                        const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
+                                        const noteLines = val.split('\n').map(s => s.trim()).filter(Boolean);
+                                        const combined = [...specialNotes, ...noteLines];
+                                        setHomeworkNotesList(combined);
+                                        try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
                                         triggerDebouncedAutoSave(350);
                                       }}
                                       onFocus={() => setIsNotesFocused(true)}
@@ -15871,7 +15903,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       }}
                                       style={{
                                         width: '100%',
-                                        height: '60px',
+                                        minHeight: '54px',
                                         padding: '8px 12px',
                                         borderRadius: '10px',
                                         border: '1px solid #e2e8f0',
@@ -15880,15 +15912,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         lineHeight: 1.45,
                                         outline: 'none',
                                         resize: 'none',
+                                        overflowY: 'hidden',
                                         background: '#f8fafc',
                                         color: '#0f172a',
-                                        boxSizing: 'border-box'
+                                        boxSizing: 'border-box',
+                                        transition: 'height 0.1s ease'
                                       }}
                                     />
                                   ) : (
                                     <textarea
+                                      ref={(el) => {
+                                        if (el) {
+                                          el.style.height = 'auto';
+                                          el.style.height = `${Math.max(54, el.scrollHeight)}px`;
+                                        }
+                                      }}
                                       placeholder="Vertrauliche Notizen zum Schüler (nur für dich sichtbar)..."
                                       value={teacherNotes}
+                                      onInput={(e) => {
+                                        const target = e.currentTarget;
+                                        target.style.height = 'auto';
+                                        target.style.height = `${Math.max(54, target.scrollHeight)}px`;
+                                      }}
                                       onChange={(e) => {
                                         const val = e.target.value;
                                         latestTeacherNotesRef.current = val;
@@ -15899,7 +15944,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       onBlur={() => triggerImmediateAutoSave()}
                                       style={{
                                         width: '100%',
-                                        height: '60px',
+                                        minHeight: '54px',
                                         padding: '8px 12px',
                                         borderRadius: '10px',
                                         border: '1px solid #e2e8f0',
@@ -15908,9 +15953,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         lineHeight: 1.45,
                                         outline: 'none',
                                         resize: 'none',
+                                        overflowY: 'hidden',
                                         background: '#f8fafc',
                                         color: '#334155',
-                                        boxSizing: 'border-box'
+                                        boxSizing: 'border-box',
+                                        transition: 'height 0.1s ease'
                                       }}
                                     />
                                   )}

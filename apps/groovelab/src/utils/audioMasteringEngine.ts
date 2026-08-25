@@ -1112,51 +1112,49 @@ export async function processDualMastering(
 
   const arrayBuffer = await audioInput.arrayBuffer();
   const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  let decodedBuffer: AudioBuffer;
   try {
     const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
-    decodedBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
+    const decodedBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
+    const originalLufs = Math.round(calculateIntegratedLufs(decodedBuffer) * 10) / 10;
+
+    // 1. Generate Pure RAW Buffer (Calibrated to TARGET_PURE_RAW_LUFS = -14.5 LUFS)
+    const rawBuffer = tempCtx.createBuffer(2, decodedBuffer.length, decodedBuffer.sampleRate);
+    rawBuffer.getChannelData(0).set(decodedBuffer.getChannelData(0));
+    rawBuffer.getChannelData(1).set(decodedBuffer.getChannelData(1));
+    processPureRawAudioBuffer(rawBuffer, {
+      targetLufs: TARGET_PURE_RAW_LUFS,
+      targetPeakDb: TARGET_PEAK_DBTP
+    });
+
+    const rawWavBlob = audioBufferToWavBlob(rawBuffer, {
+      title: 'Campus-Groovelab Pure RAW Audio',
+      artist: 'Campus-Groovelab'
+    });
+    const rawNormalizedUrl = URL.createObjectURL(rawWavBlob);
+
+    // 2. Generate Studio Master (DIRECTLY from Pure RAW Buffer, calibrated to TARGET_STUDIO_LUFS = -14.0 LUFS)
+    const masterRes = await processStudioMasteringAudioBuffer(rawBuffer, {
+      ...mergedOptions,
+      targetLufs: TARGET_STUDIO_LUFS,
+      targetPeakDb: TARGET_PEAK_DBTP
+    });
+
+    return {
+      masteredBlob: masterRes.masteredBlob,
+      masteredUrl: masterRes.masteredUrl,
+      rawNormalizedBlob: rawWavBlob,
+      rawNormalizedUrl,
+      originalLufs,
+      finalLufs: masterRes.finalLufs,
+      detectedF0MinHz: masterRes.detectedF0MinHz,
+      adaptiveHpfFreqHz: masterRes.adaptiveHpfFreqHz,
+      durationSec: masterRes.durationSec
+    };
   } finally {
     try {
       tempCtx.close();
     } catch (e) {}
   }
-
-  const originalLufs = Math.round(calculateIntegratedLufs(decodedBuffer) * 10) / 10;
-
-  // 1. Generate Pure RAW Buffer (Calibrated to TARGET_PURE_RAW_LUFS = -14.5 LUFS)
-  const rawBuffer = tempCtx.createBuffer(2, decodedBuffer.length, decodedBuffer.sampleRate);
-  rawBuffer.getChannelData(0).set(decodedBuffer.getChannelData(0));
-  rawBuffer.getChannelData(1).set(decodedBuffer.getChannelData(1));
-  processPureRawAudioBuffer(rawBuffer, {
-    targetLufs: TARGET_PURE_RAW_LUFS,
-    targetPeakDb: TARGET_PEAK_DBTP
-  });
-
-  const rawWavBlob = audioBufferToWavBlob(rawBuffer, {
-    title: 'Campus-Groovelab Pure RAW Audio',
-    artist: 'Campus-Groovelab'
-  });
-  const rawNormalizedUrl = URL.createObjectURL(rawWavBlob);
-
-  // 2. Generate Studio Master (DIRECTLY from Pure RAW Buffer, calibrated to TARGET_STUDIO_LUFS = -14.0 LUFS)
-  const masterRes = await processStudioMasteringAudioBuffer(rawBuffer, {
-    ...mergedOptions,
-    targetLufs: TARGET_STUDIO_LUFS,
-    targetPeakDb: TARGET_PEAK_DBTP
-  });
-
-  return {
-    masteredBlob: masterRes.masteredBlob,
-    masteredUrl: masterRes.masteredUrl,
-    rawNormalizedBlob: rawWavBlob,
-    rawNormalizedUrl,
-    originalLufs,
-    finalLufs: masterRes.finalLufs,
-    detectedF0MinHz: masterRes.detectedF0MinHz,
-    adaptiveHpfFreqHz: masterRes.adaptiveHpfFreqHz,
-    durationSec: masterRes.durationSec
-  };
 }
 
 // ==============================================================================
