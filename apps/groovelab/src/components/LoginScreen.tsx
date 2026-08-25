@@ -3534,6 +3534,52 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [geoDebug, setGeoDebug] = useState<any>(null);
   const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && import.meta.env.DEV;
 
+  const [bypassUserCounts, setBypassUserCounts] = useState<{
+    hasTeacher: boolean;
+    hasStudent: boolean;
+    hasAdmin: boolean;
+    teacherName?: string;
+    studentName?: string;
+    adminName?: string;
+  }>({
+    hasTeacher: false,
+    hasStudent: false,
+    hasAdmin: false
+  });
+
+  useEffect(() => {
+    if (!isLocalhost) return;
+    const targetSchoolId = schoolData?.id;
+    if (!targetSchoolId) return;
+
+    const loadSchoolUsers = async () => {
+      try {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, role, first_name, last_name, is_master_admin')
+          .eq('school_id', targetSchoolId);
+
+        if (users) {
+          const teachers = users.filter((u: any) => u.role === 'teacher' && !u.is_master_admin);
+          const students = users.filter((u: any) => u.role === 'student');
+          const admins = users.filter((u: any) => (u.role === 'admin' || u.role === 'secretary'));
+
+          setBypassUserCounts({
+            hasTeacher: teachers.length > 0,
+            hasStudent: students.length > 0,
+            hasAdmin: admins.length > 0,
+            teacherName: teachers[0] ? `${teachers[0].first_name} ${teachers[0].last_name || ''}`.trim() : undefined,
+            studentName: students[0] ? `${students[0].first_name} ${students[0].last_name || ''}`.trim() : undefined,
+            adminName: admins[0] ? `${admins[0].first_name} ${admins[0].last_name || ''}`.trim() : undefined
+          });
+        }
+      } catch (e) {
+        console.warn('[Bypass counts error]:', e);
+      }
+    };
+    loadSchoolUsers();
+  }, [schoolData?.id, isLocalhost]);
+
   // Intercept and render coach self-onboarding if invite parameters are in URL
   if (inviteSchoolId) {
     const isSecretary = inviteRole === 'secretary' || inviteRole === 'admin';
@@ -4125,10 +4171,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
               <div style={{ textAlign: 'left' }}>
                 <div style={{ fontSize: '0.88rem', fontWeight: 800, color: isGroovelabKiosk ? '#0f172a' : '#ffffff' }}>
-                  Fingerabdruck-Login
+                  Fingerabdruck / Face ID
                 </div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: isGroovelabKiosk ? '#475569' : '#cbd5e1' }}>
-                  {selectedBiometricUser ? `${selectedBiometricUser.firstName} ${selectedBiometricUser.lastName}` : 'Auf diesem Gerät bereit'}
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: isGroovelabKiosk ? '#475569' : '#cbd5e1', lineHeight: '1.3' }}>
+                  {selectedBiometricUser ? (
+                    <>
+                      <span>{selectedBiometricUser.firstName} {selectedBiometricUser.lastName}</span>
+                      <span style={{ display: 'block', fontSize: '0.68rem', opacity: 0.85, color: isGroovelabKiosk ? '#78350f' : '#a7f3d0' }}>
+                        {selectedBiometricUser.role === 'admin' ? 'Schulleitung' : selectedBiometricUser.role === 'teacher' ? 'Lehrkraft' : 'Schüler'} • {selectedBiometricUser.schoolName || schoolData?.name || 'Campus-Groovelab'}
+                      </span>
+                    </>
+                  ) : (
+                    'Auf diesem Gerät bereit'
+                  )}
                 </div>
               </div>
             </div>
@@ -6439,250 +6494,196 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             👑 BYPASS: MASTER-ADMIN (Leitstand)
           </button>
 
-          {/* Lehrer Bypass (Teacher) */}
-          <button
-            type="button"
-            onClick={async () => {
-              const targetSchoolName = schoolData?.name || 'Musäk Bad Säckingen';
-              const targetSchoolId = schoolData?.id;
-              try {
-                console.log('[Bypass] Attempting Lehrer login for school:', targetSchoolName);
-                sessionStorage.removeItem('groovelab_is_master_admin');
-                sessionStorage.removeItem('groovelab_support_ghost');
+          {/* Lehrer Bypass (Teacher) - Only show if teacher exists */}
+          {bypassUserCounts.hasTeacher && (
+            <button
+              type="button"
+              onClick={async () => {
+                const targetSchoolName = schoolData?.name || 'Musikschule';
+                const targetSchoolId = schoolData?.id;
+                try {
+                  console.log('[Bypass] Attempting Lehrer login for school:', targetSchoolName);
+                  sessionStorage.removeItem('groovelab_is_master_admin');
+                  sessionStorage.removeItem('groovelab_support_ghost');
 
-                if (schoolData?.groovelab_kiosk_token) {
-                  localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
-                }
-
-                // 1. Fetch teacher for school, explicitly prioritizing Severin Landenberger / Severin L.
-                let targetUser: any = null;
-                if (targetSchoolId) {
-                  const { data: schoolUsers } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
-                    .eq('school_id', targetSchoolId);
-
-                  if (schoolUsers && schoolUsers.length > 0) {
-                    targetUser = schoolUsers.find((u: any) => 
-                      u.role === 'teacher' && 
-                      (u.first_name?.toLowerCase().includes('severin') || u.last_name?.toLowerCase().includes('landenberger') || u.last_name?.toLowerCase() === 'l.' || u.last_name?.toLowerCase() === 'l')
-                    ) ||
-                    schoolUsers.find((u: any) => u.role === 'teacher' && !u.is_master_admin) ||
-                    schoolUsers.find((u: any) => u.role === 'teacher') ||
-                    schoolUsers[0];
+                  if (schoolData?.groovelab_kiosk_token) {
+                    localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                   }
-                }
 
-                // 2. Global explicit lookup for Severin across all users
-                if (!targetUser || !targetUser.first_name?.toLowerCase().includes('severin')) {
-                  const { data: severinUsers } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
-                    .ilike('first_name', '%severin%')
-                    .limit(10);
-                  
-                  if (severinUsers && severinUsers.length > 0) {
-                    const severinTeacher = severinUsers.find((u: any) => u.role === 'teacher') || severinUsers[0];
-                    if (severinTeacher) {
-                      targetUser = severinTeacher;
+                  let targetUser: any = null;
+                  if (targetSchoolId) {
+                    const { data: schoolUsers } = await supabase
+                      .from('users')
+                      .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
+                      .eq('school_id', targetSchoolId)
+                      .eq('role', 'teacher');
+
+                    if (schoolUsers && schoolUsers.length > 0) {
+                      targetUser = schoolUsers[0];
                     }
                   }
-                }
 
-                // 3. Fallback across all teachers
-                if (!targetUser) {
-                  const { data: allUsers } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
-                    .eq('role', 'teacher')
-                    .limit(50);
-                  if (allUsers && allUsers.length > 0) {
-                    targetUser = allUsers.find((u: any) => !u.is_master_admin) || allUsers[0];
+                  if (targetUser && targetUser.role === 'teacher') {
+                    sessionStorage.removeItem('groovelab_is_master_admin');
+                    sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+                    sessionStorage.setItem('groovelab_active_platform', 'campus');
+                    sessionStorage.setItem('campus_active_tab', 'live');
+                    sessionStorage.setItem('groovelab_user_id', targetUser.id);
+                    sessionStorage.removeItem('groovelab_qr_token');
+                    onLogin(targetUser.id, true);
+                  } else {
+                    alert(`Kein Lehrer-Profil für "${targetSchoolName}" in der Datenbank gefunden.`);
                   }
+                } catch (err: any) {
+                  console.error('[Bypass] Error logging in as Lehrer:', err);
+                  alert('Bypass Fehler: ' + (err?.message || err));
                 }
+              }}
+              style={{
+                background: '#064e3b',
+                color: '#a7f3d0',
+                border: '1px solid #059669',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              🔓 BYPASS: LEHRER ({bypassUserCounts.teacherName ? `${bypassUserCounts.teacherName} • ` : ''}{schoolData?.name || 'Musikschule'})
+            </button>
+          )}
 
-                if (targetUser) {
+          {/* Schüler Bypass (Student) - Only show if student exists, NEVER fallback to teacher */}
+          {bypassUserCounts.hasStudent && (
+            <button
+              type="button"
+              onClick={async () => {
+                const targetSchoolName = schoolData?.name || 'Musikschule';
+                const targetSchoolId = schoolData?.id;
+                try {
+                  console.log('[Bypass] Attempting Schüler login for school:', targetSchoolName);
                   sessionStorage.removeItem('groovelab_is_master_admin');
-                  sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-                  sessionStorage.setItem('groovelab_active_platform', 'campus');
-                  sessionStorage.setItem('campus_active_tab', 'live');
-                  sessionStorage.setItem('groovelab_user_id', targetUser.id);
-                  sessionStorage.removeItem('groovelab_qr_token');
-                  onLogin(targetUser.id, true);
-                } else {
-                  alert(`Kein Lehrer-Profil für "${targetSchoolName}" in der Datenbank gefunden.`);
-                }
-              } catch (err: any) {
-                console.error('[Bypass] Error logging in as Lehrer:', err);
-                alert('Bypass Fehler: ' + (err?.message || err));
-              }
-            }}
-            style={{
-              background: '#064e3b',
-              color: '#a7f3d0',
-              border: '1px solid #059669',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
-            🔓 BYPASS: LEHRER (Severin L. • {schoolData?.name || 'Musäk Bad Säckingen'})
-          </button>
+                  sessionStorage.removeItem('groovelab_support_ghost');
 
-          {/* Schüler Bypass (Student) */}
-          <button
-            type="button"
-            onClick={async () => {
-              const targetSchoolName = schoolData?.name || 'Musäk Bad Säckingen';
-              const targetSchoolId = schoolData?.id;
-              try {
-                console.log('[Bypass] Attempting Schüler login for school:', targetSchoolName);
-                sessionStorage.removeItem('groovelab_is_master_admin');
-                sessionStorage.removeItem('groovelab_support_ghost');
-
-                if (schoolData?.groovelab_kiosk_token) {
-                  localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
-                }
-
-                // 1. Fetch users from selected school if present
-                let targetUser: any = null;
-                if (targetSchoolId) {
-                  const { data: schoolUsers } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
-                    .eq('school_id', targetSchoolId);
-
-                  if (schoolUsers && schoolUsers.length > 0) {
-                    targetUser = schoolUsers.find((u: any) => u.role === 'student') || schoolUsers[0];
+                  if (schoolData?.groovelab_kiosk_token) {
+                    localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                   }
-                }
 
-                // 2. Global fallback across all users
-                if (!targetUser) {
-                  const { data: allUsers } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
-                    .limit(50);
-                  if (allUsers && allUsers.length > 0) {
-                    targetUser = allUsers.find((u: any) => u.role === 'student') || allUsers[0];
+                  let targetUser: any = null;
+                  if (targetSchoolId) {
+                    const { data: schoolUsers } = await supabase
+                      .from('users')
+                      .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
+                      .eq('school_id', targetSchoolId)
+                      .eq('role', 'student');
+
+                    if (schoolUsers && schoolUsers.length > 0) {
+                      targetUser = schoolUsers[0];
+                    }
                   }
-                }
 
-                if (targetUser) {
-                  sessionStorage.removeItem('groovelab_is_master_admin');
-                  sessionStorage.setItem('groovelab_active_workspace', 'student');
-                  sessionStorage.setItem('groovelab_active_platform', 'campus');
-                  sessionStorage.setItem('groovelab_user_id', targetUser.id);
-                  sessionStorage.removeItem('groovelab_qr_token');
-                  onLogin(targetUser.id, true);
-                } else {
-                  alert(`Kein Schüler-Profil für "${targetSchoolName}" in der Datenbank gefunden.`);
+                  if (targetUser && targetUser.role === 'student') {
+                    sessionStorage.removeItem('groovelab_is_master_admin');
+                    sessionStorage.setItem('groovelab_active_workspace', 'student');
+                    sessionStorage.setItem('groovelab_active_platform', 'campus');
+                    sessionStorage.setItem('groovelab_user_id', targetUser.id);
+                    sessionStorage.removeItem('groovelab_qr_token');
+                    onLogin(targetUser.id, true);
+                  } else {
+                    alert(`Kein Schüler-Profil für "${targetSchoolName}" in der Datenbank gefunden.`);
+                  }
+                } catch (err: any) {
+                  console.error('[Bypass] Error logging in as Schüler:', err);
+                  alert('Bypass Fehler: ' + (err?.message || err));
                 }
-              } catch (err: any) {
-                console.error('[Bypass] Error logging in as Schüler:', err);
-                alert('Bypass Fehler: ' + (err?.message || err));
-              }
-            }}
-            style={{
-              background: '#064e3b',
-              color: '#a7f3d0',
-              border: '1px solid #059669',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
-            🔓 BYPASS: SCHÜLER-LOGIN ({schoolData?.name || 'Musäk Bad Säckingen'})
-          </button>
+              }}
+              style={{
+                background: '#064e3b',
+                color: '#a7f3d0',
+                border: '1px solid #059669',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              🔓 BYPASS: SCHÜLER-LOGIN ({bypassUserCounts.studentName ? `${bypassUserCounts.studentName} • ` : ''}{schoolData?.name || 'Musikschule'})
+            </button>
+          )}
 
           {/* Verwaltung / Schulleitung Bypass */}
-          <button
-            type="button"
-            onClick={async () => {
-              const targetSchoolName = schoolData?.name || 'Musäk Bad Säckingen';
-              const targetSchoolId = schoolData?.id;
-              try {
-                console.log('[Bypass] Attempting Verwaltung login for school:', targetSchoolName);
-                sessionStorage.removeItem('groovelab_is_master_admin');
-                sessionStorage.removeItem('groovelab_support_ghost');
-
-                if (schoolData?.groovelab_kiosk_token) {
-                  localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
-                }
-
-                // 1. Fetch local school admin or secretary (not master admin)
-                let targetUser: any = null;
-                if (targetSchoolId) {
-                  const { data: schoolUsers } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
-                    .eq('school_id', targetSchoolId);
-
-                  if (schoolUsers && schoolUsers.length > 0) {
-                    targetUser = schoolUsers.find((u: any) => (u.role === 'admin' || u.role === 'secretary') && !u.is_master_admin) ||
-                                 schoolUsers.find((u: any) => u.first_name?.toLowerCase().includes('kornelius')) ||
-                                 schoolUsers.find((u: any) => u.role === 'admin' || u.role === 'secretary') ||
-                                 schoolUsers[0];
-                  }
-                }
-
-                // 2. Global fallback across all admin users
-                if (!targetUser) {
-                  const { data: allUsers } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
-                    .in('role', ['admin', 'secretary'])
-                    .limit(50);
-                  if (allUsers && allUsers.length > 0) {
-                    targetUser = allUsers.find((u: any) => !u.is_master_admin) || allUsers[0];
-                  }
-                }
-
-                if (targetUser) {
+          {(bypassUserCounts.hasAdmin || !schoolData?.id) && (
+            <button
+              type="button"
+              onClick={async () => {
+                const targetSchoolName = schoolData?.name || 'Musikschule';
+                const targetSchoolId = schoolData?.id;
+                try {
+                  console.log('[Bypass] Attempting Verwaltung login for school:', targetSchoolName);
                   sessionStorage.removeItem('groovelab_is_master_admin');
-                  sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-                  sessionStorage.setItem('groovelab_active_platform', 'campus');
-                  sessionStorage.setItem('campus_active_tab', 'briefing');
-                  sessionStorage.setItem('groovelab_user_id', targetUser.id);
-                  sessionStorage.removeItem('groovelab_qr_token');
-                  onLogin(targetUser.id, true);
-                } else {
-                  alert(`Kein Admin/Verwaltungs-Profil für "${targetSchoolName}" in der Datenbank gefunden.`);
+                  sessionStorage.removeItem('groovelab_support_ghost');
+
+                  if (schoolData?.groovelab_kiosk_token) {
+                    localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
+                  }
+
+                  let targetUser: any = null;
+                  if (targetSchoolId) {
+                    const { data: schoolUsers } = await supabase
+                      .from('users')
+                      .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
+                      .eq('school_id', targetSchoolId)
+                      .in('role', ['admin', 'secretary']);
+
+                    if (schoolUsers && schoolUsers.length > 0) {
+                      targetUser = schoolUsers[0];
+                    }
+                  }
+
+                  if (targetUser) {
+                    sessionStorage.removeItem('groovelab_is_master_admin');
+                    sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+                    sessionStorage.setItem('groovelab_active_platform', 'campus');
+                    sessionStorage.setItem('campus_active_tab', 'briefing');
+                    sessionStorage.setItem('groovelab_user_id', targetUser.id);
+                    sessionStorage.removeItem('groovelab_qr_token');
+                    onLogin(targetUser.id, true);
+                  } else {
+                    alert(`Kein Admin/Verwaltungs-Profil für "${targetSchoolName}" in der Datenbank gefunden.`);
+                  }
+                } catch (err: any) {
+                  console.error('[Bypass] Error logging in as Verwaltung:', err);
+                  alert('Bypass Fehler: ' + (err?.message || err));
                 }
-              } catch (err: any) {
-                console.error('[Bypass] Error logging in as Verwaltung:', err);
-                alert('Bypass Fehler: ' + (err?.message || err));
-              }
-            }}
-            style={{
-              background: '#451a03',
-              color: '#fde68a',
-              border: '1px solid #d97706',
-              borderRadius: '12px',
-              padding: '12px 16px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
-            🔓 BYPASS: VERWALTUNG / SCHULLEITUNG ({schoolData?.name || 'Musäk Bad Säckingen'})
-          </button>
+              }}
+              style={{
+                background: '#451a03',
+                color: '#fde68a',
+                border: '1px solid #d97706',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              🔒 BYPASS: VERWALTUNG / SCHULLEITUNG ({bypassUserCounts.adminName ? `${bypassUserCounts.adminName} • ` : ''}{schoolData?.name || 'Musikschule'})
+            </button>
+          )}
         </div>
       )}
 

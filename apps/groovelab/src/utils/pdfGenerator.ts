@@ -1,3 +1,5 @@
+import { getParentOnboardingUrl, getTeacherLoginUrl } from './tenantUrlHelper';
+
 export const generateConsentPDF = async (
   schoolName: string, 
   activePlatform: 'campus' | 'groovelab' | 'both', 
@@ -529,7 +531,7 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
 /**
  * Generates a 1-page A4 Quickstart Cheat Sheet for Teachers
  */
-export const generateTeacherQuickstartPDF = async (schoolName: string) => {
+export const generateTeacherQuickstartPDF = async (schoolName: string, schoolSubdomain?: string) => {
   const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF();
 
@@ -544,6 +546,7 @@ export const generateTeacherQuickstartPDF = async (schoolName: string) => {
   const darkSlate = [15, 23, 42];
   const mutedText = [100, 116, 139];
   const borderGray = [226, 232, 240];
+  const teacherLoginUrl = getTeacherLoginUrl(schoolName, schoolSubdomain);
 
   // Top Accent Bar
   doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
@@ -574,7 +577,7 @@ export const generateTeacherQuickstartPDF = async (schoolName: string) => {
     {
       nr: '1',
       title: 'Schritt 1: Einloggen & Schülerprofil öffnen',
-      desc: 'Melden Sie sich mit Ihrem PIN im Lehrer-Dashboard an. Ihre Schülerliste und der tagesaktuelle Stundenplan sind bereits hinterlegt. Klicken Sie auf den Namen Ihres Schülers, um das digitale Protokoll aufzurufen.'
+      desc: `Melden Sie sich unter ${teacherLoginUrl} mit Ihrem Lehrer-PIN oder QR-Ausweis an. Ihre Schülerliste und der Stundenplan sind hinterlegt. Klicken Sie auf den Namen Ihres Schülers für das digitale Protokoll.`
     },
     {
       nr: '2',
@@ -657,7 +660,8 @@ export const generateTeacherQuickstartPDF = async (schoolName: string) => {
  */
 export const generateParentQuickstartPDF = async (
   schoolName: string,
-  _activePlatform?: 'campus' | 'groovelab' | 'both'
+  _activePlatform?: 'campus' | 'groovelab' | 'both',
+  schoolSubdomain?: string
 ) => {
   const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF();
@@ -673,6 +677,7 @@ export const generateParentQuickstartPDF = async (
   const darkSlate = [15, 23, 42];
   const mutedText = [100, 116, 139];
   const borderGray = [226, 232, 240];
+  const parentOnboardingUrl = getParentOnboardingUrl(schoolName, schoolSubdomain);
 
   // Top Accent Bar
   doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
@@ -753,14 +758,14 @@ export const generateParentQuickstartPDF = async (
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(29, 78, 216);
-  doc.text('WIE MELDET SICH MEIN KIND AN?', 25, y + 8);
+  doc.text('WIE STARTEN SIE & IHR KIND?', 25, y + 8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.2);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text('1. Öffnen Sie die Website oder Web-App der Musikschule auf dem Smartphone oder Tablet.', 25, y + 16);
-  doc.text('2. Scannen Sie den persönlichen QR-Code des Schülers oder wählen Sie den Namen in der Liste.', 25, y + 23);
-  doc.text('3. Geben Sie die 4-stellige Schüler-PIN ein – und schon kann die Übe-Session starten!', 25, y + 30);
+  doc.text(`1. Öffnen Sie die Plattform im Browser: ${parentOnboardingUrl}`, 25, y + 16);
+  doc.text('2. Scannen Sie den persönlichen QR-Code des Schülers oder geben Sie die Schüler-PIN ein.', 25, y + 23);
+  doc.text('3. Fertig! Ihr Kind ist sofort mit dem digitalen Hausaufgabenheft verbunden.', 25, y + 30);
 
   // Footer
   doc.setFont('helvetica', 'normal');

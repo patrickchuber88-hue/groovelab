@@ -1913,8 +1913,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     // 2. ☁️ Persist to Supabase Cloud Storage
     try {
       const sId = student?.id || studentId || 'student';
-      const rawPath = `audio_biography/${sId}_${targetTrackId}_raw.wav`;
-      const masterPath = `audio_biography/${sId}_${targetTrackId}_master.wav`;
+      const targetSchoolId = student?.school_id || (student as any)?.schoolId || (window as any).__groovelab_school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+      const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
+      const rawPath = `${schoolPathPrefix}audio_biography/${sId}_${targetTrackId}_raw.wav`;
+      const masterPath = `${schoolPathPrefix}audio_biography/${sId}_${targetTrackId}_master.wav`;
 
       const [rawUploadRes, masterUploadRes] = await Promise.all([
         supabase.storage.from('campus-assets').upload(rawPath, savedData.rawBlob, { contentType: 'audio/wav', upsert: true }),
@@ -2580,8 +2582,22 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     // 2. ☁️ PERSIST TO SUPABASE CLOUD STORAGE (Bucket: campus-assets) (parallel)
     try {
       const sId = student?.id || studentId || 'student';
-      const rawPath = `audio_biography/${sId}_${targetTrackId}_raw.wav`;
-      const masterPath = `audio_biography/${sId}_${targetTrackId}_master.wav`;
+      let targetSchoolId = student?.school_id || (student as any)?.schoolId || (window as any).__groovelab_school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+
+      if (!targetSchoolId && studentId && studentId !== 'anonymous_student') {
+        try {
+          const { data: stRec } = await supabase
+            .from('students')
+            .select('school_id')
+            .eq('id', studentId)
+            .maybeSingle();
+          if (stRec?.school_id) targetSchoolId = stRec.school_id;
+        } catch (stErr) {}
+      }
+
+      const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
+      const rawPath = `${schoolPathPrefix}audio_biography/${sId}_${targetTrackId}_raw.wav`;
+      const masterPath = `${schoolPathPrefix}audio_biography/${sId}_${targetTrackId}_master.wav`;
 
       const [rawUploadRes, masterUploadRes] = await Promise.all([
         supabase.storage.from('campus-assets').upload(rawPath, rawBlob, { contentType: 'audio/wav', upsert: true }),
@@ -2599,23 +2615,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       }
 
       // 3. 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Async non-blocking)
-      let targetSchoolId = student?.school_id || (student as any)?.schoolId || (window as any).__groovelab_school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
-
-      if (!targetSchoolId && studentId && studentId !== 'anonymous_student') {
-        try {
-          const { data: stRec } = await supabase
-            .from('students')
-            .select('school_id')
-            .eq('id', studentId)
-            .maybeSingle();
-          if (stRec?.school_id) {
-            targetSchoolId = stRec.school_id;
-          }
-        } catch (stErr) {
-          console.warn('[Storage] School lookup note:', stErr);
-        }
-      }
-
       if (targetSchoolId) {
         const addedBytes = (rawBlob?.size || 0) + (masterBlob?.size || 0);
         (async () => {

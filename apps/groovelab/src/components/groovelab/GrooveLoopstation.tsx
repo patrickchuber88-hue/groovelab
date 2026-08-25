@@ -3001,8 +3001,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         }
       }
 
+      const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
       const fileName = `${student.id}_loopmix_${Date.now()}.${fileExt}`;
-      const filePath = `loops/${fileName}`;
+      const filePath = `${schoolPathPrefix}loops/${fileName}`;
 
       const { error } = await supabase.storage
         .from('campus-assets')

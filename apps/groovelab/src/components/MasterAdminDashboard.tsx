@@ -2345,12 +2345,27 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         const overridesStr = localStorage.getItem('groovelab_school_overrides');
         if (overridesStr) {
           const overrides = JSON.parse(overridesStr);
-          mergedSchools = mergedSchools.map(s => overrides[s.id] ? { ...s, ...overrides[s.id] } : s);
+          mergedSchools = mergedSchools.map(s => {
+            if (!overrides[s.id]) return s;
+            return {
+              ...s,
+              ...overrides[s.id],
+              opening_hours: {
+                ...(s.opening_hours || {}),
+                ...(overrides[s.id].opening_hours || {})
+              }
+            };
+          });
         }
       } catch (e) {
         console.warn('Could not load localStorage school overrides:', e);
       }
       setSchools(mergedSchools);
+      setSelectedSchool((prev: any) => {
+        if (!prev) return prev;
+        const fresh = mergedSchools.find(s => s.id === prev.id);
+        return fresh ? { ...prev, ...fresh } : prev;
+      });
 
       const [
         { data: statsData },
@@ -7599,9 +7614,61 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           operatorCompany={billingCompany}
           onClose={() => setSelectedSchool(null)}
           onUpdateSchool={async (updatedData) => {
-            await supabase.from('schools').update(updatedData).eq('id', selectedSchool.id);
-            setSelectedSchool((prev) => ({ ...prev, ...updatedData }));
+            const targetSchoolId = selectedSchool.id;
+            const payload = { ...updatedData };
+            delete (payload as any).extra_storage_gb;
+
+            let { data: updatedRows, error } = await supabase
+              .from('schools')
+              .update(payload)
+              .eq('id', targetSchoolId)
+              .select();
+
+            if (error && (error.message?.includes('column') || error.message?.includes('Could not find') || error.code === 'PGRST204' || error.code === 'PGRST106' || error.message?.includes('schema cache'))) {
+              console.warn('⚠️ Supabase Schema fallback for school update. Stripping unmigrated columns...', error.message);
+              const safePayload = { ...payload };
+              delete safePayload.storage_addon_monthly_fee;
+              delete safePayload.storage_addon_gb;
+              delete safePayload.extra_billing_option;
+              delete safePayload.billing_email;
+              delete safePayload.billing_contact_person;
+              delete safePayload.house_number;
+              delete safePayload.legal_name;
+              delete safePayload.country;
+              delete safePayload.vat_id;
+              delete safePayload.leitweg_id;
+              delete safePayload.custom_price_kombi;
+              delete safePayload.subscription_bypass_until;
+              delete safePayload.subscription_bypass_reason;
+
+              const fallbackRes = await supabase
+                .from('schools')
+                .update(safePayload)
+                .eq('id', targetSchoolId)
+                .select();
+              updatedRows = fallbackRes.data;
+              error = fallbackRes.error;
+            }
+
+            if (error) {
+              console.error('Failed to update school in Supabase:', error);
+              throw error;
+            }
+
+            const returnedRow = (updatedRows && updatedRows.length > 0) ? updatedRows[0] : {};
+            const updatedSchoolObj = { ...selectedSchool, ...updatedData, ...returnedRow };
+
+            setSelectedSchool(updatedSchoolObj);
+            try {
+              const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+              const overrides = JSON.parse(overridesStr);
+              overrides[targetSchoolId] = { ...(overrides[targetSchoolId] || {}), ...selectedSchool, ...updatedData, ...returnedRow };
+              localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+              window.dispatchEvent(new Event('groovelab_school_updated'));
+            } catch (e) {}
+
             await fetchSchoolsAndStats();
+            setSchools((prev) => prev.map(s => s.id === targetSchoolId ? { ...s, ...updatedSchoolObj } : s));
             setSaveSuccessToast('Schulstammdaten erfolgreich aktualisiert!');
             setTimeout(() => setSaveSuccessToast(null), 3000);
           }}

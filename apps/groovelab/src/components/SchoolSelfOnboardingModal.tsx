@@ -247,7 +247,8 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         'admin',
         createdData.user.id,
         'Schulleitung',
-        '/campus_login_hero.png'
+        '/campus_login_hero.png',
+        createdData.school?.name || schoolName
       );
 
       setBiometricsStatus('success');

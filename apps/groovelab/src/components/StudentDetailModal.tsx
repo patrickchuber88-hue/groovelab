@@ -12,6 +12,7 @@ import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './Meist
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 import { IDBadgeCard } from './IDBadgeCard';
 import { StudentPinResetModal } from './StudentPinResetModal';
+import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
 
 const brandColor = 'var(--primary-color)';
 
@@ -281,6 +282,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [showTageskompassModal, setShowTageskompassModal] = useState(false);
   const [currentTeacherId, setCurrentTeacherId] = useState<string | undefined>(undefined);
   const [schoolName, setSchoolName] = useState<string>('Campus Musikschule');
+  const [schoolSubdomain, setSchoolSubdomain] = useState<string | undefined>(undefined);
   const [localQrToken, setLocalQrToken] = useState<string>(student.qr_token || '');
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [copiedOnboardingLink, setCopiedOnboardingLink] = useState(false);
@@ -539,7 +541,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
       if (error) throw error;
       
-      const inviteUrl = `${window.location.origin}/?onboarding=parent&token=${data.token}`;
+      const inviteUrl = getParentOnboardingUrl(schoolName, schoolSubdomain, data.token);
       await navigator.clipboard.writeText(inviteUrl);
       setCopiedOnboardingLink(true);
       alert(`Personalisierter Onboarding-Link für ${student.first_name || 'Schüler'} wurde in die Zwischenablage kopiert!\n\nLink: ${inviteUrl}`);
@@ -573,17 +575,19 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         try {
           const { data, error } = await supabase
             .from('schools')
-            .select('name')
+            .select('name, subdomain')
             .eq('id', resolvedSchoolId)
             .single();
           if (data) {
             setSchoolName(data.name || 'Campus Musikschule');
+            setSchoolSubdomain(data.subdomain || undefined);
           }
         } catch (err) {
           console.error('Error fetching school details:', err);
         }
       } else {
         setSchoolName('Campus Musikschule');
+        setSchoolSubdomain(undefined);
       }
     };
 

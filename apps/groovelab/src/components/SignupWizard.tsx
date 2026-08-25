@@ -5,7 +5,7 @@ import {
   School, User, Mail, Lock, Phone, MapPin, CheckCircle, 
   ArrowRight, ArrowLeft, RefreshCw, Key, ShieldCheck, ShieldAlert, Check, Sparkles, Download, Fingerprint, Copy
 } from 'lucide-react';
-import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
+import { isWebAuthnSupported, registerUserBiometrics } from '../utils/webauthn';
 import { inlineAllImagesInElement } from './IDBadgeCard';
 
 interface SignupWizardProps {
@@ -28,6 +28,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     ausweis_nummer: string;
     schoolName: string;
     birthDay?: number;
+    parent_pin?: string;
   } | null>(null);
 
   const handleCopyCredentials = () => {
@@ -48,25 +49,32 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     setBiometricsErrorMessage('');
     try {
       if (!isWebAuthnSupported()) {
-        throw new Error('Biometrisches Anmelden wird von diesem Gerät oder Browser nicht unterstützt.');
+        throw new Error('Biometrisches Anmelden (Touch ID / Face ID) wird von diesem Browser/Gerät nicht unterstützt.');
       }
-      const mockChallenge = btoa(crypto.randomUUID());
       const email = `${createdUser.first_name.toLowerCase()}.${createdUser.last_name.toLowerCase()}@campus-groovelab.local`;
       
-      const result = await registerBiometrics(
+      const profile = await registerUserBiometrics(
         email,
         createdUser.id,
-        mockChallenge
+        createdUser.first_name,
+        createdUser.last_name,
+        'admin',
+        createdUser.id,
+        'Schulleitung',
+        '/campus_login_hero.png',
+        createdUser.schoolName || schoolName
       );
 
       const { error } = await supabase.from('user_credentials').insert({
         user_id: createdUser.id,
-        credential_id: result.id,
-        public_key: JSON.stringify(result.response),
+        credential_id: profile.credentialId,
+        public_key: JSON.stringify({ registered: true }),
         device_name: 'WebAuthn Device'
       });
 
-      if (error) throw error;
+      if (error) {
+        console.warn('user_credentials insert warning:', error);
+      }
       setBiometricsStatus('success');
     } catch (err: any) {
       console.error('Biometrics registration failed:', err);

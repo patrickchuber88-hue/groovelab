@@ -38,6 +38,7 @@ import { ScheduleCalendarView } from './ScheduleCalendarView';
 import { ScheduleBoardDesktop } from './ScheduleBoardDesktop';
 import { StudentScheduleSlotsModal } from './StudentScheduleSlotsModal';
 import { run15StageSolver } from '../engine/Schedule15StageSolverEngine';
+import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
 export interface Student {
   id: string;
   first_name: string;
@@ -213,6 +214,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   // Main state
   const [activeTab, setActiveTab] = useState<'calendar' | 'designer'>('calendar');
+  const [schoolProfile, setSchoolProfile] = useState<{ name?: string; subdomain?: string } | null>(null);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    supabase
+      .from('schools')
+      .select('name, subdomain')
+      .eq('id', schoolId)
+      .single()
+      .then(({ data }) => {
+        if (data) setSchoolProfile(data);
+      });
+  }, [schoolId]);
+
   const [designerCardIndex, setDesignerCardIndex] = useState<number>(0);
   const [showDesignerToolsSheet, setShowDesignerToolsSheet] = useState<boolean>(false);
   const [showUnassignedDrawer, setShowUnassignedDrawer] = useState<boolean>(false);
@@ -4785,7 +4800,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         type="button"
                         onClick={async () => {
                           setShowMoreMenu(false);
-                          const inviteLink = window.location.origin + "?onboarding=parent";
+                          const inviteLink = getParentOnboardingUrl(schoolProfile?.name || 'Stadtmusikschule', schoolProfile?.subdomain);
                           await navigator.clipboard.writeText(inviteLink);
                           await showAlert("Allgemeiner Schüler-Onboarding-Link kopiert! Sende diesen Link an deine Schüler: " + inviteLink);
                         }}
@@ -7098,7 +7113,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 type="button"
                                 onClick={async (e) => {
                                   e.stopPropagation();
-                                  const inviteLink = window.location.origin + "?onboarding=parent";
+                                  const inviteLink = getParentOnboardingUrl(schoolProfile?.name || 'Stadtmusikschule', schoolProfile?.subdomain);
                                   navigator.clipboard.writeText(inviteLink);
                                   await showAlert("Onboarding-Link kopiert! Du kannst diesen Link jetzt an die Eltern senden: " + inviteLink);
                                 }}
@@ -8398,7 +8413,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   )}
                   <button type="button" onClick={async () => {
                     setShowDesignerToolsSheet(false);
-                    const inviteLink = window.location.origin + "?onboarding=parent";
+                    const inviteLink = getParentOnboardingUrl(schoolProfile?.name || 'Stadtmusikschule', schoolProfile?.subdomain);
                     await navigator.clipboard.writeText(inviteLink);
                     setToast({ message: 'Onboarding-Link kopiert! 📋', type: 'success' });
                   }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#0f172a', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>

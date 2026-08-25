@@ -485,7 +485,8 @@ export function AdminDashboard({
 
   const [campusBookings, setCampusBookingsRaw] = useState<any[]>(() => {
     try {
-      const stored = localStorage.getItem('groovelab_campus_bookings');
+      const sId = admin?.school_id || '';
+      const stored = (sId ? localStorage.getItem(`groovelab_campus_bookings_${sId}`) : null) || localStorage.getItem('groovelab_campus_bookings');
       const initial = stored ? JSON.parse(stored) : [];
       return consolidateBookings(Array.isArray(initial) ? initial : []);
     } catch {
@@ -815,7 +816,8 @@ export function AdminDashboard({
 
   // Textbausteine states
   const [textbausteine, setTextbausteine] = useState<any[]>(() => {
-    const stored = localStorage.getItem('groovelab_textbausteine');
+    const sId = admin?.school_id || '';
+    const stored = (sId ? localStorage.getItem(`groovelab_textbausteine_${sId}`) : null) || localStorage.getItem('groovelab_textbausteine');
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
@@ -919,10 +921,14 @@ export function AdminDashboard({
   }, [bookingStartTime, bookingEndTime]);
 
   // LocalStorage synchronization for campus bookings
-
   useEffect(() => {
-    localStorage.setItem('groovelab_campus_bookings', JSON.stringify(campusBookings));
-  }, [campusBookings]);
+    const sId = admin?.school_id;
+    if (sId) {
+      localStorage.setItem(`groovelab_campus_bookings_${sId}`, JSON.stringify(campusBookings));
+    } else {
+      localStorage.setItem('groovelab_campus_bookings', JSON.stringify(campusBookings));
+    }
+  }, [campusBookings, admin?.school_id]);
 
   const handleDeleteTextbaustein = (id: string) => {
     setTextbausteine(prev => prev.filter(tb => tb.id !== id));
@@ -936,8 +942,13 @@ export function AdminDashboard({
   };
 
   useEffect(() => {
-    localStorage.setItem('groovelab_textbausteine', JSON.stringify(textbausteine));
-  }, [textbausteine]);
+    const sId = admin?.school_id;
+    if (sId) {
+      localStorage.setItem(`groovelab_textbausteine_${sId}`, JSON.stringify(textbausteine));
+    } else {
+      localStorage.setItem('groovelab_textbausteine', JSON.stringify(textbausteine));
+    }
+  }, [textbausteine, admin?.school_id]);
 
   const handleSaveTextbaustein = (e: React.FormEvent) => {
     e.preventDefault();
@@ -15402,14 +15413,25 @@ export function AdminDashboard({
       <AVVModal
         isOpen={showAVVModal}
         onClose={() => setShowAVVModal(false)}
-        school={schoolObj}
+        school={schoolObj || (admin?.schools ? (Array.isArray(admin.schools) ? admin.schools[0] : admin.schools) : null) || { id: admin?.school_id, name: admin?.first_name ? `${admin.first_name}'s Schule` : 'Musikschule' }}
         onAVVSigned={() => {
-          if (admin && admin.schools) {
-            setAdmin({
-              ...admin,
-              schools: Array.isArray(admin.schools)
-                ? admin.schools.map((s: any) => s.id === schoolObj?.id ? { ...s, avv_signed_at: new Date().toISOString() } : s)
-                : { ...admin.schools, avv_signed_at: new Date().toISOString() }
+          const nowIso = new Date().toISOString();
+          if (admin) {
+            setAdmin((prev: any) => {
+              if (!prev) return prev;
+              const currentSchools = prev.schools;
+              let updatedSchools;
+              if (Array.isArray(currentSchools)) {
+                updatedSchools = currentSchools.map((s: any) => ({ ...s, avv_signed_at: nowIso }));
+              } else if (currentSchools && typeof currentSchools === 'object') {
+                updatedSchools = { ...currentSchools, avv_signed_at: nowIso };
+              } else {
+                updatedSchools = { id: prev.school_id, avv_signed_at: nowIso };
+              }
+              return {
+                ...prev,
+                schools: updatedSchools
+              };
             });
           }
         }}

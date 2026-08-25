@@ -518,7 +518,17 @@ Ihr Campus-Groovelab Abrechnungsteam`;
           const overridesStr = localStorage.getItem('groovelab_school_overrides');
           if (overridesStr) {
             const overrides = JSON.parse(overridesStr);
-            schools = schools.map(s => (overrides[s.id] ? { ...s, ...overrides[s.id] } : s));
+            schools = schools.map(s => {
+              if (!overrides[s.id]) return s;
+              return {
+                ...s,
+                ...overrides[s.id],
+                opening_hours: {
+                  ...(s.opening_hours || {}),
+                  ...(overrides[s.id].opening_hours || {})
+                }
+              };
+            });
           }
         } catch (e) {
           console.warn('Could not merge groovelab_school_overrides:', e);

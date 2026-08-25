@@ -6095,8 +6095,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const recUniqueId = `rec_${studentId}_${Date.now()}`;
       const fileExt = hasTresor ? 'wav' : (saveBlob.type.includes('mp4') ? 'mp4' : 'webm');
       const contentType = hasTresor ? 'audio/wav' : (saveBlob.type || 'audio/webm');
+      const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
       const fileName = `meisterwerk_${studentId}_${Date.now()}.${fileExt}`;
-      const filePath = `recordings/${fileName}`;
+      const filePath = `${schoolPathPrefix}recordings/${fileName}`;
       
       // 1. Store directly in local IndexedDB vault first (100% resilient)
       await storeBlob(`campus_audio_${recUniqueId}_raw`, saveBlob);

@@ -102,7 +102,7 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     throw new Error('DATABASE_CIRCUIT_OPEN: DB-Verbindungspool ist ausgelastet. Lokaler Offline-Modus aktiv.');
   }
 
-  const maxAttempts = 2;
+  const maxAttempts = 3;
   let lastError: any = null;
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -119,8 +119,19 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
       const response = await fetch(input, fetchInit);
       if (timeoutId) clearTimeout(timeoutId);
       
-      // If server returned 503 / 504 / 429, record circuit failure
-      if (response.status === 503 || response.status === 504 || response.status === 429) {
+      // If server returned 503 / 502 / 504 (e.g. PostgREST transient schema cache reload), retry before failing
+      if (response.status === 503 || response.status === 502 || response.status === 504 || response.status === 429) {
+        if (attempt < maxAttempts) {
+          try {
+            const clone = response.clone();
+            const text = await clone.text();
+            if (text.includes('schema cache') || text.includes('PGRST002') || text.includes('503') || text.includes('502')) {
+              console.warn(`[Supabase Fetch] PostgREST schema cache reload (HTTP ${response.status}). Retrying attempt ${attempt + 1} in ${attempt * 350}ms...`);
+              await new Promise(r => setTimeout(r, attempt * 350));
+              continue;
+            }
+          } catch (e) {}
+        }
         dbCircuitBreaker.recordFailure(new Error(`HTTP ${response.status} from Supabase`));
       } else if (response.status < 500) {
         dbCircuitBreaker.recordSuccess();

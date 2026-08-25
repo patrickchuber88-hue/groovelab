@@ -43,9 +43,10 @@ function arrayBufferToBase64url(buffer: ArrayBuffer): string {
  * In a production app, the challenge, rp, and user information would be fetched from the backend first.
  */
 export const registerBiometrics = async (
-  email: string,
+  userName: string,
   userId: string,
-  challengeFromServer: string
+  challengeFromServer: string,
+  displayName?: string
 ): Promise<any> => {
   if (!isWebAuthnSupported()) {
     throw new Error('WebAuthn is not supported on this device/browser.');
@@ -59,8 +60,8 @@ export const registerBiometrics = async (
     },
     user: {
       id: base64urlToArrayBuffer(userId),
-      name: email,
-      displayName: email,
+      name: userName,
+      displayName: displayName || userName,
     },
     pubKeyCredParams: [
       { alg: -7, type: 'public-key' }, // ES256
@@ -149,6 +150,7 @@ export interface BiometricVaultProfile {
   firstName: string;
   lastName: string;
   role: string;
+  schoolName?: string | null;
   instrument?: string | null;
   photoUrl?: string | null;
   credentialId: string;
@@ -227,12 +229,26 @@ export const registerUserBiometrics = async (
   role: string,
   sessionToken: string,
   instrument?: string | null,
-  photoUrl?: string | null
+  photoUrl?: string | null,
+  schoolName?: string | null
 ): Promise<BiometricVaultProfile> => {
   // Generate pseudo random challenge
   const randomBytes = crypto.getRandomValues(new Uint8Array(32));
   const challenge = arrayBufferToBase64url(randomBytes.buffer);
-  const credential = await registerBiometrics(email || `${userId}@campus-groovelab.de`, userId, challenge);
+
+  // Format human-readable FIDO2 account name with School context (e.g. "Patrick Huber • Patrick Huber Musikschule")
+  const roleLabel = role === 'admin' ? 'Schulleitung' : role === 'teacher' ? 'Lehrkraft' : '';
+  const contextParts = [schoolName, roleLabel].filter(Boolean).join(' • ');
+  const formattedAccountName = contextParts 
+    ? `${firstName} ${lastName} (${contextParts})` 
+    : `${firstName} ${lastName}`;
+
+  const credential = await registerBiometrics(
+    formattedAccountName,
+    userId,
+    challenge,
+    formattedAccountName
+  );
 
   const profile: BiometricVaultProfile = {
     userId,
@@ -240,6 +256,7 @@ export const registerUserBiometrics = async (
     firstName,
     lastName,
     role,
+    schoolName: schoolName || null,
     instrument: instrument || null,
     photoUrl: photoUrl || null,
     credentialId: credential.id,

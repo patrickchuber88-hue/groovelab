@@ -3226,7 +3226,8 @@ export function TeacherDashboard({
     const loadMyBookings = async () => {
       try {
         let allBookings: any[] = [];
-        const stored = localStorage.getItem('groovelab_campus_bookings');
+        const sId = teacher?.school_id || '';
+        const stored = (sId ? localStorage.getItem(`groovelab_campus_bookings_${sId}`) : null) || localStorage.getItem('groovelab_campus_bookings');
         if (stored) {
           allBookings = JSON.parse(stored);
         }

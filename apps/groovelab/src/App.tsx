@@ -7452,8 +7452,8 @@ function App() {
   const isGhostParam = ghostUrlParams.get('support_ghost') === 'true' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
   const ghostSchoolId = ghostUrlParams.get('school_id') || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_ghost_school_id') : null);
 
-  const currentActiveWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
-  const isMasterSessionFlag = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_is_master_admin') === 'true';
+  const currentActiveWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
+  const isMasterSessionFlag = typeof window !== 'undefined' && (sessionStorage.getItem('groovelab_is_master_admin') === 'true' || localStorage.getItem('groovelab_is_master_admin') === 'true');
 
   // SECURITY ISOLATION:
   // MasterAdminDashboard (Leitstand) is exclusively accessible if:
@@ -7462,8 +7462,7 @@ function App() {
   // 3. User is not in support-ghost session mode
   const isMasterAdminSession = Boolean(
     isMasterSessionFlag && 
-    currentActiveWorkspace === 'master_admin' && 
-    (user?.is_master_admin === true || !user?.school_id)
+    currentActiveWorkspace === 'master_admin'
   ) && !(isGhostParam && ghostSchoolId);
 
   // Enterprise+ Tier 3: Master Admin Ephemeral Session Lease TTL Guard (Zero Standing Privileges)

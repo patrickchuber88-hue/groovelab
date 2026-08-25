@@ -2,21 +2,23 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { useRealNamesVisibility, maskLastName, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
 import { useMasterPricing } from '../context/MasterPricingContext';
-import { StorageTier, DEFAULT_STORAGE_TIERS, getStorageTierByGb } from '../domain/pricingEngine';
+import { StorageTier, DEFAULT_STORAGE_TIERS, getStorageTierByGb, isSchoolBypassActive } from '../domain/pricingEngine';
 import { 
   ShieldAlert, CheckCircle, Users, Settings, ShieldCheck, FileText,
   UserCheck, RefreshCw, Key, ChevronRight, UserX, LogOut,
   Copy, Check, Link as LinkIcon, Monitor, Sliders,
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
-  Trash2, Shield, Calendar, CalendarX, CalendarCheck, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
+  Trash2, Shield, Calendar, CalendarX, CalendarCheck, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon, Edit2,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
   School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake,
-  HardDrive, Cloud, Crown, Rocket, Cpu
+  HardDrive, Cloud, Crown, Rocket, Cpu, Fingerprint, Smartphone, KeyRound, RotateCw
 } from 'lucide-react';
+import { isWebAuthnSupported, registerUserBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
 import { TeacherDashboard } from './TeacherDashboard';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { AdminDashboard } from './AdminDashboard';
 import { PilotOnboardingModal } from './PilotOnboardingModal';
+import { AVVModal } from './AVVModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
@@ -33,7 +35,9 @@ import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 're
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { BulkImportModal } from './common/BulkImportModal';
+import { GuidanceCenterModal } from './modals/GuidanceCenterModal';
 import { generateTeacherQuickstartPDF, generateParentQuickstartPDF } from '../utils/pdfGenerator';
+import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -1254,135 +1258,73 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     return 'briefing';
   });
 
-  // 🎙️ Live Audio-Tresor Storage & Quota Auto-Refresh with Live File Aggregation
+  // 🎙️ Live Audio-Tresor Storage & Quota Auto-Refresh (Strictly Multi-Tenant School-Scoped)
   useEffect(() => {
-    if (secretarySubTab === 'licenses' && currentSchoolProfile?.id) {
+    if (currentSchoolProfile?.id) {
       const refreshStorageQuota = async () => {
         try {
+          const schoolId = String(currentSchoolProfile.id);
           const { data: schData } = await supabase
             .from('schools')
             .select('storage_used_bytes, storage_addon_gb, storage_addon_status, storage_addon_monthly_fee')
-            .eq('id', currentSchoolProfile.id)
+            .eq('id', schoolId)
             .maybeSingle();
 
           let usedBytes = Number(schData?.storage_used_bytes || 0);
 
-          // 🎙️ AUTOMATIC LIVE STORAGE SCANNER: Multi-source aggregation (Cloud + Local Audio + Milestones + Loops)
+          // 🎙️ MULTI-TENANT ISOLATED STORAGE SCANNER: Scan ONLY this school's dedicated partition
           try {
-            let aggregatedBytes = 0;
-
-            // 1. Scan localStorage for all student recordings & audio biography milestones
-            if (typeof window !== 'undefined') {
-              for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (!key) continue;
-
-                // Audio Biography Milestones
-                if (key.startsWith('campus_audio_biography_milestones_')) {
-                  try {
-                    const milestones = JSON.parse(localStorage.getItem(key) || '[]');
-                    if (Array.isArray(milestones)) {
-                      for (const ms of milestones) {
-                        if (ms.audioUrl || ms.audio_url || ms.blobKey || ms.audioBlob) {
-                          const sz = Number(ms.size || ms.fileSize || ms.bytes || 0);
-                          aggregatedBytes += sz > 0 ? sz : 18.5 * 1024 * 1024;
-                        }
-                      }
-                    }
-                  } catch (e) {}
-                }
-
-                // Junior & Studio Recordings
-                if (key.startsWith('campus_junior_recordings_') || key.startsWith('campus_recordings_')) {
-                  try {
-                    const recs = JSON.parse(localStorage.getItem(key) || '[]');
-                    if (Array.isArray(recs)) {
-                      for (const rec of recs) {
-                        if (rec.url || rec.blobKey || rec.blob) {
-                          const sz = Number(rec.size || rec.fileSize || rec.bytes || 0);
-                          const dur = Number(rec.duration || 0);
-                          const estimated = dur > 0 ? Math.max(1024 * 1024, dur * 192000) : 14.2 * 1024 * 1024;
-                          aggregatedBytes += sz > 0 ? sz : estimated;
-                        }
-                      }
-                    }
-                  } catch (e) {}
-                }
-
-                // Saved Loops
-                if (key.startsWith('campus_saved_loops_')) {
-                  try {
-                    const loops = JSON.parse(localStorage.getItem(key) || '[]');
-                    if (Array.isArray(loops)) {
-                      for (const l of loops) {
-                        if (l.url || l.blobKey) {
-                          const sz = Number(l.size || l.fileSize || 0);
-                          aggregatedBytes += sz > 0 ? sz : 22.8 * 1024 * 1024;
-                        }
-                      }
-                    }
-                  } catch (e) {}
-                }
-
-                // Homework notes with AUDIO: or LOOP:
-                if (key.startsWith('campus_homework_notes_')) {
-                  try {
-                    const notes = JSON.parse(localStorage.getItem(key) || '[]');
-                    if (Array.isArray(notes)) {
-                      for (const note of notes) {
-                        if (typeof note === 'string') {
-                          if (note.startsWith('AUDIO:')) {
-                            aggregatedBytes += 12.5 * 1024 * 1024;
-                          } else if (note.startsWith('LOOP:')) {
-                            aggregatedBytes += 22.8 * 1024 * 1024;
-                          }
-                        }
-                      }
-                    }
-                  } catch (e) {}
-                }
-              }
-            }
-
-            // 2. Scan cloud bucket folders
-            const folders = ['recordings', 'loops', 'audio-biography'];
-            for (const folder of folders) {
+            let schoolAggregatedBytes = 0;
+            const subFolders = ['recordings', 'loops', 'audio_biography', 'audio'];
+            for (const subFolder of subFolders) {
               try {
                 const { data: files } = await supabase.storage
                   .from('campus-assets')
-                  .list(folder, { limit: 500 });
+                  .list(`schools/${schoolId}/${subFolder}`, { limit: 500 });
                 if (files && files.length > 0) {
                   for (const file of files) {
                     const fileSize = Number(file.metadata?.size || 0);
                     if (fileSize > 0) {
-                      aggregatedBytes += fileSize;
+                      schoolAggregatedBytes += fileSize;
                     }
                   }
                 }
               } catch (folderErr) {
-                console.warn(`[Storage Scan] Folder ${folder} scan note:`, folderErr);
+                // Folder might not exist yet if no files were uploaded
               }
             }
 
-            if (aggregatedBytes > 0) {
-              usedBytes = Math.max(usedBytes, aggregatedBytes);
-              if (usedBytes > Number(schData?.storage_used_bytes || 0)) {
+            if (schoolAggregatedBytes > 0) {
+              usedBytes = schoolAggregatedBytes;
+              if (usedBytes !== Number(schData?.storage_used_bytes || 0)) {
                 await supabase
                   .from('schools')
                   .update({ storage_used_bytes: usedBytes })
-                  .eq('id', currentSchoolProfile.id);
+                  .eq('id', schoolId);
               }
-              try {
-                const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-                const overrides = JSON.parse(overridesStr);
-                if (overrides[currentSchoolProfile.id]) {
-                  overrides[currentSchoolProfile.id].storage_used_bytes = usedBytes;
-                  localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
-                }
-              } catch (e) {}
+            } else {
+              // If school has 0 files in its partition, verify if DB had contaminated legacy global bytes
+              if (usedBytes > 0) {
+                // School has 0 actual uploaded files in its tenant partition -> reset to 0
+                usedBytes = 0;
+                await supabase
+                  .from('schools')
+                  .update({ storage_used_bytes: 0 })
+                  .eq('id', schoolId);
+              }
             }
+
+            // Sync local overrides cache cleanly
+            try {
+              const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+              const overrides = JSON.parse(overridesStr);
+              if (overrides[schoolId]) {
+                overrides[schoolId].storage_used_bytes = usedBytes;
+                localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+              }
+            } catch (e) {}
           } catch (scanErr) {
-            console.warn('[Storage Scan] Aggregation note:', scanErr);
+            console.warn('[Storage Scan] School quota sync note:', scanErr);
           }
 
           if (schData) {
@@ -1394,7 +1336,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       };
       refreshStorageQuota();
     }
-  }, [secretarySubTab, currentSchoolProfile?.id]);
+  }, [currentSchoolProfile?.id]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [auditLoading, setAuditLoading] = useState<boolean>(false);
   const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
@@ -1450,6 +1392,103 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       console.error('Error saving setting:', err);
     }
   };
+
+  const handleToggleAutoClean = async (nextVal: boolean) => {
+    setAutoDeleteExpiredUsers(nextVal);
+    setInitialSettings((prev: any) => prev ? ({ ...prev, autoDeleteExpiredUsers: nextVal }) : prev);
+    try {
+      const currentOp = openingHours || {};
+      const updatedOp = { ...currentOp, auto_delete_expired_users: nextVal };
+      setOpeningHours(updatedOp);
+      
+      try {
+        const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+        const overrides = JSON.parse(overridesStr);
+        if (schoolId) {
+          overrides[schoolId] = {
+            ...(overrides[schoolId] || {}),
+            auto_delete_expired_users: nextVal,
+            opening_hours: updatedOp
+          };
+          localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+        }
+      } catch (e) {}
+
+      if (schoolId) {
+        const { error } = await supabase
+          .from('schools')
+          .update({
+            auto_delete_expired_users: nextVal,
+            opening_hours: updatedOp
+          })
+          .eq('id', schoolId);
+        
+        if (error) {
+          await supabase
+            .from('schools')
+            .update({
+              opening_hours: updatedOp
+            })
+            .eq('id', schoolId);
+        }
+      }
+    } catch (err) {
+      console.error('[SecretarySettings] Error toggling auto-clean:', err);
+    }
+  };
+
+  const handleUpdateSchoolYear = async (newMonth: number, newDay: number) => {
+    setSchoolYearStartMonth(newMonth);
+    setSchoolYearStartDay(newDay);
+    setInitialSettings((prev: any) => prev ? ({ ...prev, schoolYearStartMonth: newMonth, schoolYearStartDay: newDay }) : prev);
+
+    try {
+      const currentOp = openingHours || {};
+      const updatedOp = {
+        ...currentOp,
+        school_year_start_month: newMonth,
+        school_year_start_day: newDay,
+        auto_delete_expired_users: autoDeleteExpiredUsers
+      };
+      setOpeningHours(updatedOp);
+
+      try {
+        const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+        const overrides = JSON.parse(overridesStr);
+        if (schoolId) {
+          overrides[schoolId] = {
+            ...(overrides[schoolId] || {}),
+            school_year_start_month: newMonth,
+            school_year_start_day: newDay,
+            opening_hours: updatedOp
+          };
+          localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+        }
+      } catch (e) {}
+
+      if (schoolId) {
+        const { error } = await supabase
+          .from('schools')
+          .update({
+            school_year_start_month: newMonth,
+            school_year_start_day: newDay,
+            opening_hours: updatedOp
+          })
+          .eq('id', schoolId);
+
+        if (error) {
+          await supabase
+            .from('schools')
+            .update({
+              opening_hours: updatedOp
+            })
+            .eq('id', schoolId);
+        }
+      }
+    } catch (err) {
+      console.error('[SecretarySettings] Error updating school year start:', err);
+    }
+  };
   const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('designer');
   const [liveViewDay, setLiveViewDay] = useState<number>(1);
   const [showAdHocBooking, setShowAdHocBooking] = useState<boolean>(false);
@@ -1484,6 +1523,85 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
     return null;
   });
+
+  // Biometrics & Passkeys Settings States
+  const [biometricsStatus, setBiometricsStatus] = useState<'idle' | 'registering' | 'verifying' | 'success' | 'error'>('idle');
+  const [biometricsMessage, setBiometricsMessage] = useState<string>('');
+  const [localPasskeyProfiles, setLocalPasskeyProfiles] = useState<BiometricVaultProfile[]>(() => getStoredBiometricProfiles());
+  const [copiedSettingsPin, setCopiedSettingsPin] = useState(false);
+  const [copiedSettingsLink, setCopiedSettingsLink] = useState(false);
+
+  const isCurrentDevicePasskeyActive = useMemo(() => {
+    if (!currentUserProfile?.id) return false;
+    return localPasskeyProfiles.some(p => p.userId === currentUserProfile.id);
+  }, [localPasskeyProfiles, currentUserProfile?.id]);
+
+  const handleEnrollBiometrics = async () => {
+    if (!currentUserProfile) return;
+    setBiometricsStatus('registering');
+    setBiometricsMessage('');
+    try {
+      if (!isWebAuthnSupported()) {
+        throw new Error('Biometrisches Anmelden (Touch ID / Face ID) wird von diesem Browser/Gerät nicht unterstützt.');
+      }
+      const email = currentUserProfile.email || `${currentUserProfile.id}@campus-groovelab.de`;
+      const profile = await registerUserBiometrics(
+        email,
+        currentUserProfile.id,
+        currentUserProfile.first_name,
+        currentUserProfile.last_name || '',
+        currentUserProfile.role || 'admin',
+        currentUserProfile.id,
+        null,
+        '/campus_login_hero.png',
+        schoolName || 'Musikschule'
+      );
+
+      await supabase.from('user_credentials').insert({
+        user_id: currentUserProfile.id,
+        credential_id: profile.credentialId,
+        public_key: JSON.stringify({ registered: true, device: navigator.userAgent }),
+        device_name: navigator.userAgent.includes('Mac') ? 'Mac Touch ID' : 'WebAuthn Device'
+      });
+
+      setLocalPasskeyProfiles(getStoredBiometricProfiles());
+      setBiometricsStatus('success');
+      setBiometricsMessage('Touch ID / Face ID wurde erfolgreich für dieses Gerät eingerichtet!');
+      setTimeout(() => setBiometricsStatus('idle'), 4000);
+    } catch (err: any) {
+      console.error('Biometrics enrollment failed:', err);
+      setBiometricsStatus('error');
+      setBiometricsMessage(err.message || 'Die Einrichtung wurde abgebrochen oder ist fehlgeschlagen.');
+    }
+  };
+
+  const handleTestBiometrics = async () => {
+    if (!currentUserProfile) return;
+    setBiometricsStatus('verifying');
+    setBiometricsMessage('');
+    try {
+      await authenticateUserBiometrics(currentUserProfile.id);
+      setBiometricsStatus('success');
+      setBiometricsMessage('✓ Authentifizierung erfolgreich! Touch ID / Face ID funktioniert einwandfrei.');
+      setTimeout(() => setBiometricsStatus('idle'), 4000);
+    } catch (err: any) {
+      console.error('Biometrics verification failed:', err);
+      setBiometricsStatus('error');
+      setBiometricsMessage(err.message || 'Die Verifikation ist fehlgeschlagen oder wurde abgebrochen.');
+    }
+  };
+
+  const handleRemoveBiometrics = () => {
+    if (!currentUserProfile?.id) return;
+    const confirm = window.confirm('Möchtest du den Touch ID / Face ID Passkey von diesem Gerät entfernen?');
+    if (!confirm) return;
+    removeBiometricProfile(currentUserProfile.id);
+    setLocalPasskeyProfiles(getStoredBiometricProfiles());
+    setBiometricsStatus('success');
+    setBiometricsMessage('Passkey wurde von diesem Gerät entfernt.');
+    setTimeout(() => setBiometricsStatus('idle'), 3000);
+  };
+
   const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<any>(null);
   const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
@@ -1931,6 +2049,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   // Manual Student Creation Form States
   const [showAddStudentModal, setShowAddStudentModal] = useState<boolean>(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState<boolean>(false);
+  const [showGuidanceModal, setShowGuidanceModal] = useState<boolean>(false);
+  const [guidanceInitialTab, setGuidanceInitialTab] = useState<'teacher' | 'parent'>('teacher');
   const [newStudentFirstName, setNewStudentFirstName] = useState<string>('');
   const [newStudentLastName, setNewStudentLastName] = useState<string>('');
   const [newStudentBirthDate, setNewStudentBirthDate] = useState<string>('');
@@ -1969,6 +2089,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   // School Data & Subscription
   const [isAvvSigned, setIsAvvSigned] = useState<boolean>(true);
   const [showPilotAgreementModalFromDashboard, setShowPilotAgreementModalFromDashboard] = useState<boolean>(false);
+  const [showAvvModal, setShowAvvModal] = useState<boolean>(false);
   const [schoolName, setSchoolName] = useState<string>('');
   const [schoolYearStartMonth, setSchoolYearStartMonth] = useState<number>(9);
   const [schoolYearStartDay, setSchoolYearStartDay] = useState<number>(1);
@@ -2857,6 +2978,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [newTeacherContractEndsAt, setNewTeacherContractEndsAt] = useState<string>('');
   const [showCsvImportModal, setShowCsvImportModal] = useState<boolean>(false);
   const [isCsvExpanded, setIsCsvExpanded] = useState<boolean>(false);
+  const [isImportingStudentsBatch, setIsImportingStudentsBatch] = useState<boolean>(false);
+  const [isHandoutsDropdownOpen, setIsHandoutsDropdownOpen] = useState<boolean>(false);
 
   // Subjects (Unterrichtsfächer) states
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -2879,113 +3002,64 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [showAddSubjectModal, setShowAddSubjectModal] = useState<boolean>(false);
   const [newSubjectName, setNewSubjectName] = useState<string>('');
   const [newSubjectDescription, setNewSubjectDescription] = useState<string>('');
-  const [newSubjectCategory, setNewSubjectCategory] = useState<string>('guitar');
+  const [newSubjectCategory, setNewSubjectCategory] = useState<string>('Allgemein');
+  const [showEditSubjectModal, setShowEditSubjectModal] = useState<boolean>(false);
+  const [editingSubject, setEditingSubject] = useState<any | null>(null);
+  const [editSubjectName, setEditSubjectName] = useState<string>('');
+  const [editSubjectCategory, setEditSubjectCategory] = useState<string>('Allgemein');
+  const [editSubjectDescription, setEditSubjectDescription] = useState<string>('');
   const [isSubjectCsvExpanded, setIsSubjectCsvExpanded] = useState<boolean>(false);
   const [subjectCsvText, setSubjectCsvText] = useState<string>('');
-  // Leihinstrumente-Verwaltung states
+  // Leihinstrumente-Verwaltung states (100% Tenant-Isolated per schoolId, Zero Mock-Data)
   const [rentalInstruments, setRentalInstruments] = useState<any[]>(() => {
+    if (typeof window === 'undefined' || !schoolId) return [];
     try {
-      const saved = localStorage.getItem('groovelab_rental_instruments');
+      // Clear legacy global un-scoped key if present
+      localStorage.removeItem('groovelab_rental_instruments');
+      const saved = localStorage.getItem(`groovelab_rental_instruments_${schoolId}`);
       if (saved) return JSON.parse(saved);
     } catch (e) {
-      console.error(e);
+      console.error('Error loading rental instruments for school:', e);
     }
-    return [
-      {
-        id: 'rent-1',
-        name: 'Yamaha YAS-280 Altsaxophon',
-        category: 'Blasinstrumente',
-        serial_number: 'CG-INV-2026-SAX-014',
-        condition: 'Sehr gut',
-        status: 'rented',
-        student_id: 's-1',
-        student_name: 'Max M.',
-        rental_start: '2026-02-15',
-        rental_end_due: '2026-07-31',
-        monthly_fee: 18.00,
-        deposit: 150.00,
-        deposit_status: 'paid',
-        notes: 'Inkl. Leichtkoffer, Mundstück und Tragegurt'
-      },
-      {
-        id: 'rent-2',
-        name: 'Gewa Vancore Cello 4/4',
-        category: 'Streicher',
-        serial_number: 'CG-INV-2026-CEL-008',
-        condition: 'Gebraucht',
-        status: 'rented',
-        student_id: 's-2',
-        student_name: 'Emma S.',
-        rental_start: '2026-01-10',
-        rental_end_due: '2026-07-31',
-        monthly_fee: 22.00,
-        deposit: 200.00,
-        deposit_status: 'paid',
-        notes: 'Bogen 2026 neu bespannt'
-      },
-      {
-        id: 'rent-3',
-        name: 'Roland FP-30X E-Piano',
-        category: 'Tasten',
-        serial_number: 'CG-INV-2026-PIA-003',
-        condition: 'Neu',
-        status: 'available',
-        student_id: null,
-        student_name: null,
-        rental_start: null,
-        rental_end_due: null,
-        monthly_fee: 25.00,
-        deposit: 200.00,
-        deposit_status: 'pending',
-        notes: 'Inkl. Pedaleinheit und Ständer'
-      },
-      {
-        id: 'rent-4',
-        name: 'Konzertgitarre 3/4 Ortega R121-3/4',
-        category: 'Zupfinstrumente',
-        serial_number: 'CG-INV-2026-GIT-022',
-        condition: 'Sehr gut',
-        status: 'available',
-        student_id: null,
-        student_name: null,
-        rental_start: null,
-        rental_end_due: null,
-        monthly_fee: 12.00,
-        deposit: 80.00,
-        deposit_status: 'pending',
-        notes: 'Ideal für Einsteiger (7-10 Jahre)'
-      },
-      {
-        id: 'rent-5',
-        name: 'Jupiter Querflöte JFL700E',
-        category: 'Blasinstrumente',
-        serial_number: 'CG-INV-2026-FLU-009',
-        condition: 'Reparaturbedürftig',
-        status: 'maintenance',
-        student_id: null,
-        student_name: null,
-        rental_start: null,
-        rental_end_due: null,
-        monthly_fee: 15.00,
-        deposit: 120.00,
-        deposit_status: 'pending',
-        notes: 'Polster am G#-Klappenhebel erneuern'
-      }
-    ];
+    return [];
   });
 
+  // Re-sync rental instruments whenever schoolId changes (preventing cross-tenant contamination)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
-      localStorage.setItem('groovelab_rental_instruments', JSON.stringify(rentalInstruments));
+      localStorage.removeItem('groovelab_rental_instruments');
+      if (!schoolId) {
+        setRentalInstruments([]);
+        return;
+      }
+      const saved = localStorage.getItem(`groovelab_rental_instruments_${schoolId}`);
+      if (saved) {
+        setRentalInstruments(JSON.parse(saved));
+      } else {
+        setRentalInstruments([]);
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Error syncing rental instruments on school change:', e);
+      setRentalInstruments([]);
     }
-  }, [rentalInstruments]);
+  }, [schoolId]);
+
+  // Persist rental instruments to school-isolated storage
+  useEffect(() => {
+    if (typeof window === 'undefined' || !schoolId) return;
+    try {
+      localStorage.setItem(`groovelab_rental_instruments_${schoolId}`, JSON.stringify(rentalInstruments));
+    } catch (e) {
+      console.error('Error saving rental instruments:', e);
+    }
+  }, [rentalInstruments, schoolId]);
 
   const [rentalSearchQuery, setRentalSearchQuery] = useState<string>('');
   const [rentalFilterStatus, setRentalFilterStatus] = useState<string>('All');
   const [rentalFilterCategory, setRentalFilterCategory] = useState<string>('All');
   const [showAddRentalModal, setShowAddRentalModal] = useState<boolean>(false);
+  const [showEditRentalModal, setShowEditRentalModal] = useState<any | null>(null);
   const [showAssignRentalModal, setShowAssignRentalModal] = useState<any | null>(null);
   const [showReturnRentalModal, setShowReturnRentalModal] = useState<any | null>(null);
 
@@ -2996,6 +3070,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [newRentalMonthlyFee, setNewRentalMonthlyFee] = useState<string>('15.00');
   const [newRentalDeposit, setNewRentalDeposit] = useState<string>('100.00');
   const [newRentalNotes, setNewRentalNotes] = useState<string>('');
+
+  // Edit Rental States
+  const [editRentalName, setEditRentalName] = useState<string>('');
+  const [editRentalCategory, setEditRentalCategory] = useState<string>('Blasinstrumente');
+  const [editRentalSerial, setEditRentalSerial] = useState<string>('');
+  const [editRentalCondition, setEditRentalCondition] = useState<string>('Sehr gut');
+  const [editRentalStatus, setEditRentalStatus] = useState<string>('available');
+  const [editRentalMonthlyFee, setEditRentalMonthlyFee] = useState<string>('15.00');
+  const [editRentalDeposit, setEditRentalDeposit] = useState<string>('100.00');
+  const [editRentalNotes, setEditRentalNotes] = useState<string>('');
 
   const [assignStudentId, setAssignStudentId] = useState<string>('');
   const [assignStudentNameCustom, setAssignStudentNameCustom] = useState<string>('');
@@ -3228,26 +3312,67 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const exportAuditLogsToCsv = () => {
     if (auditLogs.length === 0) return;
-    const headers = ['Zeitpunkt', 'Aktion', 'Tabelle', 'Betroffener Nutzer', 'Record-ID', 'Geändert von', 'Details'];
+    const headers = ['Zeitpunkt', 'Aktion', 'Kategorie', 'Betroffener Datensatz', 'Record-ID', 'Geändert von', 'Protokollierte Details'];
+    const ignoredKeys = [
+      'id', 'created_at', 'school_id', 'password', 'password_hash', 
+      'personal_pin', 'parent_pin', 'teacher_qr_token', 'campus_login_token', 
+      'groovelab_kiosk_token', 'secret_token', 'joker_used_at', 'weekly_jokers_used',
+      'lesson_duration', 'preferred_room_ids', 'planned_boards', 'sick_until',
+      'age', 'bio', 'gear', 'listening', 'projects', 'bands', 'expertise', 'phone', 'group_id', 'nickname'
+    ];
+
     const rows = auditLogs.map(log => {
-      const changer = log.users ? `${log.users.first_name} ${log.users.last_name}` : 'System';
-      const targetName = log.table_name === 'users' ? (userMap[log.record_id] || 'Unbekannt') : log.table_name;
+      const changer = log.users ? `${log.users.first_name} ${log.users.last_name}` : 'System (Automatik)';
+      let targetName = log.table_name === 'users' ? (userMap[log.record_id] || '') : log.table_name;
+      if (!targetName && log.new_data) {
+        const fn = log.new_data.first_name || '';
+        const ln = log.new_data.last_name || '';
+        if (fn || ln) targetName = `${fn} ${ln}`.trim();
+      }
+      if (!targetName) targetName = 'Datensatz';
+
       let details = '';
       if (log.action === 'UPDATE') {
-        details = Object.entries(log.new_data || {}).map(([k, v]) => `${k}: ${JSON.stringify(log.old_data?.[k])} -> ${JSON.stringify(v)}`).join(' | ');
+        details = Object.entries(log.new_data || {})
+          .filter(([k]) => !ignoredKeys.includes(k))
+          .map(([k, v]) => {
+            const oldV = translateValue(k, log.old_data?.[k]);
+            const newV = translateValue(k, v);
+            if (oldV === newV) return null;
+            return `${translateKey(k)}: ${oldV || '(leer)'} -> ${newV || '(gelöscht)'}`;
+          })
+          .filter(Boolean)
+          .join(' | ');
       } else if (log.action === 'INSERT') {
-        details = Object.entries(log.new_data || {}).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(' | ');
+        details = Object.entries(log.new_data || {})
+          .filter(([k]) => !ignoredKeys.includes(k))
+          .map(([k, v]) => {
+            const valStr = translateValue(k, v);
+            if (!valStr) return null;
+            return `${translateKey(k)}: ${valStr}`;
+          })
+          .filter(Boolean)
+          .join(' | ');
       } else {
-        details = Object.entries(log.old_data || {}).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(' | ');
+        details = Object.entries(log.old_data || {})
+          .filter(([k]) => !ignoredKeys.includes(k))
+          .map(([k, v]) => {
+            const valStr = translateValue(k, v);
+            if (!valStr) return null;
+            return `${translateKey(k)}: ${valStr}`;
+          })
+          .filter(Boolean)
+          .join(' | ');
       }
+
       return [
         new Date(log.created_at).toLocaleString('de-DE'),
-        log.action,
-        log.table_name,
+        log.action === 'INSERT' ? 'Neuanlage' : log.action === 'UPDATE' ? 'Aktualisierung' : 'Löschung',
+        log.table_name === 'users' ? 'Benutzer' : log.table_name === 'schools' ? 'Musikschule' : log.table_name,
         targetName,
         log.record_id,
         changer,
-        details
+        details || 'Keine relevanten Feldänderungen'
       ];
     });
     const csvContent = "\uFEFF" + [headers.join(';'), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(';'))].join('\n');
@@ -3269,20 +3394,27 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       last_name: 'Nachname',
       email: 'E-Mail',
       is_active: 'Konto-Status',
-      is_campus_active: 'Campus-Zugang',
-      is_groovelab_active: 'Campus-Groovelab-Zugang',
+      is_campus_active: 'Campus Modul',
+      is_groovelab_active: 'GrooveLab Modul',
       is_trial: 'Probezeit-Status',
       trial_ends_at: 'Probezeit-Ende',
       activated_at: 'Aktivierungsdatum',
       ausweis_nummer: 'Mitarbeiter-PIN',
+      ausweis_id: 'Ausweis-ID',
       is_app_user: 'App-Nutzung',
-      is_premium_user: 'Premium-Status'
+      is_premium_user: 'Premium-Status',
+      contract_start_date: 'Vertragsstart',
+      status: 'Status',
+      storage_addon_gb: 'Zusatzspeicher',
+      has_campus_subscription: 'Abo Campus',
+      has_groovelab_subscription: 'Abo GrooveLab',
+      student_billing_option: 'Abrechnungsmodell'
     };
     return keyMap[key] || key;
   };
 
   const translateValue = (key: string, val: any): string => {
-    if (val === null || val === undefined || val === '') return 'nicht gesetzt';
+    if (val === null || val === undefined || val === '') return '';
     if (typeof val === 'object' && !Array.isArray(val)) {
       return JSON.stringify(val);
     }
@@ -3290,20 +3422,32 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       if (key.startsWith('is_') && key.endsWith('_active')) {
         return val ? 'Freigeschaltet' : 'Gesperrt';
       }
+      if (key === 'is_campus_active' || key === 'is_groovelab_active' || key === 'has_campus_subscription' || key === 'has_groovelab_subscription') {
+        return val ? 'Aktiv' : 'Inaktiv';
+      }
       return val ? 'Aktiv' : 'Inaktiv';
     }
     if (Array.isArray(val)) {
-      if (val.length === 0) return 'keine';
-      return val.map(v => translateValue(key, v)).join(', ');
+      if (val.length === 0) return '';
+      return val.map(v => translateValue(key, v)).filter(Boolean).join(', ');
     }
     const valueMap: Record<string, string> = {
-      admin: 'Admin',
-      secretary: 'Verwaltung',
+      admin: 'Schulleitung (Admin)',
+      secretary: 'Schulsekretariat',
       teacher: 'Lehrkraft',
-      student: 'Schüler'
+      student: 'Schüler',
+      active: 'Aktiv',
+      trial: 'Testphase'
     };
     if (typeof val === 'string' && valueMap[val]) {
       return valueMap[val];
+    }
+    if (typeof val === 'string' && (key === 'photo_url' || key === 'avatar_url')) {
+      if (val.includes('campus_login_hero')) return 'Schul-Tafel (Standard)';
+      return 'Profilbild hinterlegt';
+    }
+    if (typeof val === 'string' && key === 'qr_token') {
+      return `Generiert (${val.substring(0, 6)}...${val.substring(val.length - 4)})`;
     }
     if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) {
       try {
@@ -3318,67 +3462,116 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const renderDiffContent = (log: any) => {
     try {
-      const ignoredKeys = ['id', 'created_at', 'school_id', 'password', 'password_hash', 'personal_pin'];
+      const ignoredKeys = [
+        'id', 'created_at', 'school_id', 'password', 'password_hash', 
+        'personal_pin', 'parent_pin', 'teacher_qr_token', 'campus_login_token', 
+        'groovelab_kiosk_token', 'secret_token', 'joker_used_at', 'weekly_jokers_used',
+        'lesson_duration', 'preferred_room_ids', 'planned_boards', 'sick_until',
+        'age', 'bio', 'gear', 'listening', 'projects', 'bands', 'expertise', 'phone', 'group_id', 'nickname'
+      ];
       
       if (log.action === 'INSERT') {
-      if (!log.new_data) return '-';
-      return Object.entries(log.new_data)
-        .filter(([key]) => !ignoredKeys.includes(key))
-        .map(([key, val]) => {
-          const label = translateKey(key);
-          const valStr = translateValue(key, val);
-          return (
-            <div key={key} style={{ fontSize: '0.74rem', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Inter' }}>
-              <span style={{ fontWeight: 700, color: '#64748b', minWidth: '120px' }}>{label}</span>
-              <span style={{ color: '#34a853', backgroundColor: '#e6f4ea', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
-                {valStr}
-              </span>
-            </div>
-          );
-        });
-    }
-    if (log.action === 'DELETE') {
-      if (!log.old_data) return '-';
-      return Object.entries(log.old_data)
-        .filter(([key]) => !ignoredKeys.includes(key))
-        .map(([key, val]) => {
-          const label = translateKey(key);
-          const valStr = translateValue(key, val);
-          return (
-            <div key={key} style={{ fontSize: '0.74rem', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Inter' }}>
-              <span style={{ fontWeight: 700, color: '#64748b', minWidth: '120px' }}>{label}</span>
-              <span style={{ textDecoration: 'line-through', color: '#dc2626', backgroundColor: '#fef2f2', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem' }}>
-                {valStr}
-              </span>
-            </div>
-          );
-        });
-    }
-    if (log.action === 'UPDATE') {
-      if (!log.new_data || !log.old_data) return '-';
-      return Object.entries(log.new_data)
-        .filter(([key]) => !ignoredKeys.includes(key))
-        .map(([key, newVal]: [string, any]) => {
-          const oldVal = log.old_data[key];
-          const label = translateKey(key);
-          const oldValStr = translateValue(key, oldVal);
-          const newValStr = translateValue(key, newVal);
-          
-          return (
-            <div key={key} style={{ fontSize: '0.74rem', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Inter' }}>
-              <span style={{ fontWeight: 700, color: '#64748b', minWidth: '120px' }}>{label}</span>
-              <span style={{ textDecoration: 'line-through', color: '#dc2626', backgroundColor: '#fef2f2', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem' }}>
-                {oldValStr}
-              </span>
-              <span style={{ color: '#94a3b8' }}>➔</span>
-              <span style={{ color: '#34a853', backgroundColor: '#e6f4ea', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
-                {newValStr}
-              </span>
-            </div>
-          );
-        });
-    }
-    return '-';
+        if (!log.new_data) return <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>Neuanlage initialisiert</span>;
+        
+        const validEntries = Object.entries(log.new_data)
+          .filter(([key]) => !ignoredKeys.includes(key))
+          .map(([key, val]) => ({ key, label: translateKey(key), valStr: translateValue(key, val) }))
+          .filter(entry => entry.valStr && entry.valStr.trim() !== '' && entry.valStr !== 'nicht gesetzt' && entry.valStr !== 'keine');
+
+        if (validEntries.length === 0) {
+          return <span style={{ color: '#64748b', fontSize: '0.72rem' }}>Datensatz mit Standardwerten initialisiert</span>;
+        }
+
+        return (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+            {validEntries.map(({ key, label, valStr }) => (
+              <div 
+                key={key} 
+                style={{ 
+                  fontSize: '0.72rem', 
+                  color: '#1e293b', 
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  padding: '3px 8px', 
+                  borderRadius: '6px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '4px' 
+                }}
+              >
+                <span style={{ fontWeight: 700, color: '#64748b' }}>{label}:</span>
+                <span style={{ color: '#166534', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                  {valStr}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      if (log.action === 'DELETE') {
+        if (!log.old_data) return <span style={{ color: '#ef4444', fontSize: '0.72rem' }}>Datensatz gelöscht</span>;
+        const validEntries = Object.entries(log.old_data)
+          .filter(([key]) => !ignoredKeys.includes(key))
+          .map(([key, val]) => ({ key, label: translateKey(key), valStr: translateValue(key, val) }))
+          .filter(entry => entry.valStr && entry.valStr.trim() !== '' && entry.valStr !== 'nicht gesetzt' && entry.valStr !== 'keine');
+
+        return (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+            <span style={{ color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700 }}>
+              Gelöschte Stammdaten:
+            </span>
+            {validEntries.map(({ key, label, valStr }) => (
+              <div key={key} style={{ fontSize: '0.72rem', color: '#64748b', background: '#fef2f2', border: '1px solid #fecaca', padding: '2px 6px', borderRadius: '6px', display: 'inline-flex', gap: '4px' }}>
+                <span>{label}:</span>
+                <span style={{ textDecoration: 'line-through' }}>{valStr}</span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      if (log.action === 'UPDATE') {
+        if (!log.new_data || !log.old_data) return <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>Keine Änderungen</span>;
+        
+        const diffEntries = Object.entries(log.new_data)
+          .filter(([key]) => !ignoredKeys.includes(key))
+          .map(([key, newVal]: [string, any]) => {
+            const oldVal = log.old_data[key];
+            const oldValStr = translateValue(key, oldVal);
+            const newValStr = translateValue(key, newVal);
+            if (oldValStr === newValStr) return null;
+            return {
+              key,
+              label: translateKey(key),
+              oldValStr: oldValStr || '(leer)',
+              newValStr: newValStr || '(gelöscht)'
+            };
+          })
+          .filter(Boolean) as Array<{ key: string; label: string; oldValStr: string; newValStr: string }>;
+
+        if (diffEntries.length === 0) {
+          return <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic' }}>System-Aktualisierung (keine sichtbaren Feldänderungen)</span>;
+        }
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+            {diffEntries.map(({ key, label, oldValStr, newValStr }) => (
+              <div key={key} style={{ fontSize: '0.72rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, color: '#475569', minWidth: '110px' }}>{label}:</span>
+                <span style={{ textDecoration: 'line-through', color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
+                  {oldValStr}
+                </span>
+                <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>➔</span>
+                <span style={{ color: '#166534', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, fontSize: '0.7rem' }}>
+                  {newValStr}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      return '-';
     } catch (err) {
       console.error('Error rendering diff content:', err);
       return <span style={{ color: '#ea4335', fontSize: '0.7rem', fontWeight: 700 }}>Fehler beim Laden der Details</span>;
@@ -3633,6 +3826,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       fetchPendingBookings();
 
       // Check pilot agreement status
+      let hasPilotAgreement = false;
       try {
         const { data: agreementData, error: agreementError } = await supabase
           .from('pilot_agreements')
@@ -3643,7 +3837,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         if (agreementError) {
           console.error('[Dashboard] Error querying pilot agreement:', agreementError);
         } else {
-          setIsAvvSigned(!!agreementData);
+          hasPilotAgreement = !!agreementData;
         }
       } catch (err) {
         console.error('[Dashboard] Error in pilot agreement check:', err);
@@ -3660,7 +3854,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       ] = await Promise.all([
         supabase
           .from('schools')
-          .select('id, subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass, school_year_start_month, school_year_start_day, auto_delete_expired_users, custom_price_campus, custom_price_groovelab, custom_price_kombi, custom_price_teacher, custom_price_student, grandfathered_campus_price, grandfathered_groovelab_price, grandfathered_kombi_price, grandfathered_teacher_price, grandfathered_student_price, price_grandfathered_at')
+          .select('id, subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass, school_year_start_month, school_year_start_day, auto_delete_expired_users, custom_price_campus, custom_price_groovelab, custom_price_kombi, custom_price_teacher, custom_price_student, grandfathered_campus_price, grandfathered_groovelab_price, grandfathered_kombi_price, grandfathered_teacher_price, grandfathered_student_price, price_grandfathered_at, avv_signed_at, avv_signee_name')
           .eq('id', schoolId)
           .single(),
         supabase
@@ -3693,14 +3887,30 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           if (overridesStr) {
             const overrides = JSON.parse(overridesStr);
             if (overrides[schoolData.id]) {
-              schoolData = { ...schoolData, ...overrides[schoolData.id] };
+              const schoolOverride = overrides[schoolData.id];
+              schoolData = {
+                ...rawSchoolData,
+                ...schoolOverride,
+                opening_hours: {
+                  ...(rawSchoolData.opening_hours || {}),
+                  ...(schoolOverride.opening_hours || {})
+                }
+              };
             }
           }
         } catch (e) {
           console.warn('Could not load localStorage school overrides in SecretaryDashboard:', e);
         }
 
+        const localSignedTimestamp = typeof window !== 'undefined' 
+          ? (localStorage.getItem(`groovelab_avv_signed_${schoolId}`) || localStorage.getItem(`groovelab_avv_signed_${schoolData.id}`)) 
+          : null;
+        if (localSignedTimestamp && !schoolData.avv_signed_at) {
+          schoolData.avv_signed_at = localSignedTimestamp;
+        }
+
         setCurrentSchoolProfile(schoolData);
+        setIsAvvSigned(Boolean(schoolData.avv_signed_at || hasPilotAgreement || localSignedTimestamp));
         if (Number(schoolData.storage_addon_gb || 0) > 0 && schoolData.storage_addon_status !== 'cancelled') {
           localStorage.setItem('groovelab_storage_addon_active', 'true');
           localStorage.setItem('campus_storage_addon_active', 'true');
@@ -3729,14 +3939,25 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setSchoolPhoneNumber(schoolData.phone_number || '');
         setSchoolEmail(schoolData.email || '');
         setEditColor(schoolData.primary_color || '#1a73e8');
-        setIsSchoolTrial(schoolData.is_trial ?? false);
+        const dbIsBooked = schoolData.is_billing_booked === true;
+        const storedIsBookedStr = typeof window !== 'undefined' ? localStorage.getItem(`isBillingBooked_${schoolId}`) : null;
+        const isExplicitlyReset = storedIsBookedStr === 'false';
+        const isBooked = !isExplicitlyReset && (dbIsBooked || storedIsBookedStr === 'true');
+
+        setIsSchoolTrial(isBooked ? false : (schoolData.is_trial ?? false));
         setSchoolTrialEndsAt(schoolData.trial_ends_at || null);
-        setSchoolStatus(schoolData.status || 'active');
-        setSubscriptionBypass(schoolData.subscription_bypass ?? false);
-        if (schoolData.storage_addon_gb !== undefined && schoolData.storage_addon_gb !== null) {
-          setSelectedStorageAddonGb(Number(schoolData.storage_addon_gb));
-          setSelectedStorageAddonFee(Number(schoolData.storage_addon_monthly_fee || 0));
-        }
+        setSchoolStatus(isBooked ? 'active' : (schoolData.status || 'active'));
+        setSubscriptionBypass(isSchoolBypassActive(schoolData));
+
+        const storageGbFromDb = Number(schoolData.storage_addon_gb || 0);
+        const storageGbFromLocal = typeof window !== 'undefined' ? Number(localStorage.getItem(`groovelab_storage_addon_gb_${schoolId}`) || localStorage.getItem('groovelab_storage_addon_gb') || 0) : 0;
+        const effectiveStorageGb = storageGbFromDb > 0 ? storageGbFromDb : storageGbFromLocal;
+        const storageFeeFromDb = Number(schoolData.storage_addon_monthly_fee || 0);
+        const storageFeeDefault = (effectiveStorageGb === 5 ? 1.49 : effectiveStorageGb === 10 ? 1.99 : effectiveStorageGb === 20 ? 3.99 : effectiveStorageGb === 25 ? 3.99 : effectiveStorageGb === 50 ? 6.99 : effectiveStorageGb === 100 ? 11.99 : effectiveStorageGb === 250 ? 24.99 : 0);
+        const effectiveStorageFee = storageFeeFromDb > 0 ? storageFeeFromDb : storageFeeDefault;
+
+        setSelectedStorageAddonGb(effectiveStorageGb);
+        setSelectedStorageAddonFee(effectiveStorageFee);
         setLogoUrl(schoolData.logo_url || '');
         const rawUrl = schoolData.calendar_url || '';
         setCalendarUrl(rawUrl);
@@ -3761,9 +3982,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setLogRetention(loadedLogRetention);
         setSyncInterval(loadedSyncInterval);
 
-        const loadedStartMonth = schoolData.school_year_start_month || 9;
-        const loadedStartDay = schoolData.school_year_start_day || 1;
-        const loadedAutoDelete = schoolData.auto_delete_expired_users || false;
+        const loadedStartMonth = Number(schoolData.school_year_start_month || op.school_year_start_month || 9);
+        const loadedStartDay = Number(schoolData.school_year_start_day || op.school_year_start_day || 1);
+        const loadedAutoDelete = Boolean(schoolData.auto_delete_expired_users === true || op.auto_delete_expired_users === true || op.auto_delete_expired_users === 'true');
 
         setSchoolYearStartMonth(loadedStartMonth);
         setSchoolYearStartDay(loadedStartDay);
@@ -3838,13 +4059,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           localStorage.removeItem(`isCancelled_${schoolId}`);
         }
         
-        const storedIsBookedStr = typeof window !== 'undefined' ? localStorage.getItem(`isBillingBooked_${schoolId}`) : null;
-        const isExplicitlyReset = storedIsBookedStr === 'false';
-        const dbIsBooked = schoolData.is_billing_booked === true;
-        const storedIsBooked = storedIsBookedStr === 'true';
-
-        if (!isExplicitlyReset && (dbIsBooked || storedIsBooked)) {
+        if (isBooked) {
           setIsBillingBooked(true);
+          setIsSchoolTrial(false);
+          setSchoolStatus('active');
           if (typeof window !== 'undefined') {
             localStorage.setItem(`isBillingBooked_${schoolId}`, 'true');
           }
@@ -5531,47 +5749,135 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
-  const handleSaveAllSettings = async () => {
+  const handleSaveAllSettings = async (customOverrides?: Partial<{ autoDeleteExpiredUsers: boolean; schoolYearStartMonth: number; schoolYearStartDay: number; kioskPinLength: number; bypassPin: string; logRetention: string; syncInterval: string }> | any) => {
     if (!schoolName.trim()) {
       alert('Bitte einen Musikschulnamen eingeben.');
       return;
     }
     setIsSavingSettings(true);
     try {
+      const overrides = (customOverrides && typeof customOverrides === 'object' && !('nativeEvent' in customOverrides)) ? customOverrides : undefined;
+      const effAutoDelete = overrides?.autoDeleteExpiredUsers !== undefined ? overrides.autoDeleteExpiredUsers : autoDeleteExpiredUsers;
+      const effMonth = overrides?.schoolYearStartMonth !== undefined ? overrides.schoolYearStartMonth : schoolYearStartMonth;
+      const effDay = overrides?.schoolYearStartDay !== undefined ? overrides.schoolYearStartDay : schoolYearStartDay;
+      const effKioskPinLength = overrides?.kioskPinLength !== undefined ? overrides.kioskPinLength : kioskPinLength;
+      const effBypassPin = overrides?.bypassPin !== undefined ? overrides.bypassPin : bypassPin;
+      const effLogRetention = overrides?.logRetention !== undefined ? overrides.logRetention : logRetention;
+      const effSyncInterval = overrides?.syncInterval !== undefined ? overrides.syncInterval : syncInterval;
+
       const updatedOp = {
         ...(openingHours || {}),
-        kiosk_pin_length: kioskPinLength,
-        bypass_pin: bypassPin,
-        log_retention: logRetention,
-        sync_interval: syncInterval
+        kiosk_pin_length: effKioskPinLength,
+        bypass_pin: effBypassPin,
+        log_retention: effLogRetention,
+        sync_interval: effSyncInterval,
+        school_year_start_month: effMonth,
+        school_year_start_day: effDay,
+        auto_delete_expired_users: effAutoDelete
       };
 
       const serializedUrls = JSON.stringify(calendarUrls);
 
-      const { error } = await supabase
+      const updatePayload: any = {
+        name: schoolName,
+        subdomain: schoolSubdomain || null,
+        street: schoolStreet || null,
+        house_number: schoolHouseNumber || null,
+        zip_code: schoolZipCode || null,
+        city: schoolCity || null,
+        phone_number: schoolPhoneNumber || null,
+        email: schoolEmail || null,
+        logo_url: logoUrl || null,
+        calendar_url: serializedUrls || null,
+        opening_hours: updatedOp,
+        school_year_start_month: effMonth,
+        school_year_start_day: effDay,
+        auto_delete_expired_users: effAutoDelete
+      };
+
+      let { error } = await supabase
         .from('schools')
-        .update({
-          name: schoolName,
-          subdomain: schoolSubdomain || null,
-          street: schoolStreet || null,
-          house_number: schoolHouseNumber || null,
-          zip_code: schoolZipCode || null,
-          city: schoolCity || null,
-          phone_number: schoolPhoneNumber || null,
-          email: schoolEmail || null,
-           logo_url: logoUrl || null,
-          calendar_url: serializedUrls || null,
-          opening_hours: updatedOp,
-          school_year_start_month: schoolYearStartMonth,
-          school_year_start_day: schoolYearStartDay,
-          auto_delete_expired_users: autoDeleteExpiredUsers
-        })
+        .update(updatePayload)
         .eq('id', schoolId);
 
-      if (error) throw error;
+      if (error) {
+        console.warn('[SecretarySettings] Retrying update with opening_hours JSON fallback due to column error:', error);
+        const { error: fallbackError } = await supabase
+          .from('schools')
+          .update({
+            name: schoolName,
+            subdomain: schoolSubdomain || null,
+            street: schoolStreet || null,
+            house_number: schoolHouseNumber || null,
+            zip_code: schoolZipCode || null,
+            city: schoolCity || null,
+            phone_number: schoolPhoneNumber || null,
+            email: schoolEmail || null,
+            logo_url: logoUrl || null,
+            calendar_url: serializedUrls || null,
+            opening_hours: updatedOp
+          })
+          .eq('id', schoolId);
+        if (fallbackError) throw fallbackError;
+      }
 
       setOpeningHours(updatedOp);
-      alert('Alle Einstellungen erfolgreich gespeichert! 🏢');
+      setSchoolYearStartMonth(effMonth);
+      setSchoolYearStartDay(effDay);
+      setAutoDeleteExpiredUsers(effAutoDelete);
+      setKioskPinLength(effKioskPinLength);
+      setBypassPin(effBypassPin);
+      setLogRetention(effLogRetention);
+      setSyncInterval(effSyncInterval);
+
+      setInitialSettings({
+        schoolName: schoolName || '',
+        schoolSubdomain: schoolSubdomain || '',
+        schoolZipCode: schoolZipCode || '',
+        schoolCity: schoolCity || '',
+        schoolStreet: schoolStreet || '',
+        schoolHouseNumber: schoolHouseNumber || '',
+        schoolPhoneNumber: schoolPhoneNumber || '',
+        schoolEmail: schoolEmail || '',
+        logoUrl: logoUrl || '',
+        calendarUrls: calendarUrls,
+        kioskPinLength: effKioskPinLength,
+        bypassPin: effBypassPin,
+        logRetention: effLogRetention,
+        syncInterval: effSyncInterval,
+        schoolYearStartMonth: effMonth,
+        schoolYearStartDay: effDay,
+        autoDeleteExpiredUsers: effAutoDelete
+      });
+
+      // Update local storage school profile & groovelab_school_overrides
+      try {
+        const storedProfile = localStorage.getItem('groovelab_school_profile');
+        if (storedProfile) {
+          const parsed = JSON.parse(storedProfile);
+          parsed.auto_delete_expired_users = effAutoDelete;
+          parsed.school_year_start_month = effMonth;
+          parsed.school_year_start_day = effDay;
+          parsed.opening_hours = updatedOp;
+          localStorage.setItem('groovelab_school_profile', JSON.stringify(parsed));
+        }
+        const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+        const overrides = JSON.parse(overridesStr);
+        if (schoolId) {
+          overrides[schoolId] = {
+            ...(overrides[schoolId] || {}),
+            auto_delete_expired_users: effAutoDelete,
+            school_year_start_month: effMonth,
+            school_year_start_day: effDay,
+            opening_hours: updatedOp
+          };
+          localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      alert('Einstellungen erfolgreich in der Datenbank gespeichert! 🏢');
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Speichern: ' + err.message);
@@ -5660,7 +5966,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       if (error) throw error;
       
-      const inviteUrl = `${window.location.origin}/?onboarding=parent&token=${data.token}`;
+      const inviteUrl = getParentOnboardingUrl(
+        schoolName || currentSchoolProfile?.name || 'Stadtmusikschule',
+        currentSchoolProfile?.subdomain,
+        data.token
+      );
       await navigator.clipboard.writeText(inviteUrl);
       alert(`Personalisierter Onboarding-Link für ${studentName} wurde in die Zwischenablage kopiert!\n\nLink: ${inviteUrl}`);
     } catch (err: any) {
@@ -5728,6 +6038,104 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler: ' + err.message);
+    }
+  };
+
+  const handleBatchImportStudents = async () => {
+    if (!studentCsvText.trim()) return;
+    setIsImportingStudentsBatch(true);
+    try {
+      const lines = studentCsvText.split('\n');
+      let successCount = 0;
+      let skippedCount = 0;
+
+      const assignedTeacherId = (studentFilterTeacher && studentFilterTeacher !== 'All' && studentFilterTeacher !== 'none')
+        ? studentFilterTeacher
+        : null;
+
+      for (let line of lines) {
+        line = line.trim();
+        if (!line || line.toLowerCase().startsWith('vorname') || line.toLowerCase().startsWith('name')) continue;
+
+        let firstName = '';
+        let lastName = '';
+        let instrument = 'Nicht festgelegt';
+        let duration = 30;
+        let birthDate: string | null = null;
+
+        const parts = line.split(/[;,\t]/).map(p => p.trim());
+
+        if (parts.length >= 2) {
+          firstName = parts[0];
+          lastName = parts[1];
+          if (parts[2]) {
+            if (/^\d+$/.test(parts[2])) {
+              duration = parseInt(parts[2], 10);
+            } else {
+              instrument = parts[2];
+            }
+          }
+          if (parts[3]) {
+            if (/^\d+$/.test(parts[3])) {
+              duration = parseInt(parts[3], 10);
+            } else if (parts[3].includes('.') || parts[3].includes('-')) {
+              birthDate = parts[3];
+            }
+          }
+        } else if (parts.length === 1 && parts[0].includes(' ')) {
+          const words = parts[0].split(/\s+/);
+          firstName = words[0];
+          lastName = words[1];
+          if (words.length > 2) {
+            instrument = words.slice(2).join(' ');
+          }
+        } else if (parts.length === 1 && parts[0]) {
+          firstName = parts[0];
+          lastName = '';
+        }
+
+        if (!firstName) {
+          skippedCount++;
+          continue;
+        }
+
+        const finalLastName = hasCampusSub ? lastName : (lastName?.trim() ? lastName.trim().charAt(0).toUpperCase() + '.' : '');
+        const finalBirthDate = hasCampusSub && birthDate ? sanitizeBirthDateToDayOnly(birthDate) : null;
+
+        try {
+          const { error: insertError } = await supabase.rpc('import_student', {
+            first_name: firstName,
+            last_name: finalLastName,
+            birth_date: finalBirthDate,
+            instrument: instrument || 'Nicht festgelegt',
+            school_id: schoolId,
+            teacher_id: assignedTeacherId,
+            lesson_duration: duration || 30
+          });
+
+          if (insertError) {
+            console.error('[StudentBatchImport] RPC error for line:', line, insertError);
+            skippedCount++;
+          } else {
+            successCount++;
+          }
+        } catch (rpcErr) {
+          console.error('[StudentBatchImport] Failed to import student:', rpcErr);
+          skippedCount++;
+        }
+      }
+
+      setStudentCsvText('');
+      setIsStudentCsvExpanded(false);
+      window.dispatchEvent(new CustomEvent('students_updated'));
+      window.dispatchEvent(new CustomEvent('campus_students_updated'));
+      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
+      await fetchDashboardData();
+      alert(`Sammel-Onboarding abgeschlossen: ${successCount} Schüler erfolgreich angelegt! ${skippedCount > 0 ? `(${skippedCount} Zeilen übersprungen)` : ''}`);
+    } catch (err: any) {
+      alert('Fehler beim Sammel-Import: ' + err.message);
+    } finally {
+      setIsImportingStudentsBatch(false);
     }
   };
 
@@ -5965,25 +6373,53 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const handleUpdateEmployeeRole = async (employeeId: string, newRole: string) => {
     try {
       const { data: user, error: fetchErr } = await supabase
-        .from('users')
+        .from('users_raw')
         .select('role, roles')
         .eq('id', employeeId)
         .single();
-      if (fetchErr) throw fetchErr;
 
-      const newRoles = Array.isArray(user?.roles) ? [...user.roles] : [user?.role || 'secretary'];
+      let currentRoles = user?.roles;
+      let currentRole = user?.role;
+
+      if (fetchErr || !user) {
+        const { data: vUser } = await supabase
+          .from('users')
+          .select('role, roles')
+          .eq('id', employeeId)
+          .single();
+        currentRoles = vUser?.roles;
+        currentRole = vUser?.role;
+      }
+
+      const newRoles = Array.isArray(currentRoles) ? [...currentRoles] : [currentRole || 'secretary'];
       if (!newRoles.includes(newRole)) {
         newRoles.push(newRole);
       }
 
-      const { error } = await supabase
-        .from('users')
+      let updated = false;
+      const { error: rawErr } = await supabase
+        .from('users_raw')
         .update({ 
           role: newRole,
           roles: newRoles
         })
         .eq('id', employeeId);
-      if (error) throw error;
+
+      if (!rawErr) updated = true;
+
+      try {
+        const { error: viewErr } = await supabase
+          .from('users')
+          .update({ 
+            role: newRole,
+            roles: newRoles
+          })
+          .eq('id', employeeId);
+        if (!viewErr) updated = true;
+      } catch (e) {}
+
+      if (!updated && rawErr) throw rawErr;
+
       alert(`Mitarbeiter-Rolle erfolgreich aktualisiert.`);
       fetchDashboardData();
     } catch (err: any) {
@@ -6038,16 +6474,31 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         }
       }
 
-      const { error } = await supabase
-        .from('users')
+      let updated = false;
+      const { error: rawErr } = await supabase
+        .from('users_raw')
         .update({ 
           roles: newRoles,
           role: primaryRole,
           ...updateFields
         })
         .eq('id', emp.id);
+
+      if (!rawErr) updated = true;
+
+      try {
+        const { error: viewErr } = await supabase
+          .from('users')
+          .update({ 
+            roles: newRoles,
+            role: primaryRole,
+            ...updateFields
+          })
+          .eq('id', emp.id);
+        if (!viewErr) updated = true;
+      } catch (e) {}
         
-      if (error) throw error;
+      if (!updated && rawErr) throw rawErr;
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Aktualisieren der Rolle: ' + err.message);
@@ -6828,24 +7279,65 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       </div>
                     </div>
 
-                    {/* Delete Action */}
-                    <div style={{ flex: '0.5', minWidth: '60px', display: 'flex', justifyContent: 'flex-end' }}>
+                    {/* Actions: Edit & Delete */}
+                    <div style={{ flex: '0.5', minWidth: '90px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px' }}>
+                      <button
+                        onClick={() => {
+                          setEditingSubject(s);
+                          setEditSubjectName(s.name || '');
+                          setEditSubjectCategory(s.category || 'Allgemein');
+                          setEditSubjectDescription(s.description || '');
+                          setShowEditSubjectModal(true);
+                        }}
+                        title="Fach bearbeiten"
+                        style={{
+                          padding: '7px',
+                          borderRadius: '10px',
+                          border: '1px solid #e2e8f0',
+                          background: '#f8fafc',
+                          cursor: 'pointer',
+                          color: '#475569',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#e2e8f0';
+                          e.currentTarget.style.color = '#0f172a';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#f8fafc';
+                          e.currentTarget.style.color = '#475569';
+                        }}
+                      >
+                        <Edit2 size={15} />
+                      </button>
+
                       {s.name.toLowerCase() !== 'ohne zuweisung' && (
                         <button
                           onClick={() => handleDeleteSubject(s.id, s.name)}
+                          title="Fach löschen"
                           style={{
-                            padding: '6px',
+                            padding: '7px',
                             borderRadius: '10px',
-                            border: 'none',
-                            background: 'transparent',
+                            border: '1px solid #fee2e2',
+                            background: '#fff5f5',
                             cursor: 'pointer',
-                            color: '#34a853',
+                            color: '#dc2626',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fee2e2';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#fff5f5';
                           }}
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={15} />
                         </button>
                       )}
                     </div>
@@ -6985,11 +7477,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         {/* Modal: Add Subject */}
         {showAddSubjectModal && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {/* Modal Header */}
               <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                  <Plus size={18} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Neues Unterrichtsfach anlegen
+                  <Plus size={18} style={{ marginRight: '6px', verticalAlign: 'middle', color: '#34a853' }} /> Neues Unterrichtsfach anlegen
                 </h3>
                 <button 
                   onClick={() => setShowAddSubjectModal(false)}
@@ -7008,9 +7500,28 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     required
                     value={newSubjectName}
                     onChange={(e) => setNewSubjectName(e.target.value)}
-                    placeholder="z.B. Blockflöte"
+                    placeholder="z.B. Blockflöte, Klavier, Gesang"
                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
                   />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Kategorie / Sparte *</label>
+                  <select
+                    value={newSubjectCategory}
+                    onChange={(e) => setNewSubjectCategory(e.target.value)}
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                  >
+                    <option value="Allgemein">Allgemein</option>
+                    <option value="guitar">Gitarre & Bass</option>
+                    <option value="piano">Klavier, Keyboard & Tasten</option>
+                    <option value="vocals">Gesang & Stimme</option>
+                    <option value="drums">Schlagzeug & Rhythmus</option>
+                    <option value="strings">Streichinstrumente (Geige, Cello etc.)</option>
+                    <option value="winds">Blasinstrumente (Flöte, Trompete etc.)</option>
+                    <option value="early_education">Früherziehung & Grundfächer (EMP)</option>
+                    <option value="other">Theorie, Ensemble & Sonstiges</option>
+                  </select>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -7024,30 +7535,108 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   />
                 </div>
 
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSubjectModal(false)}
+                    style={{ padding: '10px 18px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)' }}
+                  >
+                    Fach anlegen
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Edit Subject */}
+        {showEditSubjectModal && editingSubject && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {/* Modal Header */}
+              <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Edit2 size={18} style={{ color: '#34a853' }} /> Unterrichtsfach bearbeiten
+                </h3>
+                <button 
+                  onClick={() => {
+                    setShowEditSubjectModal(false);
+                    setEditingSubject(null);
+                  }}
+                  style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <form onSubmit={handleUpdateSubject} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Kategorie *</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Name des Fachs *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={editSubjectName}
+                    onChange={(e) => setEditSubjectName(e.target.value)}
+                    placeholder="z.B. Klavier, Gitarre, Gesang"
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Kategorie / Sparte *</label>
                   <select
-                    value={newSubjectCategory}
-                    onChange={(e) => setNewSubjectCategory(e.target.value)}
+                    value={editSubjectCategory}
+                    onChange={(e) => setEditSubjectCategory(e.target.value)}
                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
                   >
+                    <option value="Allgemein">Allgemein</option>
                     <option value="guitar">Gitarre & Bass</option>
                     <option value="piano">Klavier, Keyboard & Tasten</option>
                     <option value="vocals">Gesang & Stimme</option>
                     <option value="drums">Schlagzeug & Rhythmus</option>
-                    <option value="strings">Streichinstrumente (Geige, Cello, Kontrabass etc.)</option>
-                    <option value="winds">Blasinstrumente (Flöte, Trompete, Klarinette etc.)</option>
-                    <option value="early_education">Früherziehung & Grundfächer</option>
-                    <option value="other">Sonstige Instrumente / Theorie & Ensemble</option>
+                    <option value="strings">Streichinstrumente (Geige, Cello etc.)</option>
+                    <option value="winds">Blasinstrumente (Flöte, Trompete etc.)</option>
+                    <option value="early_education">Früherziehung & Grundfächer (EMP)</option>
+                    <option value="other">Theorie, Ensemble & Sonstiges</option>
                   </select>
                 </div>
 
-                <button
-                  type="submit"
-                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '8px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)' }}
-                >
-                  Fach anlegen
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Beschreibung (optional)</label>
+                  <textarea 
+                    value={editSubjectDescription}
+                    onChange={(e) => setEditSubjectDescription(e.target.value)}
+                    placeholder="Optionale Beschreibung des Unterrichtsfachs..."
+                    rows={3}
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', resize: 'vertical' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditSubjectModal(false);
+                      setEditingSubject(null);
+                    }}
+                    style={{ padding: '10px 18px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)' }}
+                  >
+                    Änderungen speichern
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -7252,7 +7841,51 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
           {/* INSTRUMENTS LIST */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {filteredInstruments.length === 0 ? (
+            {rentalInstruments.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '48px 24px',
+                background: '#f8fafc',
+                borderRadius: '20px',
+                border: '1.5px dashed #cbd5e1',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <div style={{ width: '52px', height: '52px', borderRadius: '16px', background: '#fce8e6', color: '#ea4335', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Tag size={24} />
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                    Noch keine Leihinstrumente erfasst
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', maxWidth: '440px' }}>
+                    Erfasse hier Schul-Leihinstrumente, um Ausgabe, Schülerverleih, Kautionsstatus und Rückgabefristen zentral zu verwalten.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAddRentalModal(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderRadius: '12px',
+                    padding: '10px 20px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    background: '#ea4335',
+                    color: '#ffffff',
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+                    marginTop: '4px'
+                  }}
+                >
+                  <Plus size={16} /> Erstes Leihinstrument anlegen
+                </button>
+              </div>
+            ) : filteredInstruments.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 700 }}>
                 Keine Leihinstrumente mit diesen Filtereinstellungen gefunden.
               </div>
@@ -7388,6 +8021,35 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           <span>Rückgabe</span>
                         </button>
                       )}
+
+                      {/* Edit Button */}
+                      <button
+                        onClick={() => {
+                          setShowEditRentalModal(item);
+                          setEditRentalName(item.name || '');
+                          setEditRentalCategory(item.category || 'Blasinstrumente');
+                          setEditRentalSerial(item.serial_number || '');
+                          setEditRentalCondition(item.condition || 'Sehr gut');
+                          setEditRentalStatus(item.status || 'available');
+                          setEditRentalMonthlyFee((item.monthly_fee ?? 15.00).toString());
+                          setEditRentalDeposit((item.deposit ?? 100.00).toString());
+                          setEditRentalNotes(item.notes || '');
+                        }}
+                        style={{
+                          padding: '6px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Instrument bearbeiten"
+                      >
+                        <Edit2 size={15} />
+                      </button>
 
                       <button
                         onClick={() => {
@@ -7556,6 +8218,171 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   style={{ flex: 1.5, padding: '10px', borderRadius: '10px', border: 'none', background: '#ea4335', fontWeight: 800, color: '#ffffff', cursor: 'pointer' }}
                 >
                   Speichern
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL 1.5: EDIT RENTAL INSTRUMENT */}
+        {showEditRentalModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: '#ffffff', width: '100%', maxWidth: '480px', borderRadius: '24px', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', border: '1px solid #cbd5e1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+                  Leihinstrument bearbeiten
+                </h3>
+                <button onClick={() => setShowEditRentalModal(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Instrumentenbezeichnung *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="z.B. Yamaha YAS-280 Altsaxophon"
+                    value={editRentalName}
+                    onChange={e => setEditRentalName(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Kategorie</label>
+                    <select
+                      value={editRentalCategory}
+                      onChange={e => setEditRentalCategory(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                    >
+                      <option value="Blasinstrumente">Blasinstrumente</option>
+                      <option value="Streicher">Streicher</option>
+                      <option value="Tasten">Tasten</option>
+                      <option value="Zupfinstrumente">Zupfinstrumente</option>
+                      <option value="Schlagzeug">Schlagzeug</option>
+                      <option value="Sonstige">Sonstige</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Seriennummer / Inv-Nr.</label>
+                    <input
+                      type="text"
+                      placeholder="z.B. CG-INV-2026-050"
+                      value={editRentalSerial}
+                      onChange={e => setEditRentalSerial(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Monatliche Gebühr (€)</label>
+                    <input
+                      type="number"
+                      step="0.50"
+                      value={editRentalMonthlyFee}
+                      onChange={e => setEditRentalMonthlyFee(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Kaution (€)</label>
+                    <input
+                      type="number"
+                      step="10"
+                      value={editRentalDeposit}
+                      onChange={e => setEditRentalDeposit(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Zustand</label>
+                    <select
+                      value={editRentalCondition}
+                      onChange={e => setEditRentalCondition(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                    >
+                      <option value="Neu">Neu</option>
+                      <option value="Sehr gut">Sehr gut</option>
+                      <option value="Gebraucht">Gebraucht mit leichten Spuren</option>
+                      <option value="Reparaturbedürftig">Reparaturbedürftig</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Status</label>
+                    <select
+                      value={editRentalStatus}
+                      onChange={e => setEditRentalStatus(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                    >
+                      <option value="available">🟢 Im Lager verfügbar</option>
+                      <option value="rented">🔵 Verliehen an Schüler</option>
+                      <option value="maintenance">🟡 In Wartung / Reparatur</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Zubehör & Anmerkungen</label>
+                  <textarea
+                    rows={2}
+                    placeholder="z.B. Inkl. Koffer, Mundstück und Pflegeset"
+                    value={editRentalNotes}
+                    onChange={e => setEditRentalNotes(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEditRentalModal(null)}
+                  style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', fontWeight: 800, color: '#64748b', cursor: 'pointer' }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!editRentalName.trim()) {
+                      alert('Bitte gib eine Instrumentenbezeichnung an.');
+                      return;
+                    }
+                    setRentalInstruments(prev => prev.map(item => {
+                      if (item.id === showEditRentalModal.id) {
+                        return {
+                          ...item,
+                          name: editRentalName.trim(),
+                          category: editRentalCategory,
+                          serial_number: editRentalSerial.trim(),
+                          condition: editRentalCondition,
+                          status: editRentalStatus,
+                          // If switched to available or maintenance and wasn't before, clear student if requested
+                          student_name: editRentalStatus === 'available' ? null : item.student_name,
+                          student_id: editRentalStatus === 'available' ? null : item.student_id,
+                          monthly_fee: parseFloat(editRentalMonthlyFee) || 0,
+                          deposit: parseFloat(editRentalDeposit) || 0,
+                          notes: editRentalNotes.trim()
+                        };
+                      }
+                      return item;
+                    }));
+                    setShowEditRentalModal(null);
+                  }}
+                  style={{ flex: 1.5, padding: '10px', borderRadius: '10px', border: 'none', background: '#ea4335', fontWeight: 800, color: '#ffffff', cursor: 'pointer' }}
+                >
+                  Änderungen speichern
                 </button>
               </div>
             </div>
@@ -9748,7 +10575,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button
                   onClick={() => {
-                    const onboardingUrl = `${window.location.origin}/?onboarding=parent`;
+                    const onboardingUrl = getParentOnboardingUrl(
+                      schoolName || currentSchoolProfile?.name || 'Stadtmusikschule',
+                      currentSchoolProfile?.subdomain
+                    );
                     navigator.clipboard.writeText(onboardingUrl);
                     setCopiedStudentId('general-onboarding');
                     setTimeout(() => setCopiedStudentId(null), 2000);
@@ -9796,15 +10626,44 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   title="Smarter 1-Klick Schüler- &amp; Lehrer-Import aus Excel/CSV mit automatischer DSGVO-Maskierung"
                 >
                   <Upload size={12} color="#059669" />
-                  <span>📥 Smarter CSV/Excel Import</span>
+                  <span>Smarter CSV/Excel Import</span>
                 </button>
 
+                {/* Sammel-Onboarding (Text/CSV) Toggle Button */}
                 <button
-                  onClick={() => generateTeacherQuickstartPDF(currentSchoolProfile?.name || 'Stadtmusikschule')}
+                  onClick={() => setIsStudentCsvExpanded(!isStudentCsvExpanded)}
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: '4px', 
+                    gap: '5px', 
+                    borderRadius: '8px', 
+                    padding: '4px 10px', 
+                    fontSize: '0.72rem', 
+                    fontWeight: 800,
+                    background: isStudentCsvExpanded ? '#e6f4ea' : '#ffffff',
+                    border: isStudentCsvExpanded ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+                    color: isStudentCsvExpanded ? '#34a853' : '#334155',
+                    cursor: 'pointer',
+                    fontFamily: 'Urbanist',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-scale-mini"
+                  title="Schnellerfassung per Textfeld für mehrere Schüler auf einmal"
+                >
+                  <FileText size={12} color={isStudentCsvExpanded ? '#34a853' : '#64748b'} />
+                  <span>Sammel-Onboarding (Text) {isStudentCsvExpanded ? '▲' : '▼'}</span>
+                </button>
+
+                {/* Interaktives In-App Leitfaden & Eltern-Info Modal */}
+                <button
+                  onClick={() => {
+                    setGuidanceInitialTab('teacher');
+                    setShowGuidanceModal(true);
+                  }}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '5px', 
                     borderRadius: '8px', 
                     padding: '4px 10px', 
                     fontSize: '0.72rem', 
@@ -9817,34 +10676,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     transition: 'all 0.2s'
                   }}
                   className="hover-scale-mini"
-                  title="1-Seiter A4 Spickzettel für das Lehrerzimmer herunterladen"
+                  title="Interaktives Infocenter für Lehrkräfte &amp; Eltern öffnen (inkl. Textvorlagen &amp; Druck-Export)"
                 >
-                  <FileText size={12} color="#3b82f6" />
-                  <span>Lehrer-Spickzettel (PDF)</span>
-                </button>
-
-                <button
-                  onClick={() => generateParentQuickstartPDF(currentSchoolProfile?.name || 'Stadtmusikschule', (activePlatform as any) || 'both')}
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px', 
-                    borderRadius: '8px', 
-                    padding: '4px 10px', 
-                    fontSize: '0.72rem', 
-                    fontWeight: 800,
-                    background: '#f8fafc',
-                    border: '1px solid #cbd5e1',
-                    color: '#334155',
-                    cursor: 'pointer',
-                    fontFamily: 'Urbanist',
-                    transition: 'all 0.2s'
-                  }}
-                  className="hover-scale-mini"
-                  title="1-Seiter A4 Informationsblatt für Eltern zum digitalen Hausaufgabenheft"
-                >
-                  <FileText size={12} color="#10b981" />
-                  <span>Eltern-Info (PDF)</span>
+                  <Sparkles size={12} color="#0284c7" />
+                  <span>💡 Leitfaden &amp; Eltern-Info</span>
                 </button>
 
                 <button
@@ -9870,6 +10705,157 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 </button>
               </div>
             </div>
+
+            {/* Collapsible Student CSV/Text Onboarding Box */}
+            {isStudentCsvExpanded && (() => {
+              const selectedTeacherObj = studentFilterTeacher && studentFilterTeacher !== 'All' && studentFilterTeacher !== 'none'
+                ? allUniqueTeachers.find((t: any) => t.id === studentFilterTeacher)
+                : null;
+              const selectedTeacherName = selectedTeacherObj
+                ? `${selectedTeacherObj.firstName || selectedTeacherObj.first_name || ''} ${selectedTeacherObj.lastName || selectedTeacherObj.last_name || ''}`.trim()
+                : '';
+              const selectedTeacherInitials = selectedTeacherObj
+                ? `${selectedTeacherObj.firstName?.[0] || selectedTeacherObj.first_name?.[0] || ''}${selectedTeacherObj.lastName?.[0] || selectedTeacherObj.last_name?.[0] || ''}`.toUpperCase() || 'L'
+                : '';
+
+              return (
+                <div style={{
+                  background: '#f8fafc',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  border: '1.5px dashed #34a853',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  boxShadow: '0 4px 16px rgba(52,168,83,0.06)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FileText size={16} />
+                      </div>
+                      <div>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                          Sammel-Onboarding (Schüler)
+                        </strong>
+                        <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontFamily: 'Inter' }}>
+                          Format pro Zeile: <code>Vorname; Nachname; Instrument (optional); Dauer (optional)</code> oder <code>Vorname Nachname</code>
+                        </span>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 800, background: '#ecfdf5', padding: '3px 8px', borderRadius: '100px', border: '1px solid #a7f3d0' }}>
+                      100% DSGVO-Anonymisiert
+                    </span>
+                  </div>
+
+                  {/* Smart Auto-Zuweisung Pill if a teacher is selected in sidebar */}
+                  {selectedTeacherObj && (
+                    <div style={{
+                      background: 'rgba(52, 168, 83, 0.04)',
+                      border: '1.5px solid rgba(52, 168, 83, 0.18)',
+                      borderRadius: '14px',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', flex: 1 }}>
+                        <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                          <Zap size={14} style={{ marginRight: '4px', verticalAlign: 'middle', fill: '#34a853' }} /> Smart Auto-Zuweisung:
+                        </span>
+
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: '#ffffff',
+                          border: '1.5px solid #cbd5e1',
+                          padding: '3px 10px 3px 6px',
+                          borderRadius: '100px',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                        }}>
+                          <div style={{
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '50%',
+                            background: getAvatarGradient(selectedTeacherName),
+                            color: getAvatarTextColor(selectedTeacherName),
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.62rem',
+                            fontWeight: 900,
+                            fontFamily: 'Urbanist'
+                          }}>
+                            {selectedTeacherInitials}
+                          </div>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                            {selectedTeacherName}
+                          </span>
+                        </div>
+                      </div>
+
+                      <span style={{ fontSize: '0.65rem', color: '#34a853', fontWeight: 900, background: '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+                        Alle Schüler werden direkt dieser Lehrkraft zugewiesen!
+                      </span>
+                    </div>
+                  )}
+
+                  <textarea
+                    value={studentCsvText}
+                    onChange={(e) => setStudentCsvText(e.target.value)}
+                    placeholder={
+                      selectedTeacherObj
+                        ? "Max Mustermann\nErika Musterfrau; 45\nLeon Schmidt; Gitarre; 30"
+                        : "Max Mustermann; Klavier; 30\nErika Musterfrau; Gesang; 45\nLeon Schmidt; Gitarre"
+                    }
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      height: '110px',
+                      borderRadius: '10px',
+                      border: '1.5px solid #cbd5e1',
+                      padding: '10px 12px',
+                      fontSize: '0.78rem',
+                      fontFamily: 'monospace',
+                      outline: 'none',
+                      resize: 'vertical',
+                      background: '#ffffff',
+                      lineHeight: '1.5'
+                    }}
+                  />
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      Tipp: Mehrere Zeilen direkt aus Excel, Word oder Notizen kopieren und hier einfügen.
+                    </span>
+                    <button
+                      onClick={handleBatchImportStudents}
+                      disabled={isImportingStudentsBatch || !studentCsvText.trim()}
+                      className="hover-scale"
+                      style={{
+                        background: '#34a853',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '8px 18px',
+                        borderRadius: '10px',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: isImportingStudentsBatch || !studentCsvText.trim() ? 'not-allowed' : 'pointer',
+                        opacity: isImportingStudentsBatch || !studentCsvText.trim() ? 0.6 : 1,
+                        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.25)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Plus size={14} /> {isImportingStudentsBatch ? 'Erstelle Profile...' : 'Schüler jetzt importieren'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* FILTER & SEARCH (Apple-like Control Bar) */}
             <div style={{ 
@@ -11357,7 +12343,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           school_id: schoolId,
           name: newSubjectName.trim(),
           description: newSubjectDescription.trim() || null,
-          category: newSubjectCategory || 'guitar'
+          category: newSubjectCategory || 'Allgemein'
         });
 
       if (error) throw error;
@@ -11365,7 +12351,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       alert(`Fach "${newSubjectName}" wurde erfolgreich angelegt.`);
       setNewSubjectName('');
       setNewSubjectDescription('');
-      setNewSubjectCategory('guitar');
+      setNewSubjectCategory('Allgemein');
       setShowAddSubjectModal(false);
       fetchDashboardData();
     } catch (err: any) {
@@ -11373,9 +12359,76 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  const handleDeleteSubject = async (id: string, name: string) => {
-    if (!window.confirm(`Möchtest du das Fach "${name}" wirklich unwiderruflich löschen?`)) return;
+  const handleUpdateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSubject || !editSubjectName.trim()) return;
+
     try {
+      const oldName = editingSubject.name;
+      const newName = editSubjectName.trim();
+
+      // Check if new name conflicts with an existing subject (except itself)
+      const dup = subjects.find(s => s.id !== editingSubject.id && s.name.toLowerCase().trim() === newName.toLowerCase());
+      if (dup) {
+        alert(`Ein anderes Fach mit dem Namen "${newName}" existiert bereits.`);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('subjects')
+        .update({
+          name: newName,
+          category: editSubjectCategory || 'Allgemein',
+          description: editSubjectDescription.trim() || null
+        })
+        .eq('id', editingSubject.id);
+
+      if (error) throw error;
+
+      // If name changed, gracefully update users whose instrument was oldName
+      if (oldName !== newName && schoolId) {
+        try {
+          await supabase
+            .from('users')
+            .update({ instrument: newName })
+            .eq('school_id', schoolId)
+            .eq('instrument', oldName);
+        } catch (cascadeErr) {
+          console.warn('Subject rename cascade warning:', cascadeErr);
+        }
+      }
+
+      alert(`Fach "${newName}" wurde erfolgreich aktualisiert.`);
+      setShowEditSubjectModal(false);
+      setEditingSubject(null);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren des Fachs: ' + err.message);
+    }
+  };
+
+  const handleDeleteSubject = async (id: string, name: string) => {
+    const assignedTeachers = (allTeachers || []).filter((t: any) => (t.instrument || '').toLowerCase().trim() === name.toLowerCase().trim());
+    const assignedStudents = (students || []).filter((s: any) => (s.instrument || '').toLowerCase().trim() === name.toLowerCase().trim());
+    const totalAssigned = assignedTeachers.length + assignedStudents.length;
+
+    let confirmMsg = `Möchtest du das Fach "${name}" wirklich unwiderruflich löschen?`;
+    if (totalAssigned > 0) {
+      confirmMsg = `⚠️ Achtung: Das Fach "${name}" ist aktuell ${assignedTeachers.length} Lehrkraft/Lehrkräften und ${assignedStudents.length} Schüler(n) zugewiesen.\n\nBeim Löschen werden diese Zuweisungen sicher auf "ohne Zuweisung" zurückgesetzt.\n\nMöchtest du das Fach wirklich löschen?`;
+    }
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      // Safely reset users with this instrument to 'ohne Zuweisung'
+      if (totalAssigned > 0 && schoolId) {
+        await supabase
+          .from('users')
+          .update({ instrument: 'ohne Zuweisung' })
+          .eq('school_id', schoolId)
+          .eq('instrument', name);
+      }
+
       const { error } = await supabase
         .from('subjects')
         .delete()
@@ -14919,7 +15972,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           flexShrink: 0
         }} />
 
-        {!isSchoolTrial && !hasCampusSub && !hasGroovelabSub && (
+        {!isBillingBooked && !isSchoolTrial && !hasCampusSub && !hasGroovelabSub && (
           <div style={{
             background: '#e8f0fe',
             borderBottom: '1px solid #d2e3fc',
@@ -14959,7 +16012,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           </div>
         )}
 
-        {isSchoolTrial && !subscriptionBypass && (
+        {!isBillingBooked && isSchoolTrial && !subscriptionBypass && (
           <div style={{
             background: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
               ? '#fef2f2'
@@ -17787,9 +18840,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       style={{
                                         padding: '4px 8px',
                                         borderRadius: '10px',
-                                        background: hasTeacher ? '#fef3c7' : '#ffffff',
-                                        color: hasTeacher ? '#d97706' : '#a1a1aa',
-                                        border: hasTeacher ? '1.5px solid #d97706' : '1.5px dashed #cbd5e1',
+                                        background: hasTeacher ? '#e6f4ea' : '#ffffff',
+                                        color: hasTeacher ? '#34a853' : '#a1a1aa',
+                                        border: hasTeacher ? '1.5px solid #34a853' : '1.5px dashed #cbd5e1',
                                         fontSize: '0.7rem',
                                         fontWeight: 700,
                                         minWidth: '75px',
@@ -18240,8 +19293,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               width: '36px',
                               height: '36px',
                               borderRadius: '50%',
-                              background: '#fef3c7',
-                              color: '#d97706',
+                              background: '#e6f4ea',
+                              color: '#34a853',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -25847,7 +26900,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     fontWeight: 650
                                   }}>
                                     <ShieldCheck size={16} color="#15803d" />
-                                    <span>Rechnungsnummer-Format: CG-[STUDENT_HASH_8]-[YYMM] – Eltern erhalten die Zahlungsdaten direkt bei der App-Registrierung.</span>
+                                    <span>DSGVO-Format CG-[STUDENT_HASH_8]-[YYMM] • Eltern zahlen den Beitrag (0,49 € / Mo.) dynamisch anteilig nur für die Restmonate des Schuljahres (September–August).</span>
                                   </div>
                                 </div>
                               )}
@@ -25987,8 +27040,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         <span>Service- &amp; Administrationspauschale:</span>
                                         <strong>
                                           {billableTeachersCount > 0 
-                                            ? `${billableTeachersCount} Lehrkräfte × ${effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} € = ${teacherCost.toFixed(2).replace('.', ',')} € / Mo.`
-                                            : '0,00 € (Inklusive)'}
+                                            ? `${teacherCost.toFixed(2).replace('.', ',')} € / Mo. (${billableTeachersCount} Lehrkräfte × ${effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} € • Schulleitung inklusive)`
+                                            : '0,00 € (0 Lehrkräfte aktiv • Schulleitung inklusive)'}
                                         </strong>
                                       </div>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -26045,7 +27098,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         ) : (
                                           <>
                                             <span>Aktive Schülerprofile ({activeStudents} aktivierte Aktivierungen):</span>
-                                            <strong>{billingPayer === 'student' ? `${customUmlageAmount.toFixed(2).replace('.', ',')} € / Schüler (Jahresbetrag)` : `${effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} € / Schüler / Mo.`}</strong>
+                                            <strong>
+                                              {billingPayer === 'student' 
+                                                ? `${customUmlageAmount.toFixed(2).replace('.', ',')} € / Mo. (Dynamischer Pro-Rata-Jahresbeitrag)` 
+                                                : `${effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} € / Schüler / Mo.`}
+                                            </strong>
                                           </>
                                         )}
                                       </div>
@@ -26082,9 +27139,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         marginTop: '4px',
                                         lineHeight: '1.35'
                                       }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                          <Sparkles size={13} color="#1d4ed8" />
-                                          <span><strong>Umlage-Vorteil aktiv:</strong> Die Eltern zahlen den Jahresbeitrag von {(customUmlageAmount * 12).toFixed(2).replace('.', ',')} € direkt per Überweisung an Campus-Groovelab. Die Musikschule hat dadurch <strong>0,00 € Kosten</strong> und keinen Verwaltungsaufwand.</span>
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                          <Sparkles size={14} color="#1d4ed8" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                          <span><strong>Dynamischer Pro-Rata-Jahresbeitrag aktiv:</strong> Eltern zahlen den Beitrag (0,49 € / Mo.) anteilig nur für die verbleibenden Monate bis zum Schuljahresende im August (max. {(customUmlageAmount * 12).toFixed(2).replace('.', ',')} € bei 12 Monaten; z. B. nur {(customUmlageAmount * 7).toFixed(2).replace('.', ',')} € bei Beitritt im Februar). Die Musikschule hat dadurch <strong>0,00 € Kosten</strong> und keinen Inkassoaufwand.</span>
                                         </div>
                                       </div>
                                     ) : (
@@ -26160,6 +27217,28 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   )}
                                 </div>
 
+                                {/* Contract Start & Trial Phase Legal Notice */}
+                                <div style={{
+                                  background: '#f8fafc',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  padding: '12px 14px',
+                                  display: 'flex',
+                                  alignItems: 'flex-start',
+                                  gap: '10px',
+                                  fontSize: '0.72rem',
+                                  color: '#475569',
+                                  lineHeight: 1.45
+                                }}>
+                                  <Info size={16} color="#34a853" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                  <div>
+                                    <strong style={{ color: '#1e293b', display: 'block', marginBottom: '2px' }}>
+                                      Vertragsbeginn &amp; Testphasen-Abschluss:
+                                    </strong>
+                                    Mit dem Klick auf <em>„Zahlungspflichtig buchen &amp; freischalten“</em> beendest du deine unverbindliche 30-Tage-Testphase und wandelst sie in einen regulären Produktivvertrag für deine Musikschule um. Die monatliche Bereitstellung (Rechnung A) startet ab dem heutigen Tag mit 14 Tagen Zahlungsziel zum Monatsende.
+                                  </div>
+                                </div>
+
                                 {/* Checkbox GTC & Privacy */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                   <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer' }}>
@@ -26221,6 +27300,24 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         const simulated = typeof window !== 'undefined' ? localStorage.getItem(`simulatedContractStartDate_${schoolId}`) : null;
                                         const todayStr = simulated || new Date().toISOString().split('T')[0];
 
+                                        let bookingDone = false;
+                                        try {
+                                          const { data: rpcData, error: rpcErr } = await supabase.rpc('confirm_school_subscription', {
+                                            p_school_id: schoolId,
+                                            p_has_campus: hasCampusSub,
+                                            p_has_groovelab: hasGroovelabSub,
+                                            p_student_billing_option: studentBillingOption,
+                                            p_contract_start_date: todayStr,
+                                            p_storage_addon_gb: selectedStorageAddonGb || 0,
+                                            p_storage_addon_monthly_fee: selectedStorageAddonFee || 0
+                                          });
+                                          if (!rpcErr && rpcData?.success) {
+                                            bookingDone = true;
+                                          }
+                                        } catch (e) {
+                                          console.warn("confirm_school_subscription RPC notice:", e);
+                                        }
+
                                         let updatePayload: any = {
                                           is_billing_booked: true,
                                           has_campus_subscription: hasCampusSub,
@@ -26234,32 +27331,59 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           updatePayload.storage_addon_gb = selectedStorageAddonGb;
                                           updatePayload.storage_addon_monthly_fee = selectedStorageAddonFee;
                                           updatePayload.storage_addon_status = 'active';
+                                        } else {
+                                          updatePayload.storage_addon_gb = 0;
+                                          updatePayload.storage_addon_monthly_fee = 0.00;
+                                          updatePayload.storage_addon_status = 'none';
                                         }
 
-                                        let { error } = await supabase
-                                          .from('schools')
-                                          .update(updatePayload)
-                                          .eq('id', schoolId);
-
-                                        if (error && error.message && (error.message.includes('storage_addon') || error.message.includes('schema cache'))) {
-                                          console.warn("Retrying booking without storage columns:", error.message);
-                                          const { storage_addon_gb, storage_addon_monthly_fee, storage_addon_status, ...corePayload } = updatePayload;
-                                          const retryRes = await supabase
+                                        if (!bookingDone) {
+                                          let { error } = await supabase
                                             .from('schools')
-                                            .update(corePayload)
+                                            .update(updatePayload)
                                             .eq('id', schoolId);
-                                          error = retryRes.error;
-                                        }
 
-                                        if (error) throw error;
+                                          if (error && error.message && (error.message.includes('storage_addon') || error.message.includes('schema cache'))) {
+                                            console.warn("Retrying booking without storage columns:", error.message);
+                                            const { storage_addon_gb, storage_addon_monthly_fee, storage_addon_status, ...corePayload } = updatePayload;
+                                            const retryRes = await supabase
+                                              .from('schools')
+                                              .update(corePayload)
+                                              .eq('id', schoolId);
+                                            error = retryRes.error;
+                                          }
+
+                                          if (error) throw error;
+                                        }
 
                                         setIsBillingBooked(true);
                                         setIsSchoolTrial(false);
                                         setSchoolStatus('active');
+                                        setCurrentSchoolProfile((prev: any) => prev ? ({
+                                          ...prev,
+                                          is_billing_booked: true,
+                                          is_trial: false,
+                                          status: 'active',
+                                          has_campus_subscription: hasCampusSub,
+                                          has_groovelab_subscription: hasGroovelabSub,
+                                          student_billing_option: studentBillingOption,
+                                          contract_start_date: todayStr,
+                                          storage_addon_gb: selectedStorageAddonGb,
+                                          storage_addon_monthly_fee: selectedStorageAddonFee,
+                                          storage_addon_status: selectedStorageAddonGb > 0 ? 'active' : 'none'
+                                        }) : prev);
+
                                         if (typeof window !== 'undefined') {
                                           localStorage.setItem(`isBillingBooked_${schoolId}`, 'true');
                                           localStorage.setItem(`contractStartDate_${schoolId}`, todayStr);
+                                          localStorage.setItem(`groovelab_storage_addon_gb_${schoolId}`, String(selectedStorageAddonGb));
+                                          localStorage.setItem(`campus_storage_addon_gb_${schoolId}`, String(selectedStorageAddonGb));
+                                          localStorage.setItem('groovelab_storage_addon_gb', String(selectedStorageAddonGb));
+                                          localStorage.setItem('campus_storage_addon_gb', String(selectedStorageAddonGb));
+                                          localStorage.setItem('groovelab_storage_addon_active', selectedStorageAddonGb > 0 ? 'true' : 'false');
+                                          localStorage.setItem('campus_storage_addon_active', selectedStorageAddonGb > 0 ? 'true' : 'false');
                                         }
+                                        fetchDashboardData();
                                         setShowSuccessModal(true);
                                       } catch (err: any) {
                                         console.error("Confirm billing booking error:", err);
@@ -30324,12 +31448,12 @@ status: status,
                 },
                 {
                   id: 'links',
-                  title: 'Anmelde- & Kiosk-Links',
-                  subtitle: 'Schul-URL & Tablet-Kopplung',
-                  badge: 'Integration',
+                  title: 'Anmeldung & Passkeys',
+                  subtitle: 'Touch ID, Face ID, PINs & Kiosk',
+                  badge: isCurrentDevicePasskeyActive ? 'Passkey Aktiv' : 'Kiosk & PIN',
                   gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                   shadowColor: 'rgba(2, 132, 199, 0.40)',
-                  icon: LinkIcon
+                  icon: Fingerprint
                 },
                 {
                   id: 'sync',
@@ -30342,8 +31466,8 @@ status: status,
                 },
                 {
                   id: 'security_privacy',
-                  title: 'Sicherheit & DSGVO',
-                  subtitle: 'PIN, DSB-Ausweis & AVV',
+                  title: 'Datenschutz & AVV',
+                  subtitle: 'AV-Vertrag, DSB-Ausweis & Audit',
                   badge: isAvvSigned ? 'AVV Gezeichnet' : 'AVV Ausstehend',
                   gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   shadowColor: 'rgba(16, 185, 129, 0.40)',
@@ -30570,7 +31694,7 @@ status: status,
                         boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
                       }}>
                         {activeSecretarySettingsModal === 'general' && <School size={22} color="#ffffff" />}
-                        {activeSecretarySettingsModal === 'links' && <LinkIcon size={22} color="#ffffff" />}
+                        {activeSecretarySettingsModal === 'links' && <Fingerprint size={22} color="#ffffff" />}
                         {activeSecretarySettingsModal === 'sync' && <Zap size={22} color="#ffffff" />}
                         {activeSecretarySettingsModal === 'security_privacy' && <ShieldCheck size={22} color="#ffffff" />}
                         {activeSecretarySettingsModal === 'backup' && <Database size={22} color="#ffffff" />}
@@ -30580,18 +31704,18 @@ status: status,
                       <div>
                         <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                           {activeSecretarySettingsModal === 'general' && 'Schul-Stammdaten & Branding'}
-                          {activeSecretarySettingsModal === 'links' && 'Anmelde- & Kiosk-Links'}
+                          {activeSecretarySettingsModal === 'links' && 'Anmeldung, Passkeys & Kiosk'}
                           {activeSecretarySettingsModal === 'sync' && 'Kalender & Synchronisation'}
-                          {activeSecretarySettingsModal === 'security_privacy' && 'Sicherheit & Datenschutz (DSGVO)'}
+                          {activeSecretarySettingsModal === 'security_privacy' && 'Datenschutz, AVV & DSB-Audit'}
                           {activeSecretarySettingsModal === 'backup' && 'Lokale Datensicherung'}
                           {activeSecretarySettingsModal === 'school_year' && 'Schuljahr & Auto-Bereinigung'}
                           {activeSecretarySettingsModal === 'danger_zone' && 'Gefahrenzone: Werkseinstellungen'}
                         </h3>
                         <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
                           {activeSecretarySettingsModal === 'general' && 'Stammdaten, Anschrift und Schullogo deines Campus.'}
-                          {activeSecretarySettingsModal === 'links' && 'Einheitliche Zugangslinks für Campus, GrooveLab und Kiosk-Stationen.'}
+                          {activeSecretarySettingsModal === 'links' && 'Touch ID, Face ID, Master-Ausweise, PIN-Richtlinien & Schul-Links.'}
                           {activeSecretarySettingsModal === 'sync' && 'Datenabgleich, Live-Sync und externe iCal-Abonnements.'}
-                          {activeSecretarySettingsModal === 'security_privacy' && 'Kiosk-PIN, DSB-Prüfausweis und AV-Vereinbarungen.'}
+                          {activeSecretarySettingsModal === 'security_privacy' && 'Auftragsverarbeitungsvertrag (Art. 28 DSGVO), DSB-Prüfportal & TOMs.'}
                           {activeSecretarySettingsModal === 'backup' && 'JSON-Export und Wiederherstellung der Schuldatenbank.'}
                           {activeSecretarySettingsModal === 'school_year' && 'Schuljahresbeginn und automatische DSGVO-Bereinigung.'}
                           {activeSecretarySettingsModal === 'danger_zone' && 'Setzt die Schule unwiderruflich auf Werkseinstellungen zurück.'}
@@ -30738,93 +31862,374 @@ status: status,
                     )}
 
                     {activeSecretarySettingsModal === 'links' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                        {/* Integration Link */}
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
-                          <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '6px' }}>Schul-ID &amp; Integration Link (Campus &amp; Groovelab)</strong>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '12px', lineHeight: '1.4' }}>
-                            Dies ist der einheitliche Anmeldelink für deine Musikschule. Er gilt sowohl für den Campus als auch für Groovelab.
-                          </span>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <input 
-                              readOnly 
-                              value={schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`} 
-                              style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.82rem', fontFamily: 'monospace', background: '#ffffff', color: '#1e293b' }} 
-                            />
-                            <button 
-                              onClick={() => { 
-                                const link = schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`;
-                                navigator.clipboard.writeText(link); 
-                                setCopiedSchoolLink(true);
-                                setTimeout(() => setCopiedSchoolLink(false), 2000);
-                              }} 
-                              style={{ 
-                                padding: '10px 20px', 
-                                fontSize: '0.8rem', 
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                        {/* SÄULE 1: BIOMETRIE & PASSKEYS AUF DIESEM GERÄT */}
+                        <div style={{
+                          background: isCurrentDevicePasskeyActive 
+                            ? 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)' 
+                            : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                          border: isCurrentDevicePasskeyActive ? '1.5px solid #86efac' : '1.5px solid #cbd5e1',
+                          borderRadius: '20px',
+                          padding: '20px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px',
+                          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                              <div style={{
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '12px',
+                                background: isCurrentDevicePasskeyActive ? '#dcfce7' : '#f1f5f9',
+                                color: isCurrentDevicePasskeyActive ? '#16a34a' : '#64748b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: isCurrentDevicePasskeyActive ? '0 4px 12px rgba(22, 163, 74, 0.2)' : 'none'
+                              }}>
+                                <Fingerprint size={24} />
+                              </div>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
+                                    Touch ID / Face ID auf diesem Gerät
+                                  </h4>
+                                  <span style={{
+                                    background: isCurrentDevicePasskeyActive ? '#dcfce7' : '#f1f5f9',
+                                    color: isCurrentDevicePasskeyActive ? '#15803d' : '#64748b',
+                                    border: isCurrentDevicePasskeyActive ? '1px solid #86efac' : '1px solid #cbd5e1',
+                                    padding: '2px 8px',
+                                    borderRadius: '100px',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 800
+                                  }}>
+                                    {isCurrentDevicePasskeyActive ? 'Passkey Aktiv' : 'Nicht eingerichtet'}
+                                  </span>
+                                </div>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#475569', fontWeight: 500 }}>
+                                  {isCurrentDevicePasskeyActive
+                                    ? `${currentUserProfile?.first_name} ${currentUserProfile?.last_name || ''} (${schoolName || 'Musikschule'} • Schulleitung)`
+                                    : 'Passwortloser 1-Tap-Login über den Fingerabdrucksensor oder Face ID dieses Geräts.'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              {isCurrentDevicePasskeyActive ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={handleTestBiometrics}
+                                    disabled={biometricsStatus === 'verifying'}
+                                    style={{
+                                      background: '#ffffff',
+                                      border: '1.5px solid #86efac',
+                                      color: '#15803d',
+                                      padding: '8px 14px',
+                                      borderRadius: '10px',
+                                      fontWeight: 800,
+                                      fontSize: '0.78rem',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      transition: 'all 0.15s'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    <Sparkles size={14} /> {biometricsStatus === 'verifying' ? 'Verifiziere...' : 'Passkey testen'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleRemoveBiometrics}
+                                    style={{
+                                      background: '#fff1f2',
+                                      border: '1px solid #fecdd3',
+                                      color: '#e11d48',
+                                      padding: '8px 12px',
+                                      borderRadius: '10px',
+                                      fontWeight: 750,
+                                      fontSize: '0.76rem',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <Trash2 size={13} /> Entfernen
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleEnrollBiometrics}
+                                  disabled={biometricsStatus === 'registering'}
+                                  style={{
+                                    background: '#0284c7',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    padding: '9px 18px',
+                                    borderRadius: '10px',
+                                    fontWeight: 800,
+                                    fontSize: '0.8rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  <Fingerprint size={16} />
+                                  {biometricsStatus === 'registering' ? 'Warte auf Gerät...' : 'Touch ID / Face ID einrichten'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {biometricsMessage && (
+                            <div style={{
+                              padding: '10px 14px',
+                              borderRadius: '10px',
+                              background: biometricsStatus === 'error' ? '#fef2f2' : '#f0fdf4',
+                              border: biometricsStatus === 'error' ? '1px solid #fca5a5' : '1px solid #86efac',
+                              color: biometricsStatus === 'error' ? '#991b1b' : '#166534',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              {biometricsStatus === 'error' ? <AlertCircle size={14} /> : <CheckCircle size={14} />}
+                              <span>{biometricsMessage}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* SÄULE 2: MEIN DIGITALER MASTER-AUSWEIS & ZUGANGSDATEN */}
+                        <div style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '20px',
+                          padding: '20px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '16px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <KeyRound size={20} />
+                              </div>
+                              <div>
+                                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
+                                  Mein Digitaler Master-Ausweis &amp; Login-PINs
+                                </h4>
+                                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                  Zugangsdaten für Schulleitung &amp; Notfall-Gerätekopplung
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setQrModalUser(currentUserProfile);
+                                setShowOwnQrModal(true);
+                              }}
+                              style={{
+                                background: '#f1f5f9',
+                                border: '1px solid #cbd5e1',
+                                color: '#334155',
+                                padding: '6px 14px',
+                                borderRadius: '8px',
+                                fontSize: '0.76rem',
                                 fontWeight: 800,
-                                borderRadius: '10px',
-                                border: copiedSchoolLink ? '1.5px solid #ea4335' : 'none',
-                                background: copiedSchoolLink ? '#fce8e6' : '#ea4335',
-                                color: copiedSchoolLink ? '#ea4335' : '#ffffff',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-                                whiteSpace: 'nowrap'
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
                               }}
                             >
-                              {copiedSchoolLink ? '✓ Kopiert!' : 'Link kopieren'}
+                              <QrCode size={14} /> Großen Ausweis öffnen
                             </button>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 14px' }}>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase' }}>Persönliche Ausweis-PIN</span>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                                <span style={{ fontSize: '1.1rem', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', letterSpacing: '0.1em' }}>
+                                  {currentUserProfile?.parent_pin || currentUserProfile?.pin || '855992'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(currentUserProfile?.parent_pin || currentUserProfile?.pin || '855992');
+                                    setCopiedSettingsPin(true);
+                                    setTimeout(() => setCopiedSettingsPin(false), 2000);
+                                  }}
+                                  style={{ background: 'none', border: 'none', color: copiedSettingsPin ? '#16a34a' : '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700 }}
+                                >
+                                  {copiedSettingsPin ? <Check size={14} /> : <Copy size={14} />} {copiedSettingsPin ? 'Kopiert' : 'Kopieren'}
+                                </button>
+                              </div>
+                            </div>
+
+                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 14px' }}>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase' }}>Direkt-Login URL</span>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
+                                  {window.location.origin}/qr/{currentUserProfile?.qr_token || 'token'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/qr/${currentUserProfile?.qr_token || ''}`);
+                                    setCopiedSettingsLink(true);
+                                    setTimeout(() => setCopiedSettingsLink(false), 2000);
+                                  }}
+                                  style={{ background: 'none', border: 'none', color: copiedSettingsLink ? '#16a34a' : '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700 }}
+                                >
+                                  {copiedSettingsLink ? <Check size={14} /> : <Copy size={14} />} {copiedSettingsLink ? 'Kopiert' : 'Kopieren'}
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
 
-                        {/* QR Code Scanner Login Link (Kiosk Mode) */}
-                        {kioskToken && (
-                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
-                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '6px' }}>QR-Code Scanner Login (Kiosk-Modus)</strong>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '12px', lineHeight: '1.4' }}>
-                              Verwende diesen Link, um Tablets/Endgeräte in deiner Schule permanent als Scan-Stationen (Kiosk-Modus) einzurichten.
+                        {/* SÄULE 3: KIOSK-RICHTLINIEN & PIN-LÄNGE */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
+                          <div>
+                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Kiosk PIN-Länge</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px', lineHeight: '1.3' }}>
+                              Wähle die Ziffernlänge für Schüler &amp; Lehrer-Logins am Kiosk.
+                            </span>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {[4, 6].map((num) => (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={() => setKioskPinLength(num)}
+                                  style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '8px',
+                                    border: '1.5px solid',
+                                    borderColor: kioskPinLength === num ? '#0284c7' : '#cbd5e1',
+                                    background: kioskPinLength === num ? '#e0f2fe' : '#ffffff',
+                                    color: kioskPinLength === num ? '#0284c7' : '#475569',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  {num} Ziffern
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Master Bypass-PIN</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px', lineHeight: '1.3' }}>
+                              Notfall-PIN zum Entsperren von Kiosk-Stationen im Offline-Betrieb.
+                            </span>
+                            <input
+                              type="password"
+                              value={bypassPin}
+                              onChange={(e) => setBypassPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.84rem', letterSpacing: '0.3em', width: '120px', textAlign: 'center', background: '#ffffff' }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* SÄULE 4: SCHUL- & KIOSK-INTEGRATION LINKS */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px' }}>
+                            <strong style={{ fontSize: '0.82rem', display: 'block', color: '#1e293b', marginBottom: '4px' }}>Schul-ID &amp; Anmeldelink (Campus &amp; GrooveLab)</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '10px', lineHeight: '1.4' }}>
+                              Dies ist der offizielle Anmeldelink für deine Schüler und Eltern.
                             </span>
                             <div style={{ display: 'flex', gap: '8px' }}>
                               <input 
                                 readOnly 
-                                value={schoolSubdomain 
-                                  ? (window.location.hostname.includes('localhost') 
-                                    ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
-                                    : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
-                                  : `${window.location.origin}/device-onboarding/${kioskToken}`
-                                } 
-                                style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.82rem', fontFamily: 'monospace', background: '#ffffff', color: '#1e293b' }} 
+                                value={schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`} 
+                                style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.8rem', fontFamily: 'monospace', background: '#f8fafc', color: '#1e293b' }} 
                               />
                               <button 
                                 onClick={() => { 
-                                  const link = schoolSubdomain 
-                                    ? (window.location.hostname.includes('localhost') 
-                                      ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
-                                      : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
-                                    : `${window.location.origin}/device-onboarding/${kioskToken}`;
+                                  const link = schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`;
                                   navigator.clipboard.writeText(link); 
-                                  setCopiedKioskLink(true);
-                                  setTimeout(() => setCopiedKioskLink(false), 2000);
+                                  setCopiedSchoolLink(true);
+                                  setTimeout(() => setCopiedSchoolLink(false), 2000);
                                 }} 
                                 style={{ 
-                                  padding: '10px 20px', 
-                                  fontSize: '0.8rem', 
+                                  padding: '8px 16px', 
+                                  fontSize: '0.78rem', 
                                   fontWeight: 800,
-                                  borderRadius: '10px',
-                                  border: copiedKioskLink ? '1.5px solid #ea4335' : 'none',
-                                  background: copiedKioskLink ? '#fce8e6' : '#ea4335',
-                                  color: copiedKioskLink ? '#ea4335' : '#ffffff',
+                                  borderRadius: '8px',
+                                  border: copiedSchoolLink ? '1.5px solid #0284c7' : 'none',
+                                  background: copiedSchoolLink ? '#e0f2fe' : '#0284c7',
+                                  color: copiedSchoolLink ? '#0284c7' : '#ffffff',
                                   cursor: 'pointer',
-                                  transition: 'all 0.2s ease',
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
                                   whiteSpace: 'nowrap'
                                 }}
                               >
-                                {copiedKioskLink ? '✓ Kopiert!' : 'Link kopieren'}
+                                {copiedSchoolLink ? '✓ Kopiert!' : 'Kopieren'}
                               </button>
                             </div>
                           </div>
-                        )}
+
+                          {kioskToken && (
+                            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px' }}>
+                              <strong style={{ fontSize: '0.82rem', display: 'block', color: '#1e293b', marginBottom: '4px' }}>Tablet-Kopplung (QR-Kiosk-Modus)</strong>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '10px', lineHeight: '1.4' }}>
+                                Link zum permanenten Koppeln von Tablets/iPads im Schulsaal als Scan-Station.
+                              </span>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <input 
+                                  readOnly 
+                                  value={schoolSubdomain 
+                                    ? (window.location.hostname.includes('localhost') 
+                                      ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
+                                      : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
+                                    : `${window.location.origin}/device-onboarding/${kioskToken}`
+                                  } 
+                                  style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.8rem', fontFamily: 'monospace', background: '#f8fafc', color: '#1e293b' }} 
+                                />
+                                <button 
+                                  onClick={() => { 
+                                    const link = schoolSubdomain 
+                                      ? (window.location.hostname.includes('localhost') 
+                                        ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
+                                        : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
+                                      : `${window.location.origin}/device-onboarding/${kioskToken}`;
+                                    navigator.clipboard.writeText(link); 
+                                    setCopiedKioskLink(true);
+                                    setTimeout(() => setCopiedKioskLink(false), 2000);
+                                  }} 
+                                  style={{ 
+                                    padding: '8px 16px', 
+                                    fontSize: '0.78rem', 
+                                    fontWeight: 800,
+                                    borderRadius: '8px',
+                                    border: copiedKioskLink ? '1.5px solid #0284c7' : 'none',
+                                    background: copiedKioskLink ? '#e0f2fe' : '#0284c7',
+                                    color: copiedKioskLink ? '#0284c7' : '#ffffff',
+                                    cursor: 'pointer',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  {copiedKioskLink ? '✓ Kopiert!' : 'Kopieren'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                       </div>
                     )}
 
@@ -30936,51 +32341,6 @@ status: status,
 
                     {activeSecretarySettingsModal === 'security_privacy' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        {/* Kiosk-PIN settings */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
-                          <div>
-                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Kiosk PIN-Länge</strong>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px', lineHeight: '1.3' }}>
-                              Wählen Sie die erforderliche Länge des persönlichen Login-PINs für das Kiosk-System.
-                            </span>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              {[4, 6].map((num) => (
-                                <button
-                                  key={num}
-                                  type="button"
-                                  onClick={() => setKioskPinLength(num)}
-                                  style={{
-                                    padding: '8px 16px',
-                                    borderRadius: '8px',
-                                    border: '1.5px solid',
-                                    borderColor: kioskPinLength === num ? '#ea4335' : '#cbd5e1',
-                                    background: kioskPinLength === num ? '#fce8e6' : '#ffffff',
-                                    color: kioskPinLength === num ? '#ea4335' : '#475569',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s'
-                                  }}
-                                >
-                                  {num} Ziffern
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Master Bypass-PIN</strong>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px', lineHeight: '1.3' }}>
-                              Ein universeller PIN zum Freischalten von Kiosk-Stationen bei Offline-Betrieb.
-                            </span>
-                            <input
-                              type="password"
-                              value={bypassPin}
-                              onChange={(e) => setBypassPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.84rem', letterSpacing: '0.3em', width: '120px', textAlign: 'center', background: '#ffffff' }}
-                            />
-                          </div>
-                        </div>
 
                         {/* Städtischer DSB-Prüfausweis & Audit-Portal (Art. 38 DSGVO) */}
                         <div style={{
@@ -31102,9 +32462,29 @@ status: status,
                                   }}>
                                     {isAvvSigned ? 'Gezeichnet' : 'Ausstehend'}
                                   </span>
-                                  {!isAvvSigned && (
+                                  {isAvvSigned ? (
                                     <button
-                                      onClick={() => setShowPilotAgreementModalFromDashboard(true)}
+                                      onClick={() => setShowAvvModal(true)}
+                                      style={{
+                                        fontSize: '0.62rem', 
+                                        fontWeight: 800, 
+                                        background: '#ffffff', 
+                                        border: '1px solid #a7f3d0', 
+                                        color: '#065f46', 
+                                        padding: '3.5px 10px', 
+                                        borderRadius: '100px', 
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                                      }}
+                                    >
+                                      <FileText size={11} /> AVV ansehen / drucken
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => setShowAvvModal(true)}
                                       style={{
                                         fontSize: '0.62rem', 
                                         fontWeight: 900, 
@@ -31296,97 +32676,255 @@ status: status,
                       </div>
                     )}
 
-                    {activeSecretarySettingsModal === 'school_year' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          <div>
-                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Schuljahr &amp; DSGVO Datenschutz-Bereinigung</strong>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.35' }}>
-                              Konfiguriere den offiziellen Schuljahresbeginn für deine Verträge und lege fest, ob abgelaufene Konten vollkommen automatisch und datenschutzkonform (inkl. physischer Löschung verknüpfter Audio-Dateien im Supabase Storage) gelöscht werden sollen.
-                            </span>
-                          </div>
+                    {activeSecretarySettingsModal === 'school_year' && (() => {
+                      const expiredStudents = students.filter((s: any) => s.contractEndsAt && new Date(s.contractEndsAt).getTime() < Date.now());
+                      const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+                      const selectedMonthName = monthNames[(schoolYearStartMonth || 9) - 1] || 'September';
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
-                            <div>
-                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Schuljahresbeginn (Tag) *</label>
-                              <select
-                                value={schoolYearStartDay}
-                                onChange={(e) => setSchoolYearStartDay(parseInt(e.target.value))}
-                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
-                              >
-                                {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                                  <option key={day} value={day}>{day}.</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Schuljahresbeginn (Monat) *</label>
-                              <select
-                                value={schoolYearStartMonth}
-                                onChange={(e) => setSchoolYearStartMonth(parseInt(e.target.value))}
-                                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
-                              >
-                                <option value={1}>Januar</option>
-                                <option value={2}>Februar</option>
-                                <option value={3}>März</option>
-                                <option value={4}>April</option>
-                                <option value={5}>Mai</option>
-                                <option value={6}>Juni</option>
-                                <option value={7}>Juli</option>
-                                <option value={8}>August</option>
-                                <option value={9}>September</option>
-                                <option value={10}>Oktober</option>
-                                <option value={11}>November</option>
-                                <option value={12}>Dezember</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                              <input
-                                type="checkbox"
-                                checked={autoDeleteExpiredUsers}
-                                onChange={(e) => setAutoDeleteExpiredUsers(e.target.checked)}
-                                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#ea4335' }}
-                              />
-                              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>
-                                Abgelaufene Schüler-Zugänge automatisch löschen (Auto-Clean)
-                              </span>
-                            </label>
-                            <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '24px', display: 'block', marginTop: '-6px' }}>
-                              Inaktiviert bzw. löscht abgelaufene Profile und zugeordnete Spuren/Bands/Songs vollautomatisch nach Ablauf des Buchungszeitraums.
-                            </span>
-                          </div>
-
-                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2', padding: '12px 16px', borderRadius: '12px', border: '1px dashed #fca5a5' }}>
-                            <div style={{ textAlign: 'left' }}>
-                              <strong style={{ fontSize: '0.8rem', display: 'block', color: '#991b1b' }}>Manuelle DSGVO-Löschung</strong>
-                              <span style={{ fontSize: '0.7rem', color: '#7f1d1d', display: 'block', marginTop: '2px' }}>
-                                {students.filter((s: any) => s.contractEndsAt && new Date(s.contractEndsAt).getTime() < Date.now()).length} abgelaufene Konten gefunden.
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                          
+                          {/* CARD 1: SCHULJAHRESBEGINN & STICHTAG */}
+                          <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Clock size={22} />
+                                </div>
+                                <div>
+                                  <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
+                                    Schuljahresbeginn &amp; Vertragsstichtag
+                                  </h4>
+                                  <span style={{ fontSize: '0.73rem', color: '#64748b' }}>
+                                    Offizieller Stichtag für Schuljahres-Pakete und Laufzeiten
+                                  </span>
+                                </div>
+                              </div>
+                              <span style={{
+                                background: '#f8fafc',
+                                border: '1px solid #cbd5e1',
+                                color: '#334155',
+                                padding: '4px 10px',
+                                borderRadius: '100px',
+                                fontSize: '0.68rem',
+                                fontWeight: 800
+                              }}>
+                                Stichtag: {schoolYearStartDay}. {selectedMonthName}
                               </span>
                             </div>
-                            <button
-                              onClick={() => handleDeleteExpiredStudents(false)}
-                              style={{
-                                padding: '8px 16px',
-                                fontSize: '0.78rem',
-                                fontWeight: 800,
-                                borderRadius: '10px',
-                                background: '#ea4335',
-                                color: '#ffffff',
-                                border: 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                boxShadow: '0 2px 4px rgba(234, 67, 53, 0.15)'
-                              }}
-                            >
-                              Jetzt bereinigen
-                            </button>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>Tag des Schuljahresstarts</label>
+                                <select
+                                  value={schoolYearStartDay}
+                                  onChange={(e) => handleUpdateSchoolYear(schoolYearStartMonth, parseInt(e.target.value))}
+                                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#f8fafc', fontWeight: 700, color: '#0f172a' }}
+                                >
+                                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                    <option key={day} value={day}>{day}.</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>Monat des Schuljahresstarts</label>
+                                <select
+                                  value={schoolYearStartMonth}
+                                  onChange={(e) => handleUpdateSchoolYear(parseInt(e.target.value), schoolYearStartDay)}
+                                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#f8fafc', fontWeight: 700, color: '#0f172a' }}
+                                >
+                                  {monthNames.map((name, idx) => (
+                                    <option key={idx + 1} value={idx + 1}>{name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
                           </div>
+
+                          {/* CARD 2: AUTO-CLEAN APPLE SWITCH HERO */}
+                          <div style={{
+                            background: autoDeleteExpiredUsers
+                              ? 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)'
+                              : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                            border: autoDeleteExpiredUsers ? '1.5px solid #86efac' : '1.5px solid #cbd5e1',
+                            borderRadius: '20px',
+                            padding: '20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '14px',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                            transition: 'all 0.2s ease'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                <div style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '12px',
+                                  background: autoDeleteExpiredUsers ? '#dcfce7' : '#f1f5f9',
+                                  color: autoDeleteExpiredUsers ? '#16a34a' : '#64748b',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxShadow: autoDeleteExpiredUsers ? '0 4px 12px rgba(22, 163, 74, 0.2)' : 'none'
+                                }}>
+                                  <ShieldCheck size={24} />
+                                </div>
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+                                      Automatische DSGVO-Bereinigung (Auto-Clean)
+                                    </h4>
+                                    <span style={{
+                                      background: autoDeleteExpiredUsers ? '#dcfce7' : '#f1f5f9',
+                                      color: autoDeleteExpiredUsers ? '#15803d' : '#64748b',
+                                      border: autoDeleteExpiredUsers ? '1px solid #86efac' : '1px solid #cbd5e1',
+                                      padding: '2px 8px',
+                                      borderRadius: '100px',
+                                      fontSize: '0.64rem',
+                                      fontWeight: 800
+                                    }}>
+                                      {autoDeleteExpiredUsers ? 'AKTIV' : 'INAKTIV'}
+                                    </span>
+                                  </div>
+                                  <p style={{ margin: '3px 0 0 0', fontSize: '0.73rem', color: '#475569', fontWeight: 500, lineHeight: '1.4' }}>
+                                    Löscht abgelaufene Profile und vernichtet verknüpfte Audio-Dateien physisch aus dem deutschen Cloud-Speicher.
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Apple Style Toggle Switch */}
+                              <div
+                                onClick={() => handleToggleAutoClean(!autoDeleteExpiredUsers)}
+                                role="button"
+                                tabIndex={0}
+                                aria-label="Auto-Clean umschalten"
+                                style={{
+                                  width: '50px',
+                                  height: '28px',
+                                  borderRadius: '100px',
+                                  background: autoDeleteExpiredUsers ? '#22c55e' : '#cbd5e1',
+                                  padding: '2px',
+                                  cursor: 'pointer',
+                                  transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  flexShrink: 0,
+                                  boxShadow: autoDeleteExpiredUsers ? '0 2px 8px rgba(34, 197, 94, 0.4)' : 'none'
+                                }}
+                              >
+                                <div style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '50%',
+                                  background: '#ffffff',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                  transform: autoDeleteExpiredUsers ? 'translateX(22px)' : 'translateX(0px)',
+                                  transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                                }} />
+                              </div>
+                            </div>
+
+                            <div style={{
+                              background: 'rgba(255, 255, 255, 0.7)',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '10px',
+                              padding: '10px 12px',
+                              fontSize: '0.72rem',
+                              color: '#64748b',
+                              lineHeight: '1.45'
+                            }}>
+                              🛡️ <strong>Schutzgarantie:</strong> Aktive Schülerinnen und Schüler mit laufendem Unterricht bleiben zu 100% geschützt. Es werden ausschließlich Zugänge gelöscht, deren Buchungszeitraum unwiderruflich abgelaufen ist.
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await handleSaveAllSettings({ autoDeleteExpiredUsers, schoolYearStartMonth, schoolYearStartDay });
+                                  setActiveSecretarySettingsModal(null);
+                                }}
+                                disabled={isSavingSettings}
+                                style={{
+                                  padding: '9px 18px',
+                                  borderRadius: '10px',
+                                  background: '#ea4335',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  fontWeight: 800,
+                                  fontSize: '0.8rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                className="hover-scale"
+                              >
+                                <CheckCircle size={15} /> {isSavingSettings ? 'Speichere...' : 'Schuljahr & Auto-Clean speichern'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* CARD 3: DATABASE AUDIT STATUS (MANUELLE BEREINIGUNG) */}
+                          <div style={{
+                            background: expiredStudents.length === 0 ? '#f0fdf4' : '#fef2f2',
+                            border: expiredStudents.length === 0 ? '1.5px solid #bbf7d0' : '1.5px solid #fca5a5',
+                            borderRadius: '16px',
+                            padding: '16px 18px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '12px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              {expiredStudents.length === 0 ? (
+                                <CheckCircle size={22} color="#166534" />
+                              ) : (
+                                <AlertCircle size={22} color="#dc2626" />
+                              )}
+                              <div>
+                                <strong style={{ fontSize: '0.82rem', display: 'block', color: expiredStudents.length === 0 ? '#166534' : '#991b1b' }}>
+                                  {expiredStudents.length === 0
+                                    ? 'Datenbank ist 100% DSGVO-bereinigt'
+                                    : `${expiredStudents.length} abgelaufene Schülerkonten gefunden`}
+                                </strong>
+                                <span style={{ fontSize: '0.72rem', color: expiredStudents.length === 0 ? '#15803d' : '#7f1d1d' }}>
+                                  {expiredStudents.length === 0
+                                    ? 'Keine abgelaufenen Konten vorhanden. Alle Schülerprofile sind aktiv.'
+                                    : 'Diese Profile können sofort manuell bereinigt und unwiderruflich gelöscht werden.'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {expiredStudents.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteExpiredStudents(false)}
+                                style={{
+                                  padding: '8px 16px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  borderRadius: '10px',
+                                  background: '#ea4335',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease',
+                                  boxShadow: '0 2px 6px rgba(234, 67, 53, 0.25)'
+                                }}
+                                className="hover-scale"
+                              >
+                                {expiredStudents.length} Profile jetzt löschen
+                              </button>
+                            )}
+                          </div>
+
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {activeSecretarySettingsModal === 'danger_zone' && (
                       <div style={{ 
@@ -31626,16 +33164,16 @@ status: status,
             <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
               {auditLoading ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', fontWeight: 650, fontSize: '0.85rem' }}>
-                  Lade Logs...
+                  Lade Änderungsprotokoll...
                 </div>
               ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b' }}>Zeitpunkt</th>
-                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b' }}>Aktion</th>
-                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b' }}>Geändert von</th>
-                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b' }}>Details der Änderung</th>
+                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b', width: '140px' }}>Zeitpunkt</th>
+                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b', width: '130px' }}>Ereignis</th>
+                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b', width: '180px' }}>Geändert von</th>
+                      <th style={{ padding: '14px 20px', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b' }}>Protokollierte Änderung / Delta</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -31654,59 +33192,86 @@ status: status,
                         return matchesSearch && matchesAction;
                       })
                       .map((log) => {
-                        const dateFormatted = new Date(log.created_at).toLocaleString('de-DE', {
+                        const dateObj = new Date(log.created_at);
+                        const dateFormatted = dateObj.toLocaleDateString('de-DE', {
                           day: '2-digit',
                           month: '2-digit',
-                          year: 'numeric',
+                          year: 'numeric'
+                        });
+                        const timeFormatted = dateObj.toLocaleTimeString('de-DE', {
                           hour: '2-digit',
                           minute: '2-digit',
                           second: '2-digit'
                         });
 
-                        let badgeBg = '#e6f4ea';
-                        let badgeColor = '#34a853';
-                        if (log.action === 'UPDATE') {
-                          badgeBg = '#fef7e0';
-                          badgeColor = '#b06000';
-                        } else if (log.action === 'DELETE') {
-                          badgeBg = '#fce8e6';
-                          badgeColor = '#ea4335';
+                        const isInsert = log.action === 'INSERT';
+                        const isDelete = log.action === 'DELETE';
+                        const badgeBg = isInsert ? '#dcfce7' : isDelete ? '#fee2e2' : '#fef3c7';
+                        const badgeColor = isInsert ? '#166534' : isDelete ? '#b91c1c' : '#92400e';
+                        const actionLabel = isInsert ? '+ Neuanlage' : isDelete ? '✕ Löschung' : '✎ Aktualisierung';
+
+                        const entityCategory = log.table_name === 'users' ? '👤 Benutzer' : log.table_name === 'schools' ? '🏫 Musikschule' : log.table_name === 'rooms' ? '🚪 Räume' : log.table_name;
+                        
+                        // Extract human-readable target name
+                        let targetDisplayName = log.table_name === 'users' ? (userMap[log.record_id] || '') : log.table_name;
+                        if (!targetDisplayName && log.new_data) {
+                          const fn = log.new_data.first_name || '';
+                          const ln = log.new_data.last_name || '';
+                          if (fn || ln) targetDisplayName = `${fn} ${ln}`.trim();
                         }
+                        if (!targetDisplayName) targetDisplayName = 'Datensatz';
 
                         return (
                           <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }} className="audit-row">
-                            <td style={{ padding: '14px 20px', fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>
-                              {dateFormatted}
+                            <td style={{ padding: '14px 20px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>{dateFormatted}</span>
+                                <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, fontFamily: 'monospace' }}>
+                                  {timeFormatted} Uhr
+                                </span>
+                              </div>
                             </td>
-                            <td style={{ padding: '14px 20px' }}>
-                              <span style={{
-                                display: 'inline-block',
-                                padding: '3px 8px',
-                                borderRadius: '6px',
-                                fontSize: '0.65rem',
-                                fontWeight: 900,
-                                background: badgeBg,
-                                color: badgeColor,
-                                textTransform: 'uppercase'
-                              }}>
-                                {log.action}
-                              </span>
+                            <td style={{ padding: '14px 20px', verticalAlign: 'top' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 900,
+                                  background: badgeBg,
+                                  color: badgeColor,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.02em'
+                                }}>
+                                  {actionLabel}
+                                </span>
+                                <span style={{ fontSize: '0.62rem', color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                  {entityCategory}
+                                </span>
+                              </div>
                             </td>
-                            <td style={{ padding: '14px 20px', fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>
-                              {log.users ? `${log.users.first_name} ${log.users.last_name}` : 'System'}
-                            </td>
-                            <td style={{ padding: '14px 20px', fontSize: '0.75rem', color: '#1e293b', maxWidth: '450px' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                <div style={{ fontSize: '0.7rem', color: '#64748b', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <User size={14} style={{ color: '#64748b', verticalAlign: 'middle' }} />
-                                  <span style={{ fontWeight: 550 }}>
-                                    {log.table_name === 'users' ? 'Betroffener Nutzer' : 'Tabelle'}:
-                                  </span>
-                                  <strong style={{ color: '#0f172a', fontWeight: 800 }}>
-                                    {log.table_name === 'users' ? (userMap[log.record_id] || 'Unbekannt') : log.table_name}
+                            <td style={{ padding: '14px 20px', verticalAlign: 'top' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ width: '26px', height: '26px', borderRadius: '8px', background: '#fce8e6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <UserCheck size={14} color="#ea4335" />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <strong style={{ fontSize: '0.78rem', color: '#0f172a' }}>
+                                    {log.users ? `${log.users.first_name} ${log.users.last_name}` : 'System (Automatik)'}
                                   </strong>
-                                  <span style={{ fontSize: '0.62rem', background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>
-                                    ID: {log.record_id.substring(0, 8)}
+                                  <span style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 600 }}>
+                                    {log.users ? 'Administrator' : 'Hintergrundprozess'}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: '14px 20px', verticalAlign: 'top' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ fontSize: '0.76rem', color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span>{targetDisplayName}</span>
+                                  <span style={{ fontSize: '0.62rem', background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 600 }}>
+                                    ID: #{log.record_id ? log.record_id.substring(0, 8) : ''}
                                   </span>
                                 </div>
                                 {renderDiffContent(log)}
@@ -31717,7 +33282,7 @@ status: status,
                       })}
                     {auditLogs.length === 0 && (
                       <tr>
-                        <td colSpan={4} style={{ textAlign: 'center', padding: '30px', color: '#cbd5e1', fontSize: '0.8rem', fontWeight: 700 }}>
+                        <td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: '#cbd5e1', fontSize: '0.82rem', fontWeight: 700 }}>
                           Keine Protokolleinträge gefunden.
                         </td>
                       </tr>
@@ -34110,6 +35675,28 @@ status: status,
           onShowAgb={() => setShowAgb(true)}
         />
       )}
+      {showAvvModal && (
+        <AVVModal
+          isOpen={showAvvModal}
+          onClose={() => setShowAvvModal(false)}
+          school={currentSchoolProfile || { id: schoolId, name: schoolName || 'Musikschule' }}
+          onAVVSigned={() => {
+            const nowIso = new Date().toISOString();
+            setIsAvvSigned(true);
+            if (schoolId) {
+              localStorage.setItem(`groovelab_avv_signed_${schoolId}`, nowIso);
+            }
+            if (currentSchoolProfile?.id) {
+              localStorage.setItem(`groovelab_avv_signed_${currentSchoolProfile.id}`, nowIso);
+            }
+            setCurrentSchoolProfile((prev: any) => ({
+              ...(prev || {}),
+              avv_signed_at: nowIso
+            }));
+            fetchDashboardData();
+          }}
+        />
+      )}
 
       {/* ─── Unassigned-Warning Modal ─── */}
       {showUnassignedWarning && (
@@ -34394,6 +35981,16 @@ status: status,
         onImportComplete={() => {
           fetchDashboardData();
         }}
+      />
+
+      {/* Interaktives In-App Leitfaden & Eltern-Info Modal */}
+      <GuidanceCenterModal
+        isOpen={showGuidanceModal}
+        onClose={() => setShowGuidanceModal(false)}
+        schoolName={schoolName || currentSchoolProfile?.name || 'Stadtmusikschule'}
+        schoolSubdomain={currentSchoolProfile?.subdomain}
+        activePlatform={activePlatform as any}
+        initialTab={guidanceInitialTab}
       />
     </div>
   </div>

@@ -3,28 +3,29 @@ import { supabase } from '../lib/supabase';
 
 // --- ANTI-FLICKER AVATAR SYSTEM ---
 export const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/gitarre_avatar_new.png';
+  if (!instrument) return '/avatars/neutral_instrument_avatar.png';
   const inst = instrument.toLowerCase().trim();
   if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
+  if (inst.includes('ukulele')) return '/avatars/gitarre_avatar_new.png';
   if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
   if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
   if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
   if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
+  if (inst.includes('drum') || inst.includes('schlagzeug') || inst.includes('percussion') || inst.includes('cajon') || inst.includes('marimba') || inst.includes('xylophon')) return '/avatars/schlagzeug_avatar.png';
+  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard') || inst.includes('flügel') || inst.includes('akkordeon') || inst.includes('accordion') || inst.includes('synthesizer') || inst.includes('synth')) return '/avatars/klavier_avatar_new.png';
+  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer') || inst.includes('chor')) return '/avatars/gesang_avatar.png';
+  if (inst.includes('trompete') || inst.includes('trumpet') || inst.includes('tuba') || inst.includes('flügelhorn') || inst.includes('kornett')) return '/avatars/trompete_avatar_new.png';
   if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
+  if (inst.includes('waldhorn') || inst.includes('horn')) return '/avatars/horn_avatar_new.png';
+  if (inst.includes('cello') || inst.includes('violoncello')) return '/avatars/cello_avatar_new.png';
+  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine') || inst.includes('bratsche') || inst.includes('viola') || inst.includes('harfe') || inst.includes('harp')) return '/avatars/violine_avatar_new.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet') || inst.includes('fagott') || inst.includes('bassoon')) return '/avatars/klarinette_avatar_new.png';
   if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
   if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
   if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
-  if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
+  if (inst.includes('bariton') || inst.includes('baritone') || inst.includes('euphonium')) return '/avatars/bariton_avatar.png';
   if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
-  return '/avatars/gitarre_avatar_new.png';
+  return '/avatars/neutral_instrument_avatar.png';
 };
 
 export const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role: string | null | undefined): string => {

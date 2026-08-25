@@ -186,7 +186,9 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       const isWav = blobToUpload.type.includes('wav');
       const fileExt = isWav ? 'wav' : (blobToUpload.type.includes('mp4') ? 'mp4' : 'webm');
       const contentType = isWav ? 'audio/wav' : (blobToUpload.type || 'audio/webm');
-      const fileName = `audio/memo_${studentId}_${Date.now()}.${fileExt}`;
+      const targetSchoolId = localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+      const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
+      const fileName = `${schoolPathPrefix}audio/memo_${studentId}_${Date.now()}.${fileExt}`;
 
       const { data, error } = await supabase.storage
         .from('campus-assets')

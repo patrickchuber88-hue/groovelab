@@ -2124,8 +2124,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         try {
           const fileExt = hasTresorStorage ? 'wav' : (blob.type.includes('wav') ? 'wav' : blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'mp3');
           const contentType = hasTresorStorage ? 'audio/wav' : (blob.type || 'audio/webm');
+          
+          let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+          if (!targetSchoolId && student?.id) {
+            try {
+              const { data: stRec } = await supabase
+                .from('students')
+                .select('school_id')
+                .eq('id', student.id)
+                .maybeSingle();
+              if (stRec?.school_id) targetSchoolId = stRec.school_id;
+            } catch (stErr) {
+              console.warn('[Meisterwerk] School lookup note:', stErr);
+            }
+          }
+
+          const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
           const fileName = `${student.id}_feedback_${Date.now()}.${fileExt}`;
-          const filePath = `recordings/${fileName}`;
+          const filePath = `${schoolPathPrefix}recordings/${fileName}`;
           
           let uploadedUrl = url;
           try {
@@ -2159,19 +2175,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           await saveAudioMetadata(uploadedUrl);
 
           // 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
-          let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
-          if (!targetSchoolId && student?.id) {
-            try {
-              const { data: stRec } = await supabase
-                .from('students')
-                .select('school_id')
-                .eq('id', student.id)
-                .maybeSingle();
-              if (stRec?.school_id) targetSchoolId = stRec.school_id;
-            } catch (stErr) {
-              console.warn('[Meisterwerk] School lookup note:', stErr);
-            }
-          }
           if (targetSchoolId && blob?.size) {
             try {
               const { data: schoolData } = await supabase

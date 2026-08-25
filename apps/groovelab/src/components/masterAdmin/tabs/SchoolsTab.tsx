@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { calculateCampusGroovelabBilling } from '../../../domain/billingCalculator';
+import { isSchoolBypassActive } from '../../../domain/pricingEngine';
 
 import type { School } from '../MasterAdminTypes';
 
@@ -72,9 +73,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   }, [schools]);
 
   // Aggregate Metrics for Header Scorecards
-  const totalPayingSchools = sanitizedSchools.filter(s => s.status === 'active' && !s.is_trial && !s.subscription_bypass && !s.is_paused).length;
+  const totalPayingSchools = sanitizedSchools.filter(s => s.status === 'active' && !s.is_trial && !isSchoolBypassActive(s) && !s.is_paused).length;
   const totalTrialSchools = sanitizedSchools.filter(s => s.is_trial && s.is_approved !== false).length;
-  const totalBypassedSchools = sanitizedSchools.filter(s => s.subscription_bypass).length;
+  const totalBypassedSchools = sanitizedSchools.filter(s => isSchoolBypassActive(s)).length;
   const totalPendingSchools = sanitizedSchools.filter(s => s.is_approved === false || s.status === 'pending').length;
 
   let totalCombinedMrr = 0;
@@ -93,7 +94,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
     totalActiveStudentsCount += activeStudents;
     totalPassiveStudentsCount += passiveStudents;
 
-    if (!s.is_trial && !s.subscription_bypass && !s.is_paused && s.status === 'active') {
+    if (!s.is_trial && !isSchoolBypassActive(s) && !s.is_paused && s.status === 'active') {
       const rates = masterPricing?.getSchoolRates ? masterPricing.getSchoolRates(s) : {
         priceCampus: s.custom_price_campus ?? masterPricing?.priceCampus ?? 14.90,
         priceGroovelab: s.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 9.90,
@@ -231,7 +232,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         }
       });
 
-      const mrr = (s.is_trial || s.subscription_bypass) ? 0 : billingCalc.totalMonthlySchoolInvoice;
+      const mrr = (s.is_trial || isSchoolBypassActive(s)) ? 0 : billingCalc.totalMonthlySchoolInvoice;
 
       return [
         `"${s.id}"`,
@@ -773,7 +774,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                   }
                 });
 
-                const mrr = (school.is_trial || school.subscription_bypass) ? 0 : billingCalc.totalMonthlySchoolInvoice;
+                const mrr = (school.is_trial || isSchoolBypassActive(school)) ? 0 : billingCalc.totalMonthlySchoolInvoice;
 
                 return (
                   <div
@@ -906,7 +907,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                             GrooveLab
                           </span>
                         )}
-                        {school.subscription_bypass && (
+                        {isSchoolBypassActive(school) && (
                           <span style={{ fontSize: '0.64rem', background: '#faf5ff', color: '#8b5cf6', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
                             Abo-Bypass
                           </span>

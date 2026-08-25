@@ -233,6 +233,15 @@ export const Startseite: React.FC<StartseiteProps> = ({
     setMasterAuthError(null);
     try {
       const profile = await authenticateMasterPasskey();
+      setFailedAttempts(0);
+      setLockoutUntil(null);
+      sessionStorage.setItem('groovelab_user_id', profile.userId);
+      sessionStorage.setItem('groovelab_is_master_admin', 'true');
+      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+      sessionStorage.setItem('groovelab_active_platform', 'campus');
+      localStorage.setItem('groovelab_user_id', profile.userId);
+      localStorage.setItem('groovelab_is_master_admin', 'true');
+      localStorage.setItem('groovelab_active_workspace', 'master_admin');
       await createMasterSessionLease(profile.userId, 'passkey_fido2', 45);
       window.location.href = '/';
     } catch (err: any) {
@@ -367,6 +376,9 @@ export const Startseite: React.FC<StartseiteProps> = ({
     sessionStorage.setItem('groovelab_is_master_admin', 'true');
     sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
     sessionStorage.setItem('groovelab_active_platform', 'campus');
+    localStorage.setItem('groovelab_user_id', user.id);
+    localStorage.setItem('groovelab_is_master_admin', 'true');
+    localStorage.setItem('groovelab_active_workspace', 'master_admin');
     await createMasterSessionLease(user.id, 'master_pin', 45);
 
     // Offer to register Passkey if WebAuthn is supported and not registered yet

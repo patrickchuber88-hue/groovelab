@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, Check, RefreshCw, Eye, HardDrive, Building, 
   Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert, BookOpen
@@ -77,6 +77,49 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
     return 0;
   });
 
+  // Keep state in sync with selected school
+  useEffect(() => {
+    if (school) {
+      setName(school.name || '');
+      setZipCode(school.zip_code || '');
+      setCity(school.city || '');
+      setStreet(school.street || '');
+      setHouseNumber(school.house_number || '');
+      setBillingEmail(school.billing_email || '');
+      setBillingContact(school.billing_contact_person || '');
+      setStatus(school.status || 'active');
+      setIsTrial(school.is_trial ?? false);
+      setTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
+      setHasCampus(school.has_campus_subscription ?? true);
+      setHasGroovelab(school.has_groovelab_subscription ?? true);
+      setSubscriptionBypass(school.subscription_bypass ?? false);
+      setExtraStorageGb(() => {
+        if (school.extra_storage_gb !== undefined && school.extra_storage_gb !== null) return Number(school.extra_storage_gb);
+        if (school.storage_addon_gb !== undefined && school.storage_addon_gb !== null) return Number(school.storage_addon_gb);
+        if (school.extra_billing_option === 'option1') return 20;
+        return 0;
+      });
+    }
+  }, [
+    school?.id,
+    school?.name,
+    school?.status,
+    school?.is_trial,
+    school?.trial_ends_at,
+    school?.has_campus_subscription,
+    school?.has_groovelab_subscription,
+    school?.subscription_bypass,
+    school?.storage_addon_gb,
+    school?.extra_storage_gb,
+    school?.extra_billing_option,
+    school?.billing_email,
+    school?.billing_contact_person,
+    school?.zip_code,
+    school?.city,
+    school?.street,
+    school?.house_number
+  ]);
+
   if (!school) return null;
 
   const teachers = schoolStats?.teachers || 0;
@@ -125,6 +168,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
     setSaving(true);
     try {
       const addonFee = currentAddonPackage.price;
+      const finalStatus = isTrial ? 'trial' : status === 'trial' ? 'active' : status;
       await onUpdateSchool({
         name,
         zip_code: zipCode,
@@ -133,20 +177,21 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         house_number: houseNumber,
         billing_email: billingEmail,
         billing_contact_person: billingContact,
-        status,
+        status: finalStatus,
         is_trial: isTrial,
-        trial_ends_at: trialEndsAt ? new Date(trialEndsAt).toISOString() : null,
+        trial_ends_at: isTrial && trialEndsAt ? new Date(trialEndsAt).toISOString() : null,
         has_campus_subscription: hasCampus,
         has_groovelab_subscription: hasGroovelab,
         subscription_bypass: subscriptionBypass,
-        extra_storage_gb: extraStorageGb,
         storage_addon_gb: extraStorageGb,
-        storage_addon_monthly_fee: addonFee
+        storage_addon_monthly_fee: addonFee,
+        extra_billing_option: extraStorageGb === 20 ? 'option1' : extraStorageGb > 0 ? 'addon' : 'none'
       });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving school details:', err);
+      alert('Fehler beim Speichern der Änderungen: ' + (err?.message || err));
     } finally {
       setSaving(false);
     }

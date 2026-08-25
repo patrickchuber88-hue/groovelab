@@ -35,6 +35,7 @@ import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { ScheduleCalendarViewDesktop as ScheduleCalendarView } from './ScheduleCalendarViewDesktop';
 import { StudentScheduleSlotsModal } from './StudentScheduleSlotsModal';
 import { run15StageSolver } from '../engine/Schedule15StageSolverEngine';
+import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
 export interface Student {
   id: string;
   first_name: string;
@@ -205,6 +206,19 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
   // Main state
   const [activeTab, setActiveTab] = useState<'calendar' | 'designer'>('calendar');
+  const [schoolProfile, setSchoolProfile] = useState<{ name?: string; subdomain?: string } | null>(null);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    supabase
+      .from('schools')
+      .select('name, subdomain')
+      .eq('id', schoolId)
+      .single()
+      .then(({ data }) => {
+        if (data) setSchoolProfile(data);
+      });
+  }, [schoolId]);
 
   // Teacher onboarding state variables
   const [isOnboardingCompleted, setIsOnboardingCompleted] = useState<boolean>(true);
@@ -4631,7 +4645,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         type="button"
                         onClick={async () => {
                           setShowMoreMenu(false);
-                          const inviteLink = window.location.origin + "?onboarding=parent";
+                          const inviteLink = getParentOnboardingUrl(schoolProfile?.name || 'Stadtmusikschule', schoolProfile?.subdomain);
                           await navigator.clipboard.writeText(inviteLink);
                           await showAlert("Allgemeiner Schüler-Onboarding-Link kopiert! Sende diesen Link an deine Schüler: " + inviteLink);
                         }}
@@ -6763,7 +6777,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                 type="button"
                                 onClick={async (e) => {
                                   e.stopPropagation();
-                                  const inviteLink = window.location.origin + "?onboarding=parent";
+                                  const inviteLink = getParentOnboardingUrl(schoolProfile?.name || 'Stadtmusikschule', schoolProfile?.subdomain);
                                   navigator.clipboard.writeText(inviteLink);
                                   await showAlert("Onboarding-Link kopiert! Du kannst diesen Link jetzt an die Eltern senden: " + inviteLink);
                                 }}
