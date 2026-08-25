@@ -4,7 +4,7 @@ import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { subscribeUserToPush } from './utils/webPush';
-import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar } from './components/StudioAvatar';
+import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar, resolveStudentInstrumentAsync, getEffectiveInstrument } from './components/StudioAvatar';
 import { reportClientError, initGlobalErrorListeners } from './lib/errorTelemetry';
 
 // Initialize global error interception
@@ -4178,6 +4178,14 @@ function App() {
             userData.photo_url = '/campus_login_hero.png';
             userData.avatar_url = '/campus_login_hero.png';
           }
+        }
+        if (userData.role === 'student') {
+          try {
+            userData.resolved_instrument = await resolveStudentInstrumentAsync(userData);
+            if (!userData.instrument || userData.instrument === 'Allgemein' || userData.instrument === 'ohne Zuweisung' || userData.instrument === 'Musiker' || userData.instrument === 'Schüler' || userData.instrument === 'Instrument') {
+              userData.instrument = userData.resolved_instrument;
+            }
+          } catch (e) {}
         }
       }
 
@@ -9430,7 +9438,15 @@ function App() {
                 border: '3px solid white', 
                 boxShadow: '0 8px 20px rgba(0,0,0,0.08)' 
               }}>
-                <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} onClick={() => setActiveStudentTab('profile')} />
+                <StudioAvatar 
+                  src={user.photo_url} 
+                  user={{
+                    ...user,
+                    resolved_instrument: user.resolved_instrument || user.instrument || (teachers.find(t => t.id === user.teacher_id)?.instrument) || (teachers[0]?.instrument) || 'Gitarre'
+                  }} 
+                  activePlatform={activePlatform} 
+                  onClick={() => setActiveStudentTab('profile')} 
+                />
               </div>
               {session && (
                 <div style={{ 
@@ -10185,7 +10201,15 @@ function App() {
                   onClick={() => setActiveStudentTab('profile')}
                   style={{ width: windowWidth <= 768 ? '36px' : '40px', height: windowWidth <= 768 ? '36px' : '40px', borderRadius: '12px', border: '3px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}
                 >
-                  <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} onClick={() => setActiveStudentTab('profile')} />
+                  <StudioAvatar 
+                    src={user.photo_url} 
+                    user={{
+                      ...user,
+                      resolved_instrument: user.resolved_instrument || user.instrument || (teachers.find(t => t.id === user.teacher_id)?.instrument) || (teachers[0]?.instrument) || 'Gitarre'
+                    }} 
+                    activePlatform={activePlatform} 
+                    onClick={() => setActiveStudentTab('profile')} 
+                  />
                 </div>
               )}
               {/* Datum Simulation Control (Dev Mode Only) */}

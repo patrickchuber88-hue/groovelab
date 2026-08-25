@@ -11,7 +11,7 @@ import {
   Trash2, Shield, Calendar, CalendarX, CalendarCheck, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon, Edit2,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
   School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake,
-  HardDrive, Cloud, Crown, Rocket, Cpu, Fingerprint, Smartphone, KeyRound, RotateCw
+  HardDrive, Cloud, Crown, Rocket, Cpu, Fingerprint, Smartphone, KeyRound, RotateCw, LayoutGrid, Mic, Smile, Radio
 } from 'lucide-react';
 import { isWebAuthnSupported, registerUserBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
 import { TeacherDashboard } from './TeacherDashboard';
@@ -1393,6 +1393,20 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
+  const handleSaveSettingValue = async (key: string, value: any, setter?: (val: any) => void) => {
+    if (setter) setter(value);
+    try {
+      const currentOp = openingHours || {};
+      const updatedOp = { ...currentOp, [key]: value };
+      setOpeningHours(updatedOp);
+      if (schoolId) {
+        await supabase.from('schools').update({ opening_hours: updatedOp }).eq('id', schoolId);
+      }
+    } catch (err) {
+      console.error('Error saving setting value:', err);
+    }
+  };
+
   const handleToggleAutoClean = async (nextVal: boolean) => {
     setAutoDeleteExpiredUsers(nextVal);
     setInitialSettings((prev: any) => prev ? ({ ...prev, autoDeleteExpiredUsers: nextVal }) : prev);
@@ -2065,6 +2079,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   // Administrative employees list
   const [employees, setEmployees] = useState<any[]>([]);
 
+  // RBAC Goldstandard: Check if the logged-in user possesses an active teacher role (Dual Role)
+  const isCurrentUserTeacher = useMemo(() => {
+    const currentEmp = employees.find(e => e.id === userId);
+    const roles = Array.isArray(currentEmp?.roles) 
+      ? currentEmp.roles 
+      : Array.isArray(currentUserProfile?.roles) 
+        ? currentUserProfile.roles 
+        : Array.isArray(userRoles) 
+          ? userRoles 
+          : [];
+    return roles.includes('teacher') || currentEmp?.role === 'teacher' || currentUserProfile?.role === 'teacher' || userRole === 'teacher';
+  }, [employees, userId, currentUserProfile, userRoles, userRole]);
+
   // Employee Form States
   const [employeeFirstName, setEmployeeFirstName] = useState<string>('');
   const [employeeLastName, setEmployeeLastName] = useState<string>('');
@@ -2313,6 +2340,45 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   // Apple-style settings panel states
   const [settingsTab, setSettingsTab] = useState<'general' | 'sync' | 'security_privacy' | 'backup'>('general');
   const [activeSecretarySettingsModal, setActiveSecretarySettingsModal] = useState<'general' | 'links' | 'sync' | 'security_privacy' | 'backup' | 'school_year' | 'danger_zone' | null>(null);
+  const [activeCampusSettingsModal, setActiveCampusSettingsModal] = useState<'boards' | 'homework' | 'timer' | 'schedule' | 'parent' | 'kiosk' | 'permissions' | 'feedback' | null>(null);
+  const [activeGroovelabSettingsModal, setActiveGroovelabSettingsModal] = useState<'bands' | 'songs' | 'live' | 'radar' | 'avatars' | 'rooms' | 'permissions' | 'feedback' | null>(null);
+
+  // Campus Extended Settings States
+  const [campusHomeworkNotesSync, setCampusHomeworkNotesSync] = useState<boolean>(true);
+  const [campusMeisterwerkEnabled, setCampusMeisterwerkEnabled] = useState<boolean>(true);
+  const [campusFocusTimerDefaultMin, setCampusFocusTimerDefaultMin] = useState<number>(25);
+  const [campusFocusTimerXpFactor, setCampusFocusTimerXpFactor] = useState<number>(1);
+  const [campusLoopstationBarsPause, setCampusLoopstationBarsPause] = useState<number>(4);
+  const [campusAudioMaxSessionMinutes, setCampusAudioMaxSessionMinutes] = useState<number>(10);
+  const [campusScheduleSlotMinutes, setCampusScheduleSlotMinutes] = useState<number>(45);
+  const [campusScheduleConflictWarning, setCampusScheduleConflictWarning] = useState<boolean>(true);
+  const [campusParentAbsenceNotify, setCampusParentAbsenceNotify] = useState<boolean>(true);
+  const [campusParentChatEnabled, setCampusParentChatEnabled] = useState<boolean>(true);
+  const [campusParentStatsEnabled, setCampusParentStatsEnabled] = useState<boolean>(true);
+  const [campusKioskPinLength, setCampusKioskPinLength] = useState<number>(4);
+  const [campusKioskAutoLogoutMinutes, setCampusKioskAutoLogoutMinutes] = useState<number>(5);
+
+  // GrooveLab Extended Settings States
+  const [glMaxBandMembers, setGlMaxBandMembers] = useState<number>(8);
+  const [glAllowStudentBandCreation, setGlAllowStudentBandCreation] = useState<boolean>(true);
+  const [glSongLevelStarterEnabled, setGlSongLevelStarterEnabled] = useState<boolean>(true);
+  const [glSongLevelProEnabled, setGlSongLevelProEnabled] = useState<boolean>(true);
+  const [glSongLevelMasterEnabled, setGlSongLevelMasterEnabled] = useState<boolean>(true);
+  const [glSongProposalWorkflow, setGlSongProposalWorkflow] = useState<boolean>(true);
+  const [glLiveDefaultBpm, setGlLiveDefaultBpm] = useState<number>(120);
+  const [glLiveCountInBars, setGlLiveCountInBars] = useState<number>(1);
+  const [glLiveStageDisplayEnabled, setGlLiveStageDisplayEnabled] = useState<boolean>(true);
+  const [glSkillRadarTiming, setGlSkillRadarTiming] = useState<boolean>(true);
+  const [glSkillRadarTechnique, setGlSkillRadarTechnique] = useState<boolean>(true);
+  const [glSkillRadarSound, setGlSkillRadarSound] = useState<boolean>(true);
+  const [glSkillRadarRepertoire, setGlSkillRadarRepertoire] = useState<boolean>(true);
+  const [glSkillRadarTeamplay, setGlSkillRadarTeamplay] = useState<boolean>(true);
+  const [glMusicianAvatarsEnabled, setGlMusicianAvatarsEnabled] = useState<boolean>(true);
+  const [glBandCoatOfArmsEnabled, setGlBandCoatOfArmsEnabled] = useState<boolean>(true);
+  const [glBandChatEnabled, setGlBandChatEnabled] = useState<boolean>(true);
+  const [glCoachModerationRequired, setGlCoachModerationRequired] = useState<boolean>(false);
+  const [glJamRecordingCompression, setGlJamRecordingCompression] = useState<boolean>(true);
+
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [initialSettings, setInitialSettings] = useState<any>(null);
   const [kioskPinLength, setKioskPinLength] = useState<number>(4);
@@ -3932,6 +3998,43 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setTeachersManageTeachers(op.gl_setting_groovelab_teachers_manage_teachers === true);
         setCampusTeachersManageStudents(op.gl_setting_campus_teachers_manage_students === true);
         setCampusTeachersManageTeachers(op.gl_setting_campus_teachers_manage_teachers === true);
+
+        // Extended Campus Settings
+        setCampusHomeworkNotesSync(op.gl_campus_homework_notes_sync !== false);
+        setCampusMeisterwerkEnabled(op.gl_campus_meisterwerk_enabled !== false);
+        setCampusFocusTimerDefaultMin(Number(op.gl_campus_focus_timer_min || 25));
+        setCampusFocusTimerXpFactor(Number(op.gl_campus_focus_timer_xp || 1));
+        setCampusLoopstationBarsPause(Number(op.gl_campus_loopstation_bars_pause || 4));
+        setCampusAudioMaxSessionMinutes(Number(op.gl_campus_audio_max_min || 10));
+        setCampusScheduleSlotMinutes(Number(op.gl_campus_schedule_slot_min || 45));
+        setCampusScheduleConflictWarning(op.gl_campus_schedule_conflict_warning !== false);
+        setCampusParentAbsenceNotify(op.gl_campus_parent_absence_notify !== false);
+        setCampusParentChatEnabled(op.gl_campus_parent_chat_enabled !== false);
+        setCampusParentStatsEnabled(op.gl_campus_parent_stats_enabled !== false);
+        setCampusKioskPinLength(Number(op.gl_campus_kiosk_pin_length || 4));
+        setCampusKioskAutoLogoutMinutes(Number(op.gl_campus_kiosk_auto_logout_min || 5));
+
+        // Extended GrooveLab Settings
+        setGlMaxBandMembers(Number(op.gl_max_band_members || 8));
+        setGlAllowStudentBandCreation(op.gl_allow_student_band_creation !== false);
+        setGlSongLevelStarterEnabled(op.gl_song_level_starter !== false);
+        setGlSongLevelProEnabled(op.gl_song_level_pro !== false);
+        setGlSongLevelMasterEnabled(op.gl_song_level_master !== false);
+        setGlSongProposalWorkflow(op.gl_song_proposal_workflow !== false);
+        setGlLiveDefaultBpm(Number(op.gl_live_default_bpm || 120));
+        setGlLiveCountInBars(Number(op.gl_live_count_in_bars || 1));
+        setGlLiveStageDisplayEnabled(op.gl_live_stage_display_enabled !== false);
+        setGlSkillRadarTiming(op.gl_skill_radar_timing !== false);
+        setGlSkillRadarTechnique(op.gl_skill_radar_technique !== false);
+        setGlSkillRadarSound(op.gl_skill_radar_sound !== false);
+        setGlSkillRadarRepertoire(op.gl_skill_radar_repertoire !== false);
+        setGlSkillRadarTeamplay(op.gl_skill_radar_teamplay !== false);
+        setGlMusicianAvatarsEnabled(op.gl_musician_avatars_enabled !== false);
+        setGlBandCoatOfArmsEnabled(op.gl_band_coat_of_arms_enabled !== false);
+        setGlBandChatEnabled(op.gl_band_chat_enabled !== false);
+        setGlCoachModerationRequired(op.gl_coach_moderation_required === true);
+        setGlJamRecordingCompression(op.gl_jam_recording_compression !== false);
+
         setSchoolZipCode(schoolData.zip_code || '');
         setSchoolCity(schoolData.city || '');
         setSchoolStreet(schoolData.street || '');
@@ -6472,6 +6575,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           updateFields.is_campus_active = true;
           updateFields.is_groovelab_active = true;
         }
+      }
+
+      // Optimistically update local state immediately
+      setEmployees((prev) =>
+        prev.map((e) =>
+          e.id === emp.id ? { ...e, roles: newRoles, role: primaryRole, ...updateFields } : e
+        )
+      );
+      if (emp.id === userId) {
+        setCurrentUserProfile((prev: any) =>
+          prev ? { ...prev, roles: newRoles, role: primaryRole, ...updateFields } : prev
+        );
       }
 
       let updated = false;
@@ -15922,45 +16037,47 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               </div>
             )}
 
-            {/* Elegant Switch to Teacher Dashboard Button (Green button replacing red Verwaltung button) */}
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                if (onRoleSwitched) {
-                  onRoleSwitched('teacher');
-                }
-              }}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                gap: '6px', 
-                background: '#e6f4ea', 
-                border: '1.5px solid #34a853', 
-                height: '40px', 
-                padding: '0 14px', 
-                borderRadius: '12px', 
-                color: '#34a853', 
-                fontWeight: 800, 
-                fontSize: '0.8rem', 
-                cursor: 'pointer', 
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', 
-                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)', 
-                flexShrink: 0 
-              }}
-              className="hover-scale"
-              title="Zum Lehrer-Dashboard wechseln"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#d1fae5';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#e6f4ea';
-              }}
-            >
-              <GraduationCap size={15} color="#34a853" />
-              <span>Lehrer</span>
-            </button>
+            {/* Elegant Switch to Teacher Dashboard Button (Only rendered if current user possesses active teacher role) */}
+            {isCurrentUserTeacher && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  if (onRoleSwitched) {
+                    onRoleSwitched('teacher');
+                  }
+                }}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '6px', 
+                  background: '#e6f4ea', 
+                  border: '1.5px solid #34a853', 
+                  height: '40px', 
+                  padding: '0 14px', 
+                  borderRadius: '12px', 
+                  color: '#34a853', 
+                  fontWeight: 800, 
+                  fontSize: '0.8rem', 
+                  cursor: 'pointer', 
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', 
+                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)', 
+                  flexShrink: 0 
+                }}
+                className="hover-scale"
+                title="Zum Lehrer-Dashboard wechseln"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#d1fae5';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#e6f4ea';
+                }}
+              >
+                <GraduationCap size={15} color="#34a853" />
+                <span>Lehrer</span>
+              </button>
+            )}
           </div>
         </div>
         
@@ -21655,377 +21772,728 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
               {/* Subtab: Einstellungen (formerly Status & API) */}
               {campusSubTab === 'status' && (
-                <div style={{
-                  fontFamily: 'Urbanist, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-                  color: '#1d1d1f',
-                  width: '100%',
-                  maxWidth: '800px',
-                  margin: '0 auto',
-                  padding: '12px 8px 48px 8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '32px'
-                }}>
-                  {/* CSS for Apple iOS Style Toggles */}
-                  <style dangerouslySetInnerHTML={{__html: `
-                    .apple-toggle {
-                      position: relative;
-                      display: inline-block;
-                      width: 51px;
-                      height: 31px;
-                      flex-shrink: 0;
-                    }
-                    .apple-toggle input {
-                      opacity: 0;
-                      width: 0;
-                      height: 0;
-                    }
-                    .apple-toggle-slider {
-                      position: absolute;
-                      cursor: pointer;
-                      top: 0; left: 0; right: 0; bottom: 0;
-                      background-color: #e9e9eb;
-                      transition: .3s cubic-bezier(0.25, 0.8, 0.25, 1);
-                      border-radius: 34px;
-                    }
-                    .apple-toggle-slider:before {
-                      position: absolute;
-                      content: "";
-                      height: 27px;
-                      width: 27px;
-                      left: 2px;
-                      bottom: 2px;
-                      background-color: white;
-                      transition: .3s cubic-bezier(0.25, 0.8, 0.25, 1);
-                      border-radius: 50%;
-                      box-shadow: 0 3px 8px rgba(0,0,0,0.15), 0 3px 1px rgba(0,0,0,0.06);
-                    }
-                    .apple-toggle input:checked + .apple-toggle-slider {
-                      background-color: #34c759;
-                    }
-                    .apple-toggle input:checked + .apple-toggle-slider:before {
-                      transform: translateX(20px);
-                    }
-                    .apple-cell-hover:hover {
-                      background-color: rgba(0, 0, 0, 0.015) !important;
-                    }
-                  `}} />
-
-                  {/* Header Title & Subtitle */}
-                  <div style={{ padding: '0 8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(52, 168, 83, 0.12)', color: '#34a853', padding: '4px 10px', borderRadius: '100px' }}>
-                        Campus Customizer
-                      </span>
-                    </div>
-                    <h2 style={{ fontSize: '2.2rem', fontWeight: 900, letterSpacing: '-0.04em', margin: '0 0 6px 0', color: '#1d1d1f', fontFamily: 'Urbanist' }}>Einstellungen</h2>
-                    <p style={{ fontSize: '0.95rem', color: '#86868b', margin: 0, fontWeight: 500, lineHeight: 1.45 }}>
-                      Verwalte die aktive Funktions- und Boardstruktur deiner Musikschule. Deaktivierte Funktionen werden nahtlos aus allen Menüs und Sichten ausgeblendet.
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
+                      ⚙️ Einstellungen
+                    </h2>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
+                      Wähle ein Modul aus, um Menü-Boards, Hausaufgabenheft, Übe-Timer, Stundenplan-Raster und Berechtigungen für deinen Campus zu konfigurieren.
                     </p>
                   </div>
 
-                  {/* SECTION 1: MODULE & NAVIGATIONS-BOARDS */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px 12px' }}>
-                      Menü-Boards de-/aktivieren
-                    </h3>
-                    <div style={{
-                      background: '#ffffff',
-                      borderRadius: '20px',
-                      border: '1px solid rgba(0, 0, 0, 0.07)',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      boxShadow: '0 6px 30px rgba(0, 0, 0, 0.025)'
-                    }}>
-                      
-                      {/* Cell: Unterrichtsfächer */}
-                      <div className="apple-cell-hover" style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '18px 24px',
-                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-                        transition: 'background-color 0.2s ease'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)' }}>
-                            <BookOpen size={20} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Unterrichtsfächer</div>
-                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Erlaubt die Definition spezifischer Instrumente & Fächer für Lehrkräfte.</div>
-                          </div>
-                        </div>
-                        <label className="apple-toggle">
-                          <input
-                            type="checkbox"
-                            checked={enabledCampusSubjects}
-                            onChange={(e) => handleToggleSetting('gl_setting_subjects', e.target.checked, setEnabledCampusSubjects)}
-                          />
-                          <span className="apple-toggle-slider"></span>
-                        </label>
-                      </div>
+                  {/* MODULAR COVER CARDS GRID (CAMPUS GREEN #34a853) */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: windowWidth < 640 ? 'repeat(2, 1fr)' : windowWidth < 1024 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+                    gap: '18px',
+                    width: '100%'
+                  }}>
+                    {[
+                      {
+                        id: 'boards',
+                        title: 'Menü- & Board-Struktur',
+                        subtitle: 'Fächer, Kooperationen, Räume, Termine',
+                        badge: `${[enabledCampusSubjects, enabledCampusCooperations, enabledCampusRooms, enabledCampusEvents, enabledCampusSchedules].filter(Boolean).length} Boards Aktiv`,
+                        gradient: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+                        shadowColor: 'rgba(52, 168, 83, 0.40)',
+                        icon: LayoutGrid
+                      },
+                      {
+                        id: 'homework',
+                        title: 'Hausaufgaben & Protokoll',
+                        subtitle: 'Hausaufgabenheft & Meisterwerk',
+                        badge: campusHomeworkNotesSync ? 'Auto-Sync An' : 'Manuell',
+                        gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+                        shadowColor: 'rgba(16, 185, 129, 0.40)',
+                        icon: BookOpen
+                      },
+                      {
+                        id: 'timer',
+                        title: 'Übe-Timer & Audio-Loopstation',
+                        subtitle: `${campusFocusTimerDefaultMin} Min Focus • ${campusLoopstationBarsPause}-Takte Loop-Puffer`,
+                        badge: `${campusFocusTimerDefaultMin} Min • Loopstation`,
+                        gradient: 'linear-gradient(135deg, #059669 0%, #065f46 100%)',
+                        shadowColor: 'rgba(5, 150, 105, 0.40)',
+                        icon: Clock
+                      },
+                      {
+                        id: 'schedule',
+                        title: 'Stundenplan & Zeitraster',
+                        subtitle: `${campusScheduleSlotMinutes} Min Takt • Konflikt-Check`,
+                        badge: `${campusScheduleSlotMinutes} Min Raster`,
+                        gradient: 'linear-gradient(135deg, #0d9488 0%, #115e59 100%)',
+                        shadowColor: 'rgba(13, 148, 136, 0.40)',
+                        icon: Calendar
+                      },
+                      {
+                        id: 'parent',
+                        title: 'Eltern-Portal & Freigaben',
+                        subtitle: 'Abwesenheiten, Chat & DSGVO',
+                        badge: campusParentChatEnabled ? 'Chat Aktiv' : 'Nur Abwesenheit',
+                        gradient: 'linear-gradient(135deg, #16a34a 0%, #166534 100%)',
+                        shadowColor: 'rgba(22, 163, 74, 0.40)',
+                        icon: Users
+                      },
+                      {
+                        id: 'kiosk',
+                        title: 'Campus-Kiosk & QR-Login',
+                        subtitle: `${campusKioskPinLength}-stellig • ${enabledQrLogin ? 'QR-Login An' : 'Passwort'}`,
+                        badge: enabledQrLogin ? 'QR-Login Aktiv' : 'PIN & Passwort',
+                        gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+                        shadowColor: 'rgba(34, 197, 94, 0.40)',
+                        icon: QrCode
+                      },
+                      {
+                        id: 'permissions',
+                        title: 'Lehrkräfte-Rechte',
+                        subtitle: 'Schüler- & Lehrer-Rollen im Campus',
+                        badge: campusTeachersManageStudents ? 'Erweitert' : 'Standard',
+                        gradient: 'linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%)',
+                        shadowColor: 'rgba(46, 125, 50, 0.40)',
+                        icon: ShieldCheck
+                      },
+                      {
+                        id: 'feedback',
+                        title: 'Ideenschmiede Campus',
+                        subtitle: 'Wünsche & Fehler melden',
+                        badge: 'Mitgestalten',
+                        gradient: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                        shadowColor: 'rgba(5, 150, 105, 0.40)',
+                        icon: Lightbulb
+                      }
+                    ].map((module) => {
+                      const IconComp = module.icon;
+                      return (
+                        <div
+                          key={module.id}
+                          onClick={() => {
+                            if (module.id === 'feedback') {
+                              setIsFeedbackModalOpen(true);
+                              return;
+                            }
+                            setActiveCampusSettingsModal(module.id as any);
+                          }}
+                          style={{
+                            background: '#ffffff',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '20px',
+                            padding: '24px 16px 20px 16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 14px 28px -6px rgba(0,0,0,0.08), 0 4px 8px -2px rgba(0,0,0,0.04)';
+                            e.currentTarget.style.borderColor = '#34a853';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)';
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                          }}
+                        >
+                          {/* Accent Top Line */}
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: '3.5px',
+                            background: module.gradient
+                          }} />
 
-                      {/* Cell: Kooperationen */}
-                      <div className="apple-cell-hover" style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '18px 24px',
-                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-                        transition: 'background-color 0.2s ease'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)' }}>
-                            <Users size={20} />
+                          {/* App Squircle Icon */}
+                          <div style={{
+                            width: '56px',
+                            height: '56px',
+                            borderRadius: '16px',
+                            background: module.gradient,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ffffff',
+                            boxShadow: `0 8px 18px -4px ${module.shadowColor}`,
+                            marginBottom: '14px',
+                            flexShrink: 0
+                          }}>
+                            <IconComp size={28} color="#ffffff" strokeWidth={2.2} />
                           </div>
-                          <div>
-                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Kooperationen</div>
-                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Verwaltet externe Kooperationspartnerschaften (z.B. Kitas, Grundschulen).</div>
-                          </div>
-                        </div>
-                        <label className="apple-toggle">
-                          <input
-                            type="checkbox"
-                            checked={enabledCampusCooperations}
-                            onChange={(e) => handleToggleSetting('gl_setting_cooperations', e.target.checked, setEnabledCampusCooperations)}
-                          />
-                          <span className="apple-toggle-slider"></span>
-                        </label>
-                      </div>
 
-                      {/* Cell: Räume */}
-                      <div className="apple-cell-hover" style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '18px 24px',
-                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-                        transition: 'background-color 0.2s ease'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
-                            <DoorOpen size={20} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Räume</div>
-                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Konfiguriert physische Unterrichtsräume und überwacht deren Schlüssel-Status.</div>
-                          </div>
-                        </div>
-                        <label className="apple-toggle">
-                          <input
-                            type="checkbox"
-                            checked={enabledCampusRooms}
-                            onChange={(e) => handleToggleSetting('gl_setting_rooms', e.target.checked, setEnabledCampusRooms)}
-                          />
-                          <span className="apple-toggle-slider"></span>
-                        </label>
-                      </div>
+                          {/* Title */}
+                          <h4 style={{
+                            margin: '0 0 6px 0',
+                            fontSize: '1.02rem',
+                            fontWeight: 900,
+                            color: '#0f172a',
+                            fontFamily: 'Urbanist, sans-serif',
+                            lineHeight: 1.2
+                          }}>
+                            {module.title}
+                          </h4>
 
-                      {/* Cell: Termine */}
-                      <div className="apple-cell-hover" style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '18px 24px',
-                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-                        transition: 'background-color 0.2s ease'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(236, 72, 153, 0.2)' }}>
-                            <Calendar size={20} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Termine</div>
-                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Verwaltet zentrale Ferienzeiten, Schulfeste und interne Event-Planung.</div>
-                          </div>
-                        </div>
-                        <label className="apple-toggle">
-                          <input
-                            type="checkbox"
-                            checked={enabledCampusEvents}
-                            onChange={(e) => handleToggleSetting('gl_setting_events', e.target.checked, setEnabledCampusEvents)}
-                          />
-                          <span className="apple-toggle-slider"></span>
-                        </label>
-                      </div>
+                          {/* Subtitle */}
+                          <p style={{
+                            margin: '0 0 14px 0',
+                            fontSize: '0.78rem',
+                            color: '#64748b',
+                            lineHeight: 1.35,
+                            minHeight: '28px'
+                          }}>
+                            {module.subtitle}
+                          </p>
 
-                      {/* Cell: Stundenpläne */}
-                      <div className="apple-cell-hover" style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '18px 24px',
-                        transition: 'background-color 0.2s ease'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)' }}>
-                            <ClipboardList size={20} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Stundenpläne</div>
-                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Aktiviert den Prüf- und Freigabe-Workflow für eingereichte Lehrerstundenpläne.</div>
-                          </div>
+                          {/* Status Badge */}
+                          <span style={{
+                            marginTop: 'auto',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            color: '#15803d',
+                            background: '#e6f4ea',
+                            border: '1px solid #bbf7d0',
+                            padding: '4px 10px',
+                            borderRadius: '100px',
+                            letterSpacing: '0.02em',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            {module.badge}
+                          </span>
                         </div>
-                        <label className="apple-toggle">
-                          <input
-                            type="checkbox"
-                            checked={enabledCampusSchedules}
-                            onChange={(e) => handleToggleSetting('gl_setting_schedules', e.target.checked, setEnabledCampusSchedules)}
-                          />
-                          <span className="apple-toggle-slider"></span>
-                        </label>
-                      </div>
-
-                    </div>
+                      );
+                    })}
                   </div>
 
-                  {/* SECTION 2: SPECIALIZED FUNCTIONS */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px 12px' }}>
-                      Schnittstellen & Widgets
-                    </h3>
-                    <div style={{
-                      background: '#ffffff',
-                      borderRadius: '20px',
-                      border: '1px solid rgba(0, 0, 0, 0.07)',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      boxShadow: '0 6px 30px rgba(0, 0, 0, 0.025)'
-                    }}>
-
-                      {/* Cell: Kalender-Widget auf Startseite */}
-                      <div className="apple-cell-hover" style={{
+                  {/* FOCUS MODAL FOR CAMPUS SETTINGS */}
+                  {activeCampusSettingsModal && (
+                    <div 
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(15, 23, 42, 0.55)',
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                        zIndex: 10000,
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '18px 24px',
-                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-                        transition: 'background-color 0.2s ease'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#06b6d4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(6, 182, 212, 0.2)' }}>
-                            <LayoutDashboard size={20} />
+                        justifyContent: 'center',
+                        padding: '20px',
+                        boxSizing: 'border-box'
+                      }}
+                      onClick={(e) => {
+                        if (e.target === e.currentTarget) setActiveCampusSettingsModal(null);
+                      }}
+                    >
+                      <div 
+                        style={{
+                          width: '100%',
+                          maxWidth: '680px',
+                          maxHeight: '90vh',
+                          background: '#ffffff',
+                          borderRadius: '24px',
+                          border: '1px solid rgba(255, 255, 255, 0.8)',
+                          boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.35)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          overflow: 'hidden',
+                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}
+                        className="animate-scale-in"
+                      >
+                        {/* Modal Header */}
+                        <div style={{
+                          padding: '20px 24px',
+                          borderBottom: '1px solid #f1f5f9',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: '#f8fafc'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '42px',
+                              height: '42px',
+                              borderRadius: '12px',
+                              background: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.35)'
+                            }}>
+                              {activeCampusSettingsModal === 'boards' && <LayoutGrid size={22} color="#ffffff" />}
+                              {activeCampusSettingsModal === 'homework' && <BookOpen size={22} color="#ffffff" />}
+                              {activeCampusSettingsModal === 'timer' && <Clock size={22} color="#ffffff" />}
+                              {activeCampusSettingsModal === 'schedule' && <Calendar size={22} color="#ffffff" />}
+                              {activeCampusSettingsModal === 'parent' && <Users size={22} color="#ffffff" />}
+                              {activeCampusSettingsModal === 'kiosk' && <QrCode size={22} color="#ffffff" />}
+                              {activeCampusSettingsModal === 'permissions' && <ShieldCheck size={22} color="#ffffff" />}
+                            </div>
+                            <div>
+                              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                                {activeCampusSettingsModal === 'boards' && 'Menü- & Board-Struktur'}
+                                {activeCampusSettingsModal === 'homework' && 'Hausaufgaben & Schüler-Protokoll'}
+                                {activeCampusSettingsModal === 'timer' && 'Übe-Timer & Audio-Loopstation'}
+                                {activeCampusSettingsModal === 'schedule' && 'Stundenplan & Zeitraster'}
+                                {activeCampusSettingsModal === 'parent' && 'Eltern-Portal & DSGVO-Freigaben'}
+                                {activeCampusSettingsModal === 'kiosk' && 'Campus-Kiosk & Schnellzugang'}
+                                {activeCampusSettingsModal === 'permissions' && 'Lehrkräfte-Berechtigungen'}
+                              </h3>
+                              <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
+                                {activeCampusSettingsModal === 'boards' && 'Aktiviere oder deaktiviere boardspezifische Menüeinträge deiner Musikschule.'}
+                                {activeCampusSettingsModal === 'homework' && 'Konfiguriere Hausaufgabenheft-Sync und Meisterwerk-Dokumentation.'}
+                                {activeCampusSettingsModal === 'timer' && 'Steuere Focus-Timer-Standards, 4-Takte Loopstation-Puffer und Audio-Tresor Limits.'}
+                                {activeCampusSettingsModal === 'schedule' && 'Definiere Zeitraster, Taktung und Konfliktwarnungen für Räume.'}
+                                {activeCampusSettingsModal === 'parent' && 'Lege DSGVO-sichere Voreinstellungen für Eltern und Erziehungsberechtigte fest.'}
+                                {activeCampusSettingsModal === 'kiosk' && 'Verwalte QR-Authentifizierung und Terminal-PIN-Richtlinien.'}
+                                {activeCampusSettingsModal === 'permissions' && 'Reguliere Berechtigungen von Lehrkräften zur Datenpflege.'}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Kalender-Widget auf Startseite</div>
-                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Blendet die heutige Betriebsübersicht im Startseiten-Panel ein.</div>
-                          </div>
+                          <button
+                            onClick={() => setActiveCampusSettingsModal(null)}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              border: '1px solid #e2e8f0',
+                              background: '#ffffff',
+                              color: '#64748b',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            <X size={16} />
+                          </button>
                         </div>
-                        <label className="apple-toggle">
-                          <input
-                            type="checkbox"
-                            checked={enabledCalendarWidget}
-                            onChange={(e) => handleToggleSetting('gl_setting_calendar_widget', e.target.checked, setEnabledCalendarWidget)}
-                          />
-                          <span className="apple-toggle-slider"></span>
-                        </label>
-                      </div>
 
-                      {/* Cell: QR-Code Authentifizierung */}
-                      <div className="apple-cell-hover" style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '18px 24px',
-                        transition: 'background-color 0.2s ease'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(100, 116, 139, 0.2)' }}>
-                            <Key size={20} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>QR-Code Authentifizierung</div>
-                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Erlaubt passwortlosen Portal-Zugang für Endnutzer via scannbare QR-Codes.</div>
-                          </div>
+                        {/* Modal Body */}
+                        <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: 'calc(90vh - 140px)' }}>
+                          
+                          {/* 1. BOARDS */}
+                          {activeCampusSettingsModal === 'boards' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {[
+                                { key: 'gl_setting_subjects', label: 'Unterrichtsfächer', desc: 'Erlaubt die Definition spezifischer Instrumente & Fächer für Lehrkräfte.', val: enabledCampusSubjects, set: setEnabledCampusSubjects, icon: BookOpen },
+                                { key: 'gl_setting_cooperations', label: 'Kooperationen', desc: 'Verwaltet externe Kooperationspartnerschaften (z.B. Kitas, Grundschulen).', val: enabledCampusCooperations, set: setEnabledCampusCooperations, icon: Users },
+                                { key: 'gl_setting_rooms', label: 'Räume', desc: 'Konfiguriert physische Unterrichtsräume und überwacht deren Schlüssel-Status.', val: enabledCampusRooms, set: setEnabledCampusRooms, icon: DoorOpen },
+                                { key: 'gl_setting_events', label: 'Termine & Schulferien', desc: 'Verwaltet zentrale Ferienzeiten, Schulfeste und interne Event-Planung.', val: enabledCampusEvents, set: setEnabledCampusEvents, icon: Calendar },
+                                { key: 'gl_setting_schedules', label: 'Stundenpläne', desc: 'Aktiviert den Prüf- und Freigabe-Workflow für eingereichte Lehrerstundenpläne.', val: enabledCampusSchedules, set: setEnabledCampusSchedules, icon: Clock }
+                              ].map((item) => {
+                                const ItemIcon = item.icon;
+                                return (
+                                  <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', maxWidth: '75%' }}>
+                                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: item.val ? '#e6f4ea' : '#f1f5f9', color: item.val ? '#34a853' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <ItemIcon size={18} />
+                                      </div>
+                                      <div>
+                                        <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>{item.label}</div>
+                                        <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{item.desc}</div>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => handleToggleSetting(item.key, !item.val, item.set)}
+                                      style={{
+                                        padding: '6px 14px',
+                                        borderRadius: '100px',
+                                        border: 'none',
+                                        background: item.val ? '#34a853' : '#e2e8f0',
+                                        color: item.val ? '#ffffff' : '#64748b',
+                                        fontWeight: 800,
+                                        fontSize: '0.76rem',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                      }}
+                                    >
+                                      {item.val ? 'Aktiv' : 'Deaktiviert'}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* 2. HOMEWORK */}
+                          {activeCampusSettingsModal === 'homework' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Automatische Notizen-Synchronisation</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Synchronisiert Hausaufgabeneinträge der Lehrkraft in Echtzeit in die Schülervorschau.</div>
+                                </div>
+                                <button
+                                  onClick={() => handleSaveSettingValue('gl_campus_homework_notes_sync', !campusHomeworkNotesSync, setCampusHomeworkNotesSync)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: campusHomeworkNotesSync ? '#34a853' : '#e2e8f0',
+                                    color: campusHomeworkNotesSync ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {campusHomeworkNotesSync ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Meisterwerk-Dokumentation</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Ermöglicht das Festhalten von Meilensteinen und Urkunden im Schüler-Protokoll.</div>
+                                </div>
+                                <button
+                                  onClick={() => handleSaveSettingValue('gl_campus_meisterwerk_enabled', !campusMeisterwerkEnabled, setCampusMeisterwerkEnabled)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: campusMeisterwerkEnabled ? '#34a853' : '#e2e8f0',
+                                    color: campusMeisterwerkEnabled ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {campusMeisterwerkEnabled ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 3. TIMER & LOOPSTATION */}
+                          {activeCampusSettingsModal === 'timer' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                              <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Standard Fokus-Timer Dauer</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Voreingestellte Dauer für selbstständige Übe-Sessions von Schülern.</div>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                  {[15, 25, 45, 60].map((min) => (
+                                    <button
+                                      key={min}
+                                      onClick={() => handleSaveSettingValue('gl_campus_focus_timer_min', min, setCampusFocusTimerDefaultMin)}
+                                      style={{
+                                        flex: 1,
+                                        padding: '8px',
+                                        borderRadius: '10px',
+                                        border: '1.5px solid',
+                                        borderColor: campusFocusTimerDefaultMin === min ? '#34a853' : '#e2e8f0',
+                                        background: campusFocusTimerDefaultMin === min ? '#e6f4ea' : '#ffffff',
+                                        color: campusFocusTimerDefaultMin === min ? '#166534' : '#64748b',
+                                        fontWeight: 800,
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      {min} Min
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Zwingende Loopstation-Pause (Sample-Genauigkeit)</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Verhindert verschluckte Anschläge (Swallowed Attack) bei Mehrspur-Aufnahmen im Solo-Übestudio.</div>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                  {[2, 4, 8].map((bars) => (
+                                    <button
+                                      key={bars}
+                                      onClick={() => handleSaveSettingValue('gl_campus_loopstation_bars_pause', bars, setCampusLoopstationBarsPause)}
+                                      style={{
+                                        flex: 1,
+                                        padding: '8px',
+                                        borderRadius: '10px',
+                                        border: '1.5px solid',
+                                        borderColor: campusLoopstationBarsPause === bars ? '#34a853' : '#e2e8f0',
+                                        background: campusLoopstationBarsPause === bars ? '#e6f4ea' : '#ffffff',
+                                        color: campusLoopstationBarsPause === bars ? '#166534' : '#64748b',
+                                        fontWeight: 800,
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      {bars} Takte {bars === 4 && '(Standard)'}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Maximale Audio-Aufnahmedauer pro Take</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Schützt den Cloud-Speicher vor überlangen unkomprimierten Sprach- und Audiomitschnitten.</div>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                  {[5, 10, 15].map((min) => (
+                                    <button
+                                      key={min}
+                                      onClick={() => handleSaveSettingValue('gl_campus_audio_max_min', min, setCampusAudioMaxSessionMinutes)}
+                                      style={{
+                                        flex: 1,
+                                        padding: '8px',
+                                        borderRadius: '10px',
+                                        border: '1.5px solid',
+                                        borderColor: campusAudioMaxSessionMinutes === min ? '#34a853' : '#e2e8f0',
+                                        background: campusAudioMaxSessionMinutes === min ? '#e6f4ea' : '#ffffff',
+                                        color: campusAudioMaxSessionMinutes === min ? '#166534' : '#64748b',
+                                        fontWeight: 800,
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      {min} Min
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 4. SCHEDULE */}
+                          {activeCampusSettingsModal === 'schedule' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                              <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Unterrichts-Taktung / Zeiteinheiten</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Standard-Raster im intelligenten Stundenplan-Designer.</div>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                  {[30, 45, 60].map((slot) => (
+                                    <button
+                                      key={slot}
+                                      onClick={() => handleSaveSettingValue('gl_campus_schedule_slot_min', slot, setCampusScheduleSlotMinutes)}
+                                      style={{
+                                        flex: 1,
+                                        padding: '8px',
+                                        borderRadius: '10px',
+                                        border: '1.5px solid',
+                                        borderColor: campusScheduleSlotMinutes === slot ? '#34a853' : '#e2e8f0',
+                                        background: campusScheduleSlotMinutes === slot ? '#e6f4ea' : '#ffffff',
+                                        color: campusScheduleSlotMinutes === slot ? '#166534' : '#64748b',
+                                        fontWeight: 800,
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      {slot} Min
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Raum- und Doppelbelegungswarnung</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Warnt die Verwaltung sofort, wenn ein Raum zeitgleich für zwei Lehrkräfte eingeteilt wird.</div>
+                                </div>
+                                <button
+                                  onClick={() => handleSaveSettingValue('gl_campus_schedule_conflict_warning', !campusScheduleConflictWarning, setCampusScheduleConflictWarning)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: campusScheduleConflictWarning ? '#34a853' : '#e2e8f0',
+                                    color: campusScheduleConflictWarning ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {campusScheduleConflictWarning ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 5. PARENT */}
+                          {activeCampusSettingsModal === 'parent' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Digitale Abwesenheitsmeldung</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt Eltern, Krankmeldungen und Unterrichtsausfälle direkt per Klick zu melden.</div>
+                                </div>
+                                <button
+                                  onClick={() => handleSaveSettingValue('gl_campus_parent_absence_notify', !campusParentAbsenceNotify, setCampusParentAbsenceNotify)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: campusParentAbsenceNotify ? '#34a853' : '#e2e8f0',
+                                    color: campusParentAbsenceNotify ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {campusParentAbsenceNotify ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Direkte Schulkommunikation &amp; Chat</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>DSGVO-konforme Direktnachrichten zwischen Lehrkraft und Erziehungsberechtigten.</div>
+                                </div>
+                                <button
+                                  onClick={() => handleSaveSettingValue('gl_campus_parent_chat_enabled', !campusParentChatEnabled, setCampusParentChatEnabled)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: campusParentChatEnabled ? '#34a853' : '#e2e8f0',
+                                    color: campusParentChatEnabled ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {campusParentChatEnabled ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 6. KIOSK */}
+                          {activeCampusSettingsModal === 'kiosk' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>QR-Code Authentifizierung</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt passwortlosen Portal-Zugang für Endnutzer via scannbare QR-Codes.</div>
+                                </div>
+                                <button
+                                  onClick={() => handleToggleSetting('gl_setting_qr_login', !enabledQrLogin, setEnabledQrLogin)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: enabledQrLogin ? '#34a853' : '#e2e8f0',
+                                    color: enabledQrLogin ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {enabledQrLogin ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Kalender-Widget auf Startseite</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Blendet die heutige Betriebsübersicht im Startseiten-Panel ein.</div>
+                                </div>
+                                <button
+                                  onClick={() => handleToggleSetting('gl_setting_calendar_widget', !enabledCalendarWidget, setEnabledCalendarWidget)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: enabledCalendarWidget ? '#34a853' : '#e2e8f0',
+                                    color: enabledCalendarWidget ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {enabledCalendarWidget ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 7. PERMISSIONS */}
+                          {activeCampusSettingsModal === 'permissions' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Schüler hinzufügen &amp; verwalten</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt Lehrkräften, im Campus-Modul neue Schüler-Profile anzulegen oder zu bearbeiten.</div>
+                                </div>
+                                <button
+                                  onClick={() => handleToggleSetting('gl_setting_campus_teachers_manage_students', !campusTeachersManageStudents, setCampusTeachersManageStudents)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: campusTeachersManageStudents ? '#34a853' : '#e2e8f0',
+                                    color: campusTeachersManageStudents ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {campusTeachersManageStudents ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Lehrkräfte hinzufügen &amp; verwalten</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt Lehrkräften, im Campus-Modul Profile anderer Lehrer anzulegen oder zu bearbeiten.</div>
+                                </div>
+                                <button
+                                  onClick={() => handleToggleSetting('gl_setting_campus_teachers_manage_teachers', !campusTeachersManageTeachers, setCampusTeachersManageTeachers)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: campusTeachersManageTeachers ? '#34a853' : '#e2e8f0',
+                                    color: campusTeachersManageTeachers ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {campusTeachersManageTeachers ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
                         </div>
-                        <label className="apple-toggle">
-                          <input
-                            type="checkbox"
-                            checked={enabledQrLogin}
-                            onChange={(e) => handleToggleSetting('gl_setting_qr_login', e.target.checked, setEnabledQrLogin)}
-                          />
-                          <span className="apple-toggle-slider"></span>
-                        </label>
-                      </div>
 
+                        {/* Modal Footer */}
+                        <div style={{
+                          padding: '16px 24px',
+                          borderTop: '1px solid #f1f5f9',
+                          display: 'flex',
+                          justifyContent: 'flex-end',
+                          background: '#f8fafc'
+                        }}>
+                          <button
+                            onClick={() => setActiveCampusSettingsModal(null)}
+                            style={{
+                              padding: '10px 20px',
+                              borderRadius: '12px',
+                              border: 'none',
+                              background: '#34a853',
+                              color: '#ffffff',
+                              fontWeight: 800,
+                              fontSize: '0.84rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                            }}
+                          >
+                            Fertig
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* SECTION 3: RECHTE & BERECHTIGUNGEN */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px 12px' }}>
-                      Rechte & Berechtigungen
-                    </h3>
-                    <div style={{
-                      background: '#ffffff',
-                      borderRadius: '20px',
-                      border: '1px solid rgba(0, 0, 0, 0.07)',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      boxShadow: '0 6px 30px rgba(0, 0, 0, 0.025)'
-                    }}>
-
-                      {/* Cell: Schüler hinzufügen & verwalten */}
-                      <div className="apple-cell-hover" style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '18px 24px',
-                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-                        transition: 'background-color 0.2s ease'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)' }}>
-                            <Users size={20} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Schüler hinzufügen & verwalten</div>
-                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Erlaubt Lehrkräften, im Campus-Modul neue Schüler-Profile anzulegen oder zu bearbeiten.</div>
-                          </div>
-                        </div>
-                        <label className="apple-toggle">
-                          <input
-                            type="checkbox"
-                            checked={campusTeachersManageStudents}
-                            onChange={(e) => handleToggleSetting('gl_setting_campus_teachers_manage_students', e.target.checked, setCampusTeachersManageStudents)}
-                          />
-                          <span className="apple-toggle-slider"></span>
-                        </label>
-                      </div>
-
-                      {/* Cell: Lehrkräfte hinzufügen & verwalten */}
-                      <div className="apple-cell-hover" style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '18px 24px',
-                        transition: 'background-color 0.2s ease'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#eab308', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(234, 179, 8, 0.2)' }}>
-                            <GraduationCap size={20} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 800, fontSize: '1.02rem', color: '#1d1d1f' }}>Lehrkräfte hinzufügen & verwalten</div>
-                            <div style={{ fontSize: '0.82rem', color: '#86868b', fontWeight: 500, marginTop: '2px', lineHeight: 1.35 }}>Erlaubt Lehrkräften, im Campus-Modul Profile anderer Lehrer anzulegen oder zu bearbeiten.</div>
-                          </div>
-                        </div>
-                        <label className="apple-toggle">
-                          <input
-                            type="checkbox"
-                            checked={campusTeachersManageTeachers}
-                            onChange={(e) => handleToggleSetting('gl_setting_campus_teachers_manage_teachers', e.target.checked, setCampusTeachersManageTeachers)}
-                          />
-                          <span className="apple-toggle-slider"></span>
-                        </label>
-                      </div>
-
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -25645,108 +26113,699 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             )}
 
             {groovelabSubTab === 'settings' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                <div className="google-card" style={{ padding: '32px', background: '#ffffff', border: '1.5px solid #e2e8f0', color: '#1e293b', borderRadius: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div>
-                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.4rem', fontWeight: 950, color: '#09090b', display: 'flex', alignItems: 'center', gap: '10px', fontFamily: 'Urbanist' }}>
-                      <Settings size={22} color="#eab308" />
-                      GrooveLab-Rechte &amp; Moduleinstellungen
-                    </h3>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                      Definiere hier die Berechtigungen für Lehrkräfte im GrooveLab-Modul deines Campus.
-                    </p>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {/* Schüler-Verwaltung Toggle */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      background: '#fafafa',
-                      border: '1px solid #f1f5f9',
-                      padding: '20px 24px',
-                      borderRadius: '24px',
-                      transition: 'all 0.2s'
-                    }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '80%' }}>
-                        <span style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>Schüler hinzufügen &amp; verwalten</span>
-                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                          Erlaubt es Lehrkräften, im GrooveLab-Modul neue Schüler-Profile anzulegen, zu bearbeiten oder zu löschen.
-                        </span>
-                      </div>
-                      <div 
-                        onClick={() => handleToggleSetting('gl_setting_groovelab_teachers_manage_students', !teachersManageStudents, setTeachersManageStudents)}
-                        style={{
-                          width: '56px',
-                          height: '32px',
-                          borderRadius: '100px',
-                          background: teachersManageStudents ? '#eab308' : '#cbd5e1',
-                          padding: '3px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: teachersManageStudents ? 'flex-end' : 'flex-start',
-                          transition: 'all 0.3s ease-in-out',
-                          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)'
-                        }}
-                      >
-                        <div style={{
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '50%',
-                          background: 'white',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                          transition: 'all 0.2s'
-                        }} />
-                      </div>
-                    </div>
-
-                    {/* Lehrer-Verwaltung Toggle */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      background: '#fafafa',
-                      border: '1px solid #f1f5f9',
-                      padding: '20px 24px',
-                      borderRadius: '24px',
-                      transition: 'all 0.2s'
-                    }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '80%' }}>
-                        <span style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>Lehrkräfte hinzufügen &amp; verwalten</span>
-                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                          Erlaubt es Lehrkräften, im GrooveLab-Modul Profile anderer Lehrer (Coaches) anzulegen, zu bearbeiten oder zu deaktivieren.
-                        </span>
-                      </div>
-                      <div 
-                        onClick={() => handleToggleSetting('gl_setting_groovelab_teachers_manage_teachers', !teachersManageTeachers, setTeachersManageTeachers)}
-                        style={{
-                          width: '56px',
-                          height: '32px',
-                          borderRadius: '100px',
-                          background: teachersManageTeachers ? '#eab308' : '#cbd5e1',
-                          padding: '3px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: teachersManageTeachers ? 'flex-end' : 'flex-start',
-                          transition: 'all 0.3s ease-in-out',
-                          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)'
-                        }}
-                      >
-                        <div style={{
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '50%',
-                          background: 'white',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                          transition: 'all 0.2s'
-                        }} />
-                      </div>
-                    </div>
-                  </div>
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
+                    ⚙️ Einstellungen
+                  </h2>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
+                    Wähle ein Modul aus, um Band-Gründung, Song-Library, Live Lab, Skill-Radar und Musiker-Avatare für deine Schule zu konfigurieren.
+                  </p>
                 </div>
+
+                {/* MODULAR COVER CARDS GRID (GROOVELAB YELLOW #eab308) */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: windowWidth < 640 ? 'repeat(2, 1fr)' : windowWidth < 1024 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: '18px',
+                  width: '100%'
+                }}>
+                  {[
+                    {
+                      id: 'bands',
+                      title: 'Band-Engine & Besetzung',
+                      subtitle: `Max. ${glMaxBandMembers} Musiker • Gründungsworkflow`,
+                      badge: `Max. ${glMaxBandMembers} Musiker`,
+                      gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                      shadowColor: 'rgba(234, 179, 8, 0.40)',
+                      icon: Users
+                    },
+                    {
+                      id: 'songs',
+                      title: 'Song-Library & Level',
+                      subtitle: 'Starter, Pro, Master & Repertoire',
+                      badge: `${[glSongLevelStarterEnabled, glSongLevelProEnabled, glSongLevelMasterEnabled].filter(Boolean).length} Level Aktiv`,
+                      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      shadowColor: 'rgba(245, 158, 11, 0.40)',
+                      icon: Music
+                    },
+                    {
+                      id: 'live',
+                      title: 'Live Lab & Band-Performance',
+                      subtitle: `${glLiveDefaultBpm} BPM Standard • ${glLiveCountInBars === 2 ? '2 Takte' : '1 Takt'} Vorzähler`,
+                      badge: `${glLiveDefaultBpm} BPM • Stage-View`,
+                      gradient: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+                      shadowColor: 'rgba(217, 119, 6, 0.40)',
+                      icon: Mic
+                    },
+                    {
+                      id: 'radar',
+                      title: 'Skill-Radar & XP',
+                      subtitle: '5-Achsen-Radar • Song-Mastery XP',
+                      badge: `${[glSkillRadarTiming, glSkillRadarTechnique, glSkillRadarSound, glSkillRadarRepertoire, glSkillRadarTeamplay].filter(Boolean).length} Achsen Aktiv`,
+                      gradient: 'linear-gradient(135deg, #eab308 0%, #a16207 100%)',
+                      shadowColor: 'rgba(234, 179, 8, 0.40)',
+                      icon: Award
+                    },
+                    {
+                      id: 'avatars',
+                      title: 'Musiker- & Band-Avatare',
+                      subtitle: 'Geist-Avatare & Band-Wappen',
+                      badge: glMusicianAvatarsEnabled ? 'Geist-Avatar Aktiv' : 'Deaktiviert',
+                      gradient: 'linear-gradient(135deg, #facc15 0%, #ca8a04 100%)',
+                      shadowColor: 'rgba(250, 204, 21, 0.40)',
+                      icon: Smile
+                    },
+                    {
+                      id: 'rooms',
+                      title: 'Band-Rooms & Chat',
+                      subtitle: 'Band-Chat, Shouts & Moderation',
+                      badge: glBandChatEnabled ? 'Band-Chat Aktiv' : 'Deaktiviert',
+                      gradient: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
+                      shadowColor: 'rgba(245, 158, 11, 0.40)',
+                      icon: Radio
+                    },
+                    {
+                      id: 'permissions',
+                      title: 'Coach-Rechte',
+                      subtitle: 'Schüler & Lehrer im GrooveLab',
+                      badge: teachersManageStudents ? 'Erweitert' : 'Standard',
+                      gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                      shadowColor: 'rgba(234, 179, 8, 0.40)',
+                      icon: ShieldCheck
+                    },
+                    {
+                      id: 'feedback',
+                      title: 'Ideenschmiede GrooveLab',
+                      subtitle: 'Wünsche & Feedback für Bands',
+                      badge: 'Mitgestalten',
+                      gradient: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)',
+                      shadowColor: 'rgba(202, 138, 4, 0.40)',
+                      icon: Lightbulb
+                    }
+                  ].map((module) => {
+                    const IconComp = module.icon;
+                    return (
+                      <div
+                        key={module.id}
+                        onClick={() => {
+                          if (module.id === 'feedback') {
+                            setIsFeedbackModalOpen(true);
+                            return;
+                          }
+                          setActiveGroovelabSettingsModal(module.id as any);
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '20px',
+                          padding: '24px 16px 20px 16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-4px)';
+                          e.currentTarget.style.boxShadow = '0 14px 28px -6px rgba(0,0,0,0.08), 0 4px 8px -2px rgba(0,0,0,0.04)';
+                          e.currentTarget.style.borderColor = '#eab308';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                        }}
+                      >
+                        {/* Accent Top Line */}
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '3.5px',
+                          background: module.gradient
+                        }} />
+
+                        {/* App Squircle Icon */}
+                        <div style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '16px',
+                          background: module.gradient,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          boxShadow: `0 8px 18px -4px ${module.shadowColor}`,
+                          marginBottom: '14px',
+                          flexShrink: 0
+                        }}>
+                          <IconComp size={28} color="#ffffff" strokeWidth={2.2} />
+                        </div>
+
+                        {/* Title */}
+                        <h4 style={{
+                          margin: '0 0 6px 0',
+                          fontSize: '1.02rem',
+                          fontWeight: 900,
+                          color: '#0f172a',
+                          fontFamily: 'Urbanist, sans-serif',
+                          lineHeight: 1.2
+                        }}>
+                          {module.title}
+                        </h4>
+
+                        {/* Subtitle */}
+                        <p style={{
+                          margin: '0 0 14px 0',
+                          fontSize: '0.78rem',
+                          color: '#64748b',
+                          lineHeight: 1.35,
+                          minHeight: '28px'
+                        }}>
+                          {module.subtitle}
+                        </p>
+
+                        {/* Status Badge */}
+                        <span style={{
+                          marginTop: 'auto',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          color: '#854d0e',
+                          background: '#fefce8',
+                          border: '1px solid #fef08a',
+                          padding: '4px 10px',
+                          borderRadius: '100px',
+                          letterSpacing: '0.02em',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          {module.badge}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* FOCUS MODAL FOR GROOVELAB SETTINGS */}
+                {activeGroovelabSettingsModal && (
+                  <div 
+                    style={{
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'rgba(15, 23, 42, 0.55)',
+                      backdropFilter: 'blur(8px)',
+                      WebkitBackdropFilter: 'blur(8px)',
+                      zIndex: 10000,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '20px',
+                      boxSizing: 'border-box'
+                    }}
+                    onClick={(e) => {
+                      if (e.target === e.currentTarget) setActiveGroovelabSettingsModal(null);
+                    }}
+                  >
+                    <div 
+                      style={{
+                        width: '100%',
+                        maxWidth: '680px',
+                        maxHeight: '90vh',
+                        background: '#ffffff',
+                        borderRadius: '24px',
+                        border: '1px solid rgba(255, 255, 255, 0.8)',
+                        boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.35)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                      }}
+                      className="animate-scale-in"
+                    >
+                      {/* Modal Header */}
+                      <div style={{
+                        padding: '20px 24px',
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#f8fafc'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '12px',
+                            background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 12px rgba(234, 179, 8, 0.35)'
+                          }}>
+                            {activeGroovelabSettingsModal === 'bands' && <Users size={22} color="#ffffff" />}
+                            {activeGroovelabSettingsModal === 'songs' && <Music size={22} color="#ffffff" />}
+                            {activeGroovelabSettingsModal === 'live' && <Mic size={22} color="#ffffff" />}
+                            {activeGroovelabSettingsModal === 'radar' && <Award size={22} color="#ffffff" />}
+                            {activeGroovelabSettingsModal === 'avatars' && <Smile size={22} color="#ffffff" />}
+                            {activeGroovelabSettingsModal === 'rooms' && <Radio size={22} color="#ffffff" />}
+                            {activeGroovelabSettingsModal === 'permissions' && <ShieldCheck size={22} color="#ffffff" />}
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                              {activeGroovelabSettingsModal === 'bands' && 'Band-Engine & Besetzung'}
+                              {activeGroovelabSettingsModal === 'songs' && 'Song-Library & Level-Matrix'}
+                              {activeGroovelabSettingsModal === 'live' && 'Live Lab & Band-Performance'}
+                              {activeGroovelabSettingsModal === 'radar' && 'Skill-Radar & XP-Belohnungen'}
+                              {activeGroovelabSettingsModal === 'avatars' && 'Musiker- & Band-Avatare'}
+                              {activeGroovelabSettingsModal === 'rooms' && 'Band-Rooms & Kommunikation'}
+                              {activeGroovelabSettingsModal === 'permissions' && 'Coach-Berechtigungen'}
+                            </h3>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
+                              {activeGroovelabSettingsModal === 'bands' && 'Konfiguriere maximale Bandgröße und Schüler-Gründungsrechte.'}
+                              {activeGroovelabSettingsModal === 'songs' && 'Verwalte Song-Schwierigkeitsgrade und Repertoire-Regeln.'}
+                              {activeGroovelabSettingsModal === 'live' && 'Konfiguriere Standard-Tempo, Vorzähler und Bühnen-Display für Bandproben.'}
+                              {activeGroovelabSettingsModal === 'radar' && 'Gewichtung der 5 Radar-Achsen und Punktevergabe.'}
+                              {activeGroovelabSettingsModal === 'avatars' && 'Schüler-Avatare und Band-Wappen-Generator steuern.'}
+                              {activeGroovelabSettingsModal === 'rooms' && 'Band-Chat, Shoutbox und Moderationspflicht festlegen.'}
+                              {activeGroovelabSettingsModal === 'permissions' && 'Rechte für Coaches zur Verwaltung von Profilen einstellen.'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setActiveGroovelabSettingsModal(null)}
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            border: '1px solid #e2e8f0',
+                            background: '#ffffff',
+                            color: '#64748b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      {/* Modal Body */}
+                      <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: 'calc(90vh - 140px)' }}>
+                        
+                        {/* 1. BANDS */}
+                        {activeGroovelabSettingsModal === 'bands' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Maximale Bandmitglieder pro Ensemble</div>
+                              <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Begrenzung für aktive Band-Slots in der GrooveLab Band-Verwaltung.</div>
+                              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                {[4, 6, 8, 10].map((num) => (
+                                  <button
+                                    key={num}
+                                    onClick={() => handleSaveSettingValue('gl_max_band_members', num, setGlMaxBandMembers)}
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px',
+                                      borderRadius: '10px',
+                                      border: '1.5px solid',
+                                      borderColor: glMaxBandMembers === num ? '#eab308' : '#e2e8f0',
+                                      background: glMaxBandMembers === num ? '#fefce8' : '#ffffff',
+                                      color: glMaxBandMembers === num ? '#854d0e' : '#64748b',
+                                      fontWeight: 800,
+                                      fontSize: '0.8rem',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {num} Musiker
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Eigenständige Bandgründung durch Schüler</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt Schülern, im GrooveLab-Modul neue Bands und Jam-Sessions zu initiieren.</div>
+                              </div>
+                              <button
+                                onClick={() => handleSaveSettingValue('gl_allow_student_band_creation', !glAllowStudentBandCreation, setGlAllowStudentBandCreation)}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: '100px',
+                                  border: 'none',
+                                  background: glAllowStudentBandCreation ? '#eab308' : '#e2e8f0',
+                                  color: glAllowStudentBandCreation ? '#ffffff' : '#64748b',
+                                  fontWeight: 800,
+                                  fontSize: '0.76rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {glAllowStudentBandCreation ? 'Aktiv' : 'Deaktiviert'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. SONGS */}
+                        {activeGroovelabSettingsModal === 'songs' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {[
+                              { key: 'gl_song_level_starter', label: 'Starter-Level freischalten', desc: 'Grundlegende Akkorde und vereinfachte Arrangements für Einsteiger.', val: glSongLevelStarterEnabled, set: setGlSongLevelStarterEnabled },
+                              { key: 'gl_song_level_pro', label: 'Pro-Level freischalten', desc: 'Vollständige Songs mit Soli und mehrstimmigem Arrangement.', val: glSongLevelProEnabled, set: setGlSongLevelProEnabled },
+                              { key: 'gl_song_level_master', label: 'Master-Level freischalten', desc: 'Bühnenreife Masterclass-Versionen mit Live-Performance-Check.', val: glSongLevelMasterEnabled, set: setGlSongLevelMasterEnabled },
+                              { key: 'gl_song_proposal_workflow', label: 'Song-Vorschläge durch Schüler', desc: 'Schüler können neue Songs zur Aufnahme in das Schul-Repertoire vorschlagen.', val: glSongProposalWorkflow, set: setGlSongProposalWorkflow }
+                            ].map((item) => (
+                              <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div style={{ maxWidth: '75%' }}>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>{item.label}</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{item.desc}</div>
+                                </div>
+                                <button
+                                  onClick={() => handleSaveSettingValue(item.key, !item.val, item.set)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: item.val ? '#eab308' : '#e2e8f0',
+                                    color: item.val ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {item.val ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 3. LIVE LAB & BAND PERFORMANCE */}
+                        {activeGroovelabSettingsModal === 'live' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Standard Band-Tempo (BPM)</div>
+                              <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Ausgangs-Geschwindigkeit für neue Proben und Songs im Live-Lab.</div>
+                              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                {[80, 100, 120, 140].map((bpm) => (
+                                  <button
+                                    key={bpm}
+                                    onClick={() => handleSaveSettingValue('gl_live_default_bpm', bpm, setGlLiveDefaultBpm)}
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px',
+                                      borderRadius: '10px',
+                                      border: '1.5px solid',
+                                      borderColor: glLiveDefaultBpm === bpm ? '#eab308' : '#e2e8f0',
+                                      background: glLiveDefaultBpm === bpm ? '#fefce8' : '#ffffff',
+                                      color: glLiveDefaultBpm === bpm ? '#854d0e' : '#64748b',
+                                      fontWeight: 800,
+                                      fontSize: '0.8rem',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {bpm} BPM
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Vorzähler / Count-In zum Band-Start</div>
+                              <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Anzahl der Vorzähler-Takte vor dem gemeinsamen Einsetzen der Band.</div>
+                              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                {[1, 2].map((bars) => (
+                                  <button
+                                    key={bars}
+                                    onClick={() => handleSaveSettingValue('gl_live_count_in_bars', bars, setGlLiveCountInBars)}
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px',
+                                      borderRadius: '10px',
+                                      border: '1.5px solid',
+                                      borderColor: glLiveCountInBars === bars ? '#eab308' : '#e2e8f0',
+                                      background: glLiveCountInBars === bars ? '#fefce8' : '#ffffff',
+                                      color: glLiveCountInBars === bars ? '#854d0e' : '#64748b',
+                                      fontWeight: 800,
+                                      fontSize: '0.8rem',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {bars} {bars === 1 ? 'Takt Vorzähler' : 'Takte Vorzähler'}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Stage-Display &amp; Teleprompter (Vollbild-Akkorde)</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Aktiviert die vergrößerte Bühnenansicht für Proberaum-Bildschirme und Tablets.</div>
+                              </div>
+                              <button
+                                onClick={() => handleSaveSettingValue('gl_live_stage_display_enabled', !glLiveStageDisplayEnabled, setGlLiveStageDisplayEnabled)}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: '100px',
+                                  border: 'none',
+                                  background: glLiveStageDisplayEnabled ? '#eab308' : '#e2e8f0',
+                                  color: glLiveStageDisplayEnabled ? '#ffffff' : '#64748b',
+                                  fontWeight: 800,
+                                  fontSize: '0.76rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {glLiveStageDisplayEnabled ? 'Aktiv' : 'Deaktiviert'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 4. RADAR */}
+                        {activeGroovelabSettingsModal === 'radar' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {[
+                              { key: 'gl_skill_radar_timing', label: 'Timing & Rhythmusgefühl', desc: 'Bewertet Taktgenauigkeit, Metronomtreue und Timekeeping.', val: glSkillRadarTiming, set: setGlSkillRadarTiming },
+                              { key: 'gl_skill_radar_technique', label: 'Spieltechnik & Fingerfertigkeit', desc: 'Bewertet Griff- und Anschlagssicherheit auf dem Instrument.', val: glSkillRadarTechnique, set: setGlSkillRadarTechnique },
+                              { key: 'gl_skill_radar_sound', label: 'Sound & Dynamik', desc: 'Bewertet Tonformung, Sound-Settings und Ausdruckskraft.', val: glSkillRadarSound, set: setGlSkillRadarSound },
+                              { key: 'gl_skill_radar_repertoire', label: 'Repertoire & Song-Mastery', desc: 'Bewertet die Anzahl der auswendig beherrschten Band-Songs.', val: glSkillRadarRepertoire, set: setGlSkillRadarRepertoire },
+                              { key: 'gl_skill_radar_teamplay', label: 'Teamplay & Zusammenspiel', desc: 'Bewertet Band-Dynamik, Interaktion und Zuverlässigkeit.', val: glSkillRadarTeamplay, set: setGlSkillRadarTeamplay }
+                            ].map((item) => (
+                              <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                <div style={{ maxWidth: '75%' }}>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>{item.label}</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>{item.desc}</div>
+                                </div>
+                                <button
+                                  onClick={() => handleSaveSettingValue(item.key, !item.val, item.set)}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '100px',
+                                    border: 'none',
+                                    background: item.val ? '#eab308' : '#e2e8f0',
+                                    color: item.val ? '#ffffff' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.76rem',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {item.val ? 'Aktiv' : 'Deaktiviert'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 5. AVATARS */}
+                        {activeGroovelabSettingsModal === 'avatars' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Musiker-Geist-Avatare im GrooveLab</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt Schülern und Lehrkräften die Nutzung von Band- und Musiker-Avataren.</div>
+                              </div>
+                              <button
+                                onClick={() => handleSaveSettingValue('gl_musician_avatars_enabled', !glMusicianAvatarsEnabled, setGlMusicianAvatarsEnabled)}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: '100px',
+                                  border: 'none',
+                                  background: glMusicianAvatarsEnabled ? '#eab308' : '#e2e8f0',
+                                  color: glMusicianAvatarsEnabled ? '#ffffff' : '#64748b',
+                                  fontWeight: 800,
+                                  fontSize: '0.76rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {glMusicianAvatarsEnabled ? 'Aktiv' : 'Deaktiviert'}
+                              </button>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Band-Wappen &amp; Logo-Generator</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Aktiviert den interaktiven Ensemble-Visual-Generator für Schüler-Bands.</div>
+                              </div>
+                              <button
+                                onClick={() => handleSaveSettingValue('gl_band_coat_of_arms_enabled', !glBandCoatOfArmsEnabled, setGlBandCoatOfArmsEnabled)}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: '100px',
+                                  border: 'none',
+                                  background: glBandCoatOfArmsEnabled ? '#eab308' : '#e2e8f0',
+                                  color: glBandCoatOfArmsEnabled ? '#ffffff' : '#64748b',
+                                  fontWeight: 800,
+                                  fontSize: '0.76rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {glBandCoatOfArmsEnabled ? 'Aktiv' : 'Deaktiviert'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 6. ROOMS */}
+                        {activeGroovelabSettingsModal === 'rooms' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Band-Chat &amp; Band-Room Kommunikation</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt geschützte Direktkommunikation innerhalb der Ensembles.</div>
+                              </div>
+                              <button
+                                onClick={() => handleSaveSettingValue('gl_band_chat_enabled', !glBandChatEnabled, setGlBandChatEnabled)}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: '100px',
+                                  border: 'none',
+                                  background: glBandChatEnabled ? '#eab308' : '#e2e8f0',
+                                  color: glBandChatEnabled ? '#ffffff' : '#64748b',
+                                  fontWeight: 800,
+                                  fontSize: '0.76rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {glBandChatEnabled ? 'Aktiv' : 'Deaktiviert'}
+                              </button>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Audio-Kompression für Probenmitschnitte</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Komprimiert Bandraum-Audioaufnahmen automatisch für schnellen Cloud-Sync.</div>
+                              </div>
+                              <button
+                                onClick={() => handleSaveSettingValue('gl_jam_recording_compression', !glJamRecordingCompression, setGlJamRecordingCompression)}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: '100px',
+                                  border: 'none',
+                                  background: glJamRecordingCompression ? '#eab308' : '#e2e8f0',
+                                  color: glJamRecordingCompression ? '#ffffff' : '#64748b',
+                                  fontWeight: 800,
+                                  fontSize: '0.76rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {glJamRecordingCompression ? 'Aktiv' : 'Deaktiviert'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 7. PERMISSIONS */}
+                        {activeGroovelabSettingsModal === 'permissions' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Schüler hinzufügen &amp; verwalten</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt es Coaches, neue Schüler-Profile im GrooveLab-Modul anzulegen oder zu bearbeiten.</div>
+                              </div>
+                              <button
+                                onClick={() => handleToggleSetting('gl_setting_groovelab_teachers_manage_students', !teachersManageStudents, setTeachersManageStudents)}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: '100px',
+                                  border: 'none',
+                                  background: teachersManageStudents ? '#eab308' : '#e2e8f0',
+                                  color: teachersManageStudents ? '#ffffff' : '#64748b',
+                                  fontWeight: 800,
+                                  fontSize: '0.76rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {teachersManageStudents ? 'Aktiv' : 'Deaktiviert'}
+                              </button>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Lehrkräfte (Coaches) hinzufügen &amp; verwalten</div>
+                                <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt Coaches, Profile anderer Lehrer im GrooveLab-Modul anzulegen oder zu bearbeiten.</div>
+                              </div>
+                              <button
+                                onClick={() => handleToggleSetting('gl_setting_groovelab_teachers_manage_teachers', !teachersManageTeachers, setTeachersManageTeachers)}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: '100px',
+                                  border: 'none',
+                                  background: teachersManageTeachers ? '#eab308' : '#e2e8f0',
+                                  color: teachersManageTeachers ? '#ffffff' : '#64748b',
+                                  fontWeight: 800,
+                                  fontSize: '0.76rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {teachersManageTeachers ? 'Aktiv' : 'Deaktiviert'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                      </div>
+
+                      {/* Modal Footer */}
+                      <div style={{
+                        padding: '16px 24px',
+                        borderTop: '1px solid #f1f5f9',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        background: '#f8fafc'
+                      }}>
+                        <button
+                          onClick={() => setActiveGroovelabSettingsModal(null)}
+                          style={{
+                            padding: '10px 20px',
+                            borderRadius: '12px',
+                            border: 'none',
+                            background: '#eab308',
+                            color: '#ffffff',
+                            fontWeight: 800,
+                            fontSize: '0.84rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)'
+                          }}
+                        >
+                          Fertig
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
           </div>

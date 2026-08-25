@@ -9780,6 +9780,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
 
       setStudentUser(user);
+      if (onProfileUpdate) {
+        try {
+          onProfileUpdate({
+            resolved_instrument: resolvedInst,
+            instrument: resolvedInst
+          });
+        } catch (e) {}
+      }
       if (user) {
         if (user.campus_ui_level && (user.campus_ui_level === 'junior' || user.campus_ui_level === 'teen' || user.campus_ui_level === 'pro')) {
           setStudentUiLevel(user.campus_ui_level);

@@ -42,28 +42,121 @@ export const getDefaultMusicianAvatarUrl = (instrument: string | null | undefine
   return '/avatars/student_eguitar_1.png';
 };
 
+export const isGenericInstrument = (inst: string | null | undefined): boolean => {
+  if (!inst) return true;
+  const clean = String(inst).trim().toLowerCase();
+  return !clean || clean === 'allgemein' || clean === 'musiker' || clean === 'schüler' || clean === 'schueler' || clean === 'instrument' || clean === 'ohne zuweisung' || clean === 'ohne';
+};
+
+export const getEffectiveInstrument = (user: any): string => {
+  if (!user) return 'Gitarre';
+  if (user.resolved_instrument && !isGenericInstrument(user.resolved_instrument)) {
+    return String(user.resolved_instrument).split(',')[0].trim();
+  }
+  if (user.instrument && !isGenericInstrument(user.instrument)) {
+    return String(user.instrument).split(',')[0].trim();
+  }
+  if (user.subject && !isGenericInstrument(user.subject)) {
+    return String(user.subject).split(',')[0].trim();
+  }
+  if (user.teacher?.instrument && !isGenericInstrument(user.teacher.instrument)) {
+    return String(user.teacher.instrument).split(',')[0].trim();
+  }
+  if (user.teacher?.subject && !isGenericInstrument(user.teacher.subject)) {
+    return String(user.teacher.subject).split(',')[0].trim();
+  }
+  return 'Gitarre';
+};
+
+export const resolveStudentInstrumentAsync = async (user: any): Promise<string> => {
+  if (!user) return 'Gitarre';
+  if (user.resolved_instrument && !isGenericInstrument(user.resolved_instrument)) {
+    return String(user.resolved_instrument).split(',')[0].trim();
+  }
+  if (user.instrument && !isGenericInstrument(user.instrument)) {
+    return String(user.instrument).split(',')[0].trim();
+  }
+
+  // 1. Direct teacher_id check in users table
+  if (user.teacher_id) {
+    try {
+      const { data: teacherData } = await supabase
+        .from('users')
+        .select('instrument, subject')
+        .eq('id', user.teacher_id)
+        .maybeSingle();
+      if (teacherData?.instrument && !isGenericInstrument(teacherData.instrument)) {
+        return String(teacherData.instrument).split(',')[0].trim();
+      }
+      if (teacherData?.subject && !isGenericInstrument(teacherData.subject)) {
+        return String(teacherData.subject).split(',')[0].trim();
+      }
+    } catch (e) {}
+  }
+
+  // 2. Relational student_teachers junction lookup
+  if (user.id) {
+    try {
+      const { data: stData } = await supabase
+        .from('student_teachers')
+        .select('teacher_id, teacher:users!student_teachers_teacher_id_fkey(instrument, subject)')
+        .eq('student_id', user.id)
+        .maybeSingle();
+      const teacherObj: any = Array.isArray(stData?.teacher) ? stData?.teacher[0] : stData?.teacher;
+      if (teacherObj?.instrument && !isGenericInstrument(teacherObj.instrument)) {
+        return String(teacherObj.instrument).split(',')[0].trim();
+      }
+      if (teacherObj?.subject && !isGenericInstrument(teacherObj.subject)) {
+        return String(teacherObj.subject).split(',')[0].trim();
+      }
+    } catch (e) {}
+  }
+
+  return 'Gitarre';
+};
+
 export const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick, activePlatform }: { src: string | null | undefined, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void, activePlatform?: string }) => {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [resolvedInstrument, setResolvedInstrument] = useState<string | null>(user?.instrument || null);
+  const [resolvedInstrument, setResolvedInstrument] = useState<string | null>(() => user ? getEffectiveInstrument(user) : null);
   
   const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
   
   useEffect(() => {
-    if (user && user.role === 'student' && (!user.instrument || user.instrument === 'Allgemein' || user.instrument === 'ohne Zuweisung') && user.teacher_id) {
-      supabase
-        .from('users')
-        .select('instrument')
-        .eq('id', user.teacher_id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.instrument) {
-            setResolvedInstrument(data.instrument);
-          }
-        });
-    } else {
-      setResolvedInstrument(user?.instrument || null);
-    }
-  }, [user]);
+    let isCancelled = false;
+
+    const runResolve = async () => {
+      if (!user) {
+        if (userId) {
+          try {
+            const { data: uData } = await supabase
+              .from('users')
+              .select('id, role, roles, instrument, subject, teacher_id, photo_url, avatar_url')
+              .eq('id', userId)
+              .maybeSingle();
+            if (!isCancelled && uData) {
+              const inst = await resolveStudentInstrumentAsync(uData);
+              if (!isCancelled) setResolvedInstrument(inst);
+            }
+          } catch (e) {}
+        }
+        return;
+      }
+
+      if (user.role === 'student' && isGenericInstrument(user.instrument) && !user.resolved_instrument) {
+        const inst = await resolveStudentInstrumentAsync(user);
+        if (!isCancelled) {
+          setResolvedInstrument(inst);
+        }
+      } else {
+        if (!isCancelled) {
+          setResolvedInstrument(getEffectiveInstrument(user));
+        }
+      }
+    };
+
+    runResolve();
+    return () => { isCancelled = true; };
+  }, [user, userId]);
 
   let displaySrc = src;
   const targetUser = user;
@@ -75,7 +168,7 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
     displaySrc = '/campus_login_hero.png';
   } else if (isTeacher && activePlat === 'campus') {
     // Teachers in Campus module must ALWAYS display their Instrumenten-Avatar!
-    displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser?.instrument);
+    displaySrc = getInstrumentAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser));
   } else if (activePlat === 'groovelab') {
     const effectiveSrc = (src === '/campus_login_hero.png') ? null : src;
     const userPhoto = (targetUser?.photo_url === '/campus_login_hero.png') ? null : targetUser?.photo_url;
@@ -88,11 +181,11 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       if (isTeacher) {
         displaySrc = '/avatar_ghost.jpg';
       } else {
-        displaySrc = getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, role);
+        displaySrc = getDefaultMusicianAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser), role);
       }
     }
   } else if (activePlat === 'campus') {
-    displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser?.instrument);
+    displaySrc = getInstrumentAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser));
   }
 
   const handleClick = (e: React.MouseEvent) => {
@@ -127,7 +220,7 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
         background: '#f1f5f9', 
         position: 'relative', 
         overflow: 'hidden', 
-        cursor: hasAction ? 'pointer' : 'default',
+        cursor: hasAction ? 'pointer' : 'default', 
         ...style 
       }} 
       className={`studio-avatar-wrapper ${hasAction ? 'hover-scale-mini' : ''} ${className || ''}`}
@@ -154,7 +247,15 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       />
     </div>
   );
-}, (prev, next) => prev.src === next.src && prev.user?.id === next.user?.id && prev.userId === next.userId && prev.user?.instrument === next.user?.instrument && prev.activePlatform === next.activePlatform);
+}, (prev, next) => (
+  prev.src === next.src && 
+  prev.user?.id === next.user?.id && 
+  prev.userId === next.userId && 
+  prev.user?.instrument === next.user?.instrument && 
+  prev.user?.resolved_instrument === next.user?.resolved_instrument && 
+  prev.user?.teacher_id === next.user?.teacher_id && 
+  prev.activePlatform === next.activePlatform
+));
 
 export const renderBandAvatar = (name: string, photoUrl?: string | null, size: string = '64px', borderRadius: string = '18px') => {
   if (photoUrl) {
