@@ -25,6 +25,16 @@ import {
   isTestOrGenericStudent, 
   deduplicateRoster 
 } from '../services/studentRosterService';
+import { fetchHolidaysCached } from '../utils/holidayHelper';
+import { 
+  fetchRoomsBySchool, 
+  fetchStationsBySchool, 
+  fetchCrisisNotifications, 
+  fetchActiveSessions, 
+  fetchSchoolStaff, 
+  fetchUserBandIds, 
+  fetchUnreadShouts 
+} from '../repositories';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -1476,8 +1486,17 @@ export function TeacherDashboard({
 
       if (sessErr) {
         console.error('[Teacher Check-in] Error:', sessErr);
-        alert('Fehler beim Einchecken: ' + sessErr.message);
-        setCheckingInStatus('error');
+        if (sessErr.message?.includes('DATABASE_CIRCUIT_OPEN') || sessErr.message?.includes('Failed to fetch') || sessErr.message?.includes('NetworkError')) {
+          console.warn('[Teacher Check-in] Offline/Circuit mode active. Enabling optimistic local check-in.');
+          setCheckingInStatus('success');
+          sessionStorage.setItem('groovelab_location_mode', 'lab');
+          localCheckedInRef.current = true;
+          setLocalCheckedIn(true);
+          if (onLocationModeChange) onLocationModeChange('lab');
+        } else {
+          alert('Fehler beim Einchecken: ' + sessErr.message);
+          setCheckingInStatus('error');
+        }
       } else {
         console.log('[Teacher Check-in] Success:', sessData.id);
         setCheckingInStatus('success');
@@ -1508,7 +1527,17 @@ export function TeacherDashboard({
       }
     } catch (e: any) {
       console.error('[Teacher Check-in] Unexpected Error:', e);
-      setCheckingInStatus('error');
+      if (e?.message?.includes('DATABASE_CIRCUIT_OPEN') || e?.message?.includes('Failed to fetch') || e?.message?.includes('NetworkError')) {
+        console.warn('[Teacher Check-in] Offline/Circuit mode active in catch. Enabling optimistic local check-in.');
+        setCheckingInStatus('success');
+        sessionStorage.setItem('groovelab_location_mode', 'lab');
+        localCheckedInRef.current = true;
+        setLocalCheckedIn(true);
+        if (onLocationModeChange) onLocationModeChange('lab');
+      } else {
+        alert('Fehler beim Einchecken: ' + (e?.message || String(e)));
+        setCheckingInStatus('error');
+      }
     }
   };
 
@@ -1696,8 +1725,15 @@ export function TeacherDashboard({
 
       if (sessErr) {
         console.error('[Kiosk Check-in] Error creating session:', sessErr);
-        alert('Fehler beim Einchecken: ' + sessErr.message);
-        setCheckingInStatus('error');
+        if (sessErr.message?.includes('DATABASE_CIRCUIT_OPEN') || sessErr.message?.includes('Failed to fetch') || sessErr.message?.includes('NetworkError')) {
+          console.warn('[Kiosk Check-in] Offline/Circuit mode active. Proceeding locally.');
+          if (onLocationModeChange) onLocationModeChange('lab');
+          setShowKioskView(false);
+          setCheckingInStatus('idle');
+        } else {
+          alert('Fehler beim Einchecken: ' + sessErr.message);
+          setCheckingInStatus('error');
+        }
         return;
       }
 
@@ -1719,8 +1755,15 @@ export function TeacherDashboard({
       setCheckingInStatus('idle');
     } catch (err: any) {
       console.error('[Kiosk Check-in] Catch error:', err);
-      alert('Fehler beim Einchecken: ' + err.message);
-      setCheckingInStatus('error');
+      if (err?.message?.includes('DATABASE_CIRCUIT_OPEN') || err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')) {
+        console.warn('[Kiosk Check-in] Offline/Circuit mode active in catch. Proceeding locally.');
+        if (onLocationModeChange) onLocationModeChange('lab');
+        setShowKioskView(false);
+        setCheckingInStatus('idle');
+      } else {
+        alert('Fehler beim Einchecken: ' + (err?.message || String(err)));
+        setCheckingInStatus('error');
+      }
     }
   };
 
@@ -2688,152 +2731,12 @@ export function TeacherDashboard({
 
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
 
-  const parseICSDate = (icsDateStr: string): Date => {
-    const cleanStr = icsDateStr.includes(':') ? icsDateStr.split(':')[1] : icsDateStr;
-    const year = parseInt(cleanStr.substring(0, 4));
-    const month = parseInt(cleanStr.substring(4, 6)) - 1;
-    const day = parseInt(cleanStr.substring(6, 8));
-
-    if (cleanStr.includes('T')) {
-      const hour = parseInt(cleanStr.substring(9, 11));
-      const min = parseInt(cleanStr.substring(11, 13));
-      const sec = parseInt(cleanStr.substring(13, 15));
-      return new Date(Date.UTC(year, month, day, hour, min, sec));
-    }
-    return new Date(year, month, day);
-  };
-
-  const parseICS = (icsText: string): any[] => {
-    const events: any[] = [];
-    const lines = icsText.split(/\r?\n/);
-    let currentEvent: any = null;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line === 'BEGIN:VEVENT') {
-        currentEvent = {};
-      } else if (line === 'END:VEVENT' && currentEvent) {
-        if (currentEvent.summary && currentEvent.dtstart) {
-          events.push(currentEvent);
-        }
-        currentEvent = null;
-      } else if (currentEvent) {
-        const colonIdx = line.indexOf(':');
-        if (colonIdx !== -1) {
-          const key = line.substring(0, colonIdx);
-          const value = line.substring(colonIdx + 1);
-
-          if (key.startsWith('SUMMARY')) {
-            currentEvent.summary = value;
-          } else if (key.startsWith('DESCRIPTION')) {
-            currentEvent.description = value.replace(/\\n/g, '\n');
-          } else if (key.startsWith('DTSTART')) {
-            currentEvent.dtstart = parseICSDate(value);
-            currentEvent.isAllDay = !value.includes('T');
-          } else if (key.startsWith('DTEND')) {
-            currentEvent.dtend = parseICSDate(value);
-          } else if (key.startsWith('LOCATION')) {
-            currentEvent.location = value;
-          }
-        }
-      }
-    }
-    return events;
-  };
-
-  const loadHolidays = async (url: string) => {
-    try {
-      const urls = (() => {
-        try {
-          if (url.startsWith('[')) return JSON.parse(url) as string[];
-        } catch (e) {}
-        if (url.includes(',')) return url.split(',').map(u => u.trim()).filter(Boolean);
-        return [url];
-      })();
-
-      let combinedEvents: any[] = [];
-
-      for (const singleUrl of urls) {
-        try {
-          let text = '';
-          try {
-            const res = await fetch(singleUrl);
-            if (!res.ok) throw new Error();
-            text = await res.text();
-          } catch (corsErr) {
-            const proxies = [
-              `https://corsproxy.io/?${singleUrl}`,
-              `https://api.allorigins.win/get?url=${encodeURIComponent(singleUrl)}`
-            ];
-
-            let success = false;
-            for (const proxyUrl of proxies) {
-              try {
-                const res = await fetch(proxyUrl);
-                if (!res.ok) continue;
-                if (proxyUrl.includes('allorigins')) {
-                  const json = await res.json();
-                  text = json.contents;
-                } else {
-                  text = await res.text();
-                }
-                if (text && text.includes('BEGIN:VCALENDAR')) {
-                  success = true;
-                  break;
-                }
-              } catch (e) {
-                console.warn(e);
-              }
-            }
-            if (!success) continue;
-          }
-
-          if (text) {
-            const parsedSingle = parseICS(text);
-            combinedEvents = [...combinedEvents, ...parsedSingle];
-          }
-        } catch (e) {
-          console.warn('Error fetching calendar URL:', singleUrl, e);
-        }
-      }
-
-      if (combinedEvents.length === 0) return;
-
-      const holidayRanges = combinedEvents
-        .filter(ev => {
-          const summary = (ev.summary || '').toLowerCase();
-          return summary.includes('ferien') || summary.includes('feiertag') || summary.includes('schulfrei');
-        })
-        .map(ev => {
-          const toYYYYMMDD = (d: Date) => {
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${y}-${m}-${day}`;
-          };
-          
-          const end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
-          if (ev.dtend && ev.isAllDay) {
-            end.setDate(end.getDate() - 1);
-          }
-          
-          return {
-            start: toYYYYMMDD(ev.dtstart),
-            end: toYYYYMMDD(end),
-            name: ev.summary || 'Ferien'
-          };
-        });
-
-      setHolidays(holidayRanges);
-    } catch (err) {
-      console.error('Error loading holidays in TeacherDashboard:', err);
-    }
-  };
-
   useEffect(() => {
     const calendarUrl = teacher?.schools?.calendar_url;
     if (calendarUrl) {
-      loadHolidays(calendarUrl);
+      fetchHolidaysCached(calendarUrl).then(h => {
+        if (h && h.length > 0) setHolidays(h);
+      });
     }
   }, [teacher?.schools?.calendar_url]);
 
@@ -4953,58 +4856,58 @@ export function TeacherDashboard({
     };
 
     const channelSessions = supabase
-      .channel('realtime_teacher_sessions')
+      .channel(`realtime_teacher_sessions_${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => {
         debouncedFetchData();
       })
       .subscribe();
 
     const channelHelp = supabase
-      .channel('realtime_teacher_help')
+      .channel(`realtime_teacher_help_${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'help_requests' }, () => {
         debouncedFetchData();
       })
       .subscribe();
 
     const channelSkills = supabase
-      .channel('realtime_teacher_skills')
+      .channel(`realtime_teacher_skills_${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_song_skills' }, () => {
         debouncedFetchData();
       })
       .subscribe();
 
     const channelBands = supabase
-      .channel('realtime_teacher_bands')
+      .channel(`realtime_teacher_bands_${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bands' }, () => {
         debouncedFetchData();
       })
       .subscribe();
 
     const channelCrisis = supabase
-      .channel('realtime_teacher_crisis')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'crisis_notifications' }, () => {
+      .channel(`realtime_teacher_crisis_${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'crisis_notifications', filter: `teacher_id=eq.${userId}` }, () => {
         debouncedFetchData();
       })
       .subscribe();
 
     const channelOccurrences = supabase
-      .channel('realtime_teacher_occurrences')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_occurrences' }, () => {
+      .channel(`realtime_teacher_occurrences_${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_occurrences', filter: `teacher_id=eq.${userId}` }, () => {
         debouncedFetchData();
         setBriefingRefreshTicker(prev => prev + 1);
       })
       .subscribe();
 
     const channelUsers = supabase
-      .channel('realtime_teacher_users')
+      .channel(`realtime_teacher_users_${userId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users_raw' }, () => {
         debouncedFetchData();
       })
       .subscribe();
 
     const channelStudents = supabase
-      .channel('realtime_teacher_students')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, (payload) => {
+      .channel(`realtime_teacher_students_${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'students', filter: `teacher_id=eq.${userId}` }, (payload) => {
         const oldRec = payload.old as any;
         const newRec = payload.new as any;
         if (oldRec?.teacher_id === userId && newRec?.teacher_id !== userId) {
@@ -5026,20 +4929,27 @@ export function TeacherDashboard({
       supabase.removeChannel(channelStudents);
       if (debounceTimer) clearTimeout(debounceTimer);
     };
-  }, [userId, activePlatform, selectedRoomId, locationMode]);
+  }, [userId, activePlatform]);
+
+  const isFetchingRef = useRef<Promise<void> | null>(null);
 
   const fetchData = async () => {
     if (!userId) return;
-    setFetchError(null);
-
-    const isGhostMode = userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
-    const ghostSchoolId = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_id') || '') : '';
-    const ghostSchoolName = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule') : 'Musikschule';
-
-    if (!isGhostMode) {
-      // Update coach presence in DB
-      supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
+    if (isFetchingRef.current) {
+      return isFetchingRef.current;
     }
+
+    const runFetch = async () => {
+      setFetchError(null);
+
+      const isGhostMode = userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
+      const ghostSchoolId = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_id') || '') : '';
+      const ghostSchoolName = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule') : 'Musikschule';
+
+      if (!isGhostMode) {
+        // Update coach presence in DB (non-blocking)
+        supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
+      }
 
     try {
       // 0. Shoutbox & Profile Info (Fetched in parallel first)
@@ -5091,15 +5001,12 @@ export function TeacherDashboard({
           setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
         }
       } else {
-        const [mBandsRes, cBandsRes, tDataRes, actDayRes] = await Promise.all([
-          supabase.from('band_members').select('band_id').eq('user_id', userId),
-          supabase.from('bands').select('id').eq('coach_id', userId),
+        const [bIds, tDataRes, actDayRes] = await Promise.all([
+          fetchUserBandIds(userId),
           supabase.from('users').select('*, schools(*)').eq('id', userId).single(),
           supabase.from('activation_days').select('day_of_birth').eq('student_id', userId).maybeSingle()
         ]);
 
-        const mBands = mBandsRes.data;
-        const cBands = cBandsRes.data;
         tData = tDataRes.data;
 
         // Fallback: if schools join failed (e.g. RLS on schools table for student), query users directly
@@ -5114,13 +5021,8 @@ export function TeacherDashboard({
           tData.day_of_birth = actDayRes?.data?.day_of_birth || null;
         }
 
-        if (mBands) bIds.push(...mBands.map(b => b.band_id));
-        if (cBands) bIds.push(...cBands.map(b => b.id));
-        bIds = [...new Set(bIds)];
-
         if (bIds.length > 0) {
-          const { data: shoutData } = await supabase.from('band_shoutbox').select('*, users(first_name, photo_url), bands(name)').in('band_id', bIds).order('created_at', { ascending: false });
-          const unread = (shoutData || []).filter(s => !(s.read_by || []).includes(userId) && s.user_id !== userId);
+          const unread = await fetchUnreadShouts(bIds, userId);
           setUnreadShouts(unread);
         }
       }
@@ -5164,7 +5066,7 @@ export function TeacherDashboard({
           wallSongsQuery = wallSongsQuery.eq('teacher_id', userId);
         }
 
-        // Concurrently query all school-based dashboard resources based on activeTab
+        // Concurrently query all school-based dashboard resources based on activeTab using repositories
         const [
           rRes,
           avRes,
@@ -5180,21 +5082,21 @@ export function TeacherDashboard({
           crisisRes,
           stationsRes
         ] = await Promise.all([
-          // rooms
+          // rooms (via RoomRepository with in-memory TTL caching)
           (activeTab === 'live' || activeTab === 'briefing')
-            ? Promise.resolve(supabase.from('rooms').select('*').eq('school_id', tData.school_id).eq('is_groovelab_active', true).order('sort_order', { ascending: true })).catch(e => ({ data: [], error: e }))
+            ? fetchRoomsBySchool(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // user_availability
           (activeTab === 'settings')
             ? Promise.resolve(supabase.from('user_availability').select('*')).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
-          // sessions
+          // sessions (via ScheduleRepository)
           (activeTab === 'live' || activeTab === 'briefing')
-            ? Promise.resolve(supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null).eq('users.school_id', tData.school_id)).catch(e => ({ data: [], error: e }))
+            ? fetchActiveSessions(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
-          // coaches
+          // coaches (via UserRepository)
           (activeTab === 'live' || activeTab === 'briefing' || activeTab === 'coaches')
-            ? Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e }))
+            ? fetchSchoolStaff(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // submissions (user_song_skills pending approval)
           (activeTab === 'live' || activeTab === 'briefing' || activeTab === 'proposals')
@@ -5222,13 +5124,13 @@ export function TeacherDashboard({
           (activeTab === 'briefing' || activeTab === 'live')
             ? Promise.resolve(supabase.from('band_song_slots').select('user_id, band_songs(song_id)')).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
-          // crisis
+          // crisis (via ScheduleRepository)
           (activeTab === 'briefing')
-            ? Promise.resolve(supabase.from('crisis_notifications').select('*, student:users!crisis_notifications_student_id_fkey(id, first_name, last_name)').eq(tData.is_ghost_mode ? 'school_id' : 'teacher_id', tData.is_ghost_mode ? tData.school_id : userId).gte('slot_start_datetime', new Date(Date.now() - 24 * 60 * 60 * 1000 * 7).toISOString()).order('slot_start_datetime', { ascending: true })).catch(e => ({ data: [], error: e }))
+            ? fetchCrisisNotifications(tData.is_ghost_mode ? tData.school_id : userId, tData.is_ghost_mode).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
-          // stations
+          // stations (via RoomRepository with in-memory TTL caching)
           (activeTab === 'live')
-            ? Promise.resolve(supabase.from('stations').select('*, rooms!inner(school_id, is_groovelab_active)').eq('rooms.school_id', tData.school_id).eq('rooms.is_groovelab_active', true).order('name')).catch(e => ({ data: [], error: e }))
+            ? fetchStationsBySchool(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null })
         ]);
 
@@ -6200,9 +6102,22 @@ export function TeacherDashboard({
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+  const promise = runFetch().finally(() => {
+    isFetchingRef.current = null;
+  });
+  isFetchingRef.current = promise;
+  return promise;
+};
+
+const isFirstMountRef = useRef(true);
+
+useEffect(() => {
+  if (isFirstMountRef.current) {
+    isFirstMountRef.current = false;
+    return;
+  }
+  fetchData();
+}, [activeTab]);
 
   const handleMarkAsRead = async (shoutId: string) => {
     if (!userId) return;

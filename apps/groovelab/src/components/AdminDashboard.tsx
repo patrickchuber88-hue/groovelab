@@ -31,6 +31,9 @@ import {
   isTestOrGenericStudent, 
   deduplicateRoster 
 } from '../services/studentRosterService';
+import { fetchHolidaysCached } from '../utils/holidayHelper';
+import { downloadCsvFile } from '../utils/csvHelper';
+import { logSecurityEvent } from '../services/auditLogService';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -540,161 +543,12 @@ export function AdminDashboard({
     return rooms.filter((r: any) => roomIds.has(r.id));
   }, [rooms, schedules, campusBookings, dbRoomBookings, userId, admin]);
 
-  const parseICSDate = (icsDateStr: string): Date => {
-    const cleanStr = icsDateStr.includes(':') ? icsDateStr.split(':')[1] : icsDateStr;
-    const year = parseInt(cleanStr.substring(0, 4));
-    const month = parseInt(cleanStr.substring(4, 6)) - 1;
-    const day = parseInt(cleanStr.substring(6, 8));
-
-    if (cleanStr.includes('T')) {
-      const hour = parseInt(cleanStr.substring(9, 11));
-      const min = parseInt(cleanStr.substring(11, 13));
-      const sec = parseInt(cleanStr.substring(13, 15));
-      return new Date(Date.UTC(year, month, day, hour, min, sec));
-    }
-    return new Date(Date.UTC(year, month, day));
-  };
-
-  const parseICS = (icsText: string): any[] => {
-    const events: any[] = [];
-    const lines = icsText.split(/\r?\n/);
-    let currentEvent: any = null;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line === 'BEGIN:VEVENT') {
-        currentEvent = {};
-      } else if (line === 'END:VEVENT' && currentEvent) {
-        if (currentEvent.summary && currentEvent.dtstart) {
-          events.push(currentEvent);
-        }
-        currentEvent = null;
-      } else if (currentEvent) {
-        const colonIdx = line.indexOf(':');
-        if (colonIdx !== -1) {
-          const key = line.substring(0, colonIdx);
-          const value = line.substring(colonIdx + 1);
-
-          if (key.startsWith('SUMMARY')) {
-            currentEvent.summary = value;
-          } else if (key.startsWith('DESCRIPTION')) {
-            currentEvent.description = value.replace(/\\n/g, '\n');
-          } else if (key.startsWith('DTSTART')) {
-            currentEvent.dtstart = parseICSDate(value);
-            currentEvent.isAllDay = !value.includes('T');
-          } else if (key.startsWith('DTEND')) {
-            currentEvent.dtend = parseICSDate(value);
-          } else if (key.startsWith('LOCATION')) {
-            currentEvent.location = value;
-          }
-        }
-      }
-    }
-    return events;
-  };
-
-  const loadHolidays = async (url: string) => {
-    try {
-      const urls = (() => {
-        try {
-          if (url.startsWith('[')) return JSON.parse(url) as string[];
-        } catch (e) {}
-        if (url.includes(',')) return url.split(',').map(u => u.trim()).filter(Boolean);
-        return [url];
-      })();
-
-      let combinedEvents: any[] = [];
-
-      for (const singleUrl of urls) {
-        try {
-          let text = '';
-          try {
-            const res = await fetch(singleUrl);
-            if (!res.ok) throw new Error();
-            text = await res.text();
-          } catch (corsErr) {
-            const proxies = [
-              `https://corsproxy.io/?${singleUrl}`,
-              `https://api.allorigins.win/get?url=${encodeURIComponent(singleUrl)}`
-            ];
-
-            let success = false;
-            for (const proxyUrl of proxies) {
-              try {
-                const res = await fetch(proxyUrl);
-                if (!res.ok) continue;
-                if (proxyUrl.includes('allorigins')) {
-                  const json = await res.json();
-                  text = json.contents;
-                } else {
-                  text = await res.text();
-                }
-                if (text && text.includes('BEGIN:VCALENDAR')) {
-                  success = true;
-                  break;
-                }
-              } catch (e) {
-                console.warn(e);
-              }
-            }
-            if (!success) continue;
-          }
-
-          if (text) {
-            const parsedSingle = parseICS(text);
-            combinedEvents = [...combinedEvents, ...parsedSingle];
-          }
-        } catch (e) {
-          console.warn('Error fetching calendar URL:', singleUrl, e);
-        }
-      }
-
-      if (combinedEvents.length === 0) return;
-
-      const holidayRanges = combinedEvents
-        .filter(ev => {
-          const summary = (ev.summary || '').toLowerCase();
-          return summary.includes('ferien') || summary.includes('feiertag') || summary.includes('schulfrei');
-        })
-        .map(ev => {
-          const toYYYYMMDD = (d: Date) => {
-            try {
-              return new Intl.DateTimeFormat('en-CA', {
-                timeZone: 'Europe/Berlin',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-              }).format(d);
-            } catch (e) {
-              const y = d.getUTCFullYear();
-              const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-              const day = String(d.getUTCDate()).padStart(2, '0');
-              return `${y}-${m}-${day}`;
-            }
-          };
-          
-          const end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
-          if (ev.dtend && ev.isAllDay) {
-            end.setUTCDate(end.getUTCDate() - 1);
-          }
-          
-          return {
-            start: toYYYYMMDD(ev.dtstart),
-            end: toYYYYMMDD(end),
-            name: ev.summary || 'Ferien'
-          };
-        });
-
-      setHolidays(holidayRanges);
-    } catch (err) {
-      console.error('Error loading holidays in AdminDashboard:', err);
-    }
-  };
-
   useEffect(() => {
     const calendarUrl = schoolObj?.calendar_url;
     if (calendarUrl) {
-      loadHolidays(calendarUrl);
+      fetchHolidaysCached(calendarUrl).then(h => {
+        if (h && h.length > 0) setHolidays(h);
+      });
     }
   }, [schoolObj?.calendar_url]);
 
@@ -3176,11 +3030,11 @@ export function AdminDashboard({
     if (!admin?.school_id) return;
     
     const channel = supabase
-      .channel('admin_lab_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => {
+      .channel(`admin_lab_updates_${admin.school_id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `school_id=eq.${admin.school_id}` }, () => {
         fetchData();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fokus_logs' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fokus_logs', filter: `school_id=eq.${admin.school_id}` }, () => {
         fetchData();
       })
       .subscribe();
@@ -19103,10 +18957,8 @@ function DeviceSetupScreen({
         return `KW ${weekNo} (${d.getUTCFullYear()})`;
       };
 
-      let csvContent = "\uFEFF";
-      csvContent += "Name;Rolle;Kalenderwoche;Datum;Station;Check-In;Check-Out;Dauer (Minuten)\n";
-
-      sessData.forEach((s: any) => {
+      const headers = ['Name', 'Rolle', 'Kalenderwoche', 'Datum', 'Station', 'Check-In', 'Check-Out', 'Dauer (Minuten)'];
+      const rows = sessData.map((s: any) => {
         const u = s.users;
         const nameStr = `${u?.first_name || ''} ${u?.last_name || ''}`.trim();
         const roleStr = u?.role === 'student' ? 'Schüler' : u?.role === 'teacher' ? 'Lehrer' : u?.role || 'Unbekannt';
@@ -19125,18 +18977,17 @@ function DeviceSetupScreen({
           durationMins = 'Aktiv';
         }
 
-        csvContent += `"${nameStr}";"${roleStr}";"${kw}";"${datum}";"${station}";"${checkInTime}";"${checkOutTime}";"${durationMins}"\n`;
+        return [nameStr, roleStr, kw, datum, station, checkInTime, checkOutTime, durationMins];
       });
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
       const fileName = `Anwesenheiten_Gesamt_${new Date().toISOString().slice(0, 10)}.csv`;
-      link.setAttribute("href", url);
-      link.setAttribute("download", fileName);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      downloadCsvFile(fileName, headers, rows, ';');
+
+      logSecurityEvent({
+        action: 'EXPORT_PRESENCE_CSV',
+        schoolId,
+        metadata: { rowCount: rows.length, fileName }
+      });
     } catch (err: any) {
       alert('Export-Fehler: ' + err.message);
     }

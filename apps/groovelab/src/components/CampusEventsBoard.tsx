@@ -44,6 +44,7 @@ import {
   AlertTriangle,
   CheckCircle2
 } from 'lucide-react';
+import { downloadCsvFile } from '../utils/csvHelper';
 import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument } from '../utils/nameHelper';
 
 interface CampusEventsBoardProps {
@@ -2117,9 +2118,9 @@ export function CampusEventsBoard({
     window.addEventListener('groovelab_schedule_changed', handleSync);
 
     const channel = supabase
-      .channel('realtime_events_board_schedule_sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_occurrences' }, handleSync)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, handleSync)
+      .channel(`realtime_events_board_schedule_sync_${schoolId || 'global'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_occurrences', ...(schoolId ? { filter: `school_id=eq.${schoolId}` } : {}) }, handleSync)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules', ...(schoolId ? { filter: `school_id=eq.${schoolId}` } : {}) }, handleSync)
       .subscribe();
 
     return () => {
@@ -4446,7 +4447,7 @@ export function CampusEventsBoard({
     });
   };
 
-  // Export CSV (Fallback)
+  // Export CSV (with Enterprise Formula Injection Protection)
   const handleExportCSV = () => {
     if (!selectedEvent) return;
     const headers = ['Name', 'Ensemble/Band', 'Repertoire', 'Dauer (Min)', 'Bühne', 'Status', 'Spezielle Wünsche'];
@@ -4463,15 +4464,8 @@ export function CampusEventsBoard({
         pp.remarks || ''
       ];
     });
-    const csvContent = [headers.join(','), ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `event_${selectedEvent.title.replace(/\s+/g, '_')}_programm.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const fileName = `event_${selectedEvent.title.replace(/\s+/g, '_')}_programm.csv`;
+    downloadCsvFile(fileName, headers, rows, ';');
   };
 
   // Export Excel (styled HTML table format that opens natively in Excel/OpenOffice without JRE warnings)

@@ -36,6 +36,7 @@ import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
 import { HelpCenterModal } from './help/HelpCenterModal';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
+import { fetchHolidaysCached } from '../utils/holidayHelper';
 
 const timeToMinutes = (timeStr: string): number => {
   if (!timeStr) return 0;
@@ -142,151 +143,11 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   // Holidays state
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
 
-  const parseICSDate = (icsDateStr: string): Date => {
-    const cleanStr = icsDateStr.includes(':') ? icsDateStr.split(':')[1] : icsDateStr;
-    const year = parseInt(cleanStr.substring(0, 4));
-    const month = parseInt(cleanStr.substring(4, 6)) - 1;
-    const day = parseInt(cleanStr.substring(6, 8));
-
-    if (cleanStr.includes('T')) {
-      const hour = parseInt(cleanStr.substring(9, 11));
-      const min = parseInt(cleanStr.substring(11, 13));
-      const sec = parseInt(cleanStr.substring(13, 15));
-      return new Date(Date.UTC(year, month, day, hour, min, sec));
-    }
-    return new Date(year, month, day);
-  };
-
-  const parseICS = (icsText: string): any[] => {
-    const events: any[] = [];
-    const lines = icsText.split(/\r?\n/);
-    let currentEvent: any = null;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line === 'BEGIN:VEVENT') {
-        currentEvent = {};
-      } else if (line === 'END:VEVENT' && currentEvent) {
-        if (currentEvent.summary && currentEvent.dtstart) {
-          events.push(currentEvent);
-        }
-        currentEvent = null;
-      } else if (currentEvent) {
-        const colonIdx = line.indexOf(':');
-        if (colonIdx !== -1) {
-          const key = line.substring(0, colonIdx);
-          const value = line.substring(colonIdx + 1);
-
-          if (key.startsWith('SUMMARY')) {
-            currentEvent.summary = value;
-          } else if (key.startsWith('DESCRIPTION')) {
-            currentEvent.description = value.replace(/\\n/g, '\n');
-          } else if (key.startsWith('DTSTART')) {
-            currentEvent.dtstart = parseICSDate(value);
-            currentEvent.isAllDay = !value.includes('T');
-          } else if (key.startsWith('DTEND')) {
-            currentEvent.dtend = parseICSDate(value);
-          } else if (key.startsWith('LOCATION')) {
-            currentEvent.location = value;
-          }
-        }
-      }
-    }
-    return events;
-  };
-
-  const loadHolidays = async (url: string) => {
-    try {
-      const urls = (() => {
-        try {
-          if (url.startsWith('[')) return JSON.parse(url) as string[];
-        } catch (e) {}
-        if (url.includes(',')) return url.split(',').map(u => u.trim()).filter(Boolean);
-        return [url];
-      })();
-
-      let combinedEvents: any[] = [];
-
-      for (const singleUrl of urls) {
-        try {
-          let text = '';
-          try {
-            const res = await fetch(singleUrl);
-            if (!res.ok) throw new Error();
-            text = await res.text();
-          } catch (corsErr) {
-            const proxies = [
-              `https://corsproxy.io/?${singleUrl}`,
-              `https://api.allorigins.win/get?url=${encodeURIComponent(singleUrl)}`
-            ];
-
-            let success = false;
-            for (const proxyUrl of proxies) {
-              try {
-                const res = await fetch(proxyUrl);
-                if (!res.ok) continue;
-                if (proxyUrl.includes('allorigins')) {
-                  const json = await res.json();
-                  text = json.contents;
-                } else {
-                  text = await res.text();
-                }
-                if (text && text.includes('BEGIN:VCALENDAR')) {
-                  success = true;
-                  break;
-                }
-              } catch (e) {
-                console.warn(e);
-              }
-            }
-            if (!success) continue;
-          }
-
-          if (text) {
-            const parsedSingle = parseICS(text);
-            combinedEvents = [...combinedEvents, ...parsedSingle];
-          }
-        } catch (e) {
-          console.warn('Error fetching calendar URL:', singleUrl, e);
-        }
-      }
-
-      if (combinedEvents.length === 0) return;
-
-      const holidayRanges = combinedEvents
-        .filter(ev => {
-          const summary = (ev.summary || '').toLowerCase();
-          return summary.includes('ferien') || summary.includes('feiertag') || summary.includes('schulfrei');
-        })
-        .map(ev => {
-          const toYYYYMMDD = (d: Date) => {
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${y}-${m}-${day}`;
-          };
-          
-          const end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
-          if (ev.dtend && ev.isAllDay) {
-            end.setDate(end.getDate() - 1);
-          }
-          
-          return {
-            start: toYYYYMMDD(ev.dtstart),
-            end: toYYYYMMDD(end),
-            name: ev.summary || 'Ferien'
-          };
-        });
-
-      setHolidays(holidayRanges);
-    } catch (err) {
-      console.error('Error loading holidays in CampusTeacherDashboard:', err);
-    }
-  };
-
   useEffect(() => {
     if (school?.calendar_url) {
-      loadHolidays(school.calendar_url);
+      fetchHolidaysCached(school.calendar_url).then(h => {
+        if (h && h.length > 0) setHolidays(h);
+      });
     }
   }, [school?.calendar_url]);
 

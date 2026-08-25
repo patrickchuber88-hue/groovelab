@@ -5,8 +5,9 @@ import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { generateInvoicePDF } from '../utils/pdfGenerator';
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { calculateSchoolEffectiveRates } from '../domain/pricingEngine';
-import { calculateCampusGroovelabBilling } from '../domain/billingCalculator';
 import { aggregateSchoolMetrics, getSchoolCanonicalBilling } from '../domain/schoolMetricsAggregator';
+import { downloadCsvFile } from '../utils/csvHelper';
+import { logSecurityEvent } from '../services/auditLogService';
 import { 
   CreditCard, 
   Search, 
@@ -803,19 +804,13 @@ Ihr Campus-Groovelab Abrechnungsteam`;
       inv.total.toFixed(2)
     ]);
 
-    const csvContent = [
-      headers.join(';'),
-      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(';'))
-    ].join('\n');
+    const fileName = `Abrechnungsliste_${new Date().toISOString().split('T')[0]}.csv`;
+    downloadCsvFile(fileName, headers, rows, ';');
 
-    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Abrechnungsliste_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    logSecurityEvent({
+      action: 'EXPORT_BILLING_CSV',
+      metadata: { rowCount: rows.length, fileName }
+    });
   };
   const filteredInvoices = invoices.filter(inv => {
     const matchesSearch = inv.schoolName.toLowerCase().includes(searchQuery.toLowerCase());

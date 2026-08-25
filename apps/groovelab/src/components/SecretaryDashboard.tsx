@@ -3217,8 +3217,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     };
 
     const channel = supabase
-      .channel('public:crisis_notifications')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'crisis_notifications' }, (payload) => {
+      .channel(`realtime_secretary_crisis_${schoolId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'crisis_notifications', filter: `school_id=eq.${schoolId}` }, (payload) => {
         const updatedRow = payload.new as any;
         if (updatedRow) {
           setCrisisNotifications(prev =>
@@ -3226,16 +3226,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           );
         }
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crisis_notifications' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crisis_notifications', filter: `school_id=eq.${schoolId}` }, () => {
         debouncedFetchCrisisNotifications();
       })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'crisis_notifications' }, () => {
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'crisis_notifications', filter: `school_id=eq.${schoolId}` }, () => {
         debouncedFetchCrisisNotifications();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'system_alerts' }, () => {
         debouncedFetchDashboardData();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload: any) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `school_id=eq.${schoolId}` }, (payload: any) => {
         debouncedFetchDashboardData();
         debouncedFetchCrisisNotifications();
 

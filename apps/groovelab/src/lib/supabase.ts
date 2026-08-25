@@ -109,10 +109,10 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     let timeoutId: any = null;
     try {
       let fetchInit = newInit;
-      // Wrap request with an 8-second timeout if no signal was passed (fast failover to offline cache)
+      // Wrap request with a 15-second timeout if no signal was passed (fast failover to offline cache)
       if (!newInit.signal && typeof AbortController !== 'undefined') {
         const controller = new AbortController();
-        timeoutId = setTimeout(() => controller.abort(), 8000);
+        timeoutId = setTimeout(() => controller.abort(), 15000);
         fetchInit = { ...newInit, signal: controller.signal };
       }
 
@@ -142,8 +142,6 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
       if (timeoutId) clearTimeout(timeoutId);
       lastError = err;
       const errMsg = err?.message || String(err);
-      
-      dbCircuitBreaker.recordFailure(err);
 
       // Check for transient network/CORS/WebKit errors that are safe to retry
       const isNetworkError = 
@@ -156,13 +154,21 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
         (typeof navigator !== 'undefined' && !navigator.onLine);
         
       if (isNetworkError && attempt < maxAttempts) {
-        const delay = 150; // Fast retry
+        const delay = 200 * attempt; // Fast incremental retry
         console.warn(`[Supabase Fetch] Attempt ${attempt} failed with "${errMsg}". Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
+      
+      // Only record failure when all retry attempts exhausted and not an external abort
+      if (!errMsg.includes('AbortError') && !errMsg.includes('aborted')) {
+        dbCircuitBreaker.recordFailure(err);
+      }
       throw err;
     }
+  }
+  if (lastError && !lastError.message?.includes('AbortError')) {
+    dbCircuitBreaker.recordFailure(lastError);
   }
   throw lastError;
 };

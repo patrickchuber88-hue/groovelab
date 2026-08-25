@@ -23,14 +23,19 @@ class DatabaseCircuitBreaker {
   private readonly timeoutMs: number;
 
   constructor(options?: CircuitBreakerOptions) {
-    this.failureThreshold = options?.failureThreshold || 3;
-    this.cooldownMs = options?.cooldownMs || 6000;
-    this.timeoutMs = options?.timeoutMs || 8000;
+    this.failureThreshold = options?.failureThreshold || 5;
+    this.cooldownMs = options?.cooldownMs || 4000;
+    this.timeoutMs = options?.timeoutMs || 15000;
   }
 
   public getState(): CircuitState {
+    const now = Date.now();
+    // Decay failures if no failure occurred in the last 20 seconds
+    if (this.state === 'CLOSED' && this.failureCount > 0 && now - this.lastFailureTime > 20000) {
+      this.failureCount = 0;
+    }
+
     if (this.state === 'OPEN') {
-      const now = Date.now();
       if (now - this.lastFailureTime > this.cooldownMs) {
         this.state = 'HALF_OPEN';
         console.info('[CircuitBreaker] Entering HALF_OPEN state. Probing database health...');
@@ -48,10 +53,23 @@ class DatabaseCircuitBreaker {
   }
 
   public recordFailure(err?: any): void {
+    const errMsg = err?.message || String(err || '');
+    const isAbort = err?.name === 'AbortError' || errMsg.includes('AbortError') || errMsg.includes('aborted');
+    if (isAbort) {
+      // Client-side cancellation or component unmount should not trip the server circuit breaker
+      return;
+    }
+
+    const now = Date.now();
+    // Reset count if previous failure was long ago
+    if (this.state === 'CLOSED' && now - this.lastFailureTime > 20000) {
+      this.failureCount = 0;
+    }
+
     this.failureCount++;
-    this.lastFailureTime = Date.now();
+    this.lastFailureTime = now;
     
-    console.warn(`[CircuitBreaker] DB Failure recorded (${this.failureCount}/${this.failureThreshold}):`, err?.message || err);
+    console.warn(`[CircuitBreaker] DB Failure recorded (${this.failureCount}/${this.failureThreshold}):`, errMsg);
 
     if (this.failureCount >= this.failureThreshold || this.state === 'HALF_OPEN') {
       this.state = 'OPEN';
@@ -92,7 +110,7 @@ class DatabaseCircuitBreaker {
 }
 
 export const dbCircuitBreaker = new DatabaseCircuitBreaker({
-  failureThreshold: 3,
-  cooldownMs: 6000,
-  timeoutMs: 8000
+  failureThreshold: 5,
+  cooldownMs: 4000,
+  timeoutMs: 15000
 });
