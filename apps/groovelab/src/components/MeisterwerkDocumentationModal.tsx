@@ -15984,8 +15984,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </button>
           </div>
 
-          {/* SIMULATOR TOGGLE BAR (Dev Mode - Teachers Only) */}
-          {!readOnly && (
+          {/* SIMULATOR TOGGLE BAR (Dev Mode Only) */}
+          {!readOnly && (import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || new URLSearchParams(window.location.search).has('dev_tools')))) && (
             <div style={{
               background: 'white',
               borderRadius: '16px',

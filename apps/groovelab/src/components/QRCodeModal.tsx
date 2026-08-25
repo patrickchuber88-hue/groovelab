@@ -764,40 +764,42 @@ ${link}`;
                   {copied ? 'Zugangs-Link in Zwischenablage kopiert!' : 'Zugangs-Link kopieren'}
                 </button>
 
-                {/* Entwickler Button: QR-Landingpage testen */}
-                <button
-                  onClick={() => {
-                    const qrUrl = `${window.location.origin}/qr/${effectiveToken}`;
-                    window.open(qrUrl, '_blank');
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '11px',
-                    borderRadius: '14px',
-                    border: '1px dashed #cbd5e1',
-                    background: '#f1f5f9',
-                    color: '#0f172a',
-                    fontWeight: 750,
-                    fontSize: '0.76rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = '#e2e8f0';
-                    e.currentTarget.style.borderColor = '#94a3b8';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = '#f1f5f9';
-                    e.currentTarget.style.borderColor = '#cbd5e1';
-                  }}
-                >
-                  <ExternalLink size={14} color="#0f172a" />
-                  🛠️ QR-Landingpage testen ↗
-                </button>
+                {/* Entwickler Button: QR-Landingpage testen (Dev Mode Only) */}
+                {(import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || new URLSearchParams(window.location.search).has('dev_tools')))) && (
+                  <button
+                    onClick={() => {
+                      const qrUrl = `${window.location.origin}/qr/${effectiveToken}`;
+                      window.open(qrUrl, '_blank');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '11px',
+                      borderRadius: '14px',
+                      border: '1px dashed #cbd5e1',
+                      background: '#f1f5f9',
+                      color: '#0f172a',
+                      fontWeight: 750,
+                      fontSize: '0.76rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e2e8f0';
+                      e.currentTarget.style.borderColor = '#94a3b8';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f1f5f9';
+                      e.currentTarget.style.borderColor = '#cbd5e1';
+                    }}
+                  >
+                    <ExternalLink size={14} color="#0f172a" />
+                    🛠️ QR-Landingpage testen ↗
+                  </button>
+                )}
 
 
                 {/* 6. Navigation: Direkt zur App / Login */}

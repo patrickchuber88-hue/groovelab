@@ -6375,7 +6375,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       )}
 
       {/* Admin & Teacher Bypass Buttons for Localhost / Dev */}
-      {import.meta.env.DEV && (
+      {isLocalhost && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Master Admin Cockpit Bypass */}
           <button

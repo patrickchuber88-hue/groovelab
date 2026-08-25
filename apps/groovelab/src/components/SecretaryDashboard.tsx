@@ -14783,87 +14783,89 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               <RefreshCw size={16} />
             </button>
 
-            {/* Datum Simulation Control */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: simulatedToday ? '#fefce8' : '#f8fafc',
-              border: simulatedToday ? '1.5px solid #eab308' : '1.5px solid #cbd5e1',
-              height: '40px',
-              padding: '0 10px',
-              borderRadius: '12px',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              color: '#334155',
-              boxShadow: simulatedToday ? '0 2px 8px rgba(234, 179, 8, 0.2)' : 'none',
-              transition: 'all 0.2s',
-              flexShrink: 0
-            }} title="Datum-Simulation für alle Dashboards">
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: simulatedToday ? '#854d0e' : '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                📅 Simu:
-              </span>
-              <input 
-                type="date"
-                value={simulatedToday || ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSimulatedToday(val);
-                  if (val) {
-                    localStorage.setItem('groovelab_simulated_date', val);
-                    localStorage.setItem('groovelab_simulated_start_timestamp', String(Date.now()));
-                    if (schoolId) {
-                      localStorage.setItem(`simulatedToday_${schoolId}`, val);
-                    }
-                  } else {
-                    localStorage.removeItem('groovelab_simulated_date');
-                    localStorage.removeItem('groovelab_simulated_start_timestamp');
-                    if (schoolId) {
-                      localStorage.removeItem(`simulatedToday_${schoolId}`);
-                    }
-                  }
-                  window.dispatchEvent(new Event('storage'));
-                  window.dispatchEvent(new CustomEvent('groovelab_simulated_date_changed'));
-                }}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  fontWeight: 800,
-                  fontSize: '0.78rem',
-                  color: simulatedToday ? '#ca8a04' : '#0f172a',
-                  outline: 'none',
-                  cursor: 'pointer'
-                }}
-              />
-              {simulatedToday && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSimulatedToday('');
-                    localStorage.removeItem('groovelab_simulated_date');
-                    localStorage.removeItem('groovelab_simulated_start_timestamp');
-                    if (schoolId) {
-                      localStorage.removeItem(`simulatedToday_${schoolId}`);
+            {/* Datum Simulation Control (Dev Mode Only) */}
+            {(import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || new URLSearchParams(window.location.search).has('dev_tools')))) && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: simulatedToday ? '#fefce8' : '#f8fafc',
+                border: simulatedToday ? '1.5px solid #eab308' : '1.5px solid #cbd5e1',
+                height: '40px',
+                padding: '0 10px',
+                borderRadius: '12px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: '#334155',
+                boxShadow: simulatedToday ? '0 2px 8px rgba(234, 179, 8, 0.2)' : 'none',
+                transition: 'all 0.2s',
+                flexShrink: 0
+              }} title="Datum-Simulation für alle Dashboards">
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: simulatedToday ? '#854d0e' : '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  📅 Simu:
+                </span>
+                <input 
+                  type="date"
+                  value={simulatedToday || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSimulatedToday(val);
+                    if (val) {
+                      localStorage.setItem('groovelab_simulated_date', val);
+                      localStorage.setItem('groovelab_simulated_start_timestamp', String(Date.now()));
+                      if (schoolId) {
+                        localStorage.setItem(`simulatedToday_${schoolId}`, val);
+                      }
+                    } else {
+                      localStorage.removeItem('groovelab_simulated_date');
+                      localStorage.removeItem('groovelab_simulated_start_timestamp');
+                      if (schoolId) {
+                        localStorage.removeItem(`simulatedToday_${schoolId}`);
+                      }
                     }
                     window.dispatchEvent(new Event('storage'));
                     window.dispatchEvent(new CustomEvent('groovelab_simulated_date_changed'));
                   }}
                   style={{
                     border: 'none',
-                    background: '#fef08a',
-                    color: '#854d0e',
-                    fontSize: '0.68rem',
-                    fontWeight: 900,
-                    padding: '2px 8px',
-                    borderRadius: '6px',
+                    background: 'transparent',
+                    fontWeight: 800,
+                    fontSize: '0.78rem',
+                    color: simulatedToday ? '#ca8a04' : '#0f172a',
+                    outline: 'none',
                     cursor: 'pointer'
                   }}
-                  title="Auf heutiges Datum zurücksetzen"
-                >
-                  Heute
-                </button>
-              )}
-            </div>
+                />
+                {simulatedToday && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSimulatedToday('');
+                      localStorage.removeItem('groovelab_simulated_date');
+                      localStorage.removeItem('groovelab_simulated_start_timestamp');
+                      if (schoolId) {
+                        localStorage.removeItem(`simulatedToday_${schoolId}`);
+                      }
+                      window.dispatchEvent(new Event('storage'));
+                      window.dispatchEvent(new CustomEvent('groovelab_simulated_date_changed'));
+                    }}
+                    style={{
+                      border: 'none',
+                      background: '#fef08a',
+                      color: '#854d0e',
+                      fontSize: '0.68rem',
+                      fontWeight: 900,
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer'
+                    }}
+                    title="Auf heutiges Datum zurücksetzen"
+                  >
+                    Heute
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Elegant Switch to Teacher Dashboard Button (Green button replacing red Verwaltung button) */}
             <button 
@@ -33976,8 +33978,8 @@ status: status,
         </div>
       )}
 
-      {/* Floating Developer Reset Button */}
-      {activeTab === 'secretary' && secretarySubTab === 'licenses' && (
+      {/* Floating Developer Reset Button (Dev Mode Only) */}
+      {(import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || new URLSearchParams(window.location.search).has('dev_tools')))) && activeTab === 'secretary' && secretarySubTab === 'licenses' && (
         <button
           onClick={handleDeveloperReset}
           style={{
