@@ -3707,7 +3707,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [timeUntilMidnight, setTimeUntilMidnight] = useState('');
   const [unreadCrisisNotifs, setUnreadCrisisNotifs] = useState<any[]>([]);
   const [confirmingCrisisId, setConfirmingCrisisId] = useState<string | null>(null);
 
@@ -3782,28 +3781,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       return true;
     });
   };
-
-  useEffect(() => {
-    const updateCountdown = () => {
-      const now = new Date();
-      const midnight = new Date();
-      midnight.setHours(24, 0, 0, 0); // Next midnight
-      const diffMs = midnight.getTime() - now.getTime();
-      if (diffMs <= 0) {
-        setTimeUntilMidnight('00:00:00');
-        return;
-      }
-      const diffSecs = Math.floor(diffMs / 1000);
-      const hrs = Math.floor(diffSecs / 3600);
-      const mins = Math.floor((diffSecs % 3600) / 60);
-      const secs = diffSecs % 60;
-      setTimeUntilMidnight(`${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
-    };
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-    return () => clearInterval(interval);
-  }, []);
   
   // Selection Screen State
   const [showSelector, setShowSelector] = useState(false);

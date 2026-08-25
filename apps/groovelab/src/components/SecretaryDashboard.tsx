@@ -4,14 +4,14 @@ import { useRealNamesVisibility, maskLastName, sanitizeBirthDateToDayOnly, forma
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { StorageTier, DEFAULT_STORAGE_TIERS, getStorageTierByGb, isSchoolBypassActive } from '../domain/pricingEngine';
 import { 
-  ShieldAlert, CheckCircle, Users, Settings, ShieldCheck, FileText,
+  ShieldAlert, CheckCircle, CheckCircle2, Users, Settings, ShieldCheck, FileText,
   UserCheck, RefreshCw, Key, ChevronRight, UserX, LogOut,
   Copy, Check, Link as LinkIcon, Monitor, Sliders,
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, CalendarX, CalendarCheck, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon, Edit2,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
   School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake,
-  HardDrive, Cloud, Crown, Rocket, Cpu, Fingerprint, Smartphone, KeyRound, RotateCw, LayoutGrid, Mic, Smile, Radio
+  HardDrive, Cloud, Crown, Rocket, Cpu, Fingerprint, Smartphone, KeyRound, RotateCw, LayoutGrid, Mic, Smile, Radio, Archive
 } from 'lucide-react';
 import { isWebAuthnSupported, registerUserBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
 import { TeacherDashboard } from './TeacherDashboard';
@@ -3311,10 +3311,26 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   useEffect(() => {
     fetchDashboardData();
+    fetchLiveStatusData();
+
+    // Visibility-aware heartbeat: real-time websockets handle instant events, heartbeat provides 60s backup
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLiveStatusData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     const interval = setInterval(() => {
-      fetchLiveStatusData();
-    }, 5000);
-    return () => clearInterval(interval);
+      if (document.visibilityState === 'visible') {
+        fetchLiveStatusData();
+      }
+    }, 60000);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [schoolId]);
 
   const fetchAuditLogs = async (limitVal: number = 200) => {
@@ -3649,7 +3665,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       // Fetch active sessions for Live Lab
       const { data: sessData, error: sessErr } = await supabase
         .from('sessions')
-        .select('*, users!inner(*), stations(*)')
+        .select('id, user_id, station_id, check_in_time, check_out_time, users!inner(id, first_name, last_name, instrument, avatar_url, photo_url, school_id), stations(id, name, school_id)')
         .is('check_out_time', null)
         .eq('users.school_id', schoolId);
 
@@ -3670,7 +3686,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       // Fetch help requests
       const { data: helpData } = await supabase
         .from('help_requests')
-        .select('*, users(*)')
+        .select('id, user_id, station_id, message, status, created_at, school_id, users(id, first_name, last_name, instrument)')
         .eq('school_id', schoolId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
@@ -3679,7 +3695,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       // Fetch groovelab tickets
       const { data: ticketsData } = await supabase
         .from('groovelab_tickets')
-        .select('*')
+        .select('id, school_id, title, status, priority, created_at')
         .eq('school_id', schoolId)
         .order('created_at', { ascending: false });
       if (ticketsData) setTickets(ticketsData);
@@ -7068,7 +7084,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const generateMailtoLink = (student: any) => {
     const { monthsCount, pricePerMonth, totalPrice } = getRemainingMonthsAndPrice();
     const employeeName = currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name || ''}`.trim() : 'Ihre Musikschule';
-    const defaultTemplate = `Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 7-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je {price_per_month} EUR, insgesamt also {total_price} EUR (ohne automatische Verlängerung).\n\nHerzliche Grüße\n{employee_name}\n{school_name}`;
+    const defaultTemplate = `Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 30-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je {price_per_month} EUR, insgesamt also {total_price} EUR (ohne automatische Verlängerung).\n\nHerzliche Grüße\n{employee_name}\n{school_name}`;
     
     let template = openingHours?.campus_settings?.mailto_template || defaultTemplate;
     
@@ -15397,7 +15413,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       const newC = log.new_data?.is_campus_active;
 
                       if (newT === true && oldT !== true) {
-                        detailMsg = `Probezeit (7 Tage) wurde gestartet (gültig bis ${log.new_data.trial_ends_at ? new Date(log.new_data.trial_ends_at).toLocaleDateString('de-DE') : ''}).`;
+                        detailMsg = `Probezeit (30 Tage) wurde gestartet (gültig bis ${log.new_data.trial_ends_at ? new Date(log.new_data.trial_ends_at).toLocaleDateString('de-DE') : ''}).`;
                         actionIcon = '⏳';
                         actionColor = '#fffbeb';
                         actionBorder = '#fde68a';
@@ -17675,11 +17691,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             const dateStr = new Date(t.slot_start_datetime).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
 
             const urgencyMeta = {
-              RED:    { leftBar: '#ef4444', bg: 'linear-gradient(135deg, rgba(254, 242, 242, 0.75) 0%, rgba(254, 226, 226, 0.45) 100%)', border: 'rgba(239, 68, 68, 0.25)', badge: '#ef4444', badgeText: 'white', badgeLabel: '🚨 Akuter Ausfall', dot: '#ef4444' },
-              YELLOW: { leftBar: '#f59e0b', bg: 'linear-gradient(135deg, rgba(255, 251, 235, 0.75) 0%, rgba(254, 243, 199, 0.45) 100%)', border: 'rgba(245, 158, 11, 0.25)', badge: '#f59e0b', badgeText: 'white', badgeLabel: '⏳ Ausstehend', dot: '#f59e0b' },
-              GREEN:  { leftBar: '#34a853', bg: 'linear-gradient(135deg, rgba(230, 244, 234, 0.75) 0%, rgba(230, 244, 234, 0.45) 100%)', border: 'rgba(52, 168, 83, 0.25)', badge: '#34a853', badgeText: 'white', badgeLabel: '✓ Informiert', dot: '#34a853' },
+              RED:    { leftBar: '#ef4444', bg: 'linear-gradient(135deg, rgba(254, 242, 242, 0.75) 0%, rgba(254, 226, 226, 0.45) 100%)', border: 'rgba(239, 68, 68, 0.25)', badge: '#ef4444', badgeText: 'white', badgeLabel: 'Akuter Ausfall', icon: ShieldAlert, dot: '#ef4444' },
+              YELLOW: { leftBar: '#f59e0b', bg: 'linear-gradient(135deg, rgba(255, 251, 235, 0.75) 0%, rgba(254, 243, 199, 0.45) 100%)', border: 'rgba(245, 158, 11, 0.25)', badge: '#f59e0b', badgeText: 'white', badgeLabel: 'Ausstehend', icon: Clock, dot: '#f59e0b' },
+              GREEN:  { leftBar: '#34a853', bg: 'linear-gradient(135deg, rgba(230, 244, 234, 0.75) 0%, rgba(230, 244, 234, 0.45) 100%)', border: 'rgba(52, 168, 83, 0.25)', badge: '#34a853', badgeText: 'white', badgeLabel: 'Informiert', icon: CheckCircle2, dot: '#34a853' },
             };
             const m = urgencyMeta[urgency] || urgencyMeta['GREEN'];
+            const UrgencyIcon = m.icon;
 
             return (
               <div key={t.id} style={{
@@ -17735,8 +17752,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     </span>
                   </div>
                   {urgency === 'RED' && (
-                    <div style={{ marginTop: '8px', fontSize: '0.72rem', fontWeight: 900, color: '#ef4444', background: '#fee2e2', padding: '6px 12px', borderRadius: '8px', width: 'fit-content' }}>
-                      ⚠️ Ausfall in unter 2h - telefonischer Sofort-Kontakt empfohlen!
+                    <div style={{ marginTop: '8px', fontSize: '0.72rem', fontWeight: 900, color: '#ef4444', background: '#fee2e2', padding: '6px 12px', borderRadius: '8px', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ShieldAlert size={14} color="#ef4444" />
+                      <span>Ausfall in unter 2h — telefonischer Sofort-Kontakt empfohlen!</span>
                     </div>
                   )}
                 </div>
@@ -17747,7 +17765,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   fontSize: '0.72rem', fontWeight: 900, whiteSpace: 'nowrap',
                   background: m.badge, color: m.badgeText,
                   boxShadow: `0 4px 14px ${m.badge}35`,
-                }}>{m.badgeLabel}</span>
+                  display: 'flex', alignItems: 'center', gap: '6px'
+                }}>
+                  <UrgencyIcon size={13} color="white" />
+                  <span>{m.badgeLabel}</span>
+                </span>
 
                 {/* Action buttons – only in live mode */}
                 {crisisTabMode === 'live' && (
@@ -17954,7 +17976,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'; }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.08)'; }}
                         >
-                          🧹 {liveTickets.filter(n => getUrgency(n) === 'GREEN').length} erledigte Ausfälle archivieren
+                          <Archive size={14} /> {liveTickets.filter(n => getUrgency(n) === 'GREEN').length} erledigte Ausfälle archivieren
                         </button>
                       )}
 
@@ -18230,11 +18252,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '0.78rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                                    ✓ {successCount} Schüler erreicht
+                                  <span style={{ fontSize: '0.78rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Check size={12} /> {successCount} Schüler erreicht
                                   </span>
-                                  <span style={{ fontSize: '0.78rem', background: failedCount > 0 ? '#fce8e6' : '#f1f5f9', color: failedCount > 0 ? '#c5221f' : '#64748b', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
-                                    {failedCount > 0 ? `❌ ${failedCount} nicht erreicht` : 'Alle erreicht'}
+                                  <span style={{ fontSize: '0.78rem', background: failedCount > 0 ? '#fce8e6' : '#f1f5f9', color: failedCount > 0 ? '#c5221f' : '#64748b', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    {failedCount > 0 ? <><X size={12} /> {failedCount} nicht erreicht</> : 'Alle erreicht'}
                                   </span>
                                   {(() => {
                                     const successRate = total > 0 ? Math.round((successCount / total) * 100) : 100;
@@ -18307,9 +18329,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           color: isSuccess ? '#34a853' : '#dc2626',
                                           background: isSuccess ? '#e6f4ea' : '#fee2e2',
                                           padding: '4px 10px',
-                                          borderRadius: '100px'
+                                          borderRadius: '100px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
                                         }}>
-                                          {isSuccess ? '✓ Erfolgreich informiert' : '❌ Nicht rechtzeitig informiert'}
+                                          {isSuccess ? <><Check size={12} /> Erfolgreich informiert</> : <><X size={12} /> Nicht rechtzeitig informiert</>}
                                         </span>
                                       </div>
                                     );
@@ -18471,8 +18496,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     boxShadow: '0 10px 25px rgba(15, 23, 42, 0.03)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ background: '#dbeafe', borderRadius: '10px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <BookOpen size={16} color="#2563eb" />
+                      <div style={{ background: '#fee2e2', borderRadius: '10px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <BookOpen size={16} color="#ea4335" />
                       </div>
                       <strong style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                         Anleitung: Operationscockpit

@@ -2327,7 +2327,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           is_campus_active: true,
           is_groovelab_active: schoolData?.has_groovelab_subscription ? true : prev.is_groovelab_active,
           is_trial: updatedUser?.is_trial ?? true,
-          trial_ends_at: updatedUser?.trial_ends_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          trial_ends_at: updatedUser?.trial_ends_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         };
       });
 
@@ -7594,7 +7594,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
                     <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#34a853'}}>Jetzt Campus testen</h3>
                     <p style={{margin: 0, fontSize: '0.85rem', color: '#34a853', lineHeight: 1.5, fontWeight: 550}}>
-                      Schalte deinen Online-Campus mit Übe-Timer, Hausaufgaben, Statistiken und Badges für 7 Tage kostenlos frei!
+                      Schalte deinen Online-Campus mit Übe-Timer, Hausaufgaben, Statistiken und Badges für 30 Tage kostenlos frei!
                     </p>
                   </div>
                   <button
@@ -7619,7 +7619,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       opacity: activationLoading ? 0.7 : 1
                     }}
                   >
-                    <Sparkles size={18} /> {activationLoading ? 'Wird gestartet...' : 'Jetzt 7 Tage kostenlos testen'}
+                    <Sparkles size={18} /> {activationLoading ? 'Wird gestartet...' : 'Jetzt 30 Tage kostenlos testen'}
                   </button>
                 </div>
               ) : (

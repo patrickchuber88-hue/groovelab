@@ -482,7 +482,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
     const timer = setInterval(() => {
       const now = new Date();
       setCurrentTimeStr(now.toTimeString().substring(0, 5));
-    }, 10000);
+    }, 60000);
     const now = new Date();
     setCurrentTimeStr(now.toTimeString().substring(0, 5));
     return () => clearInterval(timer);
@@ -559,10 +559,16 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
       }
     }
 
-    // 3. Fetch Availabilities
-    const { data: aData } = await supabase
-      .from('user_availability')
-      .select('*');
+    // 3. Fetch Availabilities (Scoped to assigned students for maximum query performance)
+    const studentIds = (sData || []).map((s: any) => s.id);
+    let aData = null;
+    if (studentIds.length > 0) {
+      const { data: resAvail } = await supabase
+        .from('user_availability')
+        .select('id, user_id, weekday, start_time, end_time, status, preference_level')
+        .in('user_id', studentIds);
+      aData = resAvail;
+    }
     setStudentAvailabilities(aData || []);
 
     // 4. Fetch Schedules

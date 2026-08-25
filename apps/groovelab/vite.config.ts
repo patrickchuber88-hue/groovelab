@@ -39,8 +39,14 @@ export default defineConfig({
             if (id.includes('html2canvas') || id.includes('jspdf') || id.includes('purify')) return 'vendor-pdf';
             if (id.includes('jsqr') || id.includes('jsQR') || id.includes('qrcode') || id.includes('react-qr-scanner')) return 'vendor-qr';
           }
-          if (id.includes('MasterAdminDashboard') || id.includes('masterAdmin/') || id.includes('SecretaryDashboard') || id.includes('AdminDashboard') || id.includes('BillingDashboard')) {
-            return 'admin-suite';
+          if (id.includes('MasterAdminDashboard') || id.includes('masterAdmin/') || id.includes('AdminDashboard') || id.includes('BillingDashboard')) {
+            return 'admin-master-suite';
+          }
+          if (id.includes('SecretaryDashboard')) {
+            return 'secretary-suite';
+          }
+          if (id.includes('TeacherDashboard') || id.includes('CampusTeacherDashboard')) {
+            return 'teacher-suite';
           }
           if (id.includes('MeisterwerkDocumentationModal')) {
             return 'meisterwerk-suite';

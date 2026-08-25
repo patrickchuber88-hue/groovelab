@@ -15,6 +15,8 @@ import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStude
 import { LiveStageToolboxModal } from './LiveStageToolboxModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
+import { BriefingNotesCard } from './notes/BriefingNotesCard';
+import { GlobalNotesDrawer } from './notes/GlobalNotesDrawer';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -3681,7 +3683,7 @@ export function TeacherDashboard({
       setCurrentTimeStr(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
     };
     updateTime();
-    const interval = setInterval(updateTime, 10000);
+    const interval = setInterval(updateTime, 60000);
     const handleStorage = (e: Event) => {
       updateTime();
       setBriefingRefreshTicker(prev => prev + 1);
@@ -3902,6 +3904,21 @@ export function TeacherDashboard({
   // Stage Toolbox & Group selection states
   const [showStageToolbox, setShowStageToolbox] = useState<'tuner' | 'metronome' | null>(null);
   const [selectedGroupStudentId, setSelectedGroupStudentId] = useState<string | null>(null);
+
+  // Quick Notes Widget & Global Drawer states
+  const [showNotesDrawer, setShowNotesDrawer] = useState<boolean>(false);
+  const [leftColumnTab, setLeftColumnTab] = useState<'briefing' | 'notes'>('briefing');
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        setShowNotesDrawer(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const activeTimelineSlot = useMemo(() => {
     if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
@@ -11208,7 +11225,90 @@ export function TeacherDashboard({
                         </div>
                       )}
 
-                      {renderHausaufgabenWidget()}
+                      {/* Segmented Switcher for Left Column: Briefing / Notizen */}
+                      <div style={{
+                        display: 'flex',
+                        background: '#f1f5f9',
+                        padding: '4px',
+                        borderRadius: '14px',
+                        gap: '4px',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => setLeftColumnTab('briefing')}
+                          style={{
+                            flex: 1,
+                            padding: '7px 12px',
+                            borderRadius: '10px',
+                            border: leftColumnTab === 'briefing' ? '1px solid #cbd5e1' : 'none',
+                            background: leftColumnTab === 'briefing' ? '#ffffff' : 'transparent',
+                            color: leftColumnTab === 'briefing' ? '#0f172a' : '#64748b',
+                            fontWeight: leftColumnTab === 'briefing' ? 850 : 600,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            boxShadow: leftColumnTab === 'briefing' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <Sparkles size={13} color={leftColumnTab === 'briefing' ? '#0f172a' : '#64748b'} />
+                          <span>Tages-Kompass</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setLeftColumnTab('notes')}
+                          style={{
+                            flex: 1,
+                            padding: '7px 12px',
+                            borderRadius: '10px',
+                            border: leftColumnTab === 'notes' ? '1px solid #cbd5e1' : 'none',
+                            background: leftColumnTab === 'notes' ? '#ffffff' : 'transparent',
+                            color: leftColumnTab === 'notes' ? '#0f172a' : '#64748b',
+                            fontWeight: leftColumnTab === 'notes' ? 850 : 600,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            boxShadow: leftColumnTab === 'notes' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <Edit3 size={13} color={leftColumnTab === 'notes' ? '#0f172a' : '#64748b'} />
+                          <span>Notizen</span>
+                        </button>
+                      </div>
+
+                      {leftColumnTab === 'briefing' ? (
+                        renderHausaufgabenWidget()
+                      ) : (
+                        <BriefingNotesCard
+                          user={teacher}
+                          schoolId={teacher?.school_id || (teacher as any)?.schoolId || schoolData?.id}
+                          activeStudent={activeStudent}
+                          allStudents={allStudents}
+                          onOpenDrawer={() => setShowNotesDrawer(true)}
+                          onOpenHomeworkModal={(stud) => {
+                            setDocStudent({
+                              ...stud,
+                              id: stud.id,
+                              first_name: stud.first_name || stud.name?.split(' ')[0],
+                              last_name: stud.last_name || stud.name?.split(' ').slice(1).join(' '),
+                              photo_url: stud.photo_url || '/avatar_ghost.jpg',
+                              is_campus_active: stud.is_campus_active ?? false,
+                              school_id: stud.school_id || teacher?.school_id,
+                              schoolId: stud.school_id || teacher?.school_id
+                            });
+                          }}
+                        />
+                      )}
                     </div>
 
                     {/* RIGHT COLUMN: TAGESPLAN */}
@@ -19211,6 +19311,28 @@ export function TeacherDashboard({
         schoolId={teacher?.school_id || (teacher as any)?.schoolId}
         schoolName={schoolData?.name || (teacher as any)?.school_name}
         activePlatform={activePlatform}
+      />
+
+      {/* Global Notes Quick-Drawer (Cmd+J) */}
+      <GlobalNotesDrawer
+        isOpen={showNotesDrawer}
+        onClose={() => setShowNotesDrawer(false)}
+        user={teacher}
+        schoolId={teacher?.school_id || (teacher as any)?.schoolId || schoolData?.id}
+        activeStudent={activeStudent}
+        allStudents={allStudents}
+        onOpenHomeworkModal={(stud) => {
+          setDocStudent({
+            ...stud,
+            id: stud.id,
+            first_name: stud.first_name || stud.name?.split(' ')[0],
+            last_name: stud.last_name || stud.name?.split(' ').slice(1).join(' '),
+            photo_url: stud.photo_url || '/avatar_ghost.jpg',
+            is_campus_active: stud.is_campus_active ?? false,
+            school_id: stud.school_id || teacher?.school_id,
+            schoolId: stud.school_id || teacher?.school_id
+          });
+        }}
       />
     </div>
   );

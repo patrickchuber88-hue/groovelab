@@ -729,6 +729,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [magicLinkMessage, setMagicLinkMessage] = useState<string | null>(null);
   const [magicLinkSuccess, setMagicLinkSuccess] = useState(false);
   const [isAlreadyOnboarded, setIsAlreadyOnboarded] = useState(false);
+  const [lockoutNotice, setLockoutNotice] = useState<{ title: string; message: string; type?: 'trial_expired' | 'suspended' | 'contract_expired' | 'general' } | null>(null);
 
   useEffect(() => {
     const checkInviteToken = async () => {
@@ -1831,7 +1832,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
 
         if (userSchool?.is_paused || userSchool?.status === 'suspended') {
-          alert("Login ist aktuell nicht möglich (Status gesperrt oder pausiert).");
+          setLockoutNotice({
+            title: 'Zugang pausiert oder gesperrt',
+            message: 'Der Zugang für Ihre Musikschule ist aktuell pausiert oder gesperrt. Bitte wenden Sie sich an die Schulleitung oder die Administration.',
+            type: 'suspended'
+          });
           await supabase.auth.signOut();
           setLoading(false);
           return;
@@ -1839,7 +1844,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           const trialEnd = new Date(userSchool.trial_ends_at).getTime();
           const nowMs = new Date().getTime();
           if (nowMs > trialEnd) {
-            alert("Login ist aktuell nicht möglich (Probezeit abgelaufen).");
+            setLockoutNotice({
+              title: '30-Tage Probezeit abgelaufen',
+              message: 'Die 30-tägige Testphase für Ihre Musikschule ist beendet. Die Schulleitung kann das Hosting im Administrationsbereich dauerhaft buchen, um alle Stundenpläne, Hausaufgaben und Schülerprofile nahtlos weiterzuführen.',
+              type: 'trial_expired'
+            });
             await supabase.auth.signOut();
             setLoading(false);
             return;
@@ -1848,13 +1857,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           const contractEnd = new Date(userSchool.contract_ends_at).getTime();
           const nowMs = new Date().getTime();
           if (nowMs > contractEnd) {
-            alert("Login ist aktuell nicht möglich (Vertrag abgelaufen).");
+            setLockoutNotice({
+              title: 'Vertragslaufzeit beendet',
+              message: 'Die Vertragslaufzeit für Ihre Musikschule ist abgelaufen. Bitte wenden Sie sich an die Administration zur Verlängerung des Cloud-Hostings.',
+              type: 'contract_expired'
+            });
             await supabase.auth.signOut();
             setLoading(false);
             return;
           }
         } else if (user.status === 'bypass') {
-          alert("Dein Login ist aktuell gesperrt.");
+          setLockoutNotice({
+            title: 'Profil gesperrt',
+            message: 'Ihr Benutzerkonto ist aktuell für den Login gesperrt. Bitte wenden Sie sich an das Sekretariat.',
+            type: 'general'
+          });
           await supabase.auth.signOut();
           setLoading(false);
           return;
@@ -1862,7 +1879,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           const trialEnd = new Date(user.trial_ends_at).getTime();
           const nowMs = new Date().getTime();
           if (nowMs > trialEnd) {
-            alert("Dein Login ist aktuell nicht möglich (Probezeit abgelaufen).");
+            setLockoutNotice({
+              title: 'Schüler-Probezeit abgelaufen',
+              message: 'Deine 30-tägige kostenfreie Testphase ist abgelaufen. Um deinen Campus-Zugang (Übe-Timer, Hausaufgaben, Loopstation) dauerhaft freizuschalten, wende dich bitte an deine Musikschule oder deine Eltern.',
+              type: 'trial_expired'
+            });
             await supabase.auth.signOut();
             setLoading(false);
             return;
@@ -1871,7 +1892,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           const contractEnd = new Date(user.contract_ends_at).getTime();
           const nowMs = new Date().getTime();
           if (nowMs > contractEnd) {
-            alert("Dein Login ist aktuell nicht möglich (Vertrag abgelaufen).");
+            setLockoutNotice({
+              title: 'Vertrag abgelaufen',
+              message: 'Ihre persönliche Vertragslaufzeit ist abgelaufen. Bitte wenden Sie sich an Ihre Schulleitung.',
+              type: 'contract_expired'
+            });
             await supabase.auth.signOut();
             setLoading(false);
             return;
@@ -8422,6 +8447,86 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             onClose={() => setShowDpoPortalModal(false)}
             schoolName={schoolData?.name || 'Stadtmusikschule'}
           />
+        </div>
+      )}
+
+      {/* Modern Lockout / Trial Notice Modal */}
+      {lockoutNotice && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 100000,
+          background: 'rgba(15, 23, 42, 0.72)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            maxWidth: '440px',
+            width: '100%',
+            padding: '32px 28px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            gap: '16px',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '16px',
+              background: lockoutNotice.type === 'trial_expired' ? '#fef3c7' : '#fee2e2',
+              border: `1px solid ${lockoutNotice.type === 'trial_expired' ? '#fde68a' : '#fca5a5'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              {lockoutNotice.type === 'trial_expired' ? (
+                <Clock size={28} color="#b45309" />
+              ) : lockoutNotice.type === 'suspended' ? (
+                <Ban size={28} color="#dc2626" />
+              ) : (
+                <AlertCircle size={28} color="#dc2626" />
+              )}
+            </div>
+
+            <div>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                {lockoutNotice.title}
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', lineHeight: 1.55 }}>
+                {lockoutNotice.message}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setLockoutNotice(null)}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '14px',
+                background: '#0f172a',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                marginTop: '8px',
+                transition: 'all 0.15s'
+              }}
+            >
+              Verstanden
+            </button>
+          </div>
         </div>
       )}
     </div>

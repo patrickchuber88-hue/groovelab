@@ -40,6 +40,7 @@ const PilotOnboardingModal = lazy(() => import('./components/PilotOnboardingModa
 const GhostSupportCapsule = lazy(() => import('./components/masterAdmin/GhostSupportCapsule').then(m => ({ default: m.GhostSupportCapsule })));
 const SharedAudioBiographyPage = lazy(() => import('./components/campus/SharedAudioBiographyPage').then(m => ({ default: m.SharedAudioBiographyPage })));
 const HelpCenterModal = lazy(() => import('./components/help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
+const TrialInfoModal = lazy(() => import('./components/TrialInfoModal').then(m => ({ default: m.TrialInfoModal })));
 
 import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import ConfettiModal from './components/ConfettiModal';
@@ -2407,6 +2408,7 @@ function App() {
   const [showAgb, setShowAgb] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
   const [showPilotAgreementModal, setShowPilotAgreementModal] = useState(false);
+  const [showTrialInfoModal, setShowTrialInfoModal] = useState(false);
   const [stationIdFromStorage, setStationIdFromStorage] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null);
   const [isCampusUnlocked, setIsCampusUnlocked] = useState(false);
   const [showCampusPinPrompt, setShowCampusPinPrompt] = useState(false);
@@ -8514,6 +8516,44 @@ function App() {
         />
       )}
       <GlobalBroadcastBanner announcement={broadcastAnnouncement} currentRole={user?.role} />
+      {/* Soft Trial Pre-Expiry Warning Banner for Admin/Secretary (Days 27-30) */}
+      {(user?.role === 'admin' || user?.role === 'secretary') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && trialDaysLeft <= 3 && trialDaysLeft > 0 && (
+        <div style={{
+          background: 'linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%)',
+          borderBottom: '1px solid #fde68a',
+          padding: '10px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          zIndex: 999
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Clock size={16} color="#b45309" />
+            <span style={{ fontSize: '0.84rem', fontWeight: 650, color: '#92400e' }}>
+              Hinweis: Die 30-tägige Probezeit Ihrer Musikschule endet in <strong>{trialDaysLeft} {trialDaysLeft === 1 ? 'Tag' : 'Tagen'}</strong>.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowTrialInfoModal(true)}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '10px',
+              background: '#b45309',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: 800,
+              fontSize: '0.78rem',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 2px 6px rgba(180, 83, 9, 0.2)'
+            }}
+          >
+            Jetzt ansehen &amp; freischalten
+          </button>
+        </div>
+      )}
       {showPwaUpdateToast && (
         <PwaUpdateToast 
           onUpdate={() => window.location.replace(window.location.pathname + '?reload_manual=1')}
@@ -9808,22 +9848,39 @@ function App() {
                     </span>
                   </div>
                 )}
-                  {/* Trial Pill */}
-                  {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && (
-                    <div style={{ 
-                      display: 'flex', alignItems: 'center', gap: '8px', 
-                      background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', 
-                      padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
-                      boxShadow: '0 4px 12px rgba(245, 158, 11, 0.1)',
-                      color: 'white'
-                    }}>
+                  {/* Interactive 30-Tage Trial Pill */}
+                  {(user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTrialInfoModal(true)}
+                      title="Klicken für Details zur 30-Tage Probezeit"
+                      style={{ 
+                        display: 'flex', alignItems: 'center', gap: '8px', 
+                        background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', 
+                        padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
+                        boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)',
+                        color: 'white',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        outline: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(245, 158, 11, 0.35)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.2)';
+                      }}
+                    >
                       <AlertCircle size={14} color="white" />
                       <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         {trialDaysLeft > 0 
                           ? `Probezeit: ${trialDaysLeft} ${trialDaysLeft === 1 ? 'Tag' : 'Tage'}`
                           : 'Probezeit abgelaufen'}
                       </span>
-                    </div>
+                    </button>
                   )}
 
                   {/* Campus Student UI Level Switcher (Placed directly to the left of School / Teacher / Student info) */}
@@ -14435,6 +14492,26 @@ function App() {
             userRole={user?.role || 'admin'}
             activePlatform={activePlatform as any}
             schoolName={school?.name || 'Meine Musikschule'}
+          />
+        </Suspense>
+      )}
+
+      {/* 30-Tage Probezeit Status & Upgrade Modal */}
+      {showTrialInfoModal && (
+        <Suspense fallback={null}>
+          <TrialInfoModal
+            isOpen={showTrialInfoModal}
+            onClose={() => setShowTrialInfoModal(false)}
+            school={school}
+            userRole={user?.role}
+            trialDaysLeft={trialDaysLeft}
+            onNavigateToBilling={() => {
+              setShowTrialInfoModal(false);
+              if (user?.role === 'admin' || user?.role === 'secretary') {
+                sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+                handleSwitchActiveRole('admin');
+              }
+            }}
           />
         </Suspense>
       )}
