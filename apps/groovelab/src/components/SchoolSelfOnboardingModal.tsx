@@ -77,6 +77,13 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         .replace(/-+/g, '-')
         .replace(/^-+|-+$/g, '') || `schule-${Math.floor(1000 + Math.random() * 9000)}`;
 
+      // Sanitize session headers
+      try {
+        sessionStorage.removeItem('groovelab_user_id');
+        sessionStorage.removeItem('groovelab_qr_token');
+        localStorage.removeItem('groovelab_kiosk_token');
+      } catch (e) {}
+
       // Generate a unique 6-digit Master-PIN
       const candidatePin = Math.floor(100000 + Math.random() * 900000).toString();
       const qrToken = crypto.randomUUID();
@@ -214,6 +221,8 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
       let friendlyMsg = err.message || 'Bitte versuchen Sie es erneut.';
       if (err.code === '23505') {
         friendlyMsg = 'Eine Musikschule mit diesem Namen oder dieser Subdomain existiert bereits. Bitte wählen Sie eine leichte Variation.';
+      } else if (err.message?.toLowerCase().includes('unauthorized') || err.code === '42501' || err.status === 401 || err.status === 403) {
+        friendlyMsg = 'Die Registrierung konnte nicht abgeschlossen werden. Bitte überprüfen Sie Ihre Eingaben und versuchen Sie es erneut.';
       }
       setError(friendlyMsg);
     } finally {

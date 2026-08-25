@@ -96,8 +96,15 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const [provisionProgress, setProvisionProgress] = useState(0);
   const [provisionStatus, setProvisionStatus] = useState('');
 
-  // Check URL for pre-filled email from LandingPage
+  // Check URL for pre-filled email from LandingPage & Sanitize session
   useEffect(() => {
+    try {
+      sessionStorage.removeItem('groovelab_user_id');
+      sessionStorage.removeItem('groovelab_qr_token');
+      localStorage.removeItem('groovelab_kiosk_token');
+    } catch (e) {
+      // ignore
+    }
     const params = new URLSearchParams(window.location.search);
     const emailParam = params.get('email');
     if (emailParam) {
@@ -187,6 +194,13 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         let schoolIdCreated = '';
         // Execute actual database insertions!
         try {
+          // Clear any stale session headers right before provisioning
+          try {
+            sessionStorage.removeItem('groovelab_user_id');
+            sessionStorage.removeItem('groovelab_qr_token');
+            localStorage.removeItem('groovelab_kiosk_token');
+          } catch (e) {}
+
           let schoolId = '';
           let adminId = '';
           let generatedAdminPin = '';
@@ -213,7 +227,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             generatedAdminPin = rpcData.pin;
             qrToken = rpcData.qr_token;
           } else {
-            if (rpcErr && !rpcErr.message?.includes('not found') && !rpcErr.message?.includes('does not exist')) {
+            if (rpcErr) {
               console.warn('[SignupWizard] RPC attempt notice:', rpcErr);
             }
             // Fallback: Direct table insertion
@@ -334,16 +348,18 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             }
           }
 
-          let friendlyError = err.message || 'Onboarding fehlgeschlagen.';
+          let friendlyError = err.message || 'Onboarding fehlgeschlagen. Bitte versuche es erneut.';
           if (err.code === '23505') {
             if (err.message?.includes('subdomain') || err.details?.includes('subdomain')) {
               friendlyError = 'Diese Wunsch-Subdomain wurde leider gerade von einer anderen Musikschule belegt. Bitte wähle eine andere Subdomain.';
             } else if (err.message?.includes('ausweis_nummer') || err.details?.includes('ausweis_nummer')) {
               friendlyError = 'Generierung einer einzigartigen PIN fehlgeschlagen. Bitte versuche es erneut.';
             }
+          } else if (err.message?.toLowerCase().includes('unauthorized') || err.code === '42501' || err.status === 401 || err.status === 403) {
+            friendlyError = 'Die Registrierung konnte nicht abgeschlossen werden. Bitte überprüfe deine Eingaben und versuche es erneut.';
           }
           setError(friendlyError);
-          setStep(1);
+          setStep(2);
         }
       }
     }, 800);
