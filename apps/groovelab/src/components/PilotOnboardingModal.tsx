@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldCheck, Lock, AlertTriangle, FileText, Check } from 'lucide-react';
+import { ShieldCheck, Check, Sparkles, FileText, Lock, ExternalLink } from 'lucide-react';
 
 interface PilotOnboardingModalProps {
   schoolId: string;
@@ -21,13 +21,42 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [signeeName, setSigneeName] = useState('');
   const [agbChecked, setAgbChecked] = useState(false);
-  const [liabilityChecked, setLiabilityChecked] = useState(false);
   const [parentChecked, setParentChecked] = useState(false);
   const [avvChecked, setAvvChecked] = useState(false);
 
+  // Auto-fetch and pre-fill admin/signee name from database
+  useEffect(() => {
+    if (!userId) return;
+    const fetchSignee = async () => {
+      try {
+        const { data } = await supabase
+          .from('users')
+          .select('first_name, last_name')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (data?.first_name || data?.last_name) {
+          setSigneeName(`${data.first_name || ''} ${data.last_name || ''} (Schulleitung)`.trim());
+        }
+      } catch (e) {
+        console.warn('Could not auto-fetch user details for signee prefill:', e);
+      }
+    };
+    fetchSignee();
+  }, [userId]);
+
+  const allChecked = agbChecked && parentChecked && avvChecked;
+
+  const handleToggleAll = () => {
+    const nextState = !allChecked;
+    setAgbChecked(nextState);
+    setParentChecked(nextState);
+    setAvvChecked(nextState);
+  };
+
   const handleAccept = async () => {
-    if (!agbChecked || !liabilityChecked || !parentChecked || !avvChecked) {
-      setError('Bitte bestätige alle rechtlichen Bedingungen, um fortzufahren.');
+    if (!allChecked) {
+      setError('Bitte bestätige alle 3 rechtlichen Bedingungen, um fortzufahren.');
       return;
     }
     if (!signeeName.trim()) {
@@ -39,7 +68,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
     setError(null);
 
     try {
-      // 1. Fetch IP Address information
+      // 1. Fetch & Anonymize IP Address for GDPR-compliant Audit Trail
       let ip = '127.0.0.1';
       try {
         const res = await fetch('https://api.ipify.org?format=json');
@@ -63,7 +92,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown';
       const signedAtIso = new Date().toISOString();
 
-      // 2. Insert or update agreement record (upsert with fallback for duplicate keys)
+      // 2. Insert or update agreement record
       try {
         const { error: upsertErr } = await supabase
           .from('pilot_agreements')
@@ -79,14 +108,12 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
           );
 
         if (upsertErr) {
-          // If upsert fails due to unique constraint, update existing record
           if (upsertErr.code === '23505' || upsertErr.message?.includes('duplicate key') || upsertErr.message?.includes('unique constraint')) {
             await supabase
               .from('pilot_agreements')
               .update({ signee_name: signeeName.trim(), ip_address: ip, user_agent: userAgent })
               .eq('school_id', schoolId);
           } else {
-            // Fallback insert attempt
             const { error: insertErr } = await supabase
               .from('pilot_agreements')
               .insert({
@@ -97,9 +124,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
                 user_agent: userAgent
               });
             
-            if (insertErr && (insertErr.code === '23505' || insertErr.message?.includes('duplicate key') || insertErr.message?.includes('unique constraint'))) {
-              // Ignore duplicate key error as agreement already exists
-            } else if (insertErr) {
+            if (insertErr && !insertErr.message?.includes('duplicate key') && insertErr.code !== '23505') {
               throw insertErr;
             }
           }
@@ -134,173 +159,248 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(244, 244, 245, 0.95)',
-      backdropFilter: 'blur(16px)',
+      background: 'rgba(15, 23, 42, 0.75)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 9999,
-      padding: '24px',
+      zIndex: 99999,
+      padding: '24px 16px',
       boxSizing: 'border-box',
-      color: '#18181b',
-      fontFamily: 'system-ui, sans-serif'
+      color: '#1e293b',
+      fontFamily: '"Outfit", "Inter", -apple-system, sans-serif'
     }}>
       <div style={{
         background: '#ffffff',
-        border: '1px solid #e4e4e7',
+        border: '1px solid rgba(255, 255, 255, 0.8)',
         borderRadius: '24px',
-        maxWidth: '640px',
+        maxWidth: '560px',
         width: '100%',
-        padding: '32px',
-        maxHeight: '90vh',
+        padding: '32px 28px',
+        maxHeight: '92vh',
         overflowY: 'auto',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        boxShadow: '0 30px 70px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '24px'
+        gap: '20px',
+        boxSizing: 'border-box'
       }}>
         
-        {/* Header */}
-        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+        {/* Header Badge */}
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
           <div style={{
-            width: '60px',
-            height: '60px',
+            width: '52px',
+            height: '52px',
             borderRadius: '16px',
-            background: 'rgba(19, 115, 51, 0.08)',
-            color: '#34a853',
+            background: '#e6f4ea',
+            color: '#15803d',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(34, 197, 94, 0.15)'
           }}>
-            <ShieldCheck size={32} />
+            <ShieldCheck size={28} />
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#18181b' }}>
-            Nutzungsvereinbarung &amp; Freischaltung
-          </h2>
-          <p style={{ fontSize: '0.88rem', color: '#71717a', margin: 0, lineHeight: 1.4 }}>
-            Bitte bestätige die offiziellen Nutzungs- &amp; Vertragsbedingungen für deine Musikschule auf der Plattform Campus-Groovelab.
-          </p>
-        </div>
-
-        {/* Warning Callout */}
-        <div style={{
-          background: 'rgba(234, 179, 8, 0.08)',
-          border: '1px solid rgba(234, 179, 8, 0.25)',
-          borderRadius: '16px',
-          padding: '16px',
-          display: 'flex',
-          gap: '12px',
-          alignItems: 'flex-start'
-        }}>
-          <AlertTriangle style={{ color: '#ca8a04', flexShrink: 0 }} size={20} />
-          <div style={{ fontSize: '0.8rem', color: '#854d0e', lineHeight: 1.4, fontWeight: 550 }}>
-            <strong>Rechtlicher Hinweis:</strong> Für die unentgeltliche Pilot- und Testphase gilt die Haftungsbegrenzung gemäß den B2B-Nutzungsbedingungen (unbeschränkte Haftung bei Vorsatz, grober Fahrlässigkeit und Körperschäden; Begrenzung bei einfacher Fahrlässigkeit).
+          <div>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
+              Nutzungsvereinbarung &amp; Freischaltung
+            </h2>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '4px 0 0 0', fontWeight: 550, lineHeight: 1.4 }}>
+              Rechtssichere B2B- und DSGVO-Legitimation für deine Musikschule auf Campus-Groovelab.
+            </p>
           </div>
         </div>
 
-        {/* Signee Name Field */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: '#f8fafc', padding: '14px 16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-          <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
+        {/* Signee Name Field (Auto-prefilled) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1.5px solid #e2e8f0' }}>
+          <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Name des/der Vertretungsberechtigten (z. B. Schulleitung / Admin):
           </label>
           <input
             type="text"
-            placeholder="z. B. Dr. Maria Musterfrau (Schulleitung)"
+            placeholder="z. B. Patrick Huber (Schulleitung)"
             value={signeeName}
             onChange={(e) => setSigneeName(e.target.value)}
             style={{
               padding: '10px 14px',
               borderRadius: '10px',
-              border: '1px solid #cbd5e1',
-              fontSize: '0.84rem',
+              border: '1.5px solid #cbd5e1',
+              fontSize: '0.86rem',
+              fontWeight: 650,
               outline: 'none',
-              background: '#ffffff'
+              background: '#ffffff',
+              color: '#0f172a'
             }}
           />
         </div>
 
-        {/* Requirements checklists */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* 1-Click Master Toggle */}
+        <div 
+          onClick={handleToggleAll}
+          style={{
+            background: allChecked ? '#e6f4ea' : '#f8fafc',
+            border: allChecked ? '1.5px solid #34a853' : '1.5px dashed #cbd5e1',
+            borderRadius: '14px',
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            userSelect: 'none'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              borderRadius: '6px',
+              border: allChecked ? 'none' : '2px solid #94a3b8',
+              background: allChecked ? '#15803d' : '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff'
+            }}>
+              {allChecked && <Check size={14} strokeWidth={3} />}
+            </div>
+            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: allChecked ? '#15803d' : '#334155' }}>
+              Alle 3 Bedingungen auswählen &amp; bestätigen
+            </span>
+          </div>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: allChecked ? '#15803d' : '#64748b' }}>
+            {allChecked ? '3 von 3 ausgewählt ✓' : '1-Klick Schnellwahl'}
+          </span>
+        </div>
+
+        {/* The 3 Core Legal Pillars */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           
-          <label style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer' }}>
+          {/* Pillar 1: AGB */}
+          <div style={{
+            background: agbChecked ? 'rgba(52, 168, 83, 0.04)' : '#ffffff',
+            border: agbChecked ? '1.5px solid rgba(52, 168, 83, 0.4)' : '1.5px solid #e2e8f0',
+            borderRadius: '14px',
+            padding: '12px 14px',
+            display: 'flex',
+            gap: '12px',
+            alignItems: 'flex-start',
+            transition: 'all 0.15s'
+          }}>
             <input 
               type="checkbox" 
               checked={agbChecked}
               onChange={(e) => setAgbChecked(e.target.checked)}
-              style={{ accentColor: '#34a853', marginTop: '3px' }}
+              style={{ accentColor: '#15803d', marginTop: '2px', width: '16px', height: '16px', cursor: 'pointer' }}
             />
-            <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
-              Ich akzeptiere die <strong onClick={(e) => { e.preventDefault(); onShowAgb(); }} style={{ color: '#34a853', textDecoration: 'underline', cursor: 'pointer' }}>Allgemeinen Geschäftsbedingungen (B2B)</strong> des Betreibers Patrick Huber (Karl-Fürstenberg-Str. 59, 79618 Rheinfelden) für die Nutzung der Plattform Campus-Groovelab.
-            </span>
-          </label>
+            <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.4 }}>
+              <strong>1. B2B-Nutzungsvertrag &amp; AGB:</strong> Ich akzeptiere die{' '}
+              <span 
+                onClick={(e) => { e.preventDefault(); onShowAgb(); }} 
+                style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750 }}
+              >
+                Allgemeinen Geschäftsbedingungen (B2B)
+              </span>{' '}
+              des Betreibers Patrick Huber (Karl-Fürstenberg-Str. 59, 79618 Rheinfelden) für die Bereitstellung der Plattform Campus-Groovelab.
+            </div>
+          </div>
 
-          <label style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer' }}>
-            <input 
-              type="checkbox" 
-              checked={liabilityChecked}
-              onChange={(e) => setLiabilityChecked(e.target.checked)}
-              style={{ accentColor: '#34a853', marginTop: '3px' }}
-            />
-            <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
-              <strong>Haftungsvereinbarung (Pilotphase):</strong> Ich bestätige, dass der Betreiber während der unentgeltlichen Testphase gemäß den B2B-AGB haftet (volle Haftung für Vorsatz, grobe Fahrlässigkeit und Kardinalpflichten).
-            </span>
-          </label>
-
-          <label style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer' }}>
+          {/* Pillar 2: Child Privacy & Data Minimization */}
+          <div style={{
+            background: parentChecked ? 'rgba(52, 168, 83, 0.04)' : '#ffffff',
+            border: parentChecked ? '1.5px solid rgba(52, 168, 83, 0.4)' : '1.5px solid #e2e8f0',
+            borderRadius: '14px',
+            padding: '12px 14px',
+            display: 'flex',
+            gap: '12px',
+            alignItems: 'flex-start',
+            transition: 'all 0.15s'
+          }}>
             <input 
               type="checkbox" 
               checked={parentChecked}
               onChange={(e) => setParentChecked(e.target.checked)}
-              style={{ accentColor: '#34a853', marginTop: '3px' }}
+              style={{ accentColor: '#15803d', marginTop: '2px', width: '16px', height: '16px', cursor: 'pointer' }}
             />
-            <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
-              <strong>Datenschutz (Minderjährige):</strong> Ich versichere, dass die Musikschule vor dem Eintragen von Schülernamen (Vorname + Nachname-Initial) die Einwilligung der Erziehungsberechtigten eingeholt hat. Schüler-E-Mail-Adressen werden nicht erfasst.
-            </span>
-          </label>
+            <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.4 }}>
+              <strong>2. Schuldatenschutz (Minderjährige):</strong> Ich bestätige die Einhaltung des Schuldatenschutzes: Schülernamen werden ausschließlich datensparsam (Vorname + Nachname-Initial) geführt. Es werden keine E-Mail-Adressen, SEPA- oder Zahlungsdaten von Minderjährigen erfasst.
+            </div>
+          </div>
 
-          <label style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', cursor: 'pointer' }}>
+          {/* Pillar 3: AVV Art. 28 DSGVO */}
+          <div style={{
+            background: avvChecked ? 'rgba(52, 168, 83, 0.04)' : '#ffffff',
+            border: avvChecked ? '1.5px solid rgba(52, 168, 83, 0.4)' : '1.5px solid #e2e8f0',
+            borderRadius: '14px',
+            padding: '12px 14px',
+            display: 'flex',
+            gap: '12px',
+            alignItems: 'flex-start',
+            transition: 'all 0.15s'
+          }}>
             <input 
               type="checkbox" 
               checked={avvChecked}
               onChange={(e) => setAvvChecked(e.target.checked)}
-              style={{ accentColor: '#34a853', marginTop: '3px' }}
+              style={{ accentColor: '#15803d', marginTop: '2px', width: '16px', height: '16px', cursor: 'pointer' }}
             />
-            <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
-              Ich zeichne hiermit die <strong onClick={(e) => { e.preventDefault(); onShowPrivacy(); }} style={{ color: '#34a853', textDecoration: 'underline', cursor: 'pointer' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong> gemäß Art. 28 DSGVO zur Absicherung des Server-Hostings in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH &amp; Supabase EU) mit dem Betreiber.
-            </span>
-          </label>
+            <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.4 }}>
+              <strong>3. Auftragsverarbeitung (AVV gem. Art. 28 DSGVO):</strong> Ich zeichne hiermit die{' '}
+              <span 
+                onClick={(e) => { e.preventDefault(); onShowPrivacy(); }} 
+                style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750 }}
+              >
+                Auftragsverarbeitungsvereinbarung (AVV)
+              </span>{' '}
+              zur Absicherung des Server-Hostings in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH &amp; Supabase EU) mit dem Betreiber.
+            </div>
+          </div>
 
         </div>
 
         {error && (
-          <p style={{ color: '#ef4444', fontSize: '0.8rem', fontWeight: 600, margin: 0, textAlign: 'center' }}>
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '10px 14px', borderRadius: '12px', color: '#b91c1c', fontSize: '0.8rem', fontWeight: 700, textAlign: 'center' }}>
             {error}
-          </p>
+          </div>
         )}
 
-        {/* Submit Action */}
-        <button
-          onClick={handleAccept}
-          disabled={loading || !signeeName.trim()}
-          style={{
-            background: (loading || !signeeName.trim()) ? '#a1a1aa' : '#34a853',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '14px',
-            fontSize: '0.9rem',
-            fontWeight: 800,
-            cursor: (loading || !signeeName.trim()) ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            boxShadow: (loading || !signeeName.trim()) ? 'none' : '0 4px 12px rgba(19, 115, 51, 0.15)',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          {loading ? 'Speichere Vereinbarung...' : 'Vereinbarung rechtsverbindlich bestätigen & freischalten'}
-        </button>
+        {/* Submit Action & Audit Trail Footer */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+          <button
+            onClick={handleAccept}
+            disabled={loading || !allChecked || !signeeName.trim()}
+            style={{
+              background: (loading || !allChecked || !signeeName.trim()) ? '#94a3b8' : 'linear-gradient(135deg, #15803d 0%, #34a853 100%)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '14px',
+              padding: '14px 20px',
+              fontSize: '0.92rem',
+              fontWeight: 800,
+              cursor: (loading || !allChecked || !signeeName.trim()) ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: (loading || !allChecked || !signeeName.trim()) ? 'none' : '0 10px 24px rgba(21, 128, 61, 0.25)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              boxSizing: 'border-box'
+            }}
+          >
+            {loading ? 'Speichere Vereinbarung...' : (
+              <>
+                <span>Vereinbarung rechtsverbindlich bestätigen &amp; freischalten</span>
+                <Check size={18} />
+              </>
+            )}
+          </button>
+          
+          <div style={{ fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontWeight: 600 }}>
+            <Lock size={11} color="#94a3b8" />
+            <span>256-Bit SSL/TLS Audit-Trail (Zeitstempel &amp; IP-Logging aktiv)</span>
+          </div>
+        </div>
 
       </div>
     </div>
