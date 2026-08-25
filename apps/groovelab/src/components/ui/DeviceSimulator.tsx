@@ -76,8 +76,16 @@ interface DeviceSimulatorProps {
 }
 
 export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) => {
+  const isDev = typeof window !== 'undefined' && (
+    import.meta.env.DEV || 
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.endsWith('.local') ||
+    new URLSearchParams(window.location.search).has('dev_simulator')
+  );
+
   const [isActive, setIsActive] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined' || !isDev) return false;
     return localStorage.getItem('groovelab_dev_simulator_active') === 'true';
   });
 
@@ -92,16 +100,19 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
   const [isDockMinimized, setIsDockMinimized] = useState(false);
 
   useEffect(() => {
+    if (!isDev) return;
     localStorage.setItem('groovelab_dev_simulator_active', String(isActive));
-  }, [isActive]);
+  }, [isActive, isDev]);
 
   useEffect(() => {
+    if (!isDev) return;
     localStorage.setItem('groovelab_dev_device_preset', selectedPresetId);
     window.dispatchEvent(new CustomEvent('groovelab_orientation_changed'));
-  }, [selectedPresetId, isRotated, isActive]);
+  }, [selectedPresetId, isRotated, isActive, isDev]);
 
-  // Keyboard shortcut: Shift + D to toggle simulator
+  // Keyboard shortcut: Shift + D to toggle simulator (strictly gated to dev mode)
   useEffect(() => {
+    if (!isDev) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.shiftKey && (e.key === 'D' || e.key === 'd')) {
         // Prevent toggle if active inside input or textarea
@@ -113,7 +124,12 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isDev]);
+
+  // In production mode, render children transparently with zero overhead
+  if (!isDev) {
+    return <>{children}</>;
+  }
 
   const currentPreset = PRESETS.find(p => p.id === selectedPresetId) || PRESETS[0];
 
@@ -140,7 +156,7 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
 
   return (
     <div style={{ minHeight: '100vh', width: '100%', position: 'relative' }}>
-      {/* Floating Toggle Button (Always visible bottom-right) */}
+      {/* Floating Toggle Button (Visible strictly in development environment) */}
       <div
         style={{
           position: 'fixed',
@@ -174,7 +190,7 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
           }}
         >
           <Sliders size={16} />
-          <span>{isActive ? 'Simulator Aktiv' : '🛠️ Dev Simulator'}</span>
+          <span>{isActive ? 'Simulator Aktiv' : 'Dev Simulator'}</span>
           <span
             style={{
               background: 'rgba(255, 255, 255, 0.2)',
