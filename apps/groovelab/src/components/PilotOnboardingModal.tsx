@@ -24,6 +24,8 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
   const [parentChecked, setParentChecked] = useState(false);
   const [avvChecked, setAvvChecked] = useState(false);
 
+  const [activeLegalDoc, setActiveLegalDoc] = useState<'agb' | 'avv' | null>(null);
+
   // Auto-fetch and pre-fill admin/signee name from database
   useEffect(() => {
     if (!userId) return;
@@ -171,6 +173,197 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
       color: '#1e293b',
       fontFamily: '"Outfit", "Inter", -apple-system, sans-serif'
     }}>
+      {/* ─── DEDICATED FULL-TEXT LEGAL READER OVERLAY (Z-INDEX 100005) ─── */}
+      {activeLegalDoc && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100005,
+          padding: '20px 16px',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            maxWidth: '760px',
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+            border: '1.5px solid #e2e8f0'
+          }}>
+            {/* Reader Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#f8fafc'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '12px',
+                  background: activeLegalDoc === 'agb' ? '#e6f4ea' : '#e6f4ea',
+                  color: '#15803d',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {activeLegalDoc === 'agb' ? <FileText size={20} /> : <ShieldCheck size={20} />}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
+                    {activeLegalDoc === 'agb' ? 'Allgemeine Geschäftsbedingungen (B2B-SaaS)' : 'Vertrag zur Auftragsverarbeitung (AVV gem. Art. 28 DSGVO)'}
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                    {activeLegalDoc === 'agb' ? 'Gültig für Musikschulen, Akademien & Bildungsträger' : 'Inklusive Technischer und Organisatorischer Maßnahmen (TOMs gem. Art. 32 DSGVO)'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setActiveLegalDoc(null)}
+                style={{
+                  border: 'none',
+                  background: '#e2e8f0',
+                  color: '#334155',
+                  borderRadius: '12px',
+                  padding: '8px 14px',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'background 0.15s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#cbd5e1'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#e2e8f0'}
+              >
+                <span>✕ Schließen</span>
+              </button>
+            </div>
+
+            {/* Reader Scrollable Content */}
+            <div style={{
+              padding: '24px 28px',
+              overflowY: 'auto',
+              fontSize: '0.84rem',
+              color: '#334155',
+              lineHeight: 1.6,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              {activeLegalDoc === 'agb' ? (
+                <>
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 16px', borderRadius: '12px', color: '#166534', fontSize: '0.82rem', fontWeight: 650 }}>
+                    ℹ️ <strong>Transparenz-Garantie:</strong> Keine Lizenzkaufgebühren (0,00 €). Berechnet wird ausschließlich die gemietete Cloud- und Hosting-Infrastruktur gemäß gebuchtem Paket.
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 1 Vertragsgegenstand & Bereitstellungsmodell</h4>
+                    <p style={{ margin: 0 }}>Gegenstand des Vertrages ist die Bereitstellung der Cloud-Software <strong>Campus-Groovelab</strong> als Software-as-a-Service (SaaS) gemäß § 535 ff. BGB durch Patrick Huber (Karl-Fürstenberg-Str. 59, 79618 Rheinfelden) für den Schul- und Musikunterrichtsbetrieb.</p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 2 Zero-Mail IAM & Authentifizierung</h4>
+                    <p style={{ margin: 0 }}>Die Plattform arbeitet nach einer Zero-Mail-Architektur. Zugänge für Lehrkräfte und Schüler werden über kryptografische Master-PINs, QR-Token und biometrische Passkeys (WebAuthn) verwaltet. Ein Versand von Klartext-Passwörtern per E-Mail findet nicht statt.</p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 3 Hosting & Rechenzentren</h4>
+                    <p style={{ margin: 0 }}>Das Hosting erfolgt zu 100% in zertifizierten Rechenzentren in Deutschland (Hetzner Online GmbH, Standort Falkenstein/Vogtland sowie Supabase EU, Frankfurt am Main). Eine Übermittlung personenbezogener Daten in unsichere Drittstaaten ist ausgeschlossen.</p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 4 Entgelte, Abrechnung & Kündigung</h4>
+                    <p style={{ margin: 0 }}>Die Abrechnung erfolgt monatlich transparent auf Basis der aktiv geschalteten Module und Nutzerkonten. Verträge sind jederzeit mit einer Frist von 14 Tagen zum Monatsende kündbar. Nach Vertragsbeendigung werden alle Mandantendaten DSGVO-konform exportiert oder gelöscht.</p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 5 Verfügbarkeit & Support</h4>
+                    <p style={{ margin: 0 }}>Der Betreiber gewährleistet eine mittlere Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel (ausgenommen planmäßige Wartungsfenster).</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '12px 16px', borderRadius: '12px', color: '#1e40af', fontSize: '0.82rem', fontWeight: 650 }}>
+                    🛡️ <strong>DSGVO Art. 28 Konformität:</strong> Dieser Vertrag regelt die Rechte und Pflichten der Parteien bei der Verarbeitung personenbezogener Daten im Auftrag der Musikschule.
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 1 Gegenstand, Art und Zweck der Verarbeitung</h4>
+                    <p style={{ margin: 0 }}>Der Auftragsverarbeiter verarbeitet personenbezogene Daten im Auftrag und nach Weisung der Musikschule (Verantwortlicher). Die Verarbeitung umfasst das Bereitstellen von Stundenplänen, Raumbelegungen, Hausaufgabenheften und Unterrichtsprotokollen.</p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 2 Kreis der Betroffenen & Datenminimierung</h4>
+                    <p style={{ margin: 0 }}>Betroffene sind Lehrkräfte, Schulleitung, Verwaltung sowie Schülerinnen und Schüler. Gemäß dem Grundsatz der Datenminimierung (Art. 5 DSGVO) werden für minderjährige Schüler keine E-Mail-Adressen, keine Bank-/SEPA-Daten und keine Telefonnummern erhoben. Der Geburtstag wird ausschließlich als Tag (1–31) zur 2FA-PIN-Verifikation ohne Geburtsjahr erfasst.</p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 3 Technische & Organisatorische Maßnahmen (TOMs nach Art. 32 DSGVO)</h4>
+                    <p style={{ margin: 0 }}>Der Auftragsverarbeiter setzt folgende TOMs ein: Ende-zu-Ende TLS 1.3 Verschlüsselung im Transit, AES-256 Verschlüsselung auf Datenbank-Ebene, automatisierte Pseudonymisierung von Schülernamen im Unterrichtsbetrieb (`Max M.`), mandantenspezifische Row-Level Security (RLS) und tägliche verschlüsselte Backups.</p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 4 Eingesetzte Unterauftragsverarbeiter</h4>
+                    <p style={{ margin: 0 }}>Als Unterauftragsverarbeiter sind genehmigt: 1. <strong>Hetzner Online GmbH</strong> (Industriestr. 25, 91710 Gunzenhausen – Server-Hosting in Falkenstein/Deutschland), 2. <strong>Supabase Inc. / AWS EU</strong> (Rechenzentrum Frankfurt am Main/Deutschland). Mit allen Unterauftragsverarbeitern bestehen wirksame Art. 28 DSGVO-Vereinbarungen.</p>
+                  </div>
+
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 5 Löschung & Datenrückgabe</h4>
+                    <p style={{ margin: 0 }}>Nach Beendigung der vertraglichen Arbeiten hat der Auftragsverarbeiter alle in seinen Besitz gelangten Daten nach Wahl des Verantwortlichen zu löschen oder datenschutzkonform zu übergeben.</p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Reader Footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #e2e8f0',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              background: '#f8fafc'
+            }}>
+              <button
+                onClick={() => setActiveLegalDoc(null)}
+                style={{
+                  background: 'linear-gradient(135deg, #15803d 0%, #34a853 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '10px 20px',
+                  fontSize: '0.86rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(21, 128, 61, 0.2)'
+                }}
+              >
+                <span>Verstanden &amp; Zurück zur Vereinbarung</span>
+                <Check size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{
         background: '#ffffff',
         border: '1px solid rgba(255, 255, 255, 0.8)',
@@ -297,7 +490,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
             <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.4 }}>
               <strong>1. B2B-Nutzungsvertrag &amp; AGB:</strong> Ich akzeptiere die{' '}
               <span 
-                onClick={(e) => { e.preventDefault(); onShowAgb(); }} 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveLegalDoc('agb'); }} 
                 style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750 }}
               >
                 Allgemeinen Geschäftsbedingungen (B2B)
@@ -348,7 +541,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
             <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.4 }}>
               <strong>3. Auftragsverarbeitung (AVV gem. Art. 28 DSGVO):</strong> Ich zeichne hiermit die{' '}
               <span 
-                onClick={(e) => { e.preventDefault(); onShowPrivacy(); }} 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveLegalDoc('avv'); }} 
                 style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750 }}
               >
                 Auftragsverarbeitungsvereinbarung (AVV)

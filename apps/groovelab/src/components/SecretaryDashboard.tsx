@@ -33676,7 +33676,7 @@ status: status,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 10000,
+          zIndex: 100005,
           padding: '20px'
         }}>
           <div style={{
@@ -33881,7 +33881,7 @@ status: status,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 10000,
+          zIndex: 100005,
           padding: '20px',
           animation: 'fadeIn 0.2s ease-out'
         }}>

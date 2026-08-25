@@ -1593,7 +1593,7 @@ function App() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 10000,
+            zIndex: 100005,
             padding: '20px'
           }}>
             <div style={{
@@ -1698,7 +1698,7 @@ function App() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 10000,
+            zIndex: 100005,
             padding: '20px'
           }}>
             <div style={{
