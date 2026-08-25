@@ -1519,11 +1519,9 @@ export function TeacherDashboard({
     }
   }, [viewMode, showKioskView]);
 
-  // Silent auto-checkin for teachers if they are on-site (geofence verification)
+  // Auto-checkin for teachers if bypass or localhost is active (passive geolocations removed for Tier-1 privacy)
   useEffect(() => {
     if (isTeacher && locationMode !== 'lab' && !localCheckedIn) {
-      console.log('[Geofence] Triggering silent auto-checkin verification for teacher...');
-      
       const schoolData = Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools;
       const hasGeofenceBypass = !!(schoolData?.opening_hours?.geofence_bypass);
       const isLocalhost = typeof window !== 'undefined' && (
@@ -1536,64 +1534,8 @@ export function TeacherDashboard({
       );
 
       if (isLocalhost || hasGeofenceBypass) {
-        console.log('[Geofence] Silent auto-checkin: Bypassing location check (localhost or database bypass active).');
+        console.log('[Geofence] Auto-checkin: Bypassing location check (localhost or database bypass active).');
         performDirectTeacherCheckin();
-        return;
-      }
-
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const currentPos = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            };
-
-            let isWithinAnyRoom = false;
-
-            // Check against room coordinates & geofences
-            if (rooms && rooms.length > 0) {
-              for (const room of rooms) {
-                const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
-                const allCoords = [...points];
-                if (room.latitude && room.longitude) {
-                  allCoords.push({ lat: room.latitude, lng: room.longitude });
-                }
-
-                for (const pt of allCoords) {
-                  if (pt && pt.lat && pt.lng) {
-                    const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
-                    if (dist < 100) {
-                      isWithinAnyRoom = true;
-                      break;
-                    }
-                  }
-                }
-                if (isWithinAnyRoom) break;
-              }
-            }
-
-            // Fallback to school coordinates
-            if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
-              const distToSchool = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(schoolData.latitude), Number(schoolData.longitude));
-              const radius = schoolData.geofence_radius_meters || 150;
-              if (distToSchool < radius) {
-                isWithinAnyRoom = true;
-              }
-            }
-
-            if (isWithinAnyRoom) {
-              console.log('[Geofence] Silent auto-checkin: Teacher verified on-site. Performing checkin...');
-              performDirectTeacherCheckin();
-            } else {
-              console.log('[Geofence] Silent auto-checkin: Teacher verified off-site. Staying in Home mode.');
-            }
-          },
-          (error) => {
-            console.warn('[Geofence] Silent auto-checkin: Geolocation request failed:', error);
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-        );
       }
     }
   }, [isTeacher, locationMode, localCheckedIn, teacher, rooms]);

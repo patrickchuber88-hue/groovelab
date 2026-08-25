@@ -4202,19 +4202,30 @@ function App() {
       
       if (isAdminOrSecUser && schoolId) {
         try {
-          const { data: agreementData, error: agreementError } = await supabase
-            .from('pilot_agreements')
-            .select('id')
-            .eq('school_id', schoolId)
+          // 1. Check if school already accepted terms during signup / self-onboarding (avv_signed_at)
+          const { data: schoolRecord } = await supabase
+            .from('schools')
+            .select('avv_signed_at, status')
+            .eq('id', schoolId)
             .maybeSingle();
 
-          if (agreementError) {
-            console.error('[Dashboard] Error querying pilot agreements:', agreementError);
-          } else if (!agreementData) {
-            console.log('[Dashboard] No pilot agreement found for school. Displaying onboarding modal.');
-            setShowPilotAgreementModal(true);
-          } else {
+          if (schoolRecord?.avv_signed_at) {
             setShowPilotAgreementModal(false);
+          } else {
+            const { data: agreementData, error: agreementError } = await supabase
+              .from('pilot_agreements')
+              .select('id')
+              .eq('school_id', schoolId)
+              .maybeSingle();
+
+            if (agreementError) {
+              console.error('[Dashboard] Error querying pilot agreements:', agreementError);
+            } else if (!agreementData) {
+              console.log('[Dashboard] No pilot agreement found for school. Displaying onboarding modal.');
+              setShowPilotAgreementModal(true);
+            } else {
+              setShowPilotAgreementModal(false);
+            }
           }
         } catch (err) {
           console.error('[Dashboard] Catch exception querying pilot agreements:', err);

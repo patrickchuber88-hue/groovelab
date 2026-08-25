@@ -11,9 +11,10 @@ interface TourConfig {
   tourKey: string;
   steps: TourStep[];
   platformTheme?: 'campus' | 'groovelab' | 'admin';
+  enabled?: boolean;
 }
 
-export function usePremiumOnboardingTour({ tourKey, steps, platformTheme = 'campus' }: TourConfig) {
+export function usePremiumOnboardingTour({ tourKey, steps, platformTheme = 'campus', enabled = true }: TourConfig) {
   const [isTourActive, setIsTourActive] = useState(false);
   const [currentTourStep, setCurrentTourStep] = useState(0);
   const [placement, setPlacement] = useState<'right' | 'left' | 'top' | 'bottom'>('right');
@@ -41,15 +42,21 @@ export function usePremiumOnboardingTour({ tourKey, steps, platformTheme = 'camp
 
   // Check if tour should run automatically
   useEffect(() => {
-    if (!tourKey || steps.length === 0) return;
+    if (enabled === false || !tourKey || steps.length === 0) return;
     const isCompleted = localStorage.getItem(tourKey);
     if (!isCompleted) {
       const timer = setTimeout(() => {
-        setIsTourActive(true);
-      }, 500);
+        // Only launch tour if no full-screen modal or dialog is present
+        const hasBlockingModal = Boolean(
+          document.querySelector('[role="dialog"], [class*="Modal"], [class*="modal-overlay"], [class*="backdrop"]')
+        );
+        if (!hasBlockingModal) {
+          setIsTourActive(true);
+        }
+      }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [tourKey, steps]);
+  }, [tourKey, steps, enabled]);
 
   useEffect(() => {
     // Reset tracker when step or active status changes to guarantee immediate position updates
