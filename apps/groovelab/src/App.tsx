@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc, Building } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, ArrowRight, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc, Building } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
@@ -2971,7 +2971,7 @@ function App() {
         return platParam as any;
       }
     }
-    const saved = sessionStorage.getItem('groovelab_active_platform');
+    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : null;
     if (!showEnsemblesFeature && saved === 'ensembles') {
       return 'campus';
     }
@@ -2996,46 +2996,54 @@ function App() {
     React.startTransition(() => {
       setActivePlatformRaw(targetVal);
     });
-    sessionStorage.setItem('groovelab_active_platform', targetVal);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('groovelab_active_platform', targetVal);
+      localStorage.setItem('groovelab_active_platform', targetVal);
+    }
     
     // Auto-switch the active tab to the saved tab of the target platform to load flawlessly
     if (targetVal === 'campus') {
-      const savedTab = sessionStorage.getItem('campus_active_tab') || 'briefing';
+      const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing';
       setActiveStudentTabRaw(savedTab);
     } else if (targetVal === 'ensembles') {
-      const savedTab = sessionStorage.getItem('ensembles_active_tab') || 'overview';
+      const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('ensembles_active_tab') || localStorage.getItem('ensembles_active_tab')) : null) || 'overview';
       setActiveStudentTabRaw(savedTab);
     } else {
-      const savedTab = sessionStorage.getItem('groovelab_active_tab') || 'live';
+      const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_tab') || localStorage.getItem('groovelab_active_tab')) : null) || 'live';
       setActiveStudentTabRaw(savedTab);
     }
   }, [locationMode, user?.role, user?.schools]);
 
   const [activeStudentTab, setActiveStudentTabRaw] = useState<string>(() => {
-    const platform = (sessionStorage.getItem('groovelab_active_platform') as any) || 'groovelab';
+    const platform = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : null) || 'campus';
     if (platform === 'campus') {
-      return sessionStorage.getItem('campus_active_tab') || 'briefing';
+      return (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing';
     }
     if (platform === 'ensembles') {
-      return sessionStorage.getItem('ensembles_active_tab') || 'overview';
+      return (typeof window !== 'undefined' ? (sessionStorage.getItem('ensembles_active_tab') || localStorage.getItem('ensembles_active_tab')) : null) || 'overview';
     }
-    return sessionStorage.getItem('groovelab_active_tab') || 'live';
+    return (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_tab') || localStorage.getItem('groovelab_active_tab')) : null) || 'live';
   });
   const setActiveStudentTab = React.useCallback((val: any) => {
     if (val === 'messages') {
       setSelectedCampusRecipient(null);
     }
     setActiveStudentTabRaw(val);
-    // Persist the tab to the correct sessionStorage key based on the current active platform
-    const platform = sessionStorage.getItem('groovelab_active_platform') || 'groovelab';
-    if (platform === 'campus') {
-      sessionStorage.setItem('campus_active_tab', val);
-    } else if (platform === 'ensembles') {
-      sessionStorage.setItem('ensembles_active_tab', val);
-    } else {
-      sessionStorage.setItem('groovelab_active_tab', val);
+    // Persist the tab to the correct sessionStorage and localStorage keys based on the current active platform
+    const platform = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : null) || 'campus';
+    if (typeof window !== 'undefined') {
+      if (platform === 'campus') {
+        sessionStorage.setItem('campus_active_tab', val);
+        localStorage.setItem('campus_active_tab', val);
+      } else if (platform === 'ensembles') {
+        sessionStorage.setItem('ensembles_active_tab', val);
+        localStorage.setItem('ensembles_active_tab', val);
+      } else {
+        sessionStorage.setItem('groovelab_active_tab', val);
+        localStorage.setItem('groovelab_active_tab', val);
+      }
     }
-  }, [user?.id]);
+  }, []);
 
   // Auto-refresh bands for staff profile and GrooveLab view
   useEffect(() => {
@@ -3775,18 +3783,25 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     if (activePlatform === 'campus') {
       sessionStorage.setItem('campus_active_tab', activeStudentTab);
+      localStorage.setItem('campus_active_tab', activeStudentTab);
     } else if (activePlatform === 'ensembles') {
       sessionStorage.setItem('ensembles_active_tab', activeStudentTab);
+      localStorage.setItem('ensembles_active_tab', activeStudentTab);
     } else {
       sessionStorage.setItem('groovelab_active_tab', activeStudentTab);
+      localStorage.setItem('groovelab_active_tab', activeStudentTab);
     }
   }, [activeStudentTab, activePlatform]);
 
   const previousPlatform = React.useRef(activePlatform);
   useEffect(() => {
-    sessionStorage.setItem('groovelab_active_platform', activePlatform);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('groovelab_active_platform', activePlatform);
+      localStorage.setItem('groovelab_active_platform', activePlatform);
+    }
     if (previousPlatform.current === activePlatform) {
       return;
     }
@@ -3794,7 +3809,7 @@ function App() {
     
     // Load the saved tab for the new platform to guarantee flawless switching
     const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : (activePlatform === 'ensembles' ? 'ensembles_active_tab' : 'groovelab_active_tab');
-    const savedTab = sessionStorage.getItem(storageKey);
+    const savedTab = typeof window !== 'undefined' ? (sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey)) : null;
     
     let fallbackTab = 'live';
     if (activePlatform === 'campus') {
@@ -7233,16 +7248,19 @@ function App() {
 
   // Dedicated hook for active tab initialization, persistence and role-based correction
   useEffect(() => {
-    if (user) {
+    if (user && user.id) {
       const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : (activePlatform === 'ensembles' ? 'ensembles_active_tab' : 'groovelab_active_tab');
-      const storedTab = sessionStorage.getItem(storageKey);
+      const storedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey)) : null);
       if (!storedTab) {
         const startTab = user.role === 'student' 
           ? (activePlatform === 'campus' ? 'briefing' : 'live') 
-          : 'live';
-        console.log('[Tab Sync] No tab stored in sessionStorage. Fallback to start tab:', startTab);
+          : (activePlatform === 'campus' ? 'briefing' : 'live');
+        console.log('[Tab Sync] No tab stored in storage. Fallback to start tab:', startTab);
         setActiveStudentTab(startTab);
-        sessionStorage.setItem(storageKey, startTab);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(storageKey, startTab);
+          localStorage.setItem(storageKey, startTab);
+        }
       } else {
         // Auto-correct if teacher/admin somehow has a student-only tab active
         const isTeacherOrAdmin = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
@@ -7252,7 +7270,10 @@ function App() {
             const fallbackTab = 'live';
             console.log('[Tab Sync] Auto-correcting student-only tab for teacher/admin to fallback:', fallbackTab);
             setActiveStudentTab(fallbackTab);
-            localStorage.setItem(storageKey, fallbackTab);
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem(storageKey, fallbackTab);
+              localStorage.setItem(storageKey, fallbackTab);
+            }
           }
         }
         // Auto-correct if a student on groovelab has an invalid campus-only tab saved (e.g. 'briefing' from old Safety Hook bug)
@@ -7262,31 +7283,38 @@ function App() {
           if (!validGroovelabStudentTabs.includes(activeStudentTab)) {
             console.log('[Tab Sync] Auto-correcting invalid groovelab student tab to live:', activeStudentTab);
             setActiveStudentTab('live');
-            localStorage.setItem('groovelab_active_tab', 'live');
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('groovelab_active_tab', 'live');
+              localStorage.setItem('groovelab_active_tab', 'live');
+            }
           }
         }
       }
     }
-  }, [user?.role, activePlatform, activeStudentTab]);
+  }, [user?.id, user?.role, activePlatform]);
 
   // Lock platform to groovelab on page load/initial mount in lab mode for security
   useEffect(() => {
     if (user && user.role === 'student' && locationMode === 'lab') {
-      const activePlat = localStorage.getItem('groovelab_active_platform');
+      const activePlat = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : null;
       if (activePlat !== 'campus' && activePlat !== 'groovelab') {
         console.log('[Lab Lock] Resetting platform to groovelab on page load for student security');
         setActivePlatformRaw('groovelab');
-        localStorage.setItem('groovelab_active_platform', 'groovelab');
-        const savedTab = localStorage.getItem('groovelab_active_tab') || 'live';
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('groovelab_active_platform', 'groovelab');
+          localStorage.setItem('groovelab_active_platform', 'groovelab');
+        }
+        const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_tab') || localStorage.getItem('groovelab_active_tab')) : null) || 'live';
         setActiveStudentTabRaw(savedTab);
       }
     }
-  }, [user?.role, locationMode]);
+  }, [user?.id, user?.role, locationMode]);
 
   // Subscription Hard Lock Enforcement
   useEffect(() => {
-    if (user) {
+    if (user && user.id) {
       const schoolObj = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+      if (!schoolObj) return;
       const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
       const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
 
@@ -7298,7 +7326,7 @@ function App() {
         setActivePlatform('campus');
       }
     }
-  }, [user, activePlatform]);
+  }, [user?.id, user?.schools, activePlatform]);
 
   // Automatic Inactivity Timeout (Auto-Lock) for shared devices in Lab Mode
   useEffect(() => {
@@ -8100,20 +8128,32 @@ function App() {
           targetPlatform = 'groovelab';
         }
 
-        sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-        sessionStorage.setItem('groovelab_active_platform', targetPlatform);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+          localStorage.setItem('groovelab_active_workspace', 'teacher');
+          sessionStorage.setItem('groovelab_active_platform', targetPlatform);
+          localStorage.setItem('groovelab_active_platform', targetPlatform);
+        }
         const startTab = targetPlatform === 'campus' 
-          ? (sessionStorage.getItem('campus_active_tab') || 'briefing')
-          : (sessionStorage.getItem('groovelab_active_tab') || 'live');
-        sessionStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
+          ? (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing'
+          : (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_tab') || localStorage.getItem('groovelab_active_tab')) : null) || 'live';
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
+          localStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
+        }
         React.startTransition(() => {
           setActivePlatform(targetPlatform);
           setActiveStudentTab(startTab);
         });
       } else if (newRole === 'admin' || newRole === 'secretary') {
-        sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-        sessionStorage.setItem('groovelab_active_platform', 'campus');
-        sessionStorage.setItem('campus_active_tab', 'briefing');
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+          localStorage.setItem('groovelab_active_workspace', 'secretary');
+          sessionStorage.setItem('groovelab_active_platform', 'campus');
+          localStorage.setItem('groovelab_active_platform', 'campus');
+          sessionStorage.setItem('campus_active_tab', 'briefing');
+          localStorage.setItem('campus_active_tab', 'briefing');
+        }
         React.startTransition(() => {
           setActivePlatform('campus');
           setActiveStudentTab('briefing');
@@ -8125,7 +8165,7 @@ function App() {
   };
 
   // 2.5b SECRETARY DASHBOARD BYPASS
-  const activeWorkspace = sessionStorage.getItem('groovelab_active_workspace');
+  const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
   if ((user.role?.toLowerCase() === 'secretary' || user.role?.toLowerCase() === 'admin') && activeWorkspace !== 'teacher') {
     return (
       <ErrorBoundary>
@@ -10290,6 +10330,102 @@ function App() {
                 <BookOpen size={15} />
                 {windowWidth > 1024 && <span>Hilfe & Guides</span>}
               </button>
+
+              {/* Must-Have 2b: Sibling / Family Quick-Switch Capsule in Header (Only when Parent Session is Active) */}
+              {user?.role?.toLowerCase() === 'student' && activePlatform === 'campus' && (() => {
+                // Check if parent area / session is actively unlocked
+                const isParentSessionActive = (() => {
+                  if (typeof window === 'undefined') return false;
+                  const globalUnlocked = sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
+                  const userUnlocked = user?.id ? sessionStorage.getItem(`groovelab_parent_unlocked_${user.id}`) === 'true' : false;
+                  const parentSessionExpiry = user?.id ? Number(sessionStorage.getItem(`groovelab_parent_session_${user.id}`) || '0') : 0;
+                  const sessionValid = parentSessionExpiry > Date.now();
+                  return globalUnlocked || userUnlocked || sessionValid;
+                })();
+
+                if (!isParentSessionActive) return null;
+
+                const familyProfiles: any[] = (() => {
+                  if (typeof window === 'undefined') return [];
+                  try {
+                    return JSON.parse(localStorage.getItem('campus_family_profiles') || '[]');
+                  } catch {
+                    return [];
+                  }
+                })();
+
+                const siblings = familyProfiles.filter((p: any) => p.id !== user.id);
+                if (siblings.length === 0) return null;
+
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {siblings.map((sibling: any) => {
+                      const siblingInst = sibling.instrument || 'Gitarre';
+                      const defaultAvatar = getInstrumentAvatarUrl(siblingInst);
+                      let avatarUrl = defaultAvatar;
+                      const rawPhoto = sibling.photo_url;
+                      if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.trim() && rawPhoto !== '/campus_login_hero.png') {
+                        const p = rawPhoto.trim();
+                        if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:image/') || p.startsWith('/avatars/') || p.startsWith('/')) {
+                          avatarUrl = p;
+                        } else if (p.endsWith('.png') || p.endsWith('.jpg') || p.endsWith('.jpeg')) {
+                          avatarUrl = `/avatars/${p}`;
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={sibling.id}
+                          type="button"
+                          onClick={() => {
+                            // Keep parent session active across family quick-switch
+                            sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+                            sessionStorage.setItem(`groovelab_parent_session_${sibling.id}`, String(Date.now() + 60 * 60 * 1000));
+                            localStorage.setItem('campus_active_student_id', sibling.id);
+                            localStorage.setItem('groovelab_current_student_id', sibling.id);
+                            sessionStorage.setItem('groovelab_user_id', sibling.id);
+                            window.location.search = `?student=${sibling.id}`;
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '7px',
+                            background: '#ffffff',
+                            border: '1.5px solid #0284c7',
+                            borderRadius: '12px',
+                            height: windowWidth <= 768 ? '36px' : '40px',
+                            padding: windowWidth <= 480 ? '0 8px' : '0 12px',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 10px rgba(2, 132, 199, 0.12)',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale"
+                          title={`Zu ${sibling.first_name} wechseln`}
+                        >
+                          <img
+                            src={avatarUrl}
+                            alt={sibling.first_name}
+                            onError={(e) => {
+                              const img = e.currentTarget;
+                              const fallback = getInstrumentAvatarUrl(siblingInst);
+                              if (img.src !== fallback && !img.src.endsWith(fallback)) {
+                                img.src = fallback;
+                              } else {
+                                img.src = '/avatars/gitarre_avatar_new.png';
+                              }
+                            }}
+                            style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', background: '#f1f5f9' }}
+                          />
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0369a1' }}>
+                            {windowWidth > 480 ? `Zu ${sibling.first_name}` : sibling.first_name}
+                          </span>
+                          <ArrowRight size={13} color="#0284c7" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
               {/* Elegant Refresh / Reload Button */}
               <button 

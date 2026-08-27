@@ -403,7 +403,22 @@ export function AdminDashboard({
   const [studentMissionsMap, setStudentMissionsMap] = useState<Record<string, any>>({});
   const [missionsActiveSubTab, setMissionsActiveSubTab] = useState<'assignments' | 'templates' | 'approvals'>('assignments');
   const tabStorageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
-  const [activeTab, setActiveTab] = useState<string>(() => forceTab || (typeof window !== 'undefined' ? sessionStorage.getItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab') : null) || 'live');
+  const [activeTab, setActiveTabRaw] = useState<string>(() => {
+    if (forceTab) return forceTab;
+    const key = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
+    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem(key) || localStorage.getItem(key)) : null;
+    return saved || (activePlatform === 'campus' ? 'briefing' : 'live');
+  });
+
+  const setActiveTab = (tab: string) => {
+    setActiveTabRaw(tab);
+    const key = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(key, tab);
+      localStorage.setItem(key, tab);
+    }
+    if (onTabChange) onTabChange(tab);
+  };
   const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke' | 'schnelltext'>('songs');
   const mediathekTouchStartXRef = useRef<number | null>(null);
 

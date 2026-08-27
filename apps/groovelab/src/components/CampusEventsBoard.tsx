@@ -436,13 +436,12 @@ export function CampusEventsBoard({
 
   const isAbsenceAllowed = useMemo(() => {
     if (role !== 'student') return true;
-    if (checkIsParentUnlocked()) return true;
-    if (parentAllowAbsences !== undefined) return parentAllowAbsences;
-    const localSetting = typeof window !== 'undefined' ? localStorage.getItem('campus_allow_absences') : null;
-    if (localSetting !== null) return localSetting === 'true';
-    const localUserSetting = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_absences_${userId}`) : null;
+    if (parentAllowAbsences !== undefined && parentAllowAbsences !== null) return Boolean(parentAllowAbsences);
+    const userAbs = (studentUser as any)?.parent_allow_absences;
+    if (userAbs !== undefined && userAbs !== null) return Boolean(userAbs);
+    const localUserSetting = typeof window !== 'undefined' && userId ? localStorage.getItem(`groovelab_parent_allow_absences_${userId}`) : null;
     if (localUserSetting !== null) return localUserSetting === 'true';
-    return studentUser?.parent_allow_absences ?? false;
+    return false;
   }, [role, parentAllowAbsences, studentUser, userId]);
 
   const [showPinGateModal, setShowPinGateModal] = useState(false);
@@ -527,10 +526,9 @@ export function CampusEventsBoard({
       }
 
       if (isMatch) {
-        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-        sessionStorage.setItem(`groovelab_parent_session_${userId}`, String(Date.now() + 60 * 60 * 1000));
         setShowPinGateModal(false);
         setPinGateInput('');
+        setPinGateError('');
         if (pinGatePendingAction) {
           const action = pinGatePendingAction;
           setPinGatePendingAction(null);
@@ -4121,7 +4119,15 @@ export function CampusEventsBoard({
   };
 
   // Undo cancellation handler for students/teachers
-  const handleUndoCancel = async (occ: any) => {
+  const handleUndoCancel = async (occ: any, skipPinCheck = false) => {
+    if (role === "student" && !skipPinCheck && !isAbsenceAllowed) {
+      setPinGatePendingAction(() => () => handleUndoCancel(occ, true));
+      setPinGateInput("");
+      setPinGateError("");
+      setShowPinGateModal(true);
+      return;
+    }
+
     // 1. Enterprise Pre-Flight Collision Check
     const conflictResult = await checkSlotConflict(occ);
     if (conflictResult.hasConflict) {
@@ -4133,17 +4139,17 @@ export function CampusEventsBoard({
       return;
     }
 
-    if (!confirm('Möchtest du diese Absage wirklich rückgängig machen? Der Termin findet dann wieder regulär statt.')) return;
+    if (!confirm("Möchtest du diese Absage wirklich rückgängig machen? Der Termin findet dann wieder regulär statt.")) return;
     try {
       if (!occ.id) return;
 
-      if (occ.id.toString().startsWith('virtual-')) {
-        if (occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+      if (occ.id.toString().startsWith("virtual-")) {
+        if (occ.status === "teacher_sick" || occ.status === "canceled_by_teacher_sick") {
           const { error: updErr } = await supabase
-            .from('schedules')
-            .update({ status: 'approved' })
-            .eq('id', occ.schedule_id)
-            .eq('status', 'canceled_by_teacher_sick');
+            .from("schedules")
+            .update({ status: "approved" })
+            .eq("id", occ.schedule_id)
+            .eq("status", "canceled_by_teacher_sick");
           if (updErr) throw updErr;
           await fetchLessons();
         }
@@ -4153,51 +4159,51 @@ export function CampusEventsBoard({
       if (occ.schedule_id) {
         // Recurring template-derived slot: delete the cancellation override row to restore template default
         const { error: delErr } = await supabase
-          .from('schedule_occurrences')
+          .from("schedule_occurrences")
           .delete()
-          .eq('id', occ.id);
+          .eq("id", occ.id);
         if (delErr) throw delErr;
       } else {
-        // One-off slot: update status back to 'scheduled'
+        // One-off slot: update status back to "scheduled"
         const { error: updErr } = await supabase
-          .from('schedule_occurrences')
-          .update({ status: 'scheduled' })
-          .eq('id', occ.id);
+          .from("schedule_occurrences")
+          .update({ status: "scheduled" })
+          .eq("id", occ.id);
         if (updErr) throw updErr;
       }
 
       // Dispatch system notification that appointment is restored to regular status
       try {
         const studentId = occ.student_id || (occ.student as any)?.id || occ.board_student_id;
-        const recipientId = role === 'student' ? (occ.teacher_id || (occ.teacher as any)?.id) : studentId;
+        const recipientId = role === "student" ? (occ.teacher_id || (occ.teacher as any)?.id) : studentId;
         const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
         
         if (userId && recipientId && occ.date) {
-          const [y, m, d] = String(occ.date).split('-').map(Number);
+          const [y, m, d] = String(occ.date).split("-").map(Number);
           const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
-          const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
-          const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
-          const timeLabel = (occ.start_time || '16:30').slice(0, 5);
+          const shortDay = occDate.toLocaleDateString("de-DE", { weekday: "short" });
+          const shortDate = occDate.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
+          const timeLabel = (occ.start_time || "16:30").slice(0, 5);
           const notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr.`;
 
-          await supabase.from('campus_direct_messages').insert({
+          await supabase.from("campus_direct_messages").insert({
             sender_id: userId,
             recipient_id: recipientId,
             content: notificationMessage,
             occurrence_id: targetOccId,
             is_system: true,
-            message_type: 'cancellation_reset'
+            message_type: "cancellation_reset"
           });
         }
       } catch (notifErr) {
-        console.error('Error creating restore notification message:', notifErr);
+        console.error("Error creating restore notification message:", notifErr);
       }
 
       // Refresh local schedule state
       await fetchLessons();
     } catch (err: any) {
-      console.error('Error undoing cancellation:', err);
-      alert('Fehler beim Rückgängigmachen der Absage: ' + err.message);
+      console.error("Error undoing cancellation:", err);
+      alert("Fehler beim Rückgängigmachen der Absage: " + err.message);
     }
   };
 
@@ -4205,23 +4211,30 @@ export function CampusEventsBoard({
     e.stopPropagation();
     const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
     if (isCanceled) {
-      handleUndoCancel(occ);
+      if (role === 'student' && !isAbsenceAllowed) {
+        setPinGatePendingAction(() => () => handleUndoCancel(occ, true));
+        setPinGateInput('');
+        setPinGateError('');
+        setShowPinGateModal(true);
+        return;
+      }
+      handleUndoCancel(occ, false);
       return;
     }
 
-    if (role === 'student' && !isAbsenceAllowed && !checkIsParentUnlocked()) {
-      setPinGatePendingAction(() => () => handleCancelOccurrence(occ));
+    if (role === 'student' && !isAbsenceAllowed) {
+      setPinGatePendingAction(() => () => handleCancelOccurrence(occ, true));
       setPinGateInput('');
       setPinGateError('');
       setShowPinGateModal(true);
       return;
     }
-    handleCancelOccurrence(occ);
+    handleCancelOccurrence(occ, false);
   };
 
-  const handleCancelOccurrence = async (occ: any) => {
-    if (role === 'student' && !isAbsenceAllowed && !checkIsParentUnlocked()) {
-      setPinGatePendingAction(() => () => handleCancelOccurrence(occ));
+  const handleCancelOccurrence = async (occ: any, skipPinCheck = false) => {
+    if (role === 'student' && !skipPinCheck && !isAbsenceAllowed) {
+      setPinGatePendingAction(() => () => handleCancelOccurrence(occ, true));
       setPinGateInput('');
       setPinGateError('');
       setShowPinGateModal(true);
@@ -13899,49 +13912,59 @@ export function CampusEventsBoard({
                          cursor: isChatLocked ? 'pointer' : 'text'
                        }}
                      />
-                     {isCanceled ? (
-                       <button
-                         type="button"
-                         onClick={() => {
-                           handleUndoCancel(activeChatOcc);
-                           setActiveChatOcc(null);
-                         }}
-                         style={{
-                           background: '#f1f5f9',
-                           color: '#475569',
-                           border: '1px solid #cbd5e1',
-                           borderRadius: '100px',
-                           padding: '10px 16px',
-                           fontSize: '0.82rem',
-                           fontWeight: 800,
-                           cursor: 'pointer',
-                           display: 'flex',
-                           alignItems: 'center',
-                           justifyContent: 'center',
-                           transition: 'all 0.2s',
-                           flexShrink: 0
-                         }}
-                       >
-                         Reaktivieren
-                       </button>
-                     ) : (
-                       <button
-                         type="button"
-                         onClick={() => {
-                           if (role === 'student' && !isAbsenceAllowed && !checkIsParentUnlocked()) {
-                             setPinGatePendingAction(() => () => {
-                               handleCancelOccurrence(activeChatOcc);
-                               setActiveChatOcc(null);
-                             });
-                             setPinGateInput('');
-                             setPinGateError('');
-                             setShowPinGateModal(true);
-                             return;
-                           }
-                           handleCancelOccurrence(activeChatOcc);
-                           setActiveChatOcc(null);
-                         }}
-                         style={{
+                      {isCanceled ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (role === "student" && !isAbsenceAllowed) {
+                              setPinGatePendingAction(() => () => {
+                                handleUndoCancel(activeChatOcc, true);
+                                setActiveChatOcc(null);
+                              });
+                              setPinGateInput("");
+                              setPinGateError("");
+                              setShowPinGateModal(true);
+                              return;
+                            }
+                            handleUndoCancel(activeChatOcc, false);
+                            setActiveChatOcc(null);
+                          }}
+                          style={{
+                            background: "#f1f5f9",
+                            color: "#475569",
+                            border: "1px solid #cbd5e1",
+                            borderRadius: "100px",
+                            padding: "10px 16px",
+                            fontSize: "0.82rem",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.2s",
+                            flexShrink: 0
+                          }}
+                        >
+                          Reaktivieren
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (role === "student" && !isAbsenceAllowed) {
+                              setPinGatePendingAction(() => () => {
+                                handleCancelOccurrence(activeChatOcc, true);
+                                setActiveChatOcc(null);
+                              });
+                              setPinGateInput("");
+                              setPinGateError("");
+                              setShowPinGateModal(true);
+                              return;
+                            }
+                            handleCancelOccurrence(activeChatOcc, false);
+                            setActiveChatOcc(null);
+                          }}
+                          style={{
                            background: '#ef4444',
                            color: '#ffffff',
                            border: 'none',

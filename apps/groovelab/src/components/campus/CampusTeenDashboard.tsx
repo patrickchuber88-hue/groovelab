@@ -62,18 +62,30 @@ export const CampusTeenDashboard: React.FC<CampusTeenDashboardProps> = ({
   fokusLogs = [],
   schoolFokusLevels
 }) => {
-  // Official School Focus Level presets for Teen (Level 2)
+  // Official School Focus Level presets: All students start at Level 1 (3/5/10m) and level up via practice
   const config = schoolFokusLevels || DEFAULT_FOKUS_LEVELS;
-  const level2Config = config.level2 || DEFAULT_FOKUS_LEVELS.level2;
+  const effectiveLevel = useMemo(() => {
+    const dbLevel = avatar?.evolution_level || 1;
+    let computedLevel = 1;
+    if (totalPracticeMinutes >= 1000) {
+      computedLevel = 3;
+    } else if (totalPracticeMinutes >= 250) {
+      computedLevel = 2;
+    }
+    return Math.max(dbLevel, computedLevel);
+  }, [avatar?.evolution_level, totalPracticeMinutes]);
+
+  const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
+  const activeLevelConfig = config[levelKey] || DEFAULT_FOKUS_LEVELS[levelKey];
   const presetMinutesOptions = [
-    { label: 'Kleine Flamme 🔥', mins: level2Config.kleine || 5 },
-    { label: 'Mittlere Flamme 🔥🔥', mins: level2Config.mittlere || 10 },
-    { label: 'Helden-Flamme 👑', mins: level2Config.helden || 15 }
+    { label: 'Kleine Flamme 🔥', mins: activeLevelConfig.kleine || 3 },
+    { label: 'Mittlere Flamme 🔥🔥', mins: activeLevelConfig.mittlere || 5 },
+    { label: 'Helden-Flamme 👑', mins: activeLevelConfig.helden || 10 }
   ];
 
   // Focus Timer State
-  const [targetMins, setTargetMins] = useState<number>(level2Config.mittlere || 10);
-  const [timerSecondsLeft, setTimerSecondsLeft] = useState<number>((level2Config.mittlere || 10) * 60);
+  const [targetMins, setTargetMins] = useState<number>(activeLevelConfig.mittlere || 5);
+  const [timerSecondsLeft, setTimerSecondsLeft] = useState<number>((activeLevelConfig.mittlere || 5) * 60);
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
   const [showCelebrationModal, setShowCelebrationModal] = useState<boolean>(false);

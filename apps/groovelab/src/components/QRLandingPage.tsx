@@ -9,6 +9,7 @@ import { AudioTrackCarousel } from './AudioTrackCarousel';
 
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate } from '../utils/studentProgressEngine';
+import { ParentCampusActivationModal } from './ParentCampusActivationModal';
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
@@ -297,7 +298,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   // Inaktive Aktivierungs-States
   const [activationStep, setActivationStep] = useState<'landing' | 'email' | 'payment' | 'success'>('landing');
   const [parentEmail, setParentEmail] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'debit' | 'cash'>('debit');
+  const [paymentMethod, setPaymentMethod] = useState<'debit' | 'cash' | 'bank_transfer'>('bank_transfer');
+  const [showGiroCodeModal, setShowGiroCodeModal] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [activationLoading, setActivationLoading] = useState(false);
   const [activationError, setActivationError] = useState<string | null>(null);
@@ -1443,12 +1445,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           parent_pin: userData.parent_pin || null,
           is_pin_activated: userData.is_pin_activated ?? false,
           pin_enforced_for_preview: userData.pin_enforced_for_preview ?? false,
-          parent_allow_absences: userData.parent_allow_absences ?? false,
-          parent_allow_chat: userData.parent_allow_chat ?? true,
-          parent_allow_timer: userData.parent_allow_timer ?? true,
-          parent_allow_leaderboard: userData.parent_allow_leaderboard ?? true,
-          parent_allow_groups: userData.parent_allow_groups ?? true,
-          parent_allow_proposals: userData.parent_allow_proposals ?? true,
+          parent_allow_absences: userData.parent_allow_absences !== undefined && userData.parent_allow_absences !== null ? Boolean(userData.parent_allow_absences) : false,
+          parent_allow_chat: userData.parent_allow_chat !== undefined && userData.parent_allow_chat !== null ? Boolean(userData.parent_allow_chat) : false,
+          parent_allow_timer: userData.parent_allow_timer !== undefined && userData.parent_allow_timer !== null ? Boolean(userData.parent_allow_timer) : true,
+          parent_allow_leaderboard: userData.parent_allow_leaderboard !== undefined && userData.parent_allow_leaderboard !== null ? Boolean(userData.parent_allow_leaderboard) : false,
+          parent_allow_groups: userData.parent_allow_groups !== undefined && userData.parent_allow_groups !== null ? Boolean(userData.parent_allow_groups) : false,
+          parent_allow_proposals: userData.parent_allow_proposals !== undefined && userData.parent_allow_proposals !== null ? Boolean(userData.parent_allow_proposals) : false,
           campus_ui_level: userData.campus_ui_level || localStorage.getItem('campus_student_ui_level') || 'junior'
         });
 
@@ -6089,15 +6091,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     // 2. Unlocked Control Center with Draft Changes & Step-Up PIN Confirmation
     const effectiveUiLevel = draftUiLevel ?? profile?.campus_ui_level ?? 'junior';
-    const effectiveAllowAbsences = draftAllowAbsences ?? profile?.parent_allow_absences ?? false;
-    const effectiveAllowChat = draftAllowChat ?? profile?.parent_allow_chat ?? true;
-    const effectiveAllowLeaderboard = draftAllowLeaderboard ?? profile?.parent_allow_leaderboard ?? true;
+    const effectiveAllowAbsences = draftAllowAbsences !== null ? draftAllowAbsences : (profile?.parent_allow_absences !== undefined && profile?.parent_allow_absences !== null ? Boolean(profile.parent_allow_absences) : false);
+    const effectiveAllowChat = draftAllowChat !== null ? draftAllowChat : (profile?.parent_allow_chat !== undefined && profile?.parent_allow_chat !== null ? Boolean(profile.parent_allow_chat) : (effectiveUiLevel !== 'junior'));
+    const effectiveAllowLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : (profile?.parent_allow_leaderboard !== undefined && profile?.parent_allow_leaderboard !== null ? Boolean(profile.parent_allow_leaderboard) : false);
 
     const hasUnsavedSettings = Boolean(
       (draftUiLevel !== null && draftUiLevel !== (profile?.campus_ui_level ?? 'junior')) ||
-      (draftAllowAbsences !== null && draftAllowAbsences !== (profile?.parent_allow_absences ?? false)) ||
-      (draftAllowChat !== null && draftAllowChat !== (profile?.parent_allow_chat ?? true)) ||
-      (draftAllowLeaderboard !== null && draftAllowLeaderboard !== (profile?.parent_allow_leaderboard ?? true))
+      (draftAllowAbsences !== null && draftAllowAbsences !== (profile?.parent_allow_absences !== undefined && profile?.parent_allow_absences !== null ? Boolean(profile.parent_allow_absences) : false)) ||
+      (draftAllowChat !== null && draftAllowChat !== (profile?.parent_allow_chat !== undefined && profile?.parent_allow_chat !== null ? Boolean(profile.parent_allow_chat) : (effectiveUiLevel !== 'junior'))) ||
+      (draftAllowLeaderboard !== null && draftAllowLeaderboard !== (profile?.parent_allow_leaderboard !== undefined && profile?.parent_allow_leaderboard !== null ? Boolean(profile.parent_allow_leaderboard) : false))
     );
 
     return (
@@ -7743,36 +7745,40 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
 
             <div style={{fontSize: '0.85rem', color: '#334155', lineHeight: '1.5', background: '#e6f4ea', padding: '16px', borderRadius: '16px', border: '1px solid #e6f4ea'}}>
-              Die Aktivierung deines Schülerkontos erfordert die Begleichung der GrooveLab-Jahresgebühr für dieses Schuljahr.
-              <div style={{ marginTop: '10px', fontWeight: 900, color: '#34a853', fontSize: '0.95rem' }}>
-                Betrag: {price.toFixed(2).replace('.', ',')} € (einmalig für dieses Schuljahr)
+              Die Aktivierung des Campus-Zugangs (Hausaufgabenheft, Übe-Timer, Loopstation &amp; Audio-Tresor) erfolgt für das laufende Schuljahr.
+              <div style={{ marginTop: '8px', fontWeight: 900, color: '#34a853', fontSize: '0.98rem' }}>
+                Bereitstellungsgebühr: {price ? price.toFixed(2).replace('.', ',') : '5,88'} € (0,49 € / Monat für 12 Monate)
               </div>
-              <span style={{ fontSize: '0.7rem', color: '#34a853', display: 'block', marginTop: '6px', fontWeight: 550 }}>
-                * Bisher wird diese Gebühr über die Schule abgerechnet. Direktzahlung der Eltern über Lastschrift/Kreditkarte wird zu einem späteren Zeitpunkt eingeführt.
+              <span style={{ fontSize: '0.7rem', color: '#047857', display: 'block', marginTop: '4px', fontWeight: 600 }}>
+                Transparentes Cloud-Hosting • Keine Einrichtungsgebühr, keine Software-Lizenzgebühren.
               </span>
             </div>
 
             <form onSubmit={(e) => { e.preventDefault(); handleActivateContract(); }} style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
               {/* Payment Methods Selector */}
-              {(!schoolData?.student_billing_option || schoolData.student_billing_option === 'both' || schoolData.student_billing_option.startsWith('option')) ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Zahlungsmethode wählen *</label>
-                  
-                  {/* Option 1: Abbuchung */}
-                  <div 
-                    onClick={() => setPaymentMethod('debit')}
-                    style={{
-                      padding: '12px 14px',
-                      borderRadius: '14px',
-                      border: paymentMethod === 'debit' ? '2.5px solid #34a853' : '1px solid #e2e8f0',
-                      background: paymentMethod === 'debit' ? '#e6f4ea' : 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      transition: 'all 0.2s'
-                    }}
-                  >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Zahlungsmethode wählen *</label>
+                
+                {/* Option 1: SEPA-Banküberweisung mit GiroCode */}
+                <div 
+                  onClick={() => {
+                    setPaymentMethod('bank_transfer');
+                    setShowGiroCodeModal(true);
+                  }}
+                  style={{
+                    padding: '14px',
+                    borderRadius: '14px',
+                    border: paymentMethod === 'bank_transfer' ? '2.5px solid #34a853' : '1px solid #e2e8f0',
+                    background: paymentMethod === 'bank_transfer' ? '#ecfdf5' : 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{
                       width: '18px',
                       height: '18px',
@@ -7783,67 +7789,117 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       justifyContent: 'center',
                       flexShrink: 0
                     }}>
-                      {paymentMethod === 'debit' && (
+                      {paymentMethod === 'bank_transfer' && (
                         <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#34a853' }} />
                       )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                      <strong style={{ color: '#1e293b', fontSize: '0.85rem' }}>Mit der nächsten Unterrichtsgebühr abbuchen</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <strong style={{ color: '#1e293b', fontSize: '0.85rem' }}>SEPA-Überweisung per Banking-App (GiroCode)</strong>
+                        <span style={{ fontSize: '0.65rem', background: '#34a853', color: '#ffffff', padding: '1px 6px', borderRadius: '100px', fontWeight: 800 }}>Empfohlen</span>
+                      </div>
                       <span style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px', lineHeight: '1.3' }}>
-                        Die Gebühr wird bequem über deine bestehende Bankverbindung der Musikschule eingezogen.
+                        QR-Code mit Sparkasse, VR-Banking, ING, DKB, N26 scannen oder Daten per Hand überweisen.
                       </span>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPaymentMethod('bank_transfer');
+                      setShowGiroCodeModal(true);
+                    }}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #86efac',
+                      borderRadius: '8px',
+                      padding: '6px 10px',
+                      color: '#047857',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    GiroCode öffnen ➔
+                  </button>
+                </div>
 
-                  {/* Option 2: Barzahlung */}
-                  <div 
-                    onClick={() => setPaymentMethod('cash')}
-                    style={{
-                      padding: '12px 14px',
-                      borderRadius: '14px',
-                      border: paymentMethod === 'cash' ? '2.5px solid #34a853' : '1px solid #e2e8f0',
-                      background: paymentMethod === 'cash' ? '#e6f4ea' : 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <div style={{
-                      width: '18px',
-                      height: '18px',
-                      borderRadius: '50%',
-                      border: '2px solid #cbd5e1',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      {paymentMethod === 'cash' && (
-                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#34a853' }} />
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                      <strong style={{ color: '#1e293b', fontSize: '0.85rem' }}>Geld in bar mitbringen</strong>
-                      <span style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px', lineHeight: '1.3' }}>
-                        Bitte bringe den Betrag passend mit in den nächsten Unterricht und gib ihn der Lehrkraft.
-                      </span>
-                    </div>
+                {/* Option 2: Abbuchung */}
+                <div 
+                  onClick={() => setPaymentMethod('debit')}
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: '14px',
+                    border: paymentMethod === 'debit' ? '2.5px solid #34a853' : '1px solid #e2e8f0',
+                    background: paymentMethod === 'debit' ? '#e6f4ea' : 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    border: '2px solid #cbd5e1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    {paymentMethod === 'debit' && (
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#34a853' }} />
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                    <strong style={{ color: '#1e293b', fontSize: '0.85rem' }}>Mit der nächsten Unterrichtsgebühr abbuchen</strong>
+                    <span style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px', lineHeight: '1.3' }}>
+                      Die Gebühr wird bequem über das bestehende Bankkonto der Musikschule eingezogen.
+                    </span>
                   </div>
                 </div>
-              ) : (
-                <div style={{ padding: '14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', textAlign: 'left' }}>
-                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#1e293b', marginBottom: '4px' }}>
-                    {schoolData.student_billing_option === 'debit' ? '💳 Abbuchung vereinbart' : '💵 Barzahlung vereinbart'}
-                  </strong>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-                    {schoolData.student_billing_option === 'debit' 
-                      ? 'Diese Gebühr wird automatisch mit deiner nächsten monatlichen Unterrichtsgebühr über die Musikschule abgebucht.'
-                      : 'Bitte bringe den Betrag passend bar zum nächsten Unterricht mit und gib ihn der Lehrkraft ab.'}
-                  </span>
+
+                {/* Option 3: Barzahlung */}
+                <div 
+                  onClick={() => setPaymentMethod('cash')}
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: '14px',
+                    border: paymentMethod === 'cash' ? '2.5px solid #34a853' : '1px solid #e2e8f0',
+                    background: paymentMethod === 'cash' ? '#e6f4ea' : 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    border: '2px solid #cbd5e1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    {paymentMethod === 'cash' && (
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#34a853' }} />
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                    <strong style={{ color: '#1e293b', fontSize: '0.85rem' }}>Geld in bar mitbringen</strong>
+                    <span style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px', lineHeight: '1.3' }}>
+                      Bitte bringen Sie den Betrag passend mit in den nächsten Unterricht zur Lehrkraft.
+                    </span>
+                  </div>
                 </div>
-              )}
+              </div>
 
               {/* Legal Confirmation Checkbox */}
               <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', marginTop: '4px', textAlign: 'left' }}>
@@ -7859,9 +7915,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowParentAgb(true); }} style={{ textDecoration: 'underline', color: '#34a853', cursor: 'pointer', fontWeight: 700 }}>AGB</span>{' '}
                   sowie der{' '}
                   <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPrivacy(true); }} style={{ textDecoration: 'underline', color: '#34a853', cursor: 'pointer', fontWeight: 700 }}>Datenschutzerklärung</span>{' '}
-                  zu und willige in die zahlungspflichtige Aktivierung für das laufende Schuljahr über {
-                    paymentMethod === 'debit' ? 'Abbuchung' : 'Barzahlung'
-                  } ein.
+                  zu und willige in die Bereitstellung des Campus-Moduls für das laufende Schuljahr ein.
                 </span>
               </label>
 
@@ -7933,6 +7987,19 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               Zum Campus Profil
             </button>
           </div>
+        )}
+
+        {/* Parent Campus EPC GiroCode Activation Modal */}
+        {showGiroCodeModal && profile && (
+          <ParentCampusActivationModal
+            student={profile}
+            schoolData={schoolData}
+            onClose={() => setShowGiroCodeModal(false)}
+            onPaymentSubmitted={() => {
+              setAgreedToTerms(true);
+              handleActivateContract();
+            }}
+          />
         )}
       </div>
     );
@@ -9805,7 +9872,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#34a853', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
-                          checked={profile.parent_allow_chat ?? true}
+                          checked={profile.parent_allow_chat !== undefined && profile.parent_allow_chat !== null ? Boolean(profile.parent_allow_chat) : (profile.campus_ui_level !== 'junior')}
                           onChange={async (e) => {
                             const checked = e.target.checked;
                             const { error } = await supabase.from('users').update({ parent_allow_chat: checked }).eq('id', profile.id);
@@ -9821,7 +9888,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#34a853', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
-                          checked={profile.parent_allow_timer ?? true}
+                          checked={profile.parent_allow_timer !== false}
                           onChange={async (e) => {
                             const checked = e.target.checked;
                             const { error } = await supabase.from('users').update({ parent_allow_timer: checked }).eq('id', profile.id);
@@ -9837,7 +9904,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#34a853', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
-                          checked={profile.parent_allow_leaderboard ?? true}
+                          checked={Boolean(profile.parent_allow_leaderboard)}
                           onChange={async (e) => {
                             const checked = e.target.checked;
                             const { error } = await supabase.from('users').update({ parent_allow_leaderboard: checked }).eq('id', profile.id);
@@ -9853,7 +9920,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#34a853', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
-                          checked={profile.parent_allow_groups ?? true}
+                          checked={Boolean(profile.parent_allow_groups)}
                           onChange={async (e) => {
                             const checked = e.target.checked;
                             const { error } = await supabase.from('users').update({ parent_allow_groups: checked }).eq('id', profile.id);

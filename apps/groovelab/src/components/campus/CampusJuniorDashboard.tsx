@@ -68,17 +68,29 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
   fokusLogs = [],
   schoolFokusLevels
 }) => {
-  // Official School Focus Level presets for Junior (Level 1)
+  // Official School Focus Level presets: All students start at Level 1 (3/5/10m) and level up via practice
   const config = schoolFokusLevels || DEFAULT_FOKUS_LEVELS;
-  const level1Config = config.level1 || DEFAULT_FOKUS_LEVELS.level1;
+  const effectiveLevel = useMemo(() => {
+    const dbLevel = avatar?.evolution_level || 1;
+    let computedLevel = 1;
+    if (totalPracticeMinutes >= 1000) {
+      computedLevel = 3;
+    } else if (totalPracticeMinutes >= 250) {
+      computedLevel = 2;
+    }
+    return Math.max(dbLevel, computedLevel);
+  }, [avatar?.evolution_level, totalPracticeMinutes]);
+
+  const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
+  const activeLevelConfig = config[levelKey] || DEFAULT_FOKUS_LEVELS[levelKey];
   const presetMinutesOptions = [
-    { label: 'Kleine Flamme 🔥', mins: level1Config.kleine || 3 },
-    { label: 'Mittlere Flamme 🔥🔥', mins: level1Config.mittlere || 5 },
-    { label: 'Helden-Flamme 👑', mins: level1Config.helden || 10 }
+    { label: 'Kleine Flamme 🔥', mins: activeLevelConfig.kleine || 3 },
+    { label: 'Mittlere Flamme 🔥🔥', mins: activeLevelConfig.mittlere || 5 },
+    { label: 'Helden-Flamme 👑', mins: activeLevelConfig.helden || 10 }
   ];
 
-  const [selectedPresetMinutes, setSelectedPresetMinutes] = useState<number>(level1Config.mittlere || 5);
-  const [timerSecondsLeft, setTimerSecondsLeft] = useState<number>((level1Config.mittlere || 5) * 60);
+  const [selectedPresetMinutes, setSelectedPresetMinutes] = useState<number>(activeLevelConfig.mittlere || 5);
+  const [timerSecondsLeft, setTimerSecondsLeft] = useState<number>((activeLevelConfig.mittlere || 5) * 60);
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
   const [showCelebrationModal, setShowCelebrationModal] = useState<boolean>(false);

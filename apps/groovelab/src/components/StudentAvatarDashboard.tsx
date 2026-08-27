@@ -582,6 +582,7 @@ interface MobileBriefingViewProps {
   studentUiLevel?: 'junior' | 'teen' | 'pro' | null;
   schoolFokusLevels?: any;
   handleTriggerCancelOccurrence?: (occ: any) => void;
+  handleTriggerUndoCancelOccurrence?: (occ: any) => void;
   handleUndoCancelOccurrence?: (occ: any) => void;
   getDeterministicWeekMetrics?: () => any;
   setShowStudentToolbox?: (show: boolean) => void;
@@ -603,6 +604,7 @@ function MobileBriefingView({
   handleConfirmReschedule,
   handleAcknowledgeCancellation,
   handleTriggerCancelOccurrence,
+  handleTriggerUndoCancelOccurrence,
   handleUndoCancelOccurrence,
   getISOWeek,
   handleTabChangeLocal,
@@ -879,7 +881,7 @@ function MobileBriefingView({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (isCanceled) {
-                          handleUndoCancelOccurrence?.(nextOcc);
+                          handleTriggerUndoCancelOccurrence?.(nextOcc);
                         } else {
                           handleTriggerCancelOccurrence?.(nextOcc);
                         }
@@ -3239,6 +3241,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [pinFormConfirm, setPinFormConfirm] = useState('');
   const [pinFormError, setPinFormError] = useState('');
   const [pinFormSuccess, setPinFormSuccess] = useState('');
+  const [securityPinTarget, setSecurityPinTarget] = useState<'student' | 'parent'>('student');
   const [isSavingPin, setIsSavingPin] = useState(false);
   const [firstPinActiveField, setFirstPinActiveField] = useState<'new' | 'confirm'>('new');
   const [firstPinShowMask, setFirstPinShowMask] = useState<boolean>(false);
@@ -3464,13 +3467,27 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     boardOverrides?: Record<string, boolean>;
   }) => {
     const nextUiLevel = updates.uiLevel ?? draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior');
-    const nextAllowAbsences = updates.allowAbsences ?? (draftAllowAbsences ?? (studentUser as any)?.parent_allow_absences ?? (nextUiLevel !== 'junior'));
-    const nextAllowChat = updates.allowChat ?? (draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (nextUiLevel !== 'junior'));
-    const nextAllowTimer = updates.allowTimer ?? (draftAllowTimer ?? (studentUser as any)?.parent_allow_timer ?? true);
-    const nextAllowLeaderboard = updates.allowLeaderboard ?? (draftAllowLeaderboard ?? (studentUser as any)?.parent_allow_leaderboard ?? (nextUiLevel !== 'junior'));
-    const nextAllowProposals = updates.allowProposals ?? (draftAllowProposals ?? (studentUser as any)?.parent_allow_proposals ?? (nextUiLevel !== 'junior'));
-    const nextAllowAudio = updates.allowAudio ?? (draftAllowAudio ?? (studentUser as any)?.parent_allow_audio ?? true);
-    const nextAllowTts = updates.allowTts ?? (draftAllowTts ?? (studentUser as any)?.parent_allow_tts ?? (nextUiLevel === 'junior'));
+    const nextAllowAbsences = updates.allowAbsences !== undefined 
+      ? updates.allowAbsences 
+      : (draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (nextUiLevel === 'pro')));
+    const nextAllowChat = updates.allowChat !== undefined 
+      ? updates.allowChat 
+      : (draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : (nextUiLevel !== 'junior')));
+    const nextAllowTimer = updates.allowTimer !== undefined 
+      ? updates.allowTimer 
+      : (draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : true));
+    const nextAllowLeaderboard = updates.allowLeaderboard !== undefined 
+      ? updates.allowLeaderboard 
+      : (draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (nextUiLevel !== 'junior')));
+    const nextAllowProposals = updates.allowProposals !== undefined 
+      ? updates.allowProposals 
+      : (draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : (nextUiLevel !== 'junior')));
+    const nextAllowAudio = updates.allowAudio !== undefined 
+      ? updates.allowAudio 
+      : (draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : true));
+    const nextAllowTts = updates.allowTts !== undefined 
+      ? updates.allowTts 
+      : (draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : (nextUiLevel === 'junior')));
     const nextOverrides = {
       ...((studentUser as any)?.parent_permissions?.board_overrides || {}),
       ...draftBoardOverrides,
@@ -3660,13 +3677,36 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   });
 
-  const handleSwitchFamilyStudent = (targetStudentId: string) => {
+  const handleSwitchFamilyStudent = (targetStudentId: string, keepParentUnlocked = false) => {
     if (targetStudentId === studentId) return;
     localStorage.setItem('groovelab_current_student_id', targetStudentId);
     localStorage.setItem('campus_active_student_id', targetStudentId);
-    sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-    sessionStorage.setItem(`groovelab_parent_session_${targetStudentId}`, String(Date.now() + 60 * 60 * 1000));
+    sessionStorage.setItem('groovelab_user_id', targetStudentId);
+    if (!keepParentUnlocked) {
+      // Auto-lock parent session when handing device over to child for 100% child safety
+      sessionStorage.removeItem('groovelab_parent_unlocked_global');
+      sessionStorage.removeItem(`groovelab_parent_session_${studentId}`);
+      sessionStorage.removeItem(`groovelab_parent_session_${targetStudentId}`);
+    } else {
+      sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+      sessionStorage.setItem(`groovelab_parent_session_${targetStudentId}`, String(Date.now() + 60 * 60 * 1000));
+    }
     window.location.search = `?student=${targetStudentId}`;
+  };
+
+  const handleRemoveFamilyProfile = (removeStudentId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (removeStudentId === studentId) return;
+    setFamilyProfiles(prev => {
+      const updated = prev.filter(p => p.id !== removeStudentId);
+      try {
+        localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
+        const localProfs = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
+        const updatedLocal = localProfs.filter((p: any) => p.id !== removeStudentId);
+        localStorage.setItem('groovelab_local_profiles', JSON.stringify(updatedLocal));
+      } catch(e) {}
+      return updated;
+    });
   };
 
   const handleOpenSettingsModule = (moduleId: 'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal' | 'feedback' | any) => {
@@ -3713,6 +3753,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
+  const handleCloseSettingsModal = () => {
+    setActiveStudentSettingsModal(null);
+  };
+
   const [isAppUser, setIsAppUser] = useState(false);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
   const [avatarFromDb, setAvatar] = useState<Avatar | null>(null);
@@ -3729,8 +3773,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     if (!studentId) return;
     const currentFirst = studentUser?.first_name || '';
     const currentLast = studentUser?.last_name || '';
-    const currentInst = studentUser?.instrument || '';
-    const currentPhoto = studentUser?.photo_url || (avatar as any)?.photo_url || (avatar as any)?.asset_path || '';
+    const currentInst = studentUser?.resolved_instrument || studentUser?.instrument || '';
+    const currentPhoto = (studentUser?.photo_url && (studentUser.photo_url.startsWith('http') || studentUser.photo_url.startsWith('/')))
+      ? studentUser.photo_url
+      : getInstrumentAvatarUrl(currentInst);
     const currentUi = studentUiLevel || studentUser?.campus_ui_level || 'junior';
 
     if (!currentFirst) return;
@@ -3760,7 +3806,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const handleExportGdprReport = async () => {
     try {
       const currentLevelKey = (draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior')) as 'junior' | 'teen' | 'pro';
-      const curAbsences = draftAllowAbsences ?? (studentUser as any)?.parent_allow_absences ?? (currentLevelKey !== 'junior');
+      const curAbsences = draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (currentLevelKey === 'pro'));
       const curChat = draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (currentLevelKey !== 'junior');
       const curLeaderboard = draftAllowLeaderboard ?? (studentUser as any)?.parent_allow_leaderboard ?? (currentLevelKey !== 'junior');
       const curPractice = draftBoardOverrides.practice_board ?? (localStorage.getItem('campus_board_override_practice_board') !== 'false');
@@ -4803,28 +4849,25 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   };
 
   const isStudentAbsenceAllowed = useMemo(() => {
-    if (checkIsParentUnlockedGlobal()) return true;
     if (draftAllowAbsences !== null) return draftAllowAbsences;
     const userAbs = (studentUser as any)?.parent_allow_absences;
     if (userAbs !== undefined && userAbs !== null) return Boolean(userAbs);
-    const localSetting = typeof window !== 'undefined' ? localStorage.getItem('campus_allow_absences') : null;
-    if (localSetting !== null) return localSetting === 'true';
-    const localUserSetting = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) : null;
+    const localUserSetting = typeof window !== 'undefined' && studentId ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) : null;
     if (localUserSetting !== null) return localUserSetting === 'true';
     const currentLvl = draftUiLevel || (studentUser as any)?.campus_ui_level || (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : 'junior') || 'junior';
+    if (currentLvl === 'junior' || currentLvl === 'teen') return false;
+    return true;
   }, [studentUser, studentId, draftAllowAbsences, draftUiLevel]);
 
   const isStudentChatAllowed = useMemo(() => {
-    if (checkIsParentUnlockedGlobal()) return true;
     if (draftAllowChat !== null) return draftAllowChat;
     const userChat = (studentUser as any)?.parent_allow_chat;
     if (userChat !== undefined && userChat !== null) return Boolean(userChat);
-    const localSetting = typeof window !== 'undefined' ? localStorage.getItem('campus_allow_chat') : null;
-    if (localSetting !== null) return localSetting === 'true';
-    const localUserSetting = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) : null;
+    const localUserSetting = typeof window !== 'undefined' && studentId ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) : null;
     if (localUserSetting !== null) return localUserSetting === 'true';
     const currentLvl = draftUiLevel || (studentUser as any)?.campus_ui_level || (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : 'junior') || 'junior';
-    return currentLvl !== 'junior';
+    if (currentLvl === 'junior') return false;
+    return true;
   }, [studentUser, studentId, draftAllowChat, draftUiLevel]);
 
   const handleVerifyGlobalParentPin = async (inputPin: string) => {
@@ -4891,10 +4934,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
 
       if (isMatch) {
-        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-        sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 60 * 60 * 1000));
+        // Step-up execution: Execute single pending action securely without leaving ambient bypass open
         setShowGlobalParentPinModal(false);
         setGlobalPinInput('');
+        setGlobalPinError('');
         if (globalPinPendingAction) {
           const action = globalPinPendingAction;
           setGlobalPinPendingAction(null);
@@ -4912,17 +4955,35 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   };
 
   const handleTriggerCancelOccurrence = (occ: any) => {
-    if (!isStudentAbsenceAllowed && !checkIsParentUnlockedGlobal()) {
-      setGlobalPinPendingAction(() => () => handleCancelOccurrence(occ));
+    if (!isStudentAbsenceAllowed) {
+      setGlobalPinPendingAction(() => () => handleCancelOccurrence(occ, true));
       setGlobalPinInput('');
       setGlobalPinError('');
       setShowGlobalParentPinModal(true);
       return;
     }
-    handleCancelOccurrence(occ);
+    handleCancelOccurrence(occ, false);
   };
 
-  const handleUndoCancelOccurrence = async (occ: any) => {
+  const handleTriggerUndoCancelOccurrence = (occ: any) => {
+    if (!isStudentAbsenceAllowed) {
+      setGlobalPinPendingAction(() => () => handleUndoCancelOccurrence(occ, true));
+      setGlobalPinInput('');
+      setGlobalPinError('');
+      setShowGlobalParentPinModal(true);
+      return;
+    }
+    handleUndoCancelOccurrence(occ, false);
+  };
+
+  const handleUndoCancelOccurrence = async (occ: any, skipPinCheck = false) => {
+    if (!skipPinCheck && !isStudentAbsenceAllowed) {
+      setGlobalPinPendingAction(() => () => handleUndoCancelOccurrence(occ, true));
+      setGlobalPinInput('');
+      setGlobalPinError('');
+      setShowGlobalParentPinModal(true);
+      return;
+    }
     if (!confirm('Möchtest du die Absage zurücknehmen und diesen Unterrichtstermin wieder reaktivieren?')) return;
     try {
       if (occ.id && !String(occ.id).startsWith('virt_')) {
@@ -4984,9 +5045,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
-  const handleCancelOccurrence = async (occ: any) => {
-    if (!isStudentAbsenceAllowed && !checkIsParentUnlockedGlobal()) {
-      setGlobalPinPendingAction(() => () => handleCancelOccurrence(occ));
+  const handleCancelOccurrence = async (occ: any, skipPinCheck = false) => {
+    if (!skipPinCheck && !isStudentAbsenceAllowed) {
+      setGlobalPinPendingAction(() => () => handleCancelOccurrence(occ, true));
       setGlobalPinInput('');
       setGlobalPinError('');
       setShowGlobalParentPinModal(true);
@@ -5117,7 +5178,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return tab;
   };
 
-  const [activeTabLocal, setActiveTabLocal] = useState<string>(() => mapTabName(parentActiveTab));
+  const [activeTabLocal, setActiveTabLocal] = useState<string>(() => {
+    if (parentActiveTab) return mapTabName(parentActiveTab);
+    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null;
+    return mapTabName(saved || 'briefing');
+  });
   const activeTab = parentActiveTab ? mapTabName(parentActiveTab) : activeTabLocal;
   const setActiveTab = (tab: string) => {
     setActiveTabLocal(tab);
@@ -5125,7 +5190,20 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       onTabChange(tab);
     }
   };
-  const [homeworkBookTab, setHomeworkBookTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>('document');
+  const [homeworkBookTab, setHomeworkBookTabRaw] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>(() => {
+    const valid = ['document', 'logbook', 'stickeralbum', 'skillradar', 'audiobiography'];
+    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('campus_student_homework_subtab') || localStorage.getItem('campus_student_homework_subtab')) : null;
+    if (saved && valid.includes(saved)) return saved as any;
+    return 'document';
+  });
+
+  const setHomeworkBookTab = (tab: 'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography') => {
+    setHomeworkBookTabRaw(tab);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('campus_student_homework_subtab', tab);
+      localStorage.setItem('campus_student_homework_subtab', tab);
+    }
+  };
 
   // ── Asset Preloading Hook (3.2) ──
   useEffect(() => {
@@ -5327,6 +5405,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const handleTabChangeLocal = (tab: string) => {
     setActiveTab(tab);
+    if (tab !== 'settings' && tab !== 'parent_controls' && !isAdultStudent) {
+      // Auto-lock parent session when navigating to student boards
+      sessionStorage.removeItem('groovelab_parent_unlocked_global');
+      if (studentId) {
+        sessionStorage.removeItem(`groovelab_parent_session_${studentId}`);
+        sessionStorage.removeItem(`groovelab_parent_unlocked_${studentId}`);
+      }
+      window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
+    }
     if (onTabChange) {
       onTabChange(tab);
     }
@@ -6499,6 +6586,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   // Hardware Keyboard listener for First-Login PIN modal & Settings PIN modal
   useEffect(() => {
     if (!showFirstLoginPinModal && activeStudentSettingsModal !== 'security') return;
+    const targetLen = (activeStudentSettingsModal === 'security' && securityPinTarget === 'parent' && !isAdultStudent) ? 6 : 4;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'text') return;
@@ -6506,15 +6595,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       if (['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) {
         setPinFormError('');
         if (firstPinActiveField === 'new') {
-          if (pinFormNew.length < 4) {
+          if (pinFormNew.length < targetLen) {
             const next = pinFormNew + e.key;
             setPinFormNew(next);
-            if (next.length === 4) {
+            if (next.length === targetLen) {
               setFirstPinActiveField('confirm');
             }
           }
         } else {
-          if (pinFormConfirm.length < 4) {
+          if (pinFormConfirm.length < targetLen) {
             setPinFormConfirm(prev => prev + e.key);
           }
         }
@@ -6533,7 +6622,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showFirstLoginPinModal, activeStudentSettingsModal, firstPinActiveField, pinFormNew, pinFormConfirm]);
+  }, [showFirstLoginPinModal, activeStudentSettingsModal, securityPinTarget, isAdultStudent, firstPinActiveField, pinFormNew, pinFormConfirm]);
 
   const [preStartCountdown, setPreStartCountdown] = useState<number | null>(null);
   const preStartCountdownRef = useRef(preStartCountdown);
@@ -10430,11 +10519,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
-  const handleCancelLesson = async (scheduleId: string) => {
-    const isParentUnlocked = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
-    const isAbsenceAllowed = isParentUnlocked || ((studentUser as any)?.parent_allow_absences ?? (typeof window !== 'undefined' && localStorage.getItem('campus_allow_absences') !== 'false' && localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) !== 'false'));
-    if (!isAbsenceAllowed) {
-      alert('Terminabsagen sind durch den Elternbereich geschützt und können nur von deinen Eltern vorgenommen werden.');
+  const handleCancelLesson = async (scheduleId: string, skipPinCheck = false) => {
+    if (!skipPinCheck && !isStudentAbsenceAllowed) {
+      setGlobalPinPendingAction(() => () => handleCancelLesson(scheduleId, true));
+      setGlobalPinInput('');
+      setGlobalPinError('');
+      setShowGlobalParentPinModal(true);
       return;
     }
 
@@ -15676,8 +15766,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             supabase={supabase}
             brandColor={studentUser?.schools?.brand_color || '#34a853'}
             studentUser={studentUser}
-            parentAllowChat={draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (studentUiLevel !== 'junior')}
-            parentAllowAbsences={draftAllowAbsences ?? (studentUser as any)?.parent_allow_absences ?? (studentUiLevel !== 'junior')}
+            parentAllowChat={isStudentChatAllowed}
+            parentAllowAbsences={isStudentAbsenceAllowed}
           />
         )}
       </div>
@@ -15752,6 +15842,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             studentUiLevel={studentUiLevel || 'pro'}
             schoolFokusLevels={schoolFokusLevels}
             handleTriggerCancelOccurrence={handleTriggerCancelOccurrence}
+            handleTriggerUndoCancelOccurrence={handleTriggerUndoCancelOccurrence}
             handleUndoCancelOccurrence={handleUndoCancelOccurrence}
             getDeterministicWeekMetrics={getDeterministicWeekMetrics}
           />
@@ -16133,7 +16224,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   background: isCanceled ? 'rgba(239, 68, 68, 0.08)' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.09) 0%, rgba(52, 168, 83, 0.03) 100%)', 
                                   color: isCanceled ? '#dc2626' : '#2e7d32', 
                                   padding: '8px 16px', 
-                                  minHeight: '38px',
+                                  minHeight: '38px', 
                                   boxSizing: 'border-box',
                                   borderRadius: '12px', 
                                   fontSize: '0.78rem', 
@@ -16212,13 +16303,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 )}
 
                                 {/* 3. Absage / Reaktivieren Button (Master-PIN geschützt für Junior) */}
-                                {nextOcc && (
+                                {nextOcc && (isCanceled || isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()) && (
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       if (isCanceled) {
-                                        handleUndoCancelOccurrence(nextOcc);
+                                        handleTriggerUndoCancelOccurrence(nextOcc);
                                       } else {
                                         handleTriggerCancelOccurrence(nextOcc);
                                       }
@@ -16241,10 +16332,19 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       transition: 'all 0.2s'
                                     }}
                                     className="hover-scale"
-                                    title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen (Eltern-PIN)"}
+                                    title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren (Eltern-PIN)" : "Unterrichtstermin absagen"}
                                   >
-                                    <CalendarX size={14} color={isCanceled ? '#dc2626' : '#64748b'} />
-                                    <span>{isCanceled ? 'Absage zurücknehmen' : 'Unterricht absagen'}</span>
+                                    {isCanceled ? (
+                                      <>
+                                        <Lock size={14} color="#dc2626" />
+                                        <span>Absage zurücknehmen (Eltern-PIN)</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CalendarX size={14} color="#64748b" />
+                                        <span>Unterricht absagen</span>
+                                      </>
+                                    )}
                                   </button>
                                 )}
                               </div>
@@ -19863,13 +19963,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             )}
 
                             {/* 3. Absage / Reaktivieren Button */}
-                            {nextOcc && (
+                            {nextOcc && (isCanceled || isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()) && (
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (isCanceled) {
-                                    handleUndoCancelOccurrence(nextOcc);
+                                    handleTriggerUndoCancelOccurrence(nextOcc);
                                   } else {
                                     handleTriggerCancelOccurrence(nextOcc);
                                   }
@@ -19894,8 +19994,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 className="hover-scale"
                                 title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen (Krankmeldung)"}
                               >
-                                <CalendarX size={14} color={isCanceled ? '#dc2626' : '#64748b'} />
-                                <span>{isCanceled ? 'Absage zurücknehmen' : 'Unterricht absagen'}</span>
+                                {isCanceled ? (
+                                  !isStudentAbsenceAllowed ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />
+                                ) : (
+                                  <CalendarX size={14} color="#64748b" />
+                                )}
+                                <span>{isCanceled ? (!isStudentAbsenceAllowed ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen') : 'Unterricht absagen'}</span>
                               </button>
                             )}
                           </div>
@@ -21226,13 +21330,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             </button>
 
                             {/* 4. Absage / Reaktivieren Button */}
-                            {nextOcc && (
+                            {nextOcc && (isCanceled || isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()) && (
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (isCanceled) {
-                                    handleUndoCancelOccurrence(nextOcc);
+                                    handleTriggerUndoCancelOccurrence(nextOcc);
                                   } else {
                                     handleTriggerCancelOccurrence(nextOcc);
                                   }
@@ -21257,8 +21361,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 className="hover-scale"
                                 title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen (Krankmeldung)"}
                               >
-                                <CalendarX size={14} color={isCanceled ? '#dc2626' : '#64748b'} />
-                                <span>{isCanceled ? 'Absage zurücknehmen' : 'Unterricht absagen'}</span>
+                                {isCanceled ? (
+                                  !isStudentAbsenceAllowed ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />
+                                ) : (
+                                  <CalendarX size={14} color="#64748b" />
+                                )}
+                                <span>{isCanceled ? (!isStudentAbsenceAllowed ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen') : 'Unterricht absagen'}</span>
                               </button>
                             )}
                           </div>
@@ -24265,9 +24373,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             (typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_pin_${studentId}`))
           );
 
-          if (isJuniorOrTeen && !isParentSessionActive) {
-            return (
-              <div style={{
+          return (
+            <>
+              {isJuniorOrTeen && !isParentSessionActive ? (
+                <div style={{
                 width: '100%',
                 maxWidth: '440px',
                 margin: '20px auto',
@@ -24487,63 +24596,59 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             }
                           }
                         }}
-                        style={{
-                          padding: '14px 0',
-                          borderRadius: '16px',
-                          border: '1px solid #e2e8f0',
-                          background: isSpecial ? '#f1f5f9' : '#ffffff',
-                          color: '#0f172a',
-                          fontSize: isSpecial ? '0.9rem' : '1.3rem',
-                          fontWeight: 800,
-                          cursor: isDisabled ? 'not-allowed' : 'pointer',
-                          opacity: isDisabled ? 0.45 : 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                          transition: 'all 0.1s'
-                        }}
-                        className="hover-scale"
-                      >
-                        {key === 'back' ? <Delete size={20} /> : key}
-                      </button>
-                    );
-                  })}
+                          style={{
+                            height: '48px',
+                            borderRadius: '14px',
+                            border: '1.5px solid #e2e8f0',
+                            background: '#ffffff',
+                            color: '#0f172a',
+                            fontSize: '1.15rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                            transition: 'all 0.1s'
+                          }}
+                          className="hover-scale"
+                        >
+                          {key === 'back' ? <Delete size={20} /> : key}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Secure Tier-1 PIN Recovery Link */}
+                  {hasConfiguredParentPin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRecoveryKeyInput('');
+                        setRecoveryKeyError('');
+                        setShowRecoveryKeyModal(true);
+                      }}
+                      style={{
+                        marginTop: '18px',
+                        background: 'none',
+                        border: 'none',
+                        color: '#0284c7',
+                        fontSize: '0.8rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <ShieldCheck size={14} />
+                      <span>Eltern-PIN vergessen? Mit Notfall-Schlüssel wiederherstellen</span>
+                    </button>
+                  )}
                 </div>
-
-                {/* Secure Tier-1 PIN Recovery Link */}
-                {hasConfiguredParentPin && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRecoveryKeyInput('');
-                      setRecoveryKeyError('');
-                      setShowRecoveryKeyModal(true);
-                    }}
-                    style={{
-                      marginTop: '18px',
-                      background: 'none',
-                      border: 'none',
-                      color: '#0284c7',
-                      fontSize: '0.8rem',
-                      fontWeight: 750,
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <ShieldCheck size={14} />
-                    <span>Eltern-PIN vergessen? Mit Notfall-Schlüssel wiederherstellen</span>
-                  </button>
-                )}
-              </div>
-            );
-          }
-
-          return (
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              ) : (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div>
                 <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
                   {isAdultStudent ? '⚙️ Mein Account & Einstellungen' : (isJuniorOrTeen ? '🛡️ Elternbereich' : '⚙️ Einstellungen & Eltern-Zone')}
@@ -25057,7 +25162,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 }}
                 onClick={(e) => {
                   if (e.target === e.currentTarget) {
-                    setActiveStudentSettingsModal(null);
+                    handleCloseSettingsModal();
                   }
                 }}
               >
@@ -25122,14 +25227,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
                           {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? 'Passe Benutzeroberfläche und Funktionen nach deinen Wünschen an.' : 'Schutz-, Design- & Freigabefunktionen für dein Kind.')}
                           {activeStudentSettingsModal === 'notifications' && 'Passe an, worüber und wie wir dich informieren.'}
-                          {activeStudentSettingsModal === 'security' && (isAdultStudent ? '4-stellige persönliche PIN für schnellen und sicheren Login.' : '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & persönliches Profil).')}
+                          {activeStudentSettingsModal === 'security' && (isAdultStudent ? '4-stellige persönliche PIN für schnellen und sicheren Login.' : (securityPinTarget === 'parent' ? '6-stellige Eltern-PIN zum Schutz des Kontrollzentrums & der Ruhezeiten.' : '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & Profil).'))}
                           {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Übersicht über deine gebuchten Module und Zahlungsnachweise.' : 'Übersicht über 100% freie App, Bereitstellung & Zahlungsnachweise.')}
                           {activeStudentSettingsModal === 'legal' && 'Transparente Informationen zu Datenschutz, DSGVO & Jugendschutz.'}
                         </p>
                       </div>
                     </div>
                     <button
-                      onClick={() => setActiveStudentSettingsModal(null)}
+                      onClick={handleCloseSettingsModal}
                       style={{
                         background: '#f1f5f9',
                         border: 'none',
@@ -25193,8 +25298,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   key={lvl.id}
                                   type="button"
                                   onClick={() => {
-                                    const std = CAMPUS_AGE_STANDARDS[lvl.id];
-                                    if (std) applyAndSaveParentControls(std);
+                                    applyAndSaveParentControls({ uiLevel: lvl.id });
                                   }}
                                   style={{
                                     padding: '10px 6px',
@@ -25226,7 +25330,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           const currentLvlKey = (draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior')) as 'junior' | 'teen' | 'pro';
                           const standard = CAMPUS_AGE_STANDARDS[currentLvlKey] || CAMPUS_AGE_STANDARDS.junior;
 
-                          const curAbsences = draftAllowAbsences ?? (studentUser as any)?.parent_allow_absences ?? (currentLvlKey !== 'junior');
+                          const curAbsences = draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (currentLvlKey === 'pro'));
                           const curChat = draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (currentLvlKey !== 'junior');
                           const curTimer = draftAllowTimer ?? (studentUser as any)?.parent_allow_timer ?? true;
                           const curLeaderboard = draftAllowLeaderboard ?? (studentUser as any)?.parent_allow_leaderboard ?? (currentLvlKey !== 'junior');
@@ -25576,69 +25680,276 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           )}
                         </div>
 
-                        {/* Must-Have 2: Geschwister-Schnellwechsel (Family Hub) */}
+                        {/* Must-Have 2: Geschwister-Schnellwechsel (Netflix Family Hub) */}
                         {familyProfiles.length > 0 && (
                           <div style={{
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '12px',
-                            padding: '18px',
-                            borderRadius: '18px',
+                            gap: '14px',
+                            padding: '22px 20px',
+                            borderRadius: '22px',
                             background: '#f8fafc',
                             border: '1px solid #e2e8f0',
                             textAlign: 'left'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <Users size={18} color="#0284c7" style={{ flexShrink: 0 }} />
+                              <div style={{
+                                width: '34px',
+                                height: '34px',
+                                borderRadius: '10px',
+                                background: '#e0f2fe',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                <Users size={18} color="#0284c7" />
+                              </div>
                               <div>
-                                <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                                <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.01em' }}>
                                   Familien-Profile &amp; Geschwister (Schnellwechsel)
                                 </div>
                                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                  Wechsle ohne erneute PIN-Eingabe zwischen deinen Kindern auf diesem Gerät.
+                                  Wähle dein Profil – genau wie bei Netflix oder Disney+ ohne erneute PIN-Eingabe.
                                 </div>
                               </div>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px', marginTop: '4px' }}>
+                            {/* Netflix-Style Profile Carousel / Stage */}
+                            <div style={{ 
+                              display: 'flex', 
+                              alignItems: 'flex-start',
+                              gap: '16px', 
+                              flexWrap: 'wrap', 
+                              marginTop: '8px' 
+                            }}>
                               {familyProfiles.map((member) => {
                                 const isCurrent = member.id === studentId;
+                                const memberInst = member.instrument || (isCurrent ? studentUser?.instrument : 'Gitarre') || 'Gitarre';
+                                const defaultInstAvatar = getInstrumentAvatarUrl(memberInst);
+                                
+                                // Robust avatar URL resolution
+                                let avatarSrc = defaultInstAvatar;
+                                const rawPhoto = member.photo_url;
+                                if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.trim() && rawPhoto !== '/campus_login_hero.png') {
+                                  const p = rawPhoto.trim();
+                                  if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:image/')) {
+                                    avatarSrc = p;
+                                  } else if (p.startsWith('/avatars/') || p.startsWith('/avatar_')) {
+                                    avatarSrc = p;
+                                  } else if (p.startsWith('/')) {
+                                    avatarSrc = p;
+                                  } else {
+                                    const matched = STUDENT_AVATARS.find(a => a.id === p || a.url === p);
+                                    if (matched) {
+                                      avatarSrc = matched.url;
+                                    } else if (p.endsWith('.png') || p.endsWith('.jpg') || p.endsWith('.jpeg')) {
+                                      avatarSrc = `/avatars/${p}`;
+                                    }
+                                  }
+                                }
+
                                 return (
-                                  <button
+                                  <div
                                     key={member.id}
-                                    type="button"
-                                    onClick={() => !isCurrent && handleSwitchFamilyStudent(member.id)}
                                     style={{
                                       display: 'flex',
+                                      flexDirection: 'column',
                                       alignItems: 'center',
-                                      gap: '10px',
-                                      padding: '10px 12px',
-                                      borderRadius: '12px',
-                                      background: isCurrent ? '#e0f2fe' : '#ffffff',
-                                      border: isCurrent ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
-                                      cursor: isCurrent ? 'default' : 'pointer',
-                                      textAlign: 'left',
-                                      transition: 'all 0.15s ease'
+                                      width: '100px',
+                                      position: 'relative',
+                                      textAlign: 'center'
                                     }}
-                                    className={!isCurrent ? 'hover-scale' : undefined}
                                   >
-                                    <img
-                                      src={getInstrumentAvatarUrl(member.instrument)}
-                                      alt={member.first_name}
-                                      style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', background: '#f1f5f9' }}
-                                    />
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: isCurrent ? '#0369a1' : '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {member.first_name} {member.last_name ? member.last_name.trim().charAt(0) + '.' : ''}
-                                      </div>
-                                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
-                                        {isCurrent ? '● Aktives Kind' : (member.instrument || 'Schüler')}
-                                      </div>
+                                    {/* Squircle Avatar Button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => !isCurrent && handleSwitchFamilyStudent(member.id)}
+                                      style={{
+                                        position: 'relative',
+                                        width: '72px',
+                                        height: '72px',
+                                        borderRadius: '20px',
+                                        padding: 0,
+                                        border: isCurrent ? '3px solid #0284c7' : '2.5px solid #ffffff',
+                                        background: '#ffffff',
+                                        cursor: isCurrent ? 'default' : 'pointer',
+                                        boxShadow: isCurrent 
+                                          ? '0 8px 24px -4px rgba(2, 132, 199, 0.4), 0 2px 8px rgba(0,0,0,0.06)' 
+                                          : '0 4px 14px rgba(0,0,0,0.08)',
+                                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                        overflow: 'hidden',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                      }}
+                                      className={!isCurrent ? "hover-scale" : undefined}
+                                      title={isCurrent ? `${member.first_name} (Aktives Profil)` : `Zu ${member.first_name} wechseln`}
+                                    >
+                                      <img
+                                        src={avatarSrc}
+                                        alt={member.first_name || 'Schüler'}
+                                        onError={(e) => {
+                                          const img = e.currentTarget;
+                                          const fallback = getInstrumentAvatarUrl(memberInst);
+                                          if (img.src !== fallback && !img.src.endsWith(fallback)) {
+                                            img.src = fallback;
+                                          } else {
+                                            img.src = '/avatars/gitarre_avatar_new.png';
+                                          }
+                                        }}
+                                        style={{ 
+                                          width: '100%', 
+                                          height: '100%', 
+                                          objectFit: 'cover', 
+                                          background: '#f1f5f9',
+                                          display: 'block'
+                                        }}
+                                      />
+                                      {isCurrent && (
+                                        <div style={{
+                                          position: 'absolute',
+                                          inset: 0,
+                                          border: '2px solid rgba(255,255,255,0.6)',
+                                          borderRadius: '17px',
+                                          pointerEvents: 'none'
+                                        }} />
+                                      )}
+                                    </button>
+
+                                    {/* Unlink Badge for non-current profiles */}
+                                    {!isCurrent && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleRemoveFamilyProfile(member.id, e)}
+                                        style={{
+                                          position: 'absolute',
+                                          top: '-4px',
+                                          right: '8px',
+                                          width: '22px',
+                                          height: '22px',
+                                          borderRadius: '50%',
+                                          background: '#ffffff',
+                                          border: '1.5px solid #cbd5e1',
+                                          color: '#64748b',
+                                          padding: 0,
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                                          transition: 'all 0.15s ease',
+                                          zIndex: 2
+                                        }}
+                                        className="hover-scale"
+                                        title={`${member.first_name} von diesem Gerät entfernen`}
+                                      >
+                                        <X size={12} strokeWidth={2.5} />
+                                      </button>
+                                    )}
+
+                                    {/* Profile Name */}
+                                    <div style={{
+                                      fontSize: '0.84rem',
+                                      fontWeight: 850,
+                                      color: isCurrent ? '#0284c7' : '#0f172a',
+                                      marginTop: '8px',
+                                      width: '100%',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      lineHeight: 1.2
+                                    }}>
+                                      {member.first_name} {member.last_name ? member.last_name.trim().charAt(0) + '.' : ''}
                                     </div>
-                                    {!isCurrent && <ArrowRight size={14} color="#64748b" />}
-                                  </button>
+
+                                    {/* Status / Instrument Badge */}
+                                    {isCurrent ? (
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        fontSize: '0.66rem',
+                                        fontWeight: 800,
+                                        color: '#0284c7',
+                                        background: '#e0f2fe',
+                                        padding: '2px 7px',
+                                        borderRadius: '8px',
+                                        marginTop: '4px'
+                                      }}>
+                                        ● Aktiv
+                                      </span>
+                                    ) : (
+                                      <span style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: 600,
+                                        color: '#64748b',
+                                        marginTop: '3px',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        maxWidth: '100%'
+                                      }}>
+                                        {member.instrument || 'Schüler'}
+                                      </span>
+                                    )}
+                                  </div>
                                 );
                               })}
+
+                              {/* Netflix-Style Iconic "+ Kind hinzufügen" Tile */}
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                width: '100px',
+                                textAlign: 'center'
+                              }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    window.location.href = '/login?scan_sibling=true';
+                                  }}
+                                  style={{
+                                    width: '72px',
+                                    height: '72px',
+                                    borderRadius: '20px',
+                                    border: '2px dashed #94a3b8',
+                                    background: '#ffffff',
+                                    color: '#0284c7',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '2px',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                                  }}
+                                  className="hover-scale"
+                                  title="Weiteres Kind per QR-Ausweis hinzufügen"
+                                >
+                                  <QrCode size={24} color="#0284c7" />
+                                </button>
+
+                                <div style={{
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  color: '#0284c7',
+                                  marginTop: '8px',
+                                  lineHeight: 1.2
+                                }}>
+                                  + Kind
+                                </div>
+                                <span style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 600,
+                                  color: '#94a3b8',
+                                  marginTop: '2px'
+                                }}>
+                                  QR-Scan
+                                </span>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -25833,383 +26144,590 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       </div>
                     )}
 
-                    {activeStudentSettingsModal === 'security' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '400px', margin: '0 auto', width: '100%' }}>
-                        <div style={{
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '24px',
-                          padding: '24px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '16px'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ padding: '10px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853' }}>
-                              <Shield size={20} />
-                            </div>
-                            <div>
-                              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>4-stellige PIN festlegen</h4>
-                              <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Schützt deinen Stundenplan und dein persönliches Konto.</p>
-                            </div>
-                          </div>
+                    {activeStudentSettingsModal === 'security' && (() => {
+                      const isParentTarget = securityPinTarget === 'parent' && !isAdultStudent;
+                      const targetPinLength = isParentTarget ? 6 : 4;
+                      const isFilledComplete = pinFormNew.length === targetPinLength && pinFormConfirm.length === targetPinLength;
 
-                          {pinFormError && (
-                            <div style={{ padding: '10px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '12px', color: '#dc2626', fontSize: '0.8rem', fontWeight: 700 }}>
-                              {pinFormError}
-                            </div>
-                          )}
-
-                          {pinFormSuccess && (
-                            <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', color: '#166534', fontSize: '0.8rem', fontWeight: 700 }}>
-                              {pinFormSuccess}
-                            </div>
-                          )}
-
-                          {/* Field 1: Neue PIN */}
-                          <div 
-                            onClick={() => setFirstPinActiveField('new')}
-                            style={{
-                              padding: '12px 14px',
-                              borderRadius: '16px',
-                              border: firstPinActiveField === 'new' ? '2px solid #15803d' : '1.5px solid #e2e8f0',
-                              background: firstPinActiveField === 'new' ? '#f0fdf4' : '#ffffff',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              textAlign: 'left'
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: firstPinActiveField === 'new' ? '#15803d' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                1. Neue 4-stellige PIN
-                              </span>
-                              {pinFormNew.length === 4 && (
-                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  <Check size={13} strokeWidth={3} /> 4 Ziffern
-                                </span>
-                              )}
-                            </div>
-
-                            {/* 4 Dots / Numbers Display */}
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', padding: '4px 0' }}>
-                              {[0, 1, 2, 3].map((idx) => {
-                                const char = pinFormNew[idx];
-                                const isFilled = Boolean(char);
-                                return (
-                                  <div
-                                    key={idx}
-                                    style={{
-                                      width: '42px',
-                                      height: '46px',
-                                      borderRadius: '12px',
-                                      border: isFilled ? '2px solid #15803d' : (firstPinActiveField === 'new' && pinFormNew.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
-                                      background: '#ffffff',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '1.25rem',
-                                      fontWeight: 900,
-                                      color: '#0f172a',
-                                      boxShadow: isFilled ? '0 2px 6px rgba(21, 128, 61, 0.15)' : 'none',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                  >
-                                    {isFilled ? (firstPinShowMask ? char : '●') : ''}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Field 2: PIN Bestätigen */}
-                          <div 
-                            onClick={() => setFirstPinActiveField('confirm')}
-                            style={{
-                              padding: '12px 14px',
-                              borderRadius: '16px',
-                              border: firstPinActiveField === 'confirm' ? '2px solid #15803d' : '1.5px solid #e2e8f0',
-                              background: firstPinActiveField === 'confirm' ? '#f0fdf4' : '#ffffff',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              textAlign: 'left'
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: firstPinActiveField === 'confirm' ? '#15803d' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                2. PIN wiederholen
-                              </span>
-                              {pinFormConfirm.length === 4 && (
-                                pinFormNew === pinFormConfirm ? (
-                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                    <CheckCheck size={14} strokeWidth={2.5} /> Stimmt überein
-                                  </span>
-                                ) : (
-                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#dc2626' }}>
-                                    Stimmt nicht überein
-                                  </span>
-                                )
-                              )}
-                            </div>
-
-                            {/* 4 Dots / Numbers Display */}
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', padding: '4px 0' }}>
-                              {[0, 1, 2, 3].map((idx) => {
-                                const char = pinFormConfirm[idx];
-                                const isFilled = Boolean(char);
-                                return (
-                                  <div
-                                    key={idx}
-                                    style={{
-                                      width: '42px',
-                                      height: '46px',
-                                      borderRadius: '12px',
-                                      border: isFilled ? (pinFormNew === pinFormConfirm && pinFormConfirm.length === 4 ? '2px solid #15803d' : '2px solid #64748b') : (firstPinActiveField === 'confirm' && pinFormConfirm.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
-                                      background: '#ffffff',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '1.25rem',
-                                      fontWeight: 900,
-                                      color: '#0f172a',
-                                      boxShadow: isFilled ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                  >
-                                    {isFilled ? (firstPinShowMask ? char : '●') : ''}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Toggle show/hide numbers */}
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', margin: '-4px 0 0 0' }}>
-                            <button
-                              type="button"
-                              onClick={() => setFirstPinShowMask(!firstPinShowMask)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#64748b',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                padding: '2px 4px'
-                              }}
-                            >
-                              {firstPinShowMask ? <EyeOff size={14} /> : <Eye size={14} />}
-                              <span>{firstPinShowMask ? 'Ziffern verbergen' : 'Ziffern anzeigen'}</span>
-                            </button>
-                          </div>
-
-                          {/* On-Screen Touch Keypad */}
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(3, 1fr)',
-                            gap: '8px',
-                            width: '100%',
-                            marginTop: '4px'
-                          }}>
-                            {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
-                              const isClear = key === 'C';
-                              const isBack = key === 'back';
-                              return (
-                                <button
-                                  key={key}
-                                  type="button"
-                                  onClick={() => {
-                                    setPinFormError('');
-                                    setPinFormSuccess('');
-                                    if (firstPinActiveField === 'new') {
-                                      if (isClear) {
-                                        setPinFormNew('');
-                                      } else if (isBack) {
-                                        setPinFormNew(prev => prev.slice(0, -1));
-                                      } else if (pinFormNew.length < 4) {
-                                        const nextVal = pinFormNew + key;
-                                        setPinFormNew(nextVal);
-                                        if (nextVal.length === 4) {
-                                          setFirstPinActiveField('confirm');
-                                        }
-                                      }
-                                    } else {
-                                      if (isClear) {
-                                        setPinFormConfirm('');
-                                      } else if (isBack) {
-                                        if (pinFormConfirm.length === 0) {
-                                          setFirstPinActiveField('new');
-                                        } else {
-                                          setPinFormConfirm(prev => prev.slice(0, -1));
-                                        }
-                                      } else if (pinFormConfirm.length < 4) {
-                                        setPinFormConfirm(prev => prev + key);
-                                      }
-                                    }
-                                  }}
-                                  style={{
-                                    padding: '12px 0',
-                                    borderRadius: '14px',
-                                    border: '1px solid #e2e8f0',
-                                    background: (isClear || isBack) ? '#f1f5f9' : '#ffffff',
-                                    color: '#0f172a',
-                                    fontSize: (isClear || isBack) ? '0.85rem' : '1.25rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                                    transition: 'all 0.1s'
-                                  }}
-                                  className="hover-scale"
-                                >
-                                  {isBack ? <Delete size={18} /> : key}
-                                </button>
-                              );
-                            })}
-                          </div>
-
-                          <button
-                            type="button"
-                            disabled={isSavingPin || pinFormNew.length !== 4 || pinFormConfirm.length !== 4}
-                            onClick={async () => {
-                              if (pinFormNew.length !== 4) {
-                                setPinFormError('Bitte gib eine vollständige 4-stellige PIN ein.');
-                                return;
-                              }
-                              if (pinFormNew !== pinFormConfirm) {
-                                setPinFormError('Die eingegebenen PINs stimmen nicht überein.');
-                                return;
-                              }
-
-                              const dayOfBirth = (studentUser as any)?.day_of_birth || (Array.isArray((studentUser as any)?.activation_days) ? (studentUser as any)?.activation_days[0]?.day_of_birth : (studentUser as any)?.activation_days?.day_of_birth);
-                              const validation = validateNewPin(pinFormNew, dayOfBirth);
-                              if (!validation.isValid) {
-                                setPinFormError(validation.error || 'Ungültige PIN.');
-                                return;
-                              }
-
-                              setIsSavingPin(true);
-                              setPinFormError('');
-
-                              try {
-                                if (studentId) {
-                                  sessionStorage.setItem('groovelab_user_id', studentId);
-                                  const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
-                                  if (authQrToken) {
-                                    sessionStorage.setItem('groovelab_qr_token', authQrToken);
-                                  }
-                                }
-
-                                try {
-                                  await supabase.from('students').update({
-                                    personal_pin: pinFormNew,
-                                    parent_pin: pinFormNew,
-                                    onboarding_pin: pinFormNew,
-                                    is_pin_activated: true,
-                                    is_campus_active: true
-                                  }).eq('id', studentId);
-
-                                  await supabase.from('pending_students').update({
-                                    personal_pin: pinFormNew,
-                                    parent_pin: pinFormNew,
-                                    onboarding_pin: pinFormNew,
-                                    is_pin_activated: true,
-                                    is_campus_active: true
-                                  }).eq('id', studentId);
-                                } catch (e) {}
-
-                                try {
-                                  await supabase.from('users_raw').update({
-                                    personal_pin: pinFormNew,
-                                    parent_pin: pinFormNew,
-                                    onboarding_pin: pinFormNew,
-                                    is_pin_activated: true,
-                                    is_campus_active: true
-                                  }).eq('id', studentId);
-                                } catch (e) {}
-
-                                const userUpdatePayload: any = {
-                                  personal_pin: pinFormNew,
-                                  parent_pin: pinFormNew,
-                                  onboarding_pin: pinFormNew,
-                                  is_pin_activated: true,
-                                  is_campus_active: true
-                                };
-                                let { error } = await supabase
-                                  .from('users')
-                                  .update(userUpdatePayload)
-                                  .eq('id', studentId);
-
-                                if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                                  delete userUpdatePayload.onboarding_pin;
-                                  const fallbackRes = await supabase
-                                    .from('users')
-                                    .update(userUpdatePayload)
-                                    .eq('id', studentId);
-                                  error = fallbackRes.error;
-                                }
-
-                                if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                                  console.warn('[StudentAvatarDashboard] users view trigger warning ignored because student table was updated:', error);
-                                  error = null;
-                                }
-
-                                localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
-                                localStorage.setItem(`groovelab_student_pin_${studentId}`, pinFormNew);
-                                sessionStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
-
-                                if (error) {
-                                  setPinFormError('Fehler beim Speichern der PIN: ' + error.message);
-                                } else {
-                                  setPinFormSuccess('Deine 4-stellige PIN wurde erfolgreich gespeichert! 🔒');
-                                  setStudentUser((prev: any) => prev ? {
-                                    ...prev,
-                                    is_pin_activated: true,
-                                    has_personal_pin: true,
-                                    has_parent_pin: true,
-                                    personal_pin: pinFormNew,
-                                    parent_pin: pinFormNew
-                                  } : prev);
-                                  if (onProfileUpdate) {
-                                    try { onProfileUpdate({ is_pin_activated: true, personal_pin: pinFormNew }); } catch (e) {}
-                                  }
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '440px', margin: '0 auto', width: '100%' }}>
+                          {/* Segmented Tab Switcher: Schüler-PIN (4-stellig) vs. Eltern-PIN (6-stellig) */}
+                          {!isAdultStudent && (
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: '6px',
+                              background: '#e2e8f0',
+                              padding: '4px',
+                              borderRadius: '16px'
+                            }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSecurityPinTarget('student');
                                   setPinFormNew('');
                                   setPinFormConfirm('');
+                                  setPinFormError('');
+                                  setPinFormSuccess('');
+                                  setFirstPinActiveField('new');
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  padding: '10px 12px',
+                                  borderRadius: '12px',
+                                  border: 'none',
+                                  background: securityPinTarget === 'student' ? '#ffffff' : 'transparent',
+                                  color: securityPinTarget === 'student' ? '#15803d' : '#64748b',
+                                  fontWeight: securityPinTarget === 'student' ? 850 : 650,
+                                  fontSize: '0.82rem',
+                                  cursor: 'pointer',
+                                  boxShadow: securityPinTarget === 'student' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                className="hover-scale"
+                              >
+                                <Shield size={16} color={securityPinTarget === 'student' ? '#15803d' : '#64748b'} />
+                                <span>Schüler-PIN (4-stellig)</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSecurityPinTarget('parent');
+                                  setPinFormNew('');
+                                  setPinFormConfirm('');
+                                  setPinFormError('');
+                                  setPinFormSuccess('');
+                                  setFirstPinActiveField('new');
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  padding: '10px 12px',
+                                  borderRadius: '12px',
+                                  border: 'none',
+                                  background: securityPinTarget === 'parent' ? '#ffffff' : 'transparent',
+                                  color: securityPinTarget === 'parent' ? '#0284c7' : '#64748b',
+                                  fontWeight: securityPinTarget === 'parent' ? 850 : 650,
+                                  fontSize: '0.82rem',
+                                  cursor: 'pointer',
+                                  boxShadow: securityPinTarget === 'parent' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                className="hover-scale"
+                              >
+                                <Lock size={16} color={securityPinTarget === 'parent' ? '#0284c7' : '#64748b'} />
+                                <span>Eltern-PIN (6-stellig)</span>
+                              </button>
+                            </div>
+                          )}
+
+                          <div style={{
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '24px',
+                            padding: '24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '16px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{ 
+                                padding: '10px', 
+                                borderRadius: '12px', 
+                                background: isParentTarget ? '#e0f2fe' : '#e6f4ea', 
+                                color: isParentTarget ? '#0284c7' : '#34a853' 
+                              }}>
+                                {isParentTarget ? <Lock size={20} /> : <Shield size={20} />}
+                              </div>
+                              <div>
+                                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                                  {isAdultStudent 
+                                    ? 'Persönliche 4-stellige PIN festlegen' 
+                                    : (isParentTarget ? '6-stellige Eltern-PIN festlegen' : '4-stellige Schüler-PIN festlegen')}
+                                </h4>
+                                <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                  {isAdultStudent 
+                                    ? 'Schützt deinen Stundenplan und dein persönliches Konto.' 
+                                    : (isParentTarget 
+                                        ? 'Schützt das Eltern-Kontrollzentrum, Board-Freigaben und Ruhezeiten vor deinem Kind.' 
+                                        : 'Schützt den Stundenplan und das persönliche Profil deines Kindes auf geteilten Geräten.')}
+                                </p>
+                              </div>
+                            </div>
+
+                            {pinFormError && (
+                              <div style={{ padding: '10px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '12px', color: '#dc2626', fontSize: '0.8rem', fontWeight: 700 }}>
+                                {pinFormError}
+                              </div>
+                            )}
+
+                            {pinFormSuccess && (
+                              <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', color: '#166534', fontSize: '0.8rem', fontWeight: 700 }}>
+                                {pinFormSuccess}
+                              </div>
+                            )}
+
+                            {/* Field 1: Neue PIN */}
+                            <div 
+                              onClick={() => setFirstPinActiveField('new')}
+                              style={{
+                                padding: '12px 14px',
+                                borderRadius: '16px',
+                                border: firstPinActiveField === 'new' 
+                                  ? (isParentTarget ? '2px solid #0284c7' : '2px solid #15803d') 
+                                  : '1.5px solid #e2e8f0',
+                                background: firstPinActiveField === 'new' 
+                                  ? (isParentTarget ? '#f0f9ff' : '#f0fdf4') 
+                                  : '#ffffff',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                textAlign: 'left'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <span style={{ 
+                                  fontSize: '0.72rem', 
+                                  fontWeight: 800, 
+                                  color: firstPinActiveField === 'new' 
+                                    ? (isParentTarget ? '#0284c7' : '#15803d') 
+                                    : '#64748b', 
+                                  textTransform: 'uppercase', 
+                                  letterSpacing: '0.04em' 
+                                }}>
+                                  1. Neue {targetPinLength}-stellige {isParentTarget ? 'Eltern-PIN' : 'PIN'}
+                                </span>
+                                {pinFormNew.length === targetPinLength && (
+                                  <span style={{ 
+                                    fontSize: '0.7rem', 
+                                    fontWeight: 800, 
+                                    color: isParentTarget ? '#0284c7' : '#15803d', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '3px' 
+                                  }}>
+                                    <Check size={13} strokeWidth={3} /> {targetPinLength} Ziffern
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Dots / Numbers Display */}
+                              <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                gap: isParentTarget ? '8px' : '14px', 
+                                padding: '4px 0' 
+                              }}>
+                                {Array.from({ length: targetPinLength }).map((_, idx) => {
+                                  const char = pinFormNew[idx];
+                                  const isFilled = Boolean(char);
+                                  const activeColor = isParentTarget ? '#0284c7' : '#15803d';
+                                  return (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        width: isParentTarget ? '38px' : '42px',
+                                        height: isParentTarget ? '44px' : '46px',
+                                        borderRadius: '12px',
+                                        border: isFilled 
+                                          ? `2px solid ${activeColor}` 
+                                          : (firstPinActiveField === 'new' && pinFormNew.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
+                                        background: '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1.25rem',
+                                        fontWeight: 900,
+                                        color: '#0f172a',
+                                        boxShadow: isFilled ? `0 2px 6px ${activeColor}25` : 'none',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                    >
+                                      {isFilled ? (firstPinShowMask ? char : '●') : ''}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Field 2: PIN Bestätigen */}
+                            <div 
+                              onClick={() => setFirstPinActiveField('confirm')}
+                              style={{
+                                padding: '12px 14px',
+                                borderRadius: '16px',
+                                border: firstPinActiveField === 'confirm' 
+                                  ? (isParentTarget ? '2px solid #0284c7' : '2px solid #15803d') 
+                                  : '1.5px solid #e2e8f0',
+                                background: firstPinActiveField === 'confirm' 
+                                  ? (isParentTarget ? '#f0f9ff' : '#f0fdf4') 
+                                  : '#ffffff',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                textAlign: 'left'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <span style={{ 
+                                  fontSize: '0.72rem', 
+                                  fontWeight: 800, 
+                                  color: firstPinActiveField === 'confirm' 
+                                    ? (isParentTarget ? '#0284c7' : '#15803d') 
+                                    : '#64748b', 
+                                  textTransform: 'uppercase', 
+                                  letterSpacing: '0.04em' 
+                                }}>
+                                  2. {targetPinLength}-stellige PIN wiederholen
+                                </span>
+                                {pinFormConfirm.length === targetPinLength && (
+                                  pinFormNew === pinFormConfirm ? (
+                                    <span style={{ 
+                                      fontSize: '0.7rem', 
+                                      fontWeight: 800, 
+                                      color: isParentTarget ? '#0284c7' : '#15803d', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: '3px' 
+                                    }}>
+                                      <CheckCheck size={14} strokeWidth={2.5} /> Stimmt überein
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#dc2626' }}>
+                                      Stimmt nicht überein
+                                    </span>
+                                  )
+                                )}
+                              </div>
+
+                              {/* Dots / Numbers Display */}
+                              <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                gap: isParentTarget ? '8px' : '14px', 
+                                padding: '4px 0' 
+                              }}>
+                                {Array.from({ length: targetPinLength }).map((_, idx) => {
+                                  const char = pinFormConfirm[idx];
+                                  const isFilled = Boolean(char);
+                                  const activeColor = isParentTarget ? '#0284c7' : '#15803d';
+                                  return (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        width: isParentTarget ? '38px' : '42px',
+                                        height: isParentTarget ? '44px' : '46px',
+                                        borderRadius: '12px',
+                                        border: isFilled 
+                                          ? (pinFormNew === pinFormConfirm && pinFormConfirm.length === targetPinLength ? `2px solid ${activeColor}` : '2px solid #64748b') 
+                                          : (firstPinActiveField === 'confirm' && pinFormConfirm.length === idx ? '2px solid #3b82f6' : '1.5px solid #cbd5e1'),
+                                        background: '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1.25rem',
+                                        fontWeight: 900,
+                                        color: '#0f172a',
+                                        boxShadow: isFilled ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                    >
+                                      {isFilled ? (firstPinShowMask ? char : '●') : ''}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Toggle show/hide numbers */}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', margin: '-4px 0 0 0' }}>
+                              <button
+                                type="button"
+                                onClick={() => setFirstPinShowMask(!firstPinShowMask)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#64748b',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '2px 4px'
+                                }}
+                              >
+                                {firstPinShowMask ? <EyeOff size={14} /> : <Eye size={14} />}
+                                <span>{firstPinShowMask ? 'Ziffern verbergen' : 'Ziffern anzeigen'}</span>
+                              </button>
+                            </div>
+
+                            {/* On-Screen Touch Keypad */}
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(3, 1fr)',
+                              gap: '8px',
+                              width: '100%',
+                              marginTop: '4px'
+                            }}>
+                              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
+                                const isClear = key === 'C';
+                                const isBack = key === 'back';
+                                return (
+                                  <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => {
+                                      setPinFormError('');
+                                      setPinFormSuccess('');
+                                      if (firstPinActiveField === 'new') {
+                                        if (isClear) {
+                                          setPinFormNew('');
+                                        } else if (isBack) {
+                                          setPinFormNew(prev => prev.slice(0, -1));
+                                        } else if (pinFormNew.length < targetPinLength) {
+                                          const nextVal = pinFormNew + key;
+                                          setPinFormNew(nextVal);
+                                          if (nextVal.length === targetPinLength) {
+                                            setFirstPinActiveField('confirm');
+                                          }
+                                        }
+                                      } else {
+                                        if (isClear) {
+                                          setPinFormConfirm('');
+                                        } else if (isBack) {
+                                          if (pinFormConfirm.length === 0) {
+                                            setFirstPinActiveField('new');
+                                          } else {
+                                            setPinFormConfirm(prev => prev.slice(0, -1));
+                                          }
+                                        } else if (pinFormConfirm.length < targetPinLength) {
+                                          setPinFormConfirm(prev => prev + key);
+                                        }
+                                      }
+                                    }}
+                                    style={{
+                                      padding: '12px 0',
+                                      borderRadius: '14px',
+                                      border: '1px solid #e2e8f0',
+                                      background: (isClear || isBack) ? '#f1f5f9' : '#ffffff',
+                                      color: '#0f172a',
+                                      fontSize: (isClear || isBack) ? '0.85rem' : '1.25rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                                      transition: 'all 0.1s'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    {isBack ? <Delete size={18} /> : key}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={isSavingPin || !isFilledComplete}
+                              onClick={async () => {
+                                if (pinFormNew.length !== targetPinLength) {
+                                  setPinFormError(`Bitte gib eine vollständige ${targetPinLength}-stellige PIN ein.`);
+                                  return;
                                 }
-                              } catch (err: any) {
-                                setPinFormError('Fehler: ' + (err?.message || 'Speichern fehlgeschlagen.'));
-                              } finally {
-                                setIsSavingPin(false);
-                              }
-                            }}
-                            style={{
-                              marginTop: '6px',
-                              padding: '14px 20px',
-                              borderRadius: '14px',
-                              background: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#34a853' : '#e2e8f0',
-                              color: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#ffffff' : '#94a3b8',
-                              border: 'none',
-                              fontWeight: 800,
-                              fontSize: '0.875rem',
-                              cursor: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && !isSavingPin) ? 'pointer' : 'not-allowed',
-                              transition: 'all 0.2s ease',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px'
-                            }}
-                            className={(pinFormNew.length === 4 && pinFormConfirm.length === 4) ? "hover-scale" : ""}
-                          >
-                            <Lock size={16} />
-                            {isSavingPin ? 'Speichere PIN...' : 'Neue PIN jetzt speichern'}
-                          </button>
+                                if (pinFormNew !== pinFormConfirm) {
+                                  setPinFormError('Die eingegebenen PINs stimmen nicht überein.');
+                                  return;
+                                }
+
+                                if (isParentTarget) {
+                                  // Trivial validation for 6-digit parent PIN
+                                  const trivialPins = ['123456', '654321', '000000', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999'];
+                                  if (trivialPins.includes(pinFormNew)) {
+                                    setPinFormError('Diese PIN ist zu einfach. Bitte wähle eine sicherere 6-stellige Eltern-PIN.');
+                                    return;
+                                  }
+                                } else {
+                                  const dayOfBirth = (studentUser as any)?.day_of_birth || (Array.isArray((studentUser as any)?.activation_days) ? (studentUser as any)?.activation_days[0]?.day_of_birth : (studentUser as any)?.activation_days?.day_of_birth);
+                                  const validation = validateNewPin(pinFormNew, dayOfBirth);
+                                  if (!validation.isValid) {
+                                    setPinFormError(validation.error || 'Ungültige PIN.');
+                                    return;
+                                  }
+                                }
+
+                                setIsSavingPin(true);
+                                setPinFormError('');
+
+                                try {
+                                  if (isParentTarget) {
+                                    // --- SAVE 6-DIGIT PARENT PIN ---
+                                    try {
+                                      await supabase.from('students').update({
+                                        parent_pin: pinFormNew,
+                                        has_parent_pin: true
+                                      }).eq('id', studentId);
+                                    } catch (e) {}
+
+                                    try {
+                                      await supabase.from('pending_students').update({
+                                        parent_pin: pinFormNew,
+                                        has_parent_pin: true
+                                      }).eq('id', studentId);
+                                    } catch (e) {}
+
+                                    try {
+                                      await supabase.from('users_raw').update({
+                                        parent_pin: pinFormNew,
+                                        has_parent_pin: true
+                                      }).eq('id', studentId);
+                                    } catch (e) {}
+
+                                    const { error } = await supabase
+                                      .from('users')
+                                      .update({ parent_pin: pinFormNew, has_parent_pin: true })
+                                      .eq('id', studentId);
+
+                                    localStorage.setItem(`groovelab_parent_pin_${studentId}`, pinFormNew);
+                                    sessionStorage.setItem(`groovelab_parent_pin_${studentId}`, pinFormNew);
+                                    sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+
+                                    if (error) {
+                                      setPinFormError('Fehler beim Speichern der Eltern-PIN: ' + error.message);
+                                    } else {
+                                      setPinFormSuccess('Deine 6-stellige Eltern-PIN wurde erfolgreich gespeichert! 🛡️');
+                                      setStudentUser((prev: any) => prev ? {
+                                        ...prev,
+                                        has_parent_pin: true,
+                                        parent_pin: pinFormNew
+                                      } : prev);
+                                      setPinFormNew('');
+                                      setPinFormConfirm('');
+                                    }
+                                  } else {
+                                    // --- SAVE 4-DIGIT STUDENT PIN (personal_pin) ---
+                                    if (studentId) {
+                                      sessionStorage.setItem('groovelab_user_id', studentId);
+                                      const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
+                                      if (authQrToken) {
+                                        sessionStorage.setItem('groovelab_qr_token', authQrToken);
+                                      }
+                                    }
+
+                                    try {
+                                      await supabase.from('students').update({
+                                        personal_pin: pinFormNew,
+                                        onboarding_pin: pinFormNew,
+                                        is_pin_activated: true,
+                                        is_campus_active: true
+                                      }).eq('id', studentId);
+
+                                      await supabase.from('pending_students').update({
+                                        personal_pin: pinFormNew,
+                                        onboarding_pin: pinFormNew,
+                                        is_pin_activated: true,
+                                        is_campus_active: true
+                                      }).eq('id', studentId);
+                                    } catch (e) {}
+
+                                    try {
+                                      await supabase.from('users_raw').update({
+                                        personal_pin: pinFormNew,
+                                        onboarding_pin: pinFormNew,
+                                        is_pin_activated: true,
+                                        is_campus_active: true
+                                      }).eq('id', studentId);
+                                    } catch (e) {}
+
+                                    const userUpdatePayload: any = {
+                                      personal_pin: pinFormNew,
+                                      onboarding_pin: pinFormNew,
+                                      is_pin_activated: true,
+                                      is_campus_active: true
+                                    };
+                                    let { error } = await supabase
+                                      .from('users')
+                                      .update(userUpdatePayload)
+                                      .eq('id', studentId);
+
+                                    if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                                      delete userUpdatePayload.onboarding_pin;
+                                      const fallbackRes = await supabase
+                                        .from('users')
+                                        .update(userUpdatePayload)
+                                        .eq('id', studentId);
+                                      error = fallbackRes.error;
+                                    }
+
+                                    if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
+                                      console.warn('[StudentAvatarDashboard] users view trigger warning ignored because student table was updated:', error);
+                                      error = null;
+                                    }
+
+                                    localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
+                                    localStorage.setItem(`groovelab_student_pin_${studentId}`, pinFormNew);
+                                    sessionStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
+
+                                    if (error) {
+                                      setPinFormError('Fehler beim Speichern der Schüler-PIN: ' + error.message);
+                                    } else {
+                                      setPinFormSuccess('Deine 4-stellige Schüler-PIN wurde erfolgreich gespeichert! 🎒');
+                                      setStudentUser((prev: any) => prev ? {
+                                        ...prev,
+                                        is_pin_activated: true,
+                                        has_personal_pin: true,
+                                        personal_pin: pinFormNew
+                                      } : prev);
+                                      if (onProfileUpdate) {
+                                        try { onProfileUpdate({ is_pin_activated: true, personal_pin: pinFormNew }); } catch (e) {}
+                                      }
+                                      setPinFormNew('');
+                                      setPinFormConfirm('');
+                                    }
+                                  }
+                                } catch (err: any) {
+                                  setPinFormError('Fehler: ' + (err?.message || 'Speichern fehlgeschlagen.'));
+                                } finally {
+                                  setIsSavingPin(false);
+                                }
+                              }}
+                              style={{
+                                marginTop: '6px',
+                                padding: '14px 20px',
+                                borderRadius: '14px',
+                                background: isFilledComplete 
+                                  ? (isParentTarget ? '#0284c7' : '#34a853') 
+                                  : '#e2e8f0',
+                                color: isFilledComplete ? '#ffffff' : '#94a3b8',
+                                border: 'none',
+                                fontWeight: 800,
+                                fontSize: '0.875rem',
+                                cursor: (isFilledComplete && !isSavingPin) ? 'pointer' : 'not-allowed',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px'
+                              }}
+                              className={isFilledComplete ? "hover-scale" : ""}
+                            >
+                              {isParentTarget ? <Lock size={16} /> : <Shield size={16} />}
+                              {isSavingPin 
+                                ? 'Speichere PIN...' 
+                                : (isAdultStudent 
+                                    ? 'Persönliche PIN jetzt speichern' 
+                                    : (isParentTarget ? '6-stellige Eltern-PIN jetzt speichern' : '4-stellige Schüler-PIN jetzt speichern'))}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {activeStudentSettingsModal === 'billing' && (
                       <div>
@@ -26309,7 +26827,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     gap: '10px'
                   }}>
                     <button
-                      onClick={() => setActiveStudentSettingsModal(null)}
+                      onClick={handleCloseSettingsModal}
                       style={{
                         padding: '8px 20px',
                         borderRadius: '10px',
@@ -26328,6 +26846,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 </div>
               </div>
             )}
+          </div>
+        )}
 
             {/* TIER-1 SAAS SCHICHT 1: ONE-TIME EMERGENCY KIT MODAL */}
             {showEmergencyKitModal && (
@@ -26597,26 +27117,31 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     onClick={async () => {
                       const raw = recoveryKeyInput.trim().toUpperCase().replace(/[\s-]/g, '').replace(/^REC/, '');
                       const userRecKey = String((studentUser as any)?.recovery_key || (studentUser as any)?.emergency_pin || '').trim().toUpperCase().replace(/[\s-]/g, '').replace(/^REC/, '');
+                      const cachedKey = (localStorage.getItem(`groovelab_recovery_key_${studentId}`) || '').toUpperCase().replace(/[\s-]/g, '').replace(/^REC/, '');
+                      const ausweisNum = String((studentUser as any)?.ausweis_nummer || '').trim().toUpperCase().replace(/[\s-]/g, '');
+                      const qrToken = String((studentUser as any)?.qr_token || '').trim().toUpperCase();
 
                       let isMatch = false;
-                      if (raw && userRecKey && raw === userRecKey) {
-                        isMatch = true;
-                      }
-
-                      if (!isMatch && raw) {
-                        const cachedKey = (localStorage.getItem(`groovelab_recovery_key_${studentId}`) || '').toUpperCase().replace(/[\s-]/g, '').replace(/^REC/, '');
-                        if (cachedKey && raw === cachedKey) isMatch = true;
-                      }
+                      if (raw && userRecKey && raw === userRecKey) isMatch = true;
+                      if (!isMatch && raw && cachedKey && raw === cachedKey) isMatch = true;
+                      if (!isMatch && raw && ausweisNum && raw === ausweisNum) isMatch = true;
+                      if (!isMatch && raw && qrToken && raw === qrToken) isMatch = true;
 
                       if (isMatch) {
                         // Valid recovery key!
                         localStorage.removeItem(`groovelab_parent_pin_${studentId}`);
+                        sessionStorage.removeItem(`groovelab_parent_session_${studentId}`);
+                        sessionStorage.removeItem(`groovelab_parent_unlocked_${studentId}`);
+                        sessionStorage.removeItem('groovelab_parent_unlocked_global');
                         if (studentUser) {
                           (studentUser as any).has_parent_pin = false;
                           (studentUser as any).parent_pin = null;
                         }
                         try {
                           await supabase.from('users').update({ parent_pin: null, has_parent_pin: false }).eq('id', studentId);
+                          try { await supabase.from('students').update({ parent_pin: null, has_parent_pin: false }).eq('id', studentId); } catch(err){}
+                          try { await supabase.from('pending_students').update({ parent_pin: null, has_parent_pin: false }).eq('id', studentId); } catch(err){}
+                          try { await supabase.from('users_raw').update({ parent_pin: null, has_parent_pin: false }).eq('id', studentId); } catch(err){}
                         } catch (e) {}
 
                         setShowRecoveryKeyModal(false);
@@ -26683,7 +27208,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 </div>
               </div>
             )}
-          </div>
+          </>
         );
       })()}
 

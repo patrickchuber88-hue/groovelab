@@ -295,7 +295,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
               e.currentTarget.style.boxShadow = '0 2px 8px rgba(15, 23, 42, 0.15)';
             }}
           >
-            <Upload size={14} /> Bank-CSV abgleichen
+            <Upload size={14} /> CAMT.053 &amp; Bank-CSV abgleichen
           </button>
 
           {/* Refresh Button */}

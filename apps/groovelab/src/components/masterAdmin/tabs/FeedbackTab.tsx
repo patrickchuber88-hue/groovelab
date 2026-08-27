@@ -294,19 +294,48 @@ export const FeedbackTab: React.FC = () => {
 
       if (annErr) throw annErr;
 
-      // Mark feedback as done & announcement created
+      // Mark feedback as done & announcement created + generate official developer shout
       if (selectedItem) {
+        const heroNotice = releaseCredit.trim() 
+          ? `🎉 Deine Idee ist jetzt live! Wir haben deinen Vorschlag für „${releaseTitle.trim()}“ erfolgreich umgesetzt und im aktuellen Update-Briefing gewürdigt (${releaseCredit.trim()}). Vielen Dank für deinen wertvollen Beitrag zu Campus-Groovelab!`
+          : `🎉 Deine Idee ist jetzt live! Wir haben deinen Vorschlag für „${releaseTitle.trim()}“ erfolgreich umgesetzt. Vielen Dank für deinen wertvollen Beitrag zu Campus-Groovelab!`;
+
         await supabase
           .from('platform_feedback')
           .update({
             status: 'done',
             is_announcement_created: true,
+            admin_response: heroNotice,
+            admin_responded_at: new Date().toISOString(),
+            is_user_read: false,
             updated_at: new Date().toISOString()
           })
           .eq('id', selectedItem.id);
 
+        // If submitter user_id is known, push a direct system message
+        if (selectedItem.user_id) {
+          try {
+            await supabase.from('campus_direct_messages').insert({
+              recipient_id: selectedItem.user_id,
+              sender_id: selectedItem.user_id,
+              content: heroNotice,
+              is_system: true,
+              message_type: 'helden_moment_reward'
+            });
+          } catch (dmErr) {
+            console.warn('Direct message notification note:', dmErr);
+          }
+        }
+
         setItems(prev => prev.map(it => 
-          it.id === selectedItem.id ? { ...it, status: 'done', is_announcement_created: true } : it
+          it.id === selectedItem.id ? { 
+            ...it, 
+            status: 'done', 
+            is_announcement_created: true,
+            admin_response: heroNotice,
+            admin_responded_at: new Date().toISOString(),
+            is_user_read: false
+          } : it
         ));
       }
 

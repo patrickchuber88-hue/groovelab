@@ -1293,7 +1293,22 @@ export function TeacherDashboard({
   const [selectedCoachProfile, setSelectedCoachProfile] = useState<any>(null);
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<any>(null);
   const [docStudent, setDocStudent] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches' | 'messages'>(initialTab || (hideHeader ? 'live' : 'briefing'));
+  const [activeTab, setActiveTabRaw] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches' | 'messages'>(() => {
+    if (initialTab) return initialTab;
+    const valid = ['briefing', 'live', 'bands', 'students', 'proposals', 'settings', 'coaches', 'messages'];
+    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('campus_teacher_active_tab') || localStorage.getItem('campus_teacher_active_tab')) : null;
+    if (saved && valid.includes(saved)) return saved as any;
+    return hideHeader ? 'live' : 'briefing';
+  });
+
+  const setActiveTab = (tab: 'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches' | 'messages') => {
+    setActiveTabRaw(tab);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('campus_teacher_active_tab', tab);
+      localStorage.setItem('campus_teacher_active_tab', tab);
+    }
+    if (onTabChange) onTabChange(tab);
+  };
 
   // --- Guided Tour ---
   const tourSteps = useMemo<TourStep[]>(() => {
