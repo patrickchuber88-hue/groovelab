@@ -48,9 +48,15 @@ export const useNotes = ({ user, schoolId, activeStudent }: UseNotesOptions) => 
   useEffect(() => {
     refreshNotes();
 
-    // Listen to multi-tab sync
+    // Listen to multi-tab sync with equality guard
     const unsubscribe = notesService.onSync(() => {
-      notesService.getLocalNotes(userId).then(setNotes);
+      notesService.getLocalNotes(userId).then(newNotes => {
+        if (!newNotes) return;
+        setNotes(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(newNotes)) return prev;
+          return newNotes;
+        });
+      });
     });
 
     return () => unsubscribe();
@@ -164,32 +170,51 @@ export const useNotes = ({ user, schoolId, activeStudent }: UseNotesOptions) => 
   // 3. Actions
   const createNote = async (content: string, options: {
     studentId?: string | null;
+    student_id?: string | null;
     studentName?: string | null;
+    student_name?: string | null;
     roomId?: string | null;
+    room_id?: string | null;
     noteType?: 'scratchpad' | 'student_note' | 'todo' | 'audio_memo' | 'room_issue';
+    note_type?: 'scratchpad' | 'student_note' | 'todo' | 'audio_memo' | 'room_issue';
     authorName?: string | null;
+    author_name?: string | null;
     audioUrl?: string | null;
+    audio_url?: string | null;
     audioDurationSeconds?: number | null;
+    audio_duration_seconds?: number | null;
     dueDate?: string | null;
+    due_date?: string | null;
     isPinned?: boolean;
+    is_pinned?: boolean;
     visibility?: 'private' | 'school_admin' | 'student_shared';
+    tags?: string[];
   } = {}) => {
     setSaveStatus('saving');
-    const authorName = options.authorName || `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Lehrkraft';
+    const effectiveAuthorName = options.authorName || (options as any).author_name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Lehrkraft';
+    const effectiveStudentId = options.studentId !== undefined ? options.studentId : ((options as any).student_id !== undefined ? (options as any).student_id : null);
+    const rawStudentName = options.studentName !== undefined ? options.studentName : ((options as any).student_name !== undefined ? (options as any).student_name : null);
+    const effectiveStudentName = rawStudentName ? maskStudentName(rawStudentName) : null;
+    const effectiveRoomId = options.roomId || (options as any).room_id || null;
+    const effectiveNoteType = options.noteType || (options as any).note_type;
+    const effectiveDueDate = options.dueDate || (options as any).due_date || null;
+    const effectiveIsPinned = options.isPinned !== undefined ? options.isPinned : ((options as any).is_pinned || false);
+
     const newNote = await notesService.createNote({
       userId,
       schoolId: effectiveSchoolId,
       content,
-      authorName,
-      studentId: options.studentId !== undefined ? options.studentId : null,
-      studentName: options.studentName !== undefined ? maskStudentName(options.studentName) : null,
-      roomId: options.roomId,
-      noteType: options.noteType,
-      audioUrl: options.audioUrl,
-      audioDurationSeconds: options.audioDurationSeconds,
-      dueDate: options.dueDate || null,
-      isPinned: options.isPinned,
-      visibility: options.visibility
+      authorName: effectiveAuthorName,
+      studentId: effectiveStudentId,
+      studentName: effectiveStudentName,
+      roomId: effectiveRoomId,
+      noteType: effectiveNoteType,
+      audioUrl: options.audioUrl || (options as any).audio_url || null,
+      audioDurationSeconds: options.audioDurationSeconds || (options as any).audio_duration_seconds || null,
+      dueDate: effectiveDueDate,
+      isPinned: effectiveIsPinned,
+      visibility: options.visibility || 'private',
+      tags: options.tags
     });
 
     setNotes(prev => [newNote, ...prev]);
@@ -318,7 +343,86 @@ export const useNotes = ({ user, schoolId, activeStudent }: UseNotesOptions) => 
       console.error('Failed to sync homework note:', e);
       return false;
     }
-  }, [activeStudent, userId]);
+  }, [activeStudent, userId, updateNote]);
+
+  // Unsync from Student's Homework Book (Toggles back to Private Note)
+  const unsyncFromHomeworkBook = useCallback(async (note: UserNote, targetStudentId?: string): Promise<boolean> => {
+    const sId = targetStudentId || note.student_id || activeStudent?.id;
+    if (!sId) return false;
+
+    try {
+      const cleanContent = note.content
+        .replace(/#Hausaufgabe/gi, '')
+        .replace(/@\S+/g, '')
+        .trim();
+
+      const storageKey = `campus_homework_notes_${sId}`;
+      const existingRaw = localStorage.getItem(storageKey);
+      let existingList: string[] = [];
+      try {
+        existingList = existingRaw ? JSON.parse(existingRaw) : [];
+        if (!Array.isArray(existingList)) existingList = existingRaw ? [existingRaw] : [];
+      } catch (e) {
+        existingList = existingRaw ? [existingRaw] : [];
+      }
+
+      const formattedEntry = note.audio_url 
+        ? `AUDIO:${note.audio_url}|${note.audio_duration_seconds || 1}|${new Date().toISOString()}|${cleanContent || 'Unterrichts-Audio'}|teacher|shared_with_teacher`
+        : cleanContent;
+
+      const filteredList = existingList.filter(item => {
+        if (typeof item !== 'string') return true;
+        if (item === formattedEntry || item === cleanContent) return false;
+        if (note.audio_url && item.startsWith(`AUDIO:${note.audio_url}`)) return false;
+        return true;
+      });
+
+      localStorage.setItem(storageKey, JSON.stringify(filteredList));
+
+      // Update in Supabase progress_matrix if online
+      try {
+        const d = new Date();
+        const startOfYear = new Date(d.getFullYear(), 0, 1);
+        const pastDays = (d.getTime() - startOfYear.getTime()) / 86400000;
+        const weekNum = Math.ceil((pastDays + startOfYear.getDay() + 1) / 7);
+        const topicName = `Hausaufgabe KW ${String(weekNum).padStart(2, '0')}`;
+
+        const { data: existingMatrix } = await supabase
+          .from('progress_matrix')
+          .select('id, homework_notes')
+          .eq('student_id', sId)
+          .eq('topic_name', topicName)
+          .maybeSingle();
+
+        if (existingMatrix) {
+          await supabase
+            .from('progress_matrix')
+            .update({
+              homework_notes: JSON.stringify(filteredList),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingMatrix.id);
+        }
+      } catch (dbErr) {
+        console.warn('[unsyncFromHomeworkBook] DB sync notice:', dbErr);
+      }
+
+      // Dispatch global event for same-window / modal live sync
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId: sId } }));
+      }
+
+      // Mark note as private
+      await updateNote(note.id, { 
+        visibility: 'private',
+        tags: (note.tags || []).filter(t => t.toLowerCase() !== '#hausaufgabe')
+      });
+      return true;
+    } catch (e) {
+      console.error('Failed to unsync homework note:', e);
+      return false;
+    }
+  }, [activeStudent, userId, updateNote]);
 
   return {
     notes,
@@ -342,6 +446,7 @@ export const useNotes = ({ user, schoolId, activeStudent }: UseNotesOptions) => 
     toggleCompleteTodo,
     toggleArchive,
     syncToHomeworkBook,
+    unsyncFromHomeworkBook,
     refreshNotes
   };
 };

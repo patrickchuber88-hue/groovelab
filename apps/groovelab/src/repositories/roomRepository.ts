@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { getItemWithTTL, setItemWithTTL } from '../utils/ttlCache';
+import { dedupeQuery } from '../utils/dedupeQuery';
 
 export interface RoomRecord {
   id: string;
@@ -48,26 +49,28 @@ export async function fetchRoomsBySchool(schoolId: string, force = false): Promi
     }
   }
 
-  try {
-    const { data, error } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('sort_order', { ascending: true });
+  return dedupeQuery(`rooms_${schoolId}`, async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('sort_order', { ascending: true });
 
-    if (error) {
-      console.warn('[RoomRepository] Error fetching rooms:', error);
+      if (error) {
+        console.warn('[RoomRepository] Error fetching rooms:', error);
+        return inMemoryRooms.get(schoolId)?.data || [];
+      }
+
+      const result = data || [];
+      inMemoryRooms.set(schoolId, { timestamp: Date.now(), data: result });
+      setItemWithTTL(persistentKey, result, CACHE_TTL_MS);
+      return result;
+    } catch (err) {
+      console.error('[RoomRepository] Unexpected error in fetchRoomsBySchool:', err);
       return inMemoryRooms.get(schoolId)?.data || [];
     }
-
-    const result = data || [];
-    inMemoryRooms.set(schoolId, { timestamp: Date.now(), data: result });
-    setItemWithTTL(persistentKey, result, CACHE_TTL_MS);
-    return result;
-  } catch (err) {
-    console.error('[RoomRepository] Unexpected error in fetchRoomsBySchool:', err);
-    return inMemoryRooms.get(schoolId)?.data || [];
-  }
+  });
 }
 
 export async function fetchStationsBySchool(schoolId: string, force = false): Promise<StationRecord[]> {
@@ -89,25 +92,27 @@ export async function fetchStationsBySchool(schoolId: string, force = false): Pr
     }
   }
 
-  try {
-    const { data, error } = await supabase
-      .from('stations')
-      .select('*, rooms!inner(school_id, is_groovelab_active)')
-      .eq('rooms.school_id', schoolId)
-      .eq('rooms.is_groovelab_active', true)
-      .order('name');
+  return dedupeQuery(`stations_${schoolId}`, async () => {
+    try {
+      const { data, error } = await supabase
+        .from('stations')
+        .select('*, rooms!inner(school_id, is_groovelab_active)')
+        .eq('rooms.school_id', schoolId)
+        .eq('rooms.is_groovelab_active', true)
+        .order('name');
 
-    if (error) {
-      console.warn('[RoomRepository] Error fetching stations:', error);
+      if (error) {
+        console.warn('[RoomRepository] Error fetching stations:', error);
+        return inMemoryStations.get(schoolId)?.data || [];
+      }
+
+      const result = data || [];
+      inMemoryStations.set(schoolId, { timestamp: Date.now(), data: result });
+      setItemWithTTL(persistentKey, result, CACHE_TTL_MS);
+      return result;
+    } catch (err) {
+      console.error('[RoomRepository] Unexpected error in fetchStationsBySchool:', err);
       return inMemoryStations.get(schoolId)?.data || [];
     }
-
-    const result = data || [];
-    inMemoryStations.set(schoolId, { timestamp: Date.now(), data: result });
-    setItemWithTTL(persistentKey, result, CACHE_TTL_MS);
-    return result;
-  } catch (err) {
-    console.error('[RoomRepository] Unexpected error in fetchStationsBySchool:', err);
-    return inMemoryStations.get(schoolId)?.data || [];
-  }
+  });
 }

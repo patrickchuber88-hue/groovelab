@@ -254,11 +254,19 @@ export const notesService = {
     dueDate?: string | null;
     isPinned?: boolean;
     visibility?: 'private' | 'school_admin' | 'student_shared';
+    tags?: string[];
   }): Promise<UserNote> {
     const { studentMentions, tags, rooms, isTodo } = parseSmartTags(params.content);
 
     const detectedType = params.noteType || 
       (params.audioUrl ? 'audio_memo' : isTodo ? 'todo' : params.studentId ? 'student_note' : (rooms.length > 0 && params.visibility === 'school_admin') ? 'room_issue' : 'scratchpad');
+
+    const combinedTags = Array.from(new Set([
+      ...tags,
+      ...(params.tags || []),
+      ...(isTodo ? ['todo'] : []),
+      ...(detectedType === 'room_issue' ? ['#Mangel'] : [])
+    ]));
 
     const newNote: UserNote = {
       id: 'note_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
@@ -266,11 +274,11 @@ export const notesService = {
       author_name: params.authorName || null,
       school_id: params.schoolId,
       student_id: params.studentId || null,
-      student_name: params.studentName ? maskStudentName(params.studentName) : (params.studentId && studentMentions.length > 0 ? maskStudentName(studentMentions[0]) : null),
+      student_name: params.studentName ? maskStudentName(params.studentName) : (studentMentions.length > 0 ? maskStudentName(studentMentions[0]) : null),
       room_id: params.roomId || (rooms.length > 0 ? rooms[0] : null),
       title: params.title || undefined,
       content: params.content,
-      tags: Array.from(new Set([...tags, ...(isTodo ? ['todo'] : []), ...(detectedType === 'room_issue' ? ['#Mangel'] : [])])),
+      tags: combinedTags,
       note_type: detectedType,
       audio_url: params.audioUrl || null,
       audio_duration_seconds: params.audioDurationSeconds || null,

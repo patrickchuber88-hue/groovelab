@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, MicOff, Volume2, VolumeX, ArrowLeft, RotateCcw, Check, Sparkles, Sliders, Music, Radio } from 'lucide-react';
+import { acquireAudioStream, releaseAudioStream } from '../../services/audioPermissionService';
 
 // Musikalische Noten-Definitionen
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -222,7 +223,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
       animationFrameRef.current = null;
     }
     if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      releaseAudioStream(mediaStreamRef.current);
       mediaStreamRef.current = null;
     }
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
@@ -285,7 +286,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
   const startListening = async () => {
     setMicError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await acquireAudioStream({
         audio: {
           echoCancellation: false,
           autoGainControl: true,

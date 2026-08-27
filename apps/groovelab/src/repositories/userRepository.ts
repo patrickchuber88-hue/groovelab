@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { getItemWithTTL, setItemWithTTL } from '../utils/ttlCache';
+import { dedupeQuery } from '../utils/dedupeQuery';
 
 export interface UserProfile {
   id: string;
@@ -42,47 +43,51 @@ export interface SchoolRecord {
 
 export async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
   if (!userId) return null;
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*, schools(*)')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (error || !data) {
-      // Fallback: query users directly if join failed
-      const { data: fallbackUser } = await supabase
+  return dedupeQuery(`user_profile_${userId}`, async () => {
+    try {
+      const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('*, schools(*)')
         .eq('id', userId)
         .maybeSingle();
-      return fallbackUser || null;
+
+      if (error || !data) {
+        // Fallback: query users directly if join failed
+        const { data: fallbackUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        return fallbackUser || null;
+      }
+      return data as UserProfile;
+    } catch (err) {
+      console.error('[UserRepository] Error fetching user profile:', err);
+      return null;
     }
-    return data as UserProfile;
-  } catch (err) {
-    console.error('[UserRepository] Error fetching user profile:', err);
-    return null;
-  }
+  });
 }
 
 export async function fetchSchoolStaff(schoolId: string): Promise<UserProfile[]> {
   if (!schoolId) return [];
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .in('role', ['teacher', 'admin', 'secretary'])
-      .eq('school_id', schoolId);
+  return dedupeQuery(`school_staff_${schoolId}`, async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .in('role', ['teacher', 'admin', 'secretary'])
+        .eq('school_id', schoolId);
 
-    if (error) {
-      console.warn('[UserRepository] Error fetching school staff:', error);
+      if (error) {
+        console.warn('[UserRepository] Error fetching school staff:', error);
+        return [];
+      }
+      return (data || []) as UserProfile[];
+    } catch (err) {
+      console.error('[UserRepository] Unexpected error in fetchSchoolStaff:', err);
       return [];
     }
-    return (data || []) as UserProfile[];
-  } catch (err) {
-    console.error('[UserRepository] Unexpected error in fetchSchoolStaff:', err);
-    return [];
-  }
+  });
 }
 
 export async function fetchSchoolById(schoolId: string, force = false): Promise<SchoolRecord | null> {
@@ -94,25 +99,27 @@ export async function fetchSchoolById(schoolId: string, force = false): Promise<
     if (cached) return cached;
   }
 
-  try {
-    const { data, error } = await supabase
-      .from('schools')
-      .select('*')
-      .eq('id', schoolId)
-      .maybeSingle();
+  return dedupeQuery(`school_${schoolId}`, async () => {
+    try {
+      const { data, error } = await supabase
+        .from('schools')
+        .select('*')
+        .eq('id', schoolId)
+        .maybeSingle();
 
-    if (error) {
-      console.warn('[UserRepository] Error fetching school data:', error);
+      if (error) {
+        console.warn('[UserRepository] Error fetching school data:', error);
+        return null;
+      }
+      if (data) {
+        setItemWithTTL(persistentKey, data, 2 * 60 * 1000); // 2 minutes cache
+      }
+      return data as SchoolRecord;
+    } catch (err) {
+      console.error('[UserRepository] Unexpected error in fetchSchoolById:', err);
       return null;
     }
-    if (data) {
-      setItemWithTTL(persistentKey, data, 2 * 60 * 1000); // 2 minutes cache
-    }
-    return data as SchoolRecord;
-  } catch (err) {
-    console.error('[UserRepository] Unexpected error in fetchSchoolById:', err);
-    return null;
-  }
+  });
 }
 
 export function updateUserPresence(userId: string): void {

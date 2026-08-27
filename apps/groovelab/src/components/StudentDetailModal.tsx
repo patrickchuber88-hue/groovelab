@@ -973,6 +973,28 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   };
 
+  const handleResetParentPin = async () => {
+    if (!confirm(`Möchtest du die Eltern-PIN für ${student.first_name || 'diesen Schüler'} wirklich zurücksetzen? Die Eltern können danach auf ihrem Gerät eine neue 6-stellige PIN festlegen.`)) return;
+    try {
+      await ensureUserRawRecord(student);
+      const { error: rawErr } = await supabase
+        .from('users_raw')
+        .update({ parent_pin: null, recovery_key: null })
+        .eq('id', student.id);
+      try {
+        await supabase.from('users').update({ parent_pin: null, has_parent_pin: false }).eq('id', student.id);
+      } catch (e) {}
+
+      if (rawErr) throw rawErr;
+      setParentPin('');
+      student.parent_pin = null;
+      student.has_parent_pin = false;
+      alert(`Die Eltern-PIN für ${student.first_name || 'den Schüler'} wurde erfolgreich zurückgesetzt.`);
+    } catch (err: any) {
+      alert('Fehler beim Zurücksetzen der Eltern-PIN: ' + err.message);
+    }
+  };
+
   const handleLinkGroup = async () => {
     if (!selectedStudentToLink) return;
     try {
@@ -4074,52 +4096,32 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                       <div>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Eltern-PIN (4-stellig)</span>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Sichert den Eltern-Bereich auf der Schüler-Startseite</div>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Eltern-Master-PIN (6-stellig)</span>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Sichert den Eltern-Bereich auf dem Schüler-Gerät</div>
                       </div>
-                      {currentUserRole === 'admin' || currentUserRole === 'secretary' ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <input
-                            type="password"
-                            maxLength={4}
-                            placeholder="1234"
-                            value={parentPin}
-                            onChange={e => {
-                              const clean = e.target.value.replace(/\D/g, '');
-                              setParentPin(clean);
-                            }}
-                            style={{
-                              width: '70px',
-                              padding: '6px 10px',
-                              border: '1.5px solid #cbd5e1',
-                              borderRadius: '10px',
-                              fontSize: '0.85rem',
-                              textAlign: 'center',
-                              outline: 'none',
-                              fontWeight: 700,
-                              letterSpacing: '0.1em'
-                            }}
-                          />
-                          <button
-                            onClick={() => handleUpdateParentPin(parentPin)}
-                            style={{
-                              background: '#34a853',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '8px',
-                              padding: '6px 12px',
-                              fontSize: '0.75rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              transition: 'all 0.15s'
-                            }}
-                          >
-                            Speichern
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '0.85rem', fontWeight: 800, letterSpacing: '0.1em' }}>****</span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={handleResetParentPin}
+                        style={{
+                          background: '#e0f2fe',
+                          color: '#0284c7',
+                          border: '1px solid #bae6fd',
+                          borderRadius: '10px',
+                          padding: '6px 12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s'
+                        }}
+                        className="hover-scale-mini"
+                        title="Setzt die Eltern-PIN zurück, damit Eltern auf ihrem Gerät eine neue 6-stellige PIN vergeben können"
+                      >
+                        <ShieldCheck size={14} />
+                        <span>Eltern-PIN zurücksetzen</span>
+                      </button>
                     </div>
                   </>
                 )}

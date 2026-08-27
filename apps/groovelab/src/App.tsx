@@ -3,6 +3,7 @@ import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldChec
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
+import { dbCircuitBreaker } from './utils/circuitBreaker';
 import { subscribeUserToPush } from './utils/webPush';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar, resolveStudentInstrumentAsync, getEffectiveInstrument } from './components/StudioAvatar';
 import { reportClientError, initGlobalErrorListeners } from './lib/errorTelemetry';
@@ -2191,6 +2192,7 @@ function App() {
   const setLocationMode = React.useCallback((val: 'lab' | 'home' | ((prev: 'lab' | 'home') => 'lab' | 'home')) => {
     setLocationModeRaw((prev) => {
       const nextVal = typeof val === 'function' ? val(prev) : val;
+      if (prev === nextVal) return prev;
       if (typeof window !== 'undefined') {
         if (nextVal) {
           sessionStorage.setItem('groovelab_location_mode', nextVal);
@@ -2715,6 +2717,18 @@ function App() {
   const setUser = React.useCallback((val: any) => {
     setUserRaw((prev: any) => {
       const nextVal = typeof val === 'function' ? val(prev) : val;
+
+      // Tier-1 Silent Background Sync: Deep Equality Guard
+      if (prev && nextVal && typeof prev === 'object' && typeof nextVal === 'object') {
+        try {
+          if (JSON.stringify(prev) === JSON.stringify(nextVal)) {
+            return prev; // Same object reference -> 0 React re-renders!
+          }
+        } catch {
+          // fallback
+        }
+      }
+
       if (typeof window !== 'undefined') {
         if (nextVal) {
           sessionStorage.setItem('groovelab_cached_user', JSON.stringify(nextVal));
@@ -2890,7 +2904,20 @@ function App() {
     }
   }, []);
 
-  const [session, setSession] = useState<any>(null);
+  const [session, setSessionRaw] = useState<any>(null);
+  const setSession = React.useCallback((val: any) => {
+    setSessionRaw((prev: any) => {
+      const nextVal = typeof val === 'function' ? val(prev) : val;
+      if (prev && nextVal && typeof prev === 'object' && typeof nextVal === 'object') {
+        try {
+          if (JSON.stringify(prev) === JSON.stringify(nextVal)) {
+            return prev;
+          }
+        } catch {}
+      }
+      return nextVal;
+    });
+  }, []);
   const [totalPresenceMins, setTotalPresenceMins] = useState(0);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [editingProfile, setEditingProfile] = useState<any>(null);
@@ -3841,6 +3868,13 @@ function App() {
               return;
             }
           }
+          // Ignore pure heartbeat / presence updates to prevent continuous re-render cascades
+          if (payload.old && payload.new) {
+            const hasSubstantiveChange = Object.keys(payload.new).some(
+              k => k !== 'last_seen' && payload.old[k] !== payload.new[k]
+            );
+            if (!hasSubstantiveChange) return;
+          }
           console.log('[Realtime] Current user profile update detected, refetching...');
           const { data: updatedUser } = await supabase.from('users').select('*, schools(*)').eq('id', user.id).single();
           if (updatedUser) {
@@ -3852,6 +3886,13 @@ function App() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` },
         async (payload: any) => {
+          // Ignore pure heartbeat / presence updates to prevent continuous re-render cascades
+          if (payload.old && payload.new) {
+            const hasSubstantiveChange = Object.keys(payload.new).some(
+              k => k !== 'last_seen' && payload.old[k] !== payload.new[k]
+            );
+            if (!hasSubstantiveChange) return;
+          }
           console.log('[Realtime] Current user profile update detected, refetching...');
           const { data: updatedUser } = await supabase.from('users').select('*, schools(*)').eq('id', user.id).single();
           if (updatedUser) {
@@ -7359,9 +7400,21 @@ function App() {
       })
       .subscribe();
 
-    // Heartbeat: Update last_seen every 30 seconds
+    // Activity-driven Heartbeat (90s): only writes to DB if user interacted recently
+    let lastActivityTime = Date.now();
+    const handleUserActivity = () => {
+      lastActivityTime = Date.now();
+    };
+    window.addEventListener('mousemove', handleUserActivity, { passive: true });
+    window.addEventListener('keydown', handleUserActivity, { passive: true });
+    window.addEventListener('touchstart', handleUserActivity, { passive: true });
+
     const updateHeartbeat = async () => {
       try {
+        if (document.hidden) return;
+        // If idle for > 5 minutes, skip DB write to protect Postgres WAL and autovacuum
+        if (Date.now() - lastActivityTime > 5 * 60 * 1000) return;
+
         const now = new Date().toISOString();
         if (user?.id) {
           await supabase
@@ -7375,15 +7428,18 @@ function App() {
     };
 
     updateHeartbeat(); // Immediate heartbeat on load/mount
-    const heartbeat = setInterval(updateHeartbeat, 30000);
+    const heartbeat = setInterval(updateHeartbeat, 90000); // 90 seconds interval
 
-    // Immediate heartbeat, layout reflow, and screen blurring protection when backgrounding tab
+    // Immediate heartbeat, Realtime reconnection, layout reflow, and screen blurring protection when backgrounding tab
     const handleVisibilityChange = () => {
       if (document.hidden) {
         document.body.style.filter = 'blur(16px)';
         document.body.style.transition = 'filter 0.15s ease-out';
       } else {
         document.body.style.filter = 'none';
+        lastActivityTime = Date.now();
+        dbCircuitBreaker.recordSuccess();
+        try { (supabase.realtime as any)?.connect?.(); } catch (e) {}
         updateHeartbeat();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('resize'));
@@ -7391,6 +7447,15 @@ function App() {
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const handleOnlineSync = () => {
+      console.info('[Network] Device came online. Reconnecting Realtime & refreshing state...');
+      lastActivityTime = Date.now();
+      dbCircuitBreaker.recordSuccess();
+      try { (supabase.realtime as any)?.connect?.(); } catch (e) {}
+      updateHeartbeat();
+    };
+    window.addEventListener('online', handleOnlineSync);
 
     const handleBeforeUnload = () => {
       if (user?.id) {
@@ -7418,7 +7483,11 @@ function App() {
       supabase.removeChannel(sessionsChannel);
       clearInterval(heartbeat);
       if (debounceCountTimer) clearTimeout(debounceCountTimer);
+      window.removeEventListener('mousemove', handleUserActivity);
+      window.removeEventListener('keydown', handleUserActivity);
+      window.removeEventListener('touchstart', handleUserActivity);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnlineSync);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [user?.id, user?.school_id, session?.id]);
@@ -12300,12 +12369,12 @@ function App() {
 
         {/* Admin/Teacher Section Tabs (Unified) */}
         {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'secretary')) && activePlatform !== 'ensembles' && activeStudentTab !== 'profile' && activeStudentTab !== 'messages' && (
-          <ErrorBoundary key={`${activePlatform}-${activeStudentTab}`}>
+          <ErrorBoundary key={`admin-teacher-suite-${activePlatform}`}>
             <AdminDashboard 
-              key={activePlatform}
+              key={`admin-dashboard-${activePlatform}`}
               userId={user.id} 
               onLogout={handleLogout} 
-              forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? activeStudentTab : 'live'}
+              forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', 'briefing', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? activeStudentTab : undefined}
               activePlatform={activePlatform as any}
               onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
               onSwitchPlatform={(platform) => setActivePlatform(platform)}

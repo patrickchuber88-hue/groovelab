@@ -55,8 +55,8 @@ class DatabaseCircuitBreaker {
   public recordFailure(err?: any): void {
     const errMsg = err?.message || String(err || '');
     const isAbort = err?.name === 'AbortError' || errMsg.includes('AbortError') || errMsg.includes('aborted');
-    if (isAbort) {
-      // Client-side cancellation or component unmount should not trip the server circuit breaker
+    if (isAbort || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      // Client-side cancellation, unmount, or device offline should not trip the server circuit breaker
       return;
     }
 
@@ -75,6 +75,12 @@ class DatabaseCircuitBreaker {
       this.state = 'OPEN';
       console.error(`[CircuitBreaker] Circuit TRIPPED to OPEN. Throttling requests for ${this.cooldownMs}ms to protect server.`);
     }
+  }
+
+  public reset(): void {
+    this.state = 'CLOSED';
+    this.failureCount = 0;
+    this.lastFailureTime = 0;
   }
 
   public async execute<T>(fn: (signal?: AbortSignal) => Promise<T>, fallbackFn?: () => Promise<T>): Promise<T> {
@@ -114,3 +120,10 @@ export const dbCircuitBreaker = new DatabaseCircuitBreaker({
   cooldownMs: 4000,
   timeoutMs: 15000
 });
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    console.info('[CircuitBreaker] Device reconnected to network (online event). Resetting circuit state.');
+    dbCircuitBreaker.reset();
+  });
+}

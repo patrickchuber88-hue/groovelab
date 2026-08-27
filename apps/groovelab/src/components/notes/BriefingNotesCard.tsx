@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { 
   Edit3, 
   Mic, 
@@ -7,7 +7,7 @@ import {
   CheckCheck, 
   Circle, 
   CheckCircle2, 
-  Plus,
+  Plus, 
   BookOpen, 
   Send, 
   Trash2, 
@@ -18,27 +18,49 @@ import {
   Volume2, 
   Play, 
   Pause, 
-  Square,
+  Square, 
   Lock, 
   User, 
-  Sparkles,
-  Calendar,
-  Layers,
-  Archive,
-  Hash,
-  DoorOpen,
-  Music,
-  AlertTriangle,
-  Zap,
-  CheckSquare,
-  ChevronDown,
-  Clock
+  Sparkles, 
+  Calendar, 
+  Layers, 
+  Archive, 
+  Hash, 
+  DoorOpen, 
+  Music, 
+  AlertTriangle, 
+  Zap, 
+  CheckSquare, 
+  ChevronDown, 
+  Clock 
 } from 'lucide-react';
 import { useNotes } from '../../hooks/useNotes';
 import { useVoiceToText } from '../../hooks/useVoiceToText';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
 import { UserNote, maskStudentName } from '../../services/notesService';
 import { supabase } from '../../lib/supabase';
+import { acquireAudioStream, releaseAudioStream } from '../../services/audioPermissionService';
+import {
+  TagDefinition,
+  STUDENT_SKILL_TAGS,
+  TEACHER_ORGANIZATION_TAGS,
+  COMMON_TAGS,
+  QUICK_SNIPPETS,
+  renderMonochromeTagIcon,
+  getAllTagStyle,
+  formatCleanNoteContent,
+  formatDueDateBadge,
+  resolveCleanInstrument,
+  getQuickDate
+} from './notesConstants';
+import { 
+  TeacherNotesBoardModal, 
+  CategoryTagPickerPopover 
+} from './TeacherNotesBoardModal';
+
+const getTagBadgeStyle = (tag: string) => {
+  return getAllTagStyle(tag);
+};
 
 interface BriefingNotesCardProps {
   user: any;
@@ -50,68 +72,6 @@ interface BriefingNotesCardProps {
   onOpenDrawer?: () => void;
   onOpenHomeworkModal?: (student: any) => void;
 }
-
-const COMMON_TAGS = ['Hausaufgabe', 'Technik', 'Repertoire', 'Theorie', 'Konzert', 'Wichtig', 'Audio'];
-
-export const QUICK_SNIPPETS = [
-  { id: 'takt', label: 'Takt & BPM', icon: Zap, snippet: 'Takt 1-8 bei 80 BPM üben', desc: 'Übe-Auftrag mit Metronom' },
-  { id: 'tonleiter', label: 'Tonleiter', icon: Music, snippet: 'Tonleiter G-Dur flüssig mit Metronom wiederholen', desc: 'Technik & Gehörbildung' },
-  { id: 'playalong', label: 'Play-Along', icon: Sparkles, snippet: 'Play-Along Track anhören und mitspielen', desc: 'Song-Begleitung' },
-  { id: 'buch', label: 'Notenbuch', icon: BookOpen, snippet: 'Bitte Notenheft zur nächsten Stunde mitbringen', desc: 'Material-Erinnerung' },
-  { id: 'todo', label: 'To-Do', icon: CheckSquare, snippet: '- Noten kopieren für nächste Stunde', desc: 'Persönliche Aufgabe' },
-  { id: 'raum', label: 'Raum-Mangel', icon: DoorOpen, snippet: '!Raum 4: Mangel melden: ', desc: 'Meldung an Sekretariat' }
-];
-
-// Helper to strictly ensure "Musiker" is NEVER displayed as an instrument
-const resolveCleanInstrument = (s: any, teacherInst?: string | null): string => {
-  const raw = (s?.instrument || s?.subject || '').trim();
-  const isInvalid = !raw || raw.toLowerCase() === 'musiker' || raw.toLowerCase() === 'allgemein' || raw.toLowerCase() === 'student';
-  if (!isInvalid) return raw;
-  if (teacherInst && teacherInst.toLowerCase() !== 'musiker' && teacherInst.toLowerCase() !== 'allgemein') {
-    return teacherInst.trim();
-  }
-  return 'Gitarre';
-};
-
-// Date calculation helpers for quick Due Date presets
-const getQuickDate = (type: 'today' | 'tomorrow' | 'friday' | 'next_week'): string => {
-  const d = new Date();
-  if (type === 'tomorrow') d.setDate(d.getDate() + 1);
-  if (type === 'friday') {
-    const day = d.getDay();
-    const diff = (5 - day + 7) % 7 || 7;
-    d.setDate(d.getDate() + diff);
-  }
-  if (type === 'next_week') d.setDate(d.getDate() + 7);
-  return d.toISOString().split('T')[0];
-};
-
-const formatDueDateBadge = (dateStr: string): { label: string; isOverdue: boolean; isToday: boolean } => {
-  const todayStr = new Date().toISOString().split('T')[0];
-  if (dateStr < todayStr) {
-    const diffDays = Math.max(1, Math.round((new Date(todayStr).getTime() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)));
-    return { label: `Überfällig (${diffDays}T)`, isOverdue: true, isToday: false };
-  }
-  if (dateStr === todayStr) {
-    return { label: 'Heute fällig', isOverdue: false, isToday: true };
-  }
-  const parts = dateStr.split('-');
-  return { label: `Bis ${parts[2]}.${parts[1]}.`, isOverdue: false, isToday: false };
-};
-
-import { 
-  TeacherNotesBoardModal, 
-  STUDENT_SKILL_TAGS, 
-  TEACHER_ORGANIZATION_TAGS, 
-  getAllTagStyle,
-  formatCleanNoteContent,
-  renderMonochromeTagIcon,
-  CategoryTagPickerPopover
-} from './TeacherNotesBoardModal';
-
-const getTagBadgeStyle = (tag: string) => {
-  return getAllTagStyle(tag);
-};
 
 export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   user,
@@ -136,6 +96,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     toggleCompleteTodo,
     toggleArchive,
     syncToHomeworkBook,
+    unsyncFromHomeworkBook,
     dueAlerts,
     saveStatus
   } = useNotes({ user, schoolId, activeStudent });
@@ -166,7 +127,35 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     return () => { isMounted = false; };
   }, [schoolId, user]);
 
-  const [showBoardModal, setShowBoardModal] = useState(false);
+  // Resilient Session-backed state: stays open even across parent background data fetches & re-renders!
+  const [showBoardModal, setShowBoardModalState] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('campus_notes_board_open') === 'true';
+    }
+    return false;
+  });
+
+  const setShowBoardModal = useCallback((open: boolean) => {
+    setShowBoardModalState(open);
+    if (typeof window !== 'undefined') {
+      if (open) {
+        sessionStorage.setItem('campus_notes_board_open', 'true');
+      } else {
+        sessionStorage.removeItem('campus_notes_board_open');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleOpen = () => setShowBoardModal(true);
+    const handleClose = () => setShowBoardModal(false);
+    window.addEventListener('campus_open_notes_board', handleOpen);
+    window.addEventListener('campus_close_notes_board', handleClose);
+    return () => {
+      window.removeEventListener('campus_open_notes_board', handleOpen);
+      window.removeEventListener('campus_close_notes_board', handleClose);
+    };
+  }, [setShowBoardModal]);
   const [activeTagPickerNoteId, setActiveTagPickerNoteId] = useState<string | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState<string>('');
@@ -299,9 +288,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   // Strict MediaStream Cleanup
   const stopHardwareStream = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => {
-        try { t.stop(); } catch (e) {}
-      });
+      releaseAudioStream(streamRef.current);
       streamRef.current = null;
     }
   };
@@ -740,7 +727,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     }
     setShowTresorLockPrompt(false);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await acquireAudioStream({ audio: true });
       streamRef.current = stream;
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -1606,6 +1593,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
         onToggleCompleteTodo={toggleCompleteTodo}
         onToggleArchive={toggleArchive}
         onSyncToHomeworkBook={syncToHomeworkBook}
+        onUnsyncFromHomeworkBook={unsyncFromHomeworkBook}
         onOpenHomeworkModal={onOpenHomeworkModal}
       />
     </div>

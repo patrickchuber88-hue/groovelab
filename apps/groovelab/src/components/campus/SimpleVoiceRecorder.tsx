@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Volume2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../../utils/audioMasteringEngine';
+import { acquireAudioStream, releaseAudioStream } from '../../services/audioPermissionService';
 
 interface SimpleVoiceRecorderProps {
   studentId: string;
@@ -39,7 +40,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
   useEffect(() => {
     return () => {
       if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach(track => track.stop());
+        releaseAudioStream(audioStreamRef.current);
       }
       if (recordAudioCtxRef.current && recordAudioCtxRef.current.state !== 'closed') {
         try { recordAudioCtxRef.current.close(); } catch {}
@@ -60,7 +61,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       audioChunksRef.current = [];
 
       // 🌟 1. Pure Raw Studio Sound Microphone Stream
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await acquireAudioStream({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,

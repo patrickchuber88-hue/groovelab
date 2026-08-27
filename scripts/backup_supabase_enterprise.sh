@@ -31,10 +31,16 @@ echo "   Target DB: $CONTAINER_NAME ($DB_NAME)"
 echo "   Backup Root: $BACKUP_ROOT"
 echo "=============================================================================="
 
-# 1. Check if DB container is running
+# 1. Check if DB container is running (auto-discover if exact name differs)
 if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-  echo "❌ FEHLER: Container '${CONTAINER_NAME}' läuft nicht! Backup abgebrochen."
-  exit 1
+  DISCOVERED_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'supabase-db|postgres' | head -n 1 || true)
+  if [ -n "$DISCOVERED_CONTAINER" ]; then
+    echo "  ℹ Verwende erkannten DB-Container: $DISCOVERED_CONTAINER"
+    CONTAINER_NAME="$DISCOVERED_CONTAINER"
+  else
+    echo "❌ FEHLER: Kein PostgreSQL/Supabase-DB Container aktiv! Backup abgebrochen."
+    exit 1
+  fi
 fi
 
 TEMP_DUMP="$HOURLY_DIR/dump_temp_${TIMESTAMP}.sql.gz"

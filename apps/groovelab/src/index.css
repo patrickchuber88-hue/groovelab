@@ -2345,4 +2345,11 @@ input[type="range"]::-moz-range-thumb {
   transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease;
 }
 
+/* Tier-1 SaaS 10k Scale Virtual Rendering (DOM Optimization) */
+.virtual-render-item {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 52px;
+}
+
+
 

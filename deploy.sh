@@ -47,6 +47,13 @@ rsync -avz --delete \
 echo "🚀 Synchronisiere Live-Web-Container..."
 ssh "$SERVER" "WEB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -v 'supabase\|coolify' | head -n 1); if [ -n \"\$WEB_CONTAINER\" ]; then docker cp $REMOTE_DIR/. \$WEB_CONTAINER:/usr/share/nginx/html/; echo \"  ✓ Live-Web-Container (\$WEB_CONTAINER) erfolgreich aktualisiert.\"; fi"
 
+# 5. Synchronisiere Enterprise Server-Skripte nach /root/scripts
+echo "⚙️  Synchronisiere Enterprise Server-Skripte..."
+ssh "$SERVER" "mkdir -p /root/scripts"
+scp scripts/backup_supabase_enterprise.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh "$SERVER:/root/scripts/" || true
+ssh "$SERVER" "chmod +x /root/scripts/*.sh 2>/dev/null || true"
+echo "  ✓ Server-Skripte synchronisiert & ausführbar."
+
 echo ""
 echo "✅ Deployment abgeschlossen!"
 echo "   Die App ist jetzt erreichbar unter: https://campus-groovelab.de"

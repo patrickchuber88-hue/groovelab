@@ -2138,7 +2138,7 @@ export function AdminDashboard({
   };
 
   useEffect(() => {
-    if (forceTab) {
+    if (forceTab && forceTab !== activeTab) {
       setActiveTab(forceTab);
     }
   }, [forceTab]);
@@ -2332,7 +2332,7 @@ export function AdminDashboard({
 
   const fetchData = async (force = false) => {
     let currentAdmin = admin;
-    let adminData = null;
+    let adminData: any = null;
     let fetchError = null;
     try {
       if (userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true')) {
@@ -2372,7 +2372,10 @@ export function AdminDashboard({
           adminData = currentAdmin;
         }
         if (adminData) {
-          setAdmin(adminData);
+          setAdmin((prev: any) => {
+            if (prev && JSON.stringify(prev) === JSON.stringify(adminData)) return prev;
+            return adminData;
+          });
         }
       }
 
@@ -2440,7 +2443,10 @@ export function AdminDashboard({
             }
           }
 
-          setStudents(activeStudentsForState);
+          setStudents(prev => {
+            if (prev && JSON.stringify(prev) === JSON.stringify(activeStudentsForState)) return prev;
+            return activeStudentsForState;
+          });
           const studentIds = activeStudentsForState.map((s: any) => s.id);
           
           // Fetch active sessions for school's students
@@ -2449,7 +2455,11 @@ export function AdminDashboard({
             .select('*, profiles:users!inner(*), stations(*)')
             .eq('profiles.school_id', adminData.school_id)
             .is('check_out_time', null);
-          setActiveSessions(sData || []);
+          setActiveSessions(prev => {
+            const nextVal = sData || [];
+            if (prev && JSON.stringify(prev) === JSON.stringify(nextVal)) return prev;
+            return nextVal;
+          });
 
           if (studentIds.length > 0) {
             // Fetch skills for XP calculation
@@ -4829,7 +4839,7 @@ export function AdminDashboard({
   const renderLiveTab = () => (
     <div style={{ marginTop: '0px', flex: 1, display: 'flex', flexDirection: 'column' }}>
       <TeacherDashboard 
-        key={`${activePlatform}-${activeTab}`}
+        key={`teacher-dashboard-view-${activePlatform}`}
         userId={userId} 
         hideHeader={activePlatform === 'campus' ? false : true} 
         hideSidebar={true}

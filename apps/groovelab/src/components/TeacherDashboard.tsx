@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
@@ -16,6 +16,8 @@ import { LiveStageToolboxModal } from './LiveStageToolboxModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
 import { BriefingNotesCard } from './notes/BriefingNotesCard';
+import { BriefingToolboxCard } from './campus/BriefingToolboxCard';
+import { TagesplanQuickAudioModal } from './campus/TagesplanQuickAudioModal';
 import { GlobalNotesDrawer } from './notes/GlobalNotesDrawer';
 import { CommandPaletteModal } from './common/CommandPaletteModal';
 import { 
@@ -2728,8 +2730,24 @@ export function TeacherDashboard({
   const isSidebarCollapsed = propsIsSidebarCollapsed !== undefined ? propsIsSidebarCollapsed : localIsSidebarCollapsed;
   const setIsSidebarCollapsed = propsSetIsSidebarCollapsed !== undefined ? propsSetIsSidebarCollapsed : setLocalIsSidebarCollapsed;
 
-  const [rawBriefingData, setRawBriefingData] = useState<any>(null);
-  const [briefingLoading, setBriefingLoading] = useState(true);
+  const [rawBriefingData, setRawBriefingData] = useState<any>(() => {
+    if (typeof window !== 'undefined' && userId) {
+      try {
+        const cached = localStorage.getItem(`groovelab_briefing_cache_${userId}`);
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return null;
+  });
+  const [briefingLoading, setBriefingLoading] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && userId) {
+      try {
+        const cached = localStorage.getItem(`groovelab_briefing_cache_${userId}`);
+        if (cached) return false;
+      } catch (e) {}
+    }
+    return true;
+  });
   const [briefingRefreshTicker, setBriefingRefreshTicker] = useState(0);
 
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
@@ -3031,7 +3049,7 @@ export function TeacherDashboard({
   }, [briefingData?.timeline]);
 
   // Extract active students scheduled in today's Tagesplan for Note widget suggestions
-  const todayTagesplanStudents = useMemo(() => {
+  const todayTagesplanStudentsRaw = useMemo(() => {
     if (!briefingData?.timeline) return [];
     const list: any[] = [];
     const seen = new Set<string>();
@@ -3079,6 +3097,15 @@ export function TeacherDashboard({
 
     return list;
   }, [briefingData?.timeline, allStudents, teacher?.instrument]);
+
+  const todayTagesplanStudentsRef = useRef<any[]>([]);
+  const todayTagesplanStudents = useMemo(() => {
+    if (JSON.stringify(todayTagesplanStudentsRef.current) === JSON.stringify(todayTagesplanStudentsRaw)) {
+      return todayTagesplanStudentsRef.current;
+    }
+    todayTagesplanStudentsRef.current = todayTagesplanStudentsRaw;
+    return todayTagesplanStudentsRaw;
+  }, [todayTagesplanStudentsRaw]);
 
 
   // New Right Sidebar Sickness & Administrative feedback states
@@ -3481,19 +3508,32 @@ export function TeacherDashboard({
           return a.startTime.localeCompare(b.startTime);
         });
 
-        setMyBookings(filteredBookings);
-        setMyChangedAppointments(finalOccurs);
+        setMyBookings(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(filteredBookings)) return prev;
+          return filteredBookings;
+        });
+        setMyChangedAppointments(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(finalOccurs)) return prev;
+          return finalOccurs;
+        });
       } catch (err) {
         console.error('Failed to load my bookings:', err);
       }
     };
 
+    const handleFilteredStorage = (e: StorageEvent) => {
+      if (e.key && !['campus_bookings_sync', 'groovelab_schedule_changed', 'campus_schedule_sync'].includes(e.key)) {
+        return;
+      }
+      loadMyBookings();
+    };
+
     loadMyBookings();
-    window.addEventListener('storage', loadMyBookings);
+    window.addEventListener('storage', handleFilteredStorage);
     window.addEventListener('refresh-bookings', loadMyBookings);
     window.addEventListener('groovelab_schedule_changed', loadMyBookings);
     return () => {
-      window.removeEventListener('storage', loadMyBookings);
+      window.removeEventListener('storage', handleFilteredStorage);
       window.removeEventListener('refresh-bookings', loadMyBookings);
       window.removeEventListener('groovelab_schedule_changed', loadMyBookings);
     };
@@ -3863,7 +3903,31 @@ export function TeacherDashboard({
 
   // Quick Notes Widget & Global Drawer states
   const [showNotesDrawer, setShowNotesDrawer] = useState<boolean>(false);
-  const [leftColumnTab, setLeftColumnTab] = useState<'briefing' | 'notes'>('briefing');
+  const [leftColumnTab, setLeftColumnTabState] = useState<'briefing' | 'notes' | 'toolbox'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('campus_left_column_tab');
+      if (saved === 'notes' || saved === 'briefing' || saved === 'toolbox') return saved as any;
+    }
+    return 'briefing';
+  });
+
+  const setLeftColumnTab = useCallback((tab: 'briefing' | 'notes' | 'toolbox') => {
+    setLeftColumnTabState(tab);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('campus_left_column_tab', tab);
+    }
+  }, []);
+
+  // Quick 1-Click Audio-Hausaufgabe state
+  const [quickAudioStudent, setQuickAudioStudent] = useState<any | null>(null);
+
+  const checkHasTodayAudio = useCallback((studentId: string) => {
+    if (!studentId || typeof window === 'undefined') return false;
+    const raw = localStorage.getItem(`campus_homework_notes_${studentId}`);
+    if (!raw) return false;
+    const todayStr = getSimulatedNow().toISOString().slice(0, 10);
+    return raw.includes('AUDIO:') && raw.includes(todayStr);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -4072,11 +4136,27 @@ export function TeacherDashboard({
   }, [activeStudent?.id, briefingData?.timeline, activeTimelineSlot?.timeSlot, showRealNames]);
 
   useEffect(() => {
+    let watchdogTimer: any = null;
+    let isCancelled = false;
+
     const loadBriefing = async () => {
-      if (!userId) return;
+      if (!userId) {
+        setBriefingLoading(false);
+        return;
+      }
+
+      // Hard watchdog timeout: Guarantee loading state resolves within 2.5s no matter what
+      watchdogTimer = setTimeout(() => {
+        if (!isCancelled) {
+          console.warn('[Briefing Watchdog] Lade-Timeout erreicht (2.5s) – schalte UI frei.');
+          setBriefingLoading(false);
+        }
+      }, 2500);
+
       const simNow = getSimulatedNow();
       const simDateStr = simNow.toLocaleDateString('sv-SE');
-      setBriefingLoading(true);
+      // Only set loading to true if we do not already have cached data
+      setBriefingLoading(prev => rawBriefingData ? false : prev);
 
       try {
         const isGhostMode = userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
@@ -4155,7 +4235,17 @@ export function TeacherDashboard({
         const dayNameStr = dayNamesMap[todayWeekday] || 'Monday';
         const todayStr = simDateStr;
 
-        // ─── HIGH-SPEED PARALLEL BATCH QUERY (Single network round-trip) ───
+        // ─── HIGH-SPEED PARALLEL BATCH QUERY WITH SAFE FALLBACK WRAPPERS ───
+        const safeQuery = async (queryPromise: any, fallback: any = { data: [] }) => {
+          try {
+            const res = await queryPromise;
+            return res || fallback;
+          } catch (e) {
+            console.warn('[Briefing Loader] Transient query error, using fallback:', e);
+            return fallback;
+          }
+        };
+
         let schedQuery = supabase
           .from('schedules')
           .select(`
@@ -4220,19 +4310,19 @@ export function TeacherDashboard({
         }
 
         const [roomsRes, tUserRes, schoolStudentsRes, schedRes, occRes] = await Promise.all([
-          supabase.from('rooms').select('id, name').eq('school_id', teacherProfile.school_id),
+          safeQuery(supabase.from('rooms').select('id, name').eq('school_id', teacherProfile.school_id)),
           targetTeacherId !== 'master-support-id' 
-            ? supabase.from('users').select('planned_boards').eq('id', targetTeacherId).maybeSingle()
+            ? safeQuery(supabase.from('users').select('planned_boards').eq('id', targetTeacherId).maybeSingle(), { data: null })
             : Promise.resolve({ data: null, error: null }),
-          supabase.from('users').select('id, first_name, last_name, instrument, is_app_user, birth_date, avatars(avatar_style, evolution_level, xp, streak_flame)').eq('school_id', teacherProfile.school_id),
-          schedQuery,
-          occQuery
+          safeQuery(supabase.from('users').select('id, first_name, last_name, instrument, is_app_user, birth_date, avatars(avatar_style, evolution_level, xp, streak_flame)').eq('school_id', teacherProfile.school_id)),
+          safeQuery(schedQuery),
+          safeQuery(occQuery)
         ]);
 
-        const allRooms = roomsRes.data || rooms || [];
-        const schoolStudents = schoolStudentsRes.data || [];
-        const allTeacherSlots = schedRes.data || [];
-        const dbOccurrences = occRes.data || [];
+        const allRooms = roomsRes?.data || rooms || [];
+        const schoolStudents = schoolStudentsRes?.data || [];
+        const allTeacherSlots = schedRes?.data || [];
+        const dbOccurrences = occRes?.data || [];
 
         const slots: any[] = [];
 
@@ -4779,17 +4869,29 @@ export function TeacherDashboard({
             console.warn('Failed to fetch fallback rescheduled reminders', err);
           }
 
-        setRawBriefingData({
+        const nextBriefing = {
           success: true,
           allowMessagesGlobal: allowMessages,
           todayWeekday,
           timeline,
           prepMirror,
           rescheduledReminders
+        };
+
+        if (typeof window !== 'undefined' && targetTeacherId) {
+          try {
+            localStorage.setItem(`groovelab_briefing_cache_${targetTeacherId}`, JSON.stringify(nextBriefing));
+          } catch (e) {}
+        }
+
+        setRawBriefingData((prev: any) => {
+          if (prev && JSON.stringify(prev) === JSON.stringify(nextBriefing)) return prev;
+          return nextBriefing;
         });
       } catch (err) {
         console.error('Error loading briefing fallback:', err);
       } finally {
+        if (watchdogTimer) clearTimeout(watchdogTimer);
         setBriefingLoading(false);
       }
     };
@@ -4800,12 +4902,12 @@ export function TeacherDashboard({
         if (e.key === 'groovelab_simulated_date' || e.key === 'groovelab_simulated_start_timestamp') {
           setBriefingRefreshTicker(prev => prev + 1);
         }
-      } else {
-        setBriefingRefreshTicker(prev => prev + 1);
       }
     };
     window.addEventListener('storage', handleSimStorage);
     return () => {
+      isCancelled = true;
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       window.removeEventListener('storage', handleSimStorage);
     };
   }, [userId, ticker, briefingRefreshTicker]);
@@ -4957,7 +5059,14 @@ export function TeacherDashboard({
 
     const channelUsers = supabase
       .channel(`realtime_teacher_users_${userId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users_raw' }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users_raw' }, (payload: any) => {
+        // Ignore pure heartbeat / presence updates to prevent continuous re-render cascades
+        if (payload.old && payload.new) {
+          const hasSubstantiveChange = Object.keys(payload.new).some(
+            k => k !== 'last_seen' && payload.old[k] !== payload.new[k]
+          );
+          if (!hasSubstantiveChange) return;
+        }
         debouncedFetchData();
       })
       .subscribe();
@@ -5085,7 +5194,10 @@ export function TeacherDashboard({
       }
 
       // 1. Info
-      setTeacher(tData);
+      setTeacher((prev: any) => {
+        if (prev && JSON.stringify(prev) === JSON.stringify(tData)) return prev;
+        return tData;
+      });
       if (tData?.briefing_sidebar_collapsed !== undefined && tData?.briefing_sidebar_collapsed !== null) {
         setIsTeacherBriefingSidebarCollapsed(Boolean(tData.briefing_sidebar_collapsed));
         localStorage.setItem('campus_teacher_briefing_sidebar_collapsed', String(tData.briefing_sidebar_collapsed));
@@ -5207,10 +5319,10 @@ export function TeacherDashboard({
         const crisisData = crisisRes.data;
         const sData = stationsRes.data;
 
-        setCrisisNotifications(crisisData || []);
+        setCrisisNotifications(prev => JSON.stringify(prev) === JSON.stringify(crisisData || []) ? prev : (crisisData || []));
 
-        setRooms(rData || []);
-        setAvailabilities(avData || []);
+        setRooms(prev => JSON.stringify(prev) === JSON.stringify(rData || []) ? prev : (rData || []));
+        setAvailabilities(prev => JSON.stringify(prev) === JSON.stringify(avData || []) ? prev : (avData || []));
         
         if (rData && rData.length > 0 && !selectedRoomId) {
           const savedRoomId = localStorage.getItem('groovelab_teacher_selected_room_id');
@@ -5220,7 +5332,7 @@ export function TeacherDashboard({
             setSelectedRoomId(rData[0].id);
           }
         }
-        setStations(sData || []);
+        setStations(prev => JSON.stringify(prev) === JSON.stringify(sData || []) ? prev : (sData || []));
 
         if (sessErr) {
           console.error('[Dashboard] Error fetching sessions:', sessErr);
@@ -5248,7 +5360,7 @@ export function TeacherDashboard({
           }));
 
         const trulyActive = schoolSess;
-        setActiveSessions(trulyActive);
+        setActiveSessions(prev => JSON.stringify(prev) === JSON.stringify(trulyActive) ? prev : trulyActive);
 
         // Auto-checkout stale session for current student removed to prevent race conditions and login/check-in loops.
         // The frontend should align to the DB state rather than checking out valid sessions.
@@ -8623,6 +8735,60 @@ useEffect(() => {
                                 </span>
                               )}
 
+                              {/* 1-Click Audio-Hausaufgabe Button on Top Row Right */}
+                              {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
+                                const targetStudent = slot.isGroup ? slot.students[0] : slot.student;
+                                const hasAudioToday = targetStudent?.id ? checkHasTodayAudio(targetStudent.id) : false;
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (targetStudent) {
+                                        setQuickAudioStudent({
+                                          ...targetStudent,
+                                          id: targetStudent.id,
+                                          first_name: targetStudent.first_name || (targetStudent.name ? targetStudent.name.split(' ')[0] : 'Schüler'),
+                                          last_name: targetStudent.last_name || (targetStudent.name ? targetStudent.name.split(' ').slice(1).join(' ') : '')
+                                        });
+                                      }
+                                    }}
+                                    title={`Audio-Hausaufgabe für ${targetStudent?.name || 'Schüler'} aufnehmen`}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      background: hasAudioToday ? '#e6f4ea' : '#ffffff',
+                                      color: hasAudioToday ? '#15803d' : '#64748b',
+                                      width: '26px',
+                                      height: '26px',
+                                      borderRadius: '50%',
+                                      border: hasAudioToday ? '1px solid rgba(52, 168, 83, 0.3)' : '1px solid rgba(0,0,0,0.06)',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s',
+                                      flexShrink: 0,
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                      marginLeft: slot.isGroup ? '2px' : 'auto',
+                                      marginRight: '2px',
+                                      position: 'relative'
+                                    }}
+                                  >
+                                    <Mic size={13} color={hasAudioToday ? '#15803d' : '#64748b'} />
+                                    {hasAudioToday && (
+                                      <span style={{
+                                        position: 'absolute',
+                                        top: '2px',
+                                        right: '2px',
+                                        width: '5px',
+                                        height: '5px',
+                                        borderRadius: '50%',
+                                        background: '#34a853'
+                                      }} />
+                                    )}
+                                  </button>
+                                );
+                              })()}
+
                               {/* 1:1 Shoutbox Icon Button on Top Row Right */}
                               {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (
                                 <button
@@ -8658,7 +8824,7 @@ useEffect(() => {
                                     transition: 'all 0.2s',
                                     flexShrink: 0,
                                     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                    marginLeft: slot.isGroup ? '2px' : '4px'
+                                    marginLeft: '2px'
                                   }}
                                 >
                                   <MessageSquare size={12} />
@@ -10164,6 +10330,20 @@ useEffect(() => {
         />
       )}
 
+      {/* 1-Click Audio-Hausaufgabe Modal */}
+      {quickAudioStudent && (
+        <TagesplanQuickAudioModal
+          isOpen={Boolean(quickAudioStudent)}
+          student={quickAudioStudent}
+          teacher={teacher}
+          dateStr={getSimulatedNow().toISOString()}
+          onClose={() => setQuickAudioStudent(null)}
+          onSaved={() => {
+            setToastMessage(`✓ Audio-Hausaufgabe für ${quickAudioStudent.first_name || quickAudioStudent.name} gespeichert!`);
+          }}
+        />
+      )}
+
       {/* Spotlight Command Palette (⌘K) */}
       <CommandPaletteModal
         isOpen={showCommandPalette}
@@ -11380,60 +11560,88 @@ useEffect(() => {
                         width: '100%',
                         boxSizing: 'border-box'
                       }}>
+                        {/* 1. Tages-Kompass */}
                         <button
                           type="button"
                           onClick={() => setLeftColumnTab('briefing')}
                           style={{
                             flex: 1,
-                            padding: '7px 12px',
+                            padding: '7px 8px',
                             borderRadius: '10px',
                             border: leftColumnTab === 'briefing' ? '1px solid #cbd5e1' : 'none',
                             background: leftColumnTab === 'briefing' ? '#ffffff' : 'transparent',
                             color: leftColumnTab === 'briefing' ? '#0f172a' : '#64748b',
                             fontWeight: leftColumnTab === 'briefing' ? 850 : 600,
-                            fontSize: '0.78rem',
+                            fontSize: '0.76rem',
                             cursor: 'pointer',
                             boxShadow: leftColumnTab === 'briefing' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
                             transition: 'all 0.15s ease',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '6px'
+                            gap: '5px'
                           }}
                         >
                           <Sparkles size={13} color={leftColumnTab === 'briefing' ? '#0f172a' : '#64748b'} />
                           <span>Tages-Kompass</span>
                         </button>
 
+                        {/* 2. Notizen */}
                         <button
                           type="button"
                           onClick={() => setLeftColumnTab('notes')}
                           style={{
                             flex: 1,
-                            padding: '7px 12px',
+                            padding: '7px 8px',
                             borderRadius: '10px',
                             border: leftColumnTab === 'notes' ? '1px solid #cbd5e1' : 'none',
                             background: leftColumnTab === 'notes' ? '#ffffff' : 'transparent',
                             color: leftColumnTab === 'notes' ? '#0f172a' : '#64748b',
                             fontWeight: leftColumnTab === 'notes' ? 850 : 600,
-                            fontSize: '0.78rem',
+                            fontSize: '0.76rem',
                             cursor: 'pointer',
                             boxShadow: leftColumnTab === 'notes' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
                             transition: 'all 0.15s ease',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '6px'
+                            gap: '5px'
                           }}
                         >
                           <Edit3 size={13} color={leftColumnTab === 'notes' ? '#0f172a' : '#64748b'} />
                           <span>Notizen</span>
                         </button>
+
+                        {/* 3. Toolbox */}
+                        <button
+                          type="button"
+                          onClick={() => setLeftColumnTab('toolbox')}
+                          style={{
+                            flex: 1,
+                            padding: '7px 8px',
+                            borderRadius: '10px',
+                            border: leftColumnTab === 'toolbox' ? '1px solid #cbd5e1' : 'none',
+                            background: leftColumnTab === 'toolbox' ? '#ffffff' : 'transparent',
+                            color: leftColumnTab === 'toolbox' ? '#0f172a' : '#64748b',
+                            fontWeight: leftColumnTab === 'toolbox' ? 850 : 600,
+                            fontSize: '0.76rem',
+                            cursor: 'pointer',
+                            boxShadow: leftColumnTab === 'toolbox' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <Sliders size={13} color={leftColumnTab === 'toolbox' ? '#0f172a' : '#64748b'} />
+                          <span>Toolbox</span>
+                        </button>
                       </div>
 
                       {leftColumnTab === 'briefing' ? (
                         renderHausaufgabenWidget()
-                      ) : (
+                      ) : leftColumnTab === 'notes' ? (
                         <BriefingNotesCard
                           user={teacher}
                           schoolId={teacher?.school_id || (teacher as any)?.schoolId || schoolData?.id}
@@ -11455,6 +11663,8 @@ useEffect(() => {
                             });
                           }}
                         />
+                      ) : (
+                        <BriefingToolboxCard />
                       )}
                     </div>
 
@@ -12199,6 +12409,65 @@ useEffect(() => {
                                     </span>
                                   )}
 
+                                   {/* 1-Click Audio-Hausaufgabe Button */}
+                                   {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
+                                     const targetStudent = slot.isGroup ? slot.students[0] : slot.student;
+                                     const hasAudioToday = targetStudent?.id ? checkHasTodayAudio(targetStudent.id) : false;
+                                     return (
+                                       <button
+                                         type="button"
+                                         onClick={(e) => {
+                                           e.stopPropagation();
+                                           if (targetStudent) {
+                                             setQuickAudioStudent({
+                                               ...targetStudent,
+                                               id: targetStudent.id,
+                                               first_name: targetStudent.first_name || (targetStudent.name ? targetStudent.name.split(' ')[0] : 'Schüler'),
+                                               last_name: targetStudent.last_name || (targetStudent.name ? targetStudent.name.split(' ').slice(1).join(' ') : '')
+                                             });
+                                           }
+                                         }}
+                                         style={{
+                                           border: hasAudioToday ? '1px solid rgba(52, 168, 83, 0.3)' : 'none',
+                                           background: hasAudioToday ? '#e6f4ea' : 'none',
+                                           padding: '6px',
+                                           cursor: 'pointer',
+                                           display: 'flex',
+                                           alignItems: 'center',
+                                           justifyContent: 'center',
+                                           color: hasAudioToday ? '#15803d' : '#94a3b8',
+                                           marginLeft: (slot.isGroup || confirmCancelSlotId === (slot.isGroup ? slot.slots[0]?.id : slot.id)) ? '0' : 'auto',
+                                           marginRight: '2px',
+                                           transition: 'all 0.2s',
+                                           borderRadius: '50%',
+                                           flexShrink: 0,
+                                           position: 'relative'
+                                         }}
+                                         onMouseEnter={(e) => e.currentTarget.style.background = hasAudioToday ? '#d1fae5' : 'rgba(0,0,0,0.06)'}
+                                         onMouseLeave={(e) => e.currentTarget.style.background = hasAudioToday ? '#e6f4ea' : 'none'}
+                                         title={hasAudioToday 
+                                           ? `Audio-Hausaufgabe für ${targetStudent?.name || 'Schüler'} bereits vorhanden (Klicken zum Ergänzen/Neuaufnehmen)` 
+                                           : `Audio-Hausaufgabe für ${targetStudent?.name || 'Schüler'} aufnehmen`}
+                                       >
+                                         <Mic 
+                                           size={16} 
+                                           color={hasAudioToday ? '#15803d' : '#94a3b8'} 
+                                         />
+                                         {hasAudioToday && (
+                                           <span style={{
+                                             position: 'absolute',
+                                             top: '4px',
+                                             right: '4px',
+                                             width: '5px',
+                                             height: '5px',
+                                             borderRadius: '50%',
+                                             background: '#34a853'
+                                           }} />
+                                         )}
+                                       </button>
+                                     );
+                                   })()}
+
                                    {/* 1:1 Shoutbox Icon Button */}
                                   {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
                                     const targetSlot = slot.isGroup ? slot.slots[0] : slot;
@@ -12229,7 +12498,7 @@ useEffect(() => {
                                           alignItems: 'center',
                                           justifyContent: 'center',
                                           color: hasChatMsgs ? '#ca8a04' : '#94a3b8',
-                                          marginLeft: (slot.isGroup || confirmCancelSlotId === (slot.isGroup ? slot.slots[0]?.id : slot.id)) ? '0' : 'auto',
+                                          marginLeft: '2px',
                                           transition: 'all 0.2s',
                                           borderRadius: '50%',
                                           flexShrink: 0,

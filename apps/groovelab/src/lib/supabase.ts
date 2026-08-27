@@ -109,10 +109,13 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     let timeoutId: any = null;
     try {
       let fetchInit = newInit;
-      // Wrap request with a 15-second timeout if no signal was passed (fast failover to offline cache)
+      // Wrap request with a fast failover timeout (4.5s for normal queries, 30s for large audio/asset uploads)
       if (!newInit.signal && typeof AbortController !== 'undefined') {
+        const inputUrlStr = typeof input === 'string' ? input : (input instanceof URL ? input.href : '');
+        const isStorageUpload = inputUrlStr.includes('/storage/v1/object/');
+        const queryTimeout = isStorageUpload ? 30000 : 4500;
         const controller = new AbortController();
-        timeoutId = setTimeout(() => controller.abort(), 15000);
+        timeoutId = setTimeout(() => controller.abort(), queryTimeout);
         fetchInit = { ...newInit, signal: controller.signal };
       }
 
@@ -126,8 +129,8 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
             const clone = response.clone();
             const text = await clone.text();
             if (text.includes('schema cache') || text.includes('PGRST002') || text.includes('503') || text.includes('502')) {
-              console.warn(`[Supabase Fetch] PostgREST schema cache reload (HTTP ${response.status}). Retrying attempt ${attempt + 1} in ${attempt * 350}ms...`);
-              await new Promise(r => setTimeout(r, attempt * 350));
+              console.warn(`[Supabase Fetch] PostgREST schema cache reload (HTTP ${response.status}). Retrying attempt ${attempt + 1} in ${attempt * 250}ms...`);
+              await new Promise(r => setTimeout(r, attempt * 250));
               continue;
             }
           } catch (e) {}
@@ -154,7 +157,7 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
         (typeof navigator !== 'undefined' && !navigator.onLine);
         
       if (isNetworkError && attempt < maxAttempts) {
-        const delay = 200 * attempt; // Fast incremental retry
+        const delay = 150 * attempt; // Fast incremental retry (150ms, 300ms)
         console.warn(`[Supabase Fetch] Attempt ${attempt} failed with "${errMsg}". Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;

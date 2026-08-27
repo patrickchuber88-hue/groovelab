@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, Coffee, Clock, Timer, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, VolumeX, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, CalendarX, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
-  Mic, Disc, Trash2, Download, Key, Delete, Headphones, ArrowRight, Sliders, Compass, Palette, Lightbulb
+  Mic, Disc, Trash2, Download, Key, Delete, Headphones, ArrowRight, Sliders, Compass, Palette, Lightbulb, Copy, ShieldAlert
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -28,6 +28,7 @@ import { CampusTeenDashboard } from './campus/CampusTeenDashboard';
 import { CampusLevelSelectModal } from './campus/CampusLevelSelectModal';
 import { AudioTrackCarousel, AudioTrackItem } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
+import { StudentToolboxModal } from './campus/StudentToolboxModal';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../utils/audioMasteringEngine';
 import { downloadStudentAudioBackup } from '../utils/audioBackupHelper';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate } from '../utils/studentProgressEngine';
@@ -583,6 +584,7 @@ interface MobileBriefingViewProps {
   handleTriggerCancelOccurrence?: (occ: any) => void;
   handleUndoCancelOccurrence?: (occ: any) => void;
   getDeterministicWeekMetrics?: () => any;
+  setShowStudentToolbox?: (show: boolean) => void;
 }
 
 function MobileBriefingView({
@@ -596,6 +598,7 @@ function MobileBriefingView({
   setActiveTab,
   setAppointmentChatData,
   setShowAppointmentChat,
+  setShowStudentToolbox,
   handleRejectReschedule,
   handleConfirmReschedule,
   handleAcknowledgeCancellation,
@@ -842,6 +845,33 @@ function MobileBriefingView({
                       </button>
                     );
                   })()}
+
+                  {/* Mobile Praxis-Toolbox Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowStudentToolbox?.(true);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: '#ffffff',
+                      color: '#34a853',
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      border: '1px solid rgba(0, 0, 0, 0.12)',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      flexShrink: 0
+                    }}
+                    title="Praxis-Toolbox (Metronom & Stimmgerät) öffnen"
+                  >
+                    <Sliders size={12} color="#34a853" />
+                  </button>
 
                   {nextOcc && (
                     <button
@@ -3241,6 +3271,108 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [parentSetupConfirm, setParentSetupConfirm] = useState('');
   const [parentSetupError, setParentSetupError] = useState('');
 
+  // Tier-1 Enterprise+ Recovery & Anti-Brute-Force States
+  const [isParentGateShaking, setIsParentGateShaking] = useState(false);
+  const [parentGateFailedCount, setParentGateFailedCount] = useState(0);
+  const [parentGateCooldownSeconds, setParentGateCooldownSeconds] = useState(0);
+  const [showEmergencyKitModal, setShowEmergencyKitModal] = useState(false);
+  const [newGeneratedRecoveryKey, setNewGeneratedRecoveryKey] = useState('');
+  const [hasCopiedRecoveryKey, setHasCopiedRecoveryKey] = useState(false);
+  const [showRecoveryKeyModal, setShowRecoveryKeyModal] = useState(false);
+  const [recoveryKeyInput, setRecoveryKeyInput] = useState('');
+  const [recoveryKeyError, setRecoveryKeyError] = useState('');
+
+  useEffect(() => {
+    if (parentGateCooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setParentGateCooldownSeconds(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [parentGateCooldownSeconds]);
+
+  const generateParentRecoveryKey = () => {
+    const p1 = Math.floor(1000 + Math.random() * 9000);
+    const p2 = Math.floor(1000 + Math.random() * 9000);
+    return `REC-${p1}-${p2}`;
+  };
+
+  const handleVerifyParentPinAttempt = async (cleanInput: string, onSuccess: () => void) => {
+    if (parentGateCooldownSeconds > 0) return;
+    setIsVerifyingParentGate(true);
+    setParentGateError('');
+
+    try {
+      let isOk = false;
+      const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${studentId}`);
+      const userEmergencyPin = String((studentUser as any)?.emergency_pin || (studentUser as any)?.recovery_key || '').trim();
+
+      // 1. Fast-Path (< 30ms): Direct comparison with cached parent PIN or emergency key
+      if (cachedParentPin && cachedParentPin.trim() === cleanInput) {
+        isOk = true;
+      } else if (userEmergencyPin && userEmergencyPin.trim().toUpperCase() === cleanInput.toUpperCase()) {
+        isOk = true;
+      }
+
+      // 2. Direct Supabase RPC verify (SHA-256 One-Way Hash against PostgreSQL users_raw)
+      if (!isOk) {
+        try {
+          const { data: rpcOk } = await supabase.rpc('verify_parent_pin', {
+            student_id: studentId,
+            input_pin: cleanInput
+          });
+          if (rpcOk === true) isOk = true;
+        } catch (e) {}
+      }
+
+      // 3. Check cached parent PIN or emergency recovery key with SHA-256 hash
+      if (!isOk) {
+        const allowedParentKeys = [cachedParentPin, userEmergencyPin].filter(Boolean).map(p => String(p).trim());
+        for (const cand of allowedParentKeys) {
+          if (cand === cleanInput) {
+            isOk = true;
+            break;
+          }
+          try {
+            const msgBuffer = new TextEncoder().encode(cleanInput);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            if (cand.toLowerCase() === hashHex.toLowerCase()) {
+              isOk = true;
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+
+      if (isOk) {
+        setParentGateFailedCount(0);
+        sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
+        sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
+        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+        window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+        setParentGatePinInput('');
+        onSuccess();
+      } else {
+        setIsParentGateShaking(true);
+        setTimeout(() => setIsParentGateShaking(false), 380);
+        const nextFailCount = parentGateFailedCount + 1;
+        setParentGateFailedCount(nextFailCount);
+        if (nextFailCount >= 3) {
+          setParentGateCooldownSeconds(30);
+          setParentGateError('Zu viele Fehlversuche. 30 Sekunden Sicherheitssperre aktiv.');
+        } else {
+          setParentGateError(`Falsche Eltern-Master-PIN (Versuch ${nextFailCount}/3).`);
+        }
+        setParentGatePinInput('');
+      }
+    } catch (e: any) {
+      setParentGateError('Fehler: ' + (e?.message || 'Verbindungsfehler'));
+      setParentGatePinInput('');
+    } finally {
+      setIsVerifyingParentGate(false);
+    }
+  };
+
   const checkIsParentSessionActive = () => {
     const sessionExpiry = sessionStorage.getItem(`groovelab_parent_session_${studentId}`);
     if (sessionExpiry && Number(sessionExpiry) > Date.now()) {
@@ -3869,6 +4001,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   // Direct Chat states inside appointment popup (Shoutbox)
   const [showAppointmentChat, setShowAppointmentChat] = useState(false);
+  const [showStudentToolbox, setShowStudentToolbox] = useState(false);
   const [appointmentChatData, setAppointmentChatData] = useState<{ teacherId: string; date: string; start_time: string; label: string; occurrenceId?: string } | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState('');
@@ -15594,6 +15727,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             setActiveTab={setActiveTab}
             setAppointmentChatData={setAppointmentChatData}
             setShowAppointmentChat={setShowAppointmentChat}
+            setShowStudentToolbox={setShowStudentToolbox}
             handleRejectReschedule={handleRejectReschedule}
             handleConfirmReschedule={handleConfirmReschedule}
             handleAcknowledgeCancellation={handleAcknowledgeCancellation}
@@ -21051,7 +21185,47 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               </button>
                             )}
 
-                            {/* 3. Absage / Reaktivieren Button */}
+                            {/* 3. Praxis-Toolbox (Metronom & Stimmgerät) Button */}
+                            <button 
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowStudentToolbox(true);
+                              }}
+                              style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                background: '#ffffff', 
+                                color: '#0f172a', 
+                                padding: '8px 16px', 
+                                minHeight: '38px',
+                                boxSizing: 'border-box',
+                                borderRadius: '14px', 
+                                fontSize: '0.80rem', 
+                                fontWeight: 900, 
+                                border: '1px solid #cbd5e1', 
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                e.currentTarget.style.borderColor = '#34a853';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'none';
+                                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.03)';
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                              }}
+                              title="Praxis-Toolbox (Metronom, Rhythmus-Trainer & Stimmgerät) öffnen"
+                            >
+                              <Sliders size={15} color="#34a853" />
+                              <span>Praxis-Toolbox</span>
+                            </button>
+
+                            {/* 4. Absage / Reaktivieren Button */}
                             {nextOcc && (
                               <button
                                 type="button"
@@ -24133,6 +24307,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         : 'Wiederhole deine 6-stellige Master-PIN zur Bestätigung.')}
                 </p>
 
+                <style>{`
+                  @keyframes pinShakeAnim {
+                    0%, 100% { transform: translateX(0); }
+                    15%, 45%, 75% { transform: translateX(-8px); }
+                    30%, 60%, 90% { transform: translateX(8px); }
+                  }
+                `}</style>
+
                 {(parentGateError || parentSetupError) && (
                   <div style={{
                     padding: '10px 16px',
@@ -24150,12 +24332,40 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   </div>
                 )}
 
-                {/* 6 Dots Display */}
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                {parentGateCooldownSeconds > 0 && (
+                  <div style={{
+                    padding: '10px 16px',
+                    background: '#fef3c7',
+                    border: '1px solid #fde68a',
+                    borderRadius: '14px',
+                    color: '#92400e',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    marginBottom: '16px',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}>
+                    <span>⏳ Sicherheitssperre aktiv: Bitte warte noch <strong>{parentGateCooldownSeconds}s</strong></span>
+                  </div>
+                )}
+
+                {/* 6 Dots Display with Shake Animation */}
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '12px', 
+                  marginBottom: '20px',
+                  animation: isParentGateShaking ? 'pinShakeAnim 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both' : 'none'
+                }}>
                   {[0, 1, 2, 3, 4, 5].map((idx) => {
                     const currentLen = hasConfiguredParentPin 
                       ? parentGatePinInput.length 
                       : (parentSetupStep === 'enter' ? parentSetupPin.length : parentSetupConfirm.length);
+                    const isFilled = currentLen > idx;
+                    const isError = isParentGateShaking;
                     return (
                       <div
                         key={idx}
@@ -24163,8 +24373,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           width: '16px',
                           height: '16px',
                           borderRadius: '50%',
-                          border: `2px solid ${currentLen > idx ? '#0284c7' : '#cbd5e1'}`,
-                          background: currentLen > idx ? '#0284c7' : 'transparent',
+                          border: `2px solid ${isError ? '#dc2626' : (isFilled ? '#0284c7' : '#cbd5e1')}`,
+                          background: isError ? '#dc2626' : (isFilled ? '#0284c7' : 'transparent'),
                           transition: 'all 0.15s ease'
                         }}
                       />
@@ -24182,12 +24392,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 }}>
                   {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
                     const isSpecial = key === 'C' || key === 'back';
+                    const isDisabled = isVerifyingParentGate || parentGateCooldownSeconds > 0;
                     return (
                       <button
                         key={key}
                         type="button"
-                        disabled={isVerifyingParentGate}
+                        disabled={isDisabled}
                         onClick={async () => {
+                          if (parentGateCooldownSeconds > 0) return;
                           setParentGateError('');
                           setParentSetupError('');
 
@@ -24200,59 +24412,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               const nextVal = parentGatePinInput + key;
                               setParentGatePinInput(nextVal);
                               if (nextVal.length === 6) {
-                                setIsVerifyingParentGate(true);
-                                try {
-                                  let isOk = false;
-                                  const cleanInput = nextVal.trim();
-                                  const userParentPin = String((studentUser as any)?.parent_pin || '').trim();
-                                  const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${studentId}`);
-                                  const cachedPin = localStorage.getItem(`groovelab_user_pin_${studentId}`);
-
-                                  try {
-                                    const { data: rpcOk } = await supabase.rpc('verify_parent_pin', {
-                                      student_id: studentId,
-                                      input_pin: cleanInput
-                                    });
-                                    if (rpcOk === true) isOk = true;
-                                  } catch (e) {}
-
-                                  if (!isOk && userParentPin) {
-                                    if (userParentPin === cleanInput || userParentPin.padStart(6, '0') === cleanInput) {
-                                      isOk = true;
-                                    } else {
-                                      try {
-                                        const msgBuffer = new TextEncoder().encode(cleanInput);
-                                        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-                                        const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-                                        if (userParentPin.toLowerCase() === hashHex.toLowerCase()) {
-                                          isOk = true;
-                                        }
-                                      } catch (e) {}
-                                    }
-                                  }
-
-                                  if (!isOk && (cachedParentPin?.trim() === cleanInput || cachedPin?.trim() === cleanInput)) {
-                                    isOk = true;
-                                  }
-
-                                  if (isOk) {
-                                    sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
-                                    sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
-                                    sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-                                    window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
-                                    setParentGatePinInput('');
-                                    setSettingsSubTab('overview');
-                                    setActiveStudentSettingsModal(null);
-                                  } else {
-                                    setParentGateError('Falsche Eltern-Master-PIN.');
-                                    setParentGatePinInput('');
-                                  }
-                                } catch (e: any) {
-                                  setParentGateError('Fehler: ' + (e?.message || 'Verbindungsfehler'));
-                                  setParentGatePinInput('');
-                                } finally {
-                                  setIsVerifyingParentGate(false);
-                                }
+                                handleVerifyParentPinAttempt(nextVal, () => {
+                                  setSettingsSubTab('overview');
+                                  setActiveStudentSettingsModal(null);
+                                });
                               }
                             }
                           } else {
@@ -24291,11 +24454,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     return;
                                   }
 
+                                  const recKey = generateParentRecoveryKey();
                                   try {
                                     localStorage.setItem(`groovelab_parent_pin_${studentId}`, nextVal);
-                                    await supabase.from('users').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', studentId);
-                                    try { await supabase.from('students').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', studentId); } catch(err){}
+                                    await supabase.from('users').update({ parent_pin: nextVal, has_parent_pin: true, recovery_key: recKey }).eq('id', studentId);
+                                    try { await supabase.from('students').update({ parent_pin: nextVal, has_parent_pin: true, recovery_key: recKey }).eq('id', studentId); } catch(err){}
                                     
+                                    if (studentUser) {
+                                      (studentUser as any).has_parent_pin = true;
+                                      (studentUser as any).recovery_key = recKey;
+                                    }
+
                                     sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
                                     sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
                                     sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
@@ -24304,8 +24473,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     setParentSetupPin('');
                                     setParentSetupConfirm('');
                                     setParentSetupStep('enter');
-                                    setSettingsSubTab('overview');
-                                    setActiveStudentSettingsModal(null);
+
+                                    // Trigger Schicht 1: One-Time Emergency Kit Modal!
+                                    setNewGeneratedRecoveryKey(recKey);
+                                    setHasCopiedRecoveryKey(false);
+                                    setShowEmergencyKitModal(true);
                                   } catch (e: any) {
                                     setParentSetupError('Fehler beim Speichern: ' + e.message);
                                     setParentSetupConfirm('');
@@ -24323,7 +24495,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           color: '#0f172a',
                           fontSize: isSpecial ? '0.9rem' : '1.3rem',
                           fontWeight: 800,
-                          cursor: 'pointer',
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          opacity: isDisabled ? 0.45 : 1,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -24337,6 +24510,34 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     );
                   })}
                 </div>
+
+                {/* Secure Tier-1 PIN Recovery Link */}
+                {hasConfiguredParentPin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecoveryKeyInput('');
+                      setRecoveryKeyError('');
+                      setShowRecoveryKeyModal(true);
+                    }}
+                    style={{
+                      marginTop: '18px',
+                      background: 'none',
+                      border: 'none',
+                      color: '#0284c7',
+                      fontSize: '0.8rem',
+                      fontWeight: 750,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <ShieldCheck size={14} />
+                    <span>Eltern-PIN vergessen? Mit Notfall-Schlüssel wiederherstellen</span>
+                  </button>
+                )}
               </div>
             );
           }
@@ -24622,12 +24823,40 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       </div>
                     )}
 
-                    {/* 6 Dots Display */}
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                    {parentGateCooldownSeconds > 0 && (
+                      <div style={{
+                        padding: '10px 14px',
+                        background: '#fef3c7',
+                        border: '1px solid #fde68a',
+                        borderRadius: '12px',
+                        color: '#92400e',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        marginBottom: '14px',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}>
+                        <span>⏳ Sicherheitssperre: Bitte warte noch <strong>{parentGateCooldownSeconds}s</strong></span>
+                      </div>
+                    )}
+
+                    {/* 6 Dots Display with Shake Animation */}
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '12px', 
+                      marginBottom: '16px',
+                      animation: isParentGateShaking ? 'pinShakeAnim 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both' : 'none'
+                    }}>
                       {[0, 1, 2, 3, 4, 5].map((idx) => {
                         const curLen = hasConfiguredParentPin
                           ? parentGatePinInput.length
                           : (parentSetupStep === 'enter' ? parentSetupPin.length : parentSetupConfirm.length);
+                        const isFilled = curLen > idx;
+                        const isError = isParentGateShaking;
                         return (
                           <div
                             key={idx}
@@ -24635,8 +24864,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               width: '16px',
                               height: '16px',
                               borderRadius: '50%',
-                              border: `2px solid ${curLen > idx ? '#0284c7' : '#cbd5e1'}`,
-                              background: curLen > idx ? '#0284c7' : 'transparent',
+                              border: `2px solid ${isError ? '#dc2626' : (isFilled ? '#0284c7' : '#cbd5e1')}`,
+                              background: isError ? '#dc2626' : (isFilled ? '#0284c7' : 'transparent'),
                               transition: 'all 0.15s ease'
                             }}
                           />
@@ -24653,12 +24882,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     }}>
                       {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
                         const isSpecial = key === 'C' || key === 'back';
+                        const isDisabled = isVerifyingParentGate || parentGateCooldownSeconds > 0;
                         return (
                           <button
                             key={key}
                             type="button"
-                            disabled={isVerifyingParentGate}
+                            disabled={isDisabled}
                             onClick={async () => {
+                              if (parentGateCooldownSeconds > 0) return;
                               setParentGateError('');
                               setParentSetupError('');
 
@@ -24671,59 +24902,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   const nextVal = parentGatePinInput + key;
                                   setParentGatePinInput(nextVal);
                                   if (nextVal.length === 6) {
-                                    setIsVerifyingParentGate(true);
-                                    try {
-                                      let isOk = false;
-                                      const cleanInput = nextVal.trim();
-                                      const userParentPin = String((studentUser as any)?.parent_pin || '').trim();
-                                      const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${studentId}`);
-                                      const cachedPin = localStorage.getItem(`groovelab_user_pin_${studentId}`);
-
-                                      try {
-                                        const { data: rpcOk } = await supabase.rpc('verify_parent_pin', {
-                                          student_id: studentId,
-                                          input_pin: cleanInput
-                                        });
-                                        if (rpcOk === true) isOk = true;
-                                      } catch (e) {}
-
-                                      if (!isOk && userParentPin) {
-                                        if (userParentPin === cleanInput || userParentPin.padStart(6, '0') === cleanInput) {
-                                          isOk = true;
-                                        } else {
-                                          try {
-                                            const msgBuffer = new TextEncoder().encode(cleanInput);
-                                            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-                                            const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-                                            if (userParentPin.toLowerCase() === hashHex.toLowerCase()) {
-                                              isOk = true;
-                                            }
-                                          } catch (e) {}
-                                        }
+                                    handleVerifyParentPinAttempt(nextVal, () => {
+                                      setShowParentGateModal(false);
+                                      if (pendingParentTarget) {
+                                        setSettingsSubTab(pendingParentTarget);
+                                        setActiveStudentSettingsModal(pendingParentTarget);
                                       }
-
-                                      if (!isOk && (cachedParentPin?.trim() === cleanInput || cachedPin?.trim() === cleanInput)) {
-                                        isOk = true;
-                                      }
-
-                                      if (isOk) {
-                                        sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
-                                        sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
-                                        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-                                        window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
-                                        setParentGatePinInput('');
-                                        setSettingsSubTab('overview');
-                                        setActiveStudentSettingsModal(null);
-                                      } else {
-                                        setParentGateError('Falsche Eltern-Master-PIN.');
-                                        setParentGatePinInput('');
-                                      }
-                                    } catch (e: any) {
-                                      setParentGateError('Fehler: ' + (e?.message || 'Verbindungsfehler'));
-                                      setParentGatePinInput('');
-                                    } finally {
-                                      setIsVerifyingParentGate(false);
-                                    }
+                                    });
                                   }
                                 }
                               } else {
@@ -24762,11 +24947,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         return;
                                       }
 
+                                      const recKey = generateParentRecoveryKey();
                                       try {
                                         localStorage.setItem(`groovelab_parent_pin_${studentId}`, nextVal);
-                                        await supabase.from('users').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', studentId);
-                                        try { await supabase.from('students').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', studentId); } catch(err){}
+                                        await supabase.from('users').update({ parent_pin: nextVal, has_parent_pin: true, recovery_key: recKey }).eq('id', studentId);
+                                        try { await supabase.from('students').update({ parent_pin: nextVal, has_parent_pin: true, recovery_key: recKey }).eq('id', studentId); } catch(err){}
                                         
+                                        if (studentUser) {
+                                          (studentUser as any).has_parent_pin = true;
+                                          (studentUser as any).recovery_key = recKey;
+                                        }
+
                                         sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
                                         sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
                                         sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
@@ -24780,6 +24971,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                           setSettingsSubTab(pendingParentTarget);
                                           setActiveStudentSettingsModal(pendingParentTarget);
                                         }
+
+                                        // Trigger Schicht 1: One-Time Emergency Kit Modal!
+                                        setNewGeneratedRecoveryKey(recKey);
+                                        setHasCopiedRecoveryKey(false);
+                                        setShowEmergencyKitModal(true);
                                       } catch (e: any) {
                                         setParentSetupError('Fehler beim Speichern: ' + e.message);
                                         setParentSetupConfirm('');
@@ -24797,7 +24993,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               color: '#0f172a',
                               fontSize: isSpecial ? '0.9rem' : '1.25rem',
                               fontWeight: 800,
-                              cursor: 'pointer',
+                              cursor: isDisabled ? 'not-allowed' : 'pointer',
+                              opacity: isDisabled ? 0.45 : 1,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -24811,6 +25008,34 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         );
                       })}
                     </div>
+
+                    {/* Secure Tier-1 PIN Recovery Link */}
+                    {hasConfiguredParentPin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRecoveryKeyInput('');
+                          setRecoveryKeyError('');
+                          setShowRecoveryKeyModal(true);
+                        }}
+                        style={{
+                          marginTop: '18px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#0284c7',
+                          fontSize: '0.78rem',
+                          fontWeight: 750,
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <ShieldCheck size={14} />
+                        <span>Eltern-PIN vergessen? Mit Notfall-Schlüssel wiederherstellen</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -26100,6 +26325,361 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       Schließen
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* TIER-1 SAAS SCHICHT 1: ONE-TIME EMERGENCY KIT MODAL */}
+            {showEmergencyKitModal && (
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 11000,
+                  background: 'rgba(15, 23, 42, 0.75)',
+                  backdropFilter: 'blur(10px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '20px'
+                }}
+              >
+                <div
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: '28px',
+                    width: '100%',
+                    maxWidth: '520px',
+                    padding: '32px 28px',
+                    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
+                    border: '1.5px solid #bae6fd',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    position: 'relative'
+                  }}
+                  className="animation-slide-up"
+                >
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '22px',
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    marginBottom: '16px',
+                    boxShadow: '0 8px 24px -4px rgba(2, 132, 199, 0.4)'
+                  }}>
+                    <ShieldCheck size={36} />
+                  </div>
+
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '1.35rem', fontWeight: 1000, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    Dein Eltern-Notfallschlüssel 🛡️
+                  </h3>
+                  <p style={{ margin: '0 0 20px 0', fontSize: '0.84rem', color: '#64748b', fontWeight: 600, lineHeight: 1.45 }}>
+                    Sichere diesen Schlüssel jetzt sorgfältig. Er wird auf dem Profil deines Kindes <strong>nie wieder angezeigt</strong>!
+                  </p>
+
+                  {/* Monospace Key Display */}
+                  <div style={{
+                    width: '100%',
+                    background: '#f0fdf4',
+                    border: '2px dashed #86efac',
+                    borderRadius: '18px',
+                    padding: '16px 20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxSizing: 'border-box',
+                    marginBottom: '16px'
+                  }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Master Recovery Key
+                    </span>
+                    <div style={{
+                      fontSize: '1.5rem',
+                      fontWeight: 1000,
+                      color: '#0f172a',
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                      letterSpacing: '0.12em',
+                      userSelect: 'all'
+                    }}>
+                      {newGeneratedRecoveryKey}
+                    </div>
+                  </div>
+
+                  {/* Copy Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(newGeneratedRecoveryKey);
+                        setHasCopiedRecoveryKey(true);
+                        setTimeout(() => setHasCopiedRecoveryKey(false), 3000);
+                      }
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 18px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #cbd5e1',
+                      background: hasCopiedRecoveryKey ? '#f0fdf4' : '#ffffff',
+                      color: hasCopiedRecoveryKey ? '#15803d' : '#334155',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      marginBottom: '20px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    {hasCopiedRecoveryKey ? <Check size={16} /> : <Copy size={16} />}
+                    <span>{hasCopiedRecoveryKey ? 'In Zwischenablage kopiert!' : 'Schlüssel kopieren'}</span>
+                  </button>
+
+                  {/* Security Info Card */}
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '14px 16px',
+                    textAlign: 'left',
+                    fontSize: '0.76rem',
+                    color: '#475569',
+                    lineHeight: 1.45,
+                    marginBottom: '24px',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    <strong style={{ color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <ShieldCheck size={14} color="#0284c7" /> Kinderschutz-Garantie:
+                    </strong>
+                    Bewahre diesen Notfallschlüssel getrennt vom Gerät deines Kindes auf (z. B. in deinem Passwort-Manager oder notiert bei deinen Unterlagen).
+                  </div>
+
+                  {/* Confirmation CTA */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEmergencyKitModal(false);
+                      setSettingsSubTab('overview');
+                      setActiveStudentSettingsModal(null);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '14px 20px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.92rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.4)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    ✓ Ich habe den Schlüssel sicher aufbewahrt ➔
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* SECURE RECOVERY KEY MODAL */}
+            {showRecoveryKeyModal && (
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 11000,
+                  background: 'rgba(15, 23, 42, 0.75)',
+                  backdropFilter: 'blur(10px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '20px'
+                }}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setShowRecoveryKeyModal(false);
+                }}
+              >
+                <div
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: '28px',
+                    width: '100%',
+                    maxWidth: '480px',
+                    padding: '32px 28px',
+                    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
+                    border: '1.5px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center'
+                  }}
+                  className="animation-slide-up"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '20px',
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    marginBottom: '16px'
+                  }}>
+                    <Key size={30} />
+                  </div>
+
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', fontWeight: 1000, color: '#0f172a' }}>
+                    Elternbereich wiederherstellen 🛡️
+                  </h3>
+                  <p style={{ margin: '0 0 18px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.45 }}>
+                    Gib deinen 8-stelligen Notfallschlüssel (z. B. <code>REC-7492-3810</code>) ein, um eine neue PIN festzulegen.
+                  </p>
+
+                  {recoveryKeyError && (
+                    <div style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      background: '#fee2e2',
+                      border: '1px solid #fca5a5',
+                      borderRadius: '12px',
+                      color: '#dc2626',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      marginBottom: '16px',
+                      boxSizing: 'border-box'
+                    }}>
+                      {recoveryKeyError}
+                    </div>
+                  )}
+
+                  {/* Monospace Key Input */}
+                  <input
+                    type="text"
+                    placeholder="REC-XXXX-XXXX"
+                    value={recoveryKeyInput}
+                    onChange={(e) => {
+                      setRecoveryKeyError('');
+                      setRecoveryKeyInput(e.target.value.toUpperCase());
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '14px 16px',
+                      borderRadius: '16px',
+                      border: '2px solid #cbd5e1',
+                      fontSize: '1.15rem',
+                      fontWeight: 900,
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                      textAlign: 'center',
+                      letterSpacing: '0.08em',
+                      outline: 'none',
+                      marginBottom: '16px',
+                      boxSizing: 'border-box'
+                    }}
+                    autoFocus
+                  />
+
+                  {/* Verify Button */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const raw = recoveryKeyInput.trim().toUpperCase().replace(/[\s-]/g, '').replace(/^REC/, '');
+                      const userRecKey = String((studentUser as any)?.recovery_key || (studentUser as any)?.emergency_pin || '').trim().toUpperCase().replace(/[\s-]/g, '').replace(/^REC/, '');
+
+                      let isMatch = false;
+                      if (raw && userRecKey && raw === userRecKey) {
+                        isMatch = true;
+                      }
+
+                      if (!isMatch && raw) {
+                        const cachedKey = (localStorage.getItem(`groovelab_recovery_key_${studentId}`) || '').toUpperCase().replace(/[\s-]/g, '').replace(/^REC/, '');
+                        if (cachedKey && raw === cachedKey) isMatch = true;
+                      }
+
+                      if (isMatch) {
+                        // Valid recovery key!
+                        localStorage.removeItem(`groovelab_parent_pin_${studentId}`);
+                        if (studentUser) {
+                          (studentUser as any).has_parent_pin = false;
+                          (studentUser as any).parent_pin = null;
+                        }
+                        try {
+                          await supabase.from('users').update({ parent_pin: null, has_parent_pin: false }).eq('id', studentId);
+                        } catch (e) {}
+
+                        setShowRecoveryKeyModal(false);
+                        setParentSetupStep('enter');
+                        setParentSetupPin('');
+                        setParentSetupConfirm('');
+                        setParentGatePinInput('');
+                        setParentGateError('');
+                        alert('Notfallschlüssel bestätigt! Bitte vergib jetzt deine neue 6-stellige Eltern-Master-PIN.');
+                      } else {
+                        setRecoveryKeyError('Ungültiger Notfallschlüssel. Bitte prüfe deine Eingabe oder wende dich an deine Lehrkraft.');
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      borderRadius: '14px',
+                      background: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.88rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      marginBottom: '16px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    Notfallschlüssel prüfen ➔
+                  </button>
+
+                  {/* Schicht 3 Note */}
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '14px',
+                    padding: '12px 14px',
+                    textAlign: 'left',
+                    fontSize: '0.74rem',
+                    color: '#64748b',
+                    lineHeight: 1.4,
+                    marginBottom: '16px',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    <strong style={{ color: '#0f172a' }}>💡 Notfallschlüssel verloren?</strong><br />
+                    Deine Musikschul-Lehrkraft kann deine Eltern-PIN im Schul-Dashboard mit einem Klick für dich zurücksetzen.
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowRecoveryKeyModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#64748b',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Abbrechen
+                  </button>
                 </div>
               </div>
             )}
@@ -28964,6 +29544,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           setPushEnabled(true);
           fetchStudentAndAvatar();
         }}
+      />
+
+      {/* Praxis-Toolbox Modal */}
+      <StudentToolboxModal
+        isOpen={showStudentToolbox}
+        onClose={() => setShowStudentToolbox(false)}
+        ageGroup={studentUiLevel || 'pro'}
       />
 
       <TourComponent />

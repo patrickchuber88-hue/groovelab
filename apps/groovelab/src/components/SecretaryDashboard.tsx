@@ -47,7 +47,7 @@ import {
   deduplicateRoster 
 } from '../services/studentRosterService';
 import { notesService, UserNote } from '../services/notesService';
-import { formatCleanNoteContent } from './notes/TeacherNotesBoardModal';
+import { formatCleanNoteContent } from './notes/notesConstants';
 function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
   let prefix = 'C';
   if (role === 'admin' || role === 'secretary') {
