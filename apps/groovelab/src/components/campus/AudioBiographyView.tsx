@@ -115,7 +115,7 @@ export const SCHOOL_YEAR_COVERS: SchoolYearCoverConfig[] = [
 
 export interface UniversalPlaylistCoverConfig {
   id: string;
-  category: 'kids' | 'urban_vibes' | 'classic_jazz' | 'events_stage';
+  category: 'concert_stage' | 'music_gifts' | 'repertoire_growth' | 'kids' | 'urban_vibes' | 'classic_jazz' | 'events_stage';
   categoryLabel: string;
   defaultTitle: string;
   subTitle: string;
@@ -128,272 +128,259 @@ export interface UniversalPlaylistCoverConfig {
 }
 
 export const UNIVERSAL_PLAYLIST_COVERS: UniversalPlaylistCoverConfig[] = [
-  // 1. Kids & Einsteiger (5)
+  // 1. Konzert & Vorspiel (VdM- & Bühnen-Repertoire)
   {
-    id: 'cov_gaming_xp',
-    category: 'kids',
-    categoryLabel: 'Kids & Einsteiger',
-    defaultTitle: 'Gaming & XP Level-Up',
-    subTitle: 'Pixel Sound, Boss Themes & Highscores',
-    gradient: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 50%, #10b981 100%)',
-    accentColor: '#06b6d4',
-    badge: 'GAMING XP',
-    iconName: 'zap',
-    emoji: '🎮',
-    vibeTheme: 'cyber_neon'
-  },
-  {
-    id: 'cov_comic_pop',
-    category: 'kids',
-    categoryLabel: 'Kids & Einsteiger',
-    defaultTitle: 'Bubblegum Comic Pop',
-    subTitle: 'Gute Laune, Spass & bunte Melodien',
-    gradient: 'linear-gradient(135deg, #ec4899 0%, #f43f5e 50%, #fbbf24 100%)',
-    accentColor: '#ec4899',
-    badge: 'COMIC POP',
-    iconName: 'sparkles',
-    emoji: '🍬',
-    vibeTheme: 'cyber_neon'
-  },
-  {
-    id: 'cov_magic_sounds',
-    category: 'kids',
-    categoryLabel: 'Kids & Einsteiger',
-    defaultTitle: 'Zauberklänge & Märchen',
-    subTitle: 'Magische Melodien & Fantasiereisen',
-    gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%)',
-    accentColor: '#8b5cf6',
-    badge: 'MAGIC SOUNDS',
-    iconName: 'sparkles',
-    emoji: '✨',
-    vibeTheme: 'midnight_neon'
-  },
-  {
-    id: 'cov_animal_groove',
-    category: 'kids',
-    categoryLabel: 'Kids & Einsteiger',
-    defaultTitle: 'Dschungel & Tier-Grooves',
-    subTitle: 'Wilde Rhythmen & lustige Tierlieder',
-    gradient: 'linear-gradient(135deg, #15803d 0%, #84cc16 50%, #eab308 100%)',
-    accentColor: '#84cc16',
-    badge: 'ANIMAL GROOVE',
-    iconName: 'music',
-    emoji: '🦁',
-    vibeTheme: 'forest_emerald'
-  },
-  {
-    id: 'cov_first_songs',
-    category: 'kids',
-    categoryLabel: 'Kids & Einsteiger',
-    defaultTitle: 'Meine ersten Songs',
-    subTitle: 'Die allerersten Lieblingslieder',
-    gradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #38bdf8 100%)',
+    id: 'cov_spring_summer_concert',
+    category: 'concert_stage',
+    categoryLabel: 'Konzert & Vorspiel',
+    defaultTitle: 'Mein Frühlings- & Sommerkonzert',
+    subTitle: 'Vorspielstücke für die große Musikschul-Bühne',
+    gradient: 'linear-gradient(135deg, #b45309 0%, #d97706 50%, #f59e0b 100%)',
     accentColor: '#f59e0b',
-    badge: 'FIRST SONGS',
-    iconName: 'heart',
-    emoji: '🌱',
+    badge: 'KONZERT-BÜHNE',
+    iconName: 'trophy',
+    emoji: '🌸',
     vibeTheme: 'sunset_gold'
   },
-
-  // 2. Pop, Rock & Urban Vibes (5)
   {
-    id: 'cov_chart_hits',
-    category: 'urban_vibes',
-    categoryLabel: 'Pop, Rock & Beats',
-    defaultTitle: 'Top Hits & Radio Charts',
-    subTitle: 'Aktuelle Chart-Hits & Ohrwürmer',
-    gradient: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 50%, #ec4899 100%)',
-    accentColor: '#06b6d4',
-    badge: 'CHART HITS',
-    iconName: 'music',
-    emoji: '🔥',
-    vibeTheme: 'cyber_neon'
-  },
-  {
-    id: 'cov_rock_garage',
-    category: 'urban_vibes',
-    categoryLabel: 'Pop, Rock & Beats',
-    defaultTitle: 'Rock Garage & Distortion',
-    subTitle: 'Riffs, Power-Chords & Drive',
-    gradient: 'linear-gradient(135deg, #0f172a 0%, #b91c1c 50%, #f97316 100%)',
-    accentColor: '#ef4444',
-    badge: 'ROCK GARAGE',
-    iconName: 'flame',
-    emoji: '🎸',
-    vibeTheme: 'royal_ruby'
-  },
-  {
-    id: 'cov_lofi_chill',
-    category: 'urban_vibes',
-    categoryLabel: 'Pop, Rock & Beats',
-    defaultTitle: 'Lo-Fi Beats & Chillout',
-    subTitle: 'Relaxte Akkorde & Study Flow',
-    gradient: 'linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #f472b6 100%)',
-    accentColor: '#c084fc',
-    badge: 'LO-FI CHILL',
-    iconName: 'headphones',
-    emoji: '☕',
-    vibeTheme: 'midnight_neon'
-  },
-  {
-    id: 'cov_urban_trap',
-    category: 'urban_vibes',
-    categoryLabel: 'Pop, Rock & Beats',
-    defaultTitle: 'Urban Flow & 808 Beats',
-    subTitle: 'Hip-Hop Vibes, Trap & Flow',
-    gradient: 'linear-gradient(135deg, #09090b 0%, #18181b 50%, #10b981 100%)',
+    id: 'cov_class_recital',
+    category: 'concert_stage',
+    categoryLabel: 'Konzert & Vorspiel',
+    defaultTitle: 'Klassenvorspiel & Schülerkonzert',
+    subTitle: 'Gemeinsam vorspielen vor Eltern & Freunden',
+    gradient: 'linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%)',
     accentColor: '#10b981',
-    badge: 'URBAN FLOW',
-    iconName: 'disc',
-    emoji: '🕶️',
-    vibeTheme: 'emerald_studio'
-  },
-  {
-    id: 'cov_summer_vibes',
-    category: 'urban_vibes',
-    categoryLabel: 'Pop, Rock & Beats',
-    defaultTitle: 'Sommerhits & Beach Jam',
-    subTitle: 'Sonnige Klänge & Urlaubsfeeling',
-    gradient: 'linear-gradient(135deg, #ea580c 0%, #f59e0b 50%, #06b6d4 100%)',
-    accentColor: '#f59e0b',
-    badge: 'SUMMER JAM',
-    iconName: 'sun',
-    emoji: '☀️',
-    vibeTheme: 'ocean_breeze'
-  },
-
-  // 3. Klassik, Jazz & Akustik (5)
-  {
-    id: 'cov_classical_gold',
-    category: 'classic_jazz',
-    categoryLabel: 'Klassik & Jazz',
-    defaultTitle: 'Klassik Meisterwerke',
-    subTitle: 'Große Meister, Sonaten & Etüden',
-    gradient: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #d97706 100%)',
-    accentColor: '#d97706',
-    badge: 'KLASSIK MEISTER',
+    badge: 'KLASSENVORSPIEL',
     iconName: 'award',
-    emoji: '🎻',
+    emoji: '🏛️',
     vibeTheme: 'forest_emerald'
   },
   {
-    id: 'cov_piano_dreams',
-    category: 'classic_jazz',
-    categoryLabel: 'Klassik & Jazz',
-    defaultTitle: 'Piano Dreams & Balladen',
-    subTitle: 'Sanfte Tastenklänge & Emotionen',
-    gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #6366f1 100%)',
+    id: 'cov_exam_prep',
+    category: 'concert_stage',
+    categoryLabel: 'Konzert & Vorspiel',
+    defaultTitle: 'Stufenprüfung & Wettbewerb',
+    subTitle: 'D-Prüfung, Leistungsabzeichen & Wertungsspiel',
+    gradient: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
     accentColor: '#6366f1',
-    badge: 'PIANO DREAMS',
-    iconName: 'music',
-    emoji: '🎹',
+    badge: 'PRÜFUNG & STUFEN',
+    iconName: 'award',
+    emoji: '🏆',
     vibeTheme: 'midnight_neon'
   },
   {
-    id: 'cov_smooth_jazz',
-    category: 'classic_jazz',
-    categoryLabel: 'Klassik & Jazz',
-    defaultTitle: 'Smooth Jazz & Soul Lounge',
-    subTitle: 'Groovige Akkorde, Swing & Improvisation',
-    gradient: 'linear-gradient(135deg, #78350f 0%, #b45309 50%, #f59e0b 100%)',
-    accentColor: '#f59e0b',
-    badge: 'JAZZ LOUNGE',
-    iconName: 'music',
-    emoji: '🎷',
-    vibeTheme: 'sunset_gold'
-  },
-  {
-    id: 'cov_acoustic_camp',
-    category: 'classic_jazz',
-    categoryLabel: 'Klassik & Jazz',
-    defaultTitle: 'Acoustic Guitar & Unplugged',
-    subTitle: 'Fingerpicking & Lagerfeuer-Songs',
-    gradient: 'linear-gradient(135deg, #27272a 0%, #3f3f46 50%, #059669 100%)',
-    accentColor: '#059669',
-    badge: 'UNPLUGGED',
-    iconName: 'music',
-    emoji: '🪕',
-    vibeTheme: 'vintage_charcoal'
-  },
-  {
-    id: 'cov_cinema_score',
-    category: 'classic_jazz',
-    categoryLabel: 'Klassik & Jazz',
-    defaultTitle: 'Filmscore & Epische Soundtracks',
-    subTitle: 'Großes Kino & heroische Orchester-Sounds',
-    gradient: 'linear-gradient(135deg, #020617 0%, #0f172a 50%, #38bdf8 100%)',
-    accentColor: '#38bdf8',
-    badge: 'CINEMA SCORE',
-    iconName: 'award',
-    emoji: '🎬',
+    id: 'cov_ensemble_duet',
+    category: 'concert_stage',
+    categoryLabel: 'Konzert & Vorspiel',
+    defaultTitle: 'Ensemble, Band & Duette',
+    subTitle: 'Zusammenspiel mit Lehrkraft & Mitschülern',
+    gradient: 'linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #a855f7 100%)',
+    accentColor: '#a855f7',
+    badge: 'ENSEMBLE & DUETT',
+    iconName: 'disc',
+    emoji: '👥',
     vibeTheme: 'royal_velvet'
   },
 
-  // 4. Events, Bühne & Saison (5)
+  // 2. Musikalische Geschenke & Familie
   {
-    id: 'cov_christmas_magic',
-    category: 'events_stage',
-    categoryLabel: 'Bühne & Saison',
-    defaultTitle: 'Weihnachten & Winterzauber',
-    subTitle: 'Festliche Klänge für Heiligabend',
-    gradient: 'linear-gradient(135deg, #991b1b 0%, #b91c1c 50%, #f59e0b 100%)',
-    accentColor: '#f59e0b',
+    id: 'cov_gift_parents',
+    category: 'music_gifts',
+    categoryLabel: 'Musik-Geschenke & Familie',
+    defaultTitle: 'Musik-Geschenk für Mama & Papa',
+    subTitle: 'Persönliche Aufnahme für die Eltern',
+    gradient: 'linear-gradient(135deg, #be123c 0%, #e11d48 50%, #fb7185 100%)',
+    accentColor: '#e11d48',
+    badge: 'FÜR ELTERN',
+    iconName: 'heart',
+    emoji: '💝',
+    vibeTheme: 'royal_ruby'
+  },
+  {
+    id: 'cov_gift_grandparents',
+    category: 'music_gifts',
+    categoryLabel: 'Musik-Geschenke & Familie',
+    defaultTitle: 'Geburtstags-Ständchen (Oma & Opa)',
+    subTitle: 'Glückwünsche & Stücke von Herzen',
+    gradient: 'linear-gradient(135deg, #c2410c 0%, #ea580c 50%, #fb923c 100%)',
+    accentColor: '#ea580c',
+    badge: 'GEBURTSTAG',
+    iconName: 'gift',
+    emoji: '🎂',
+    vibeTheme: 'vintage_tape'
+  },
+  {
+    id: 'cov_christmas_festive',
+    category: 'music_gifts',
+    categoryLabel: 'Musik-Geschenke & Familie',
+    defaultTitle: 'Mein Festtags- & Weihnachtsalbum',
+    subTitle: 'Besinnliche Melodien zur Adventszeit',
+    gradient: 'linear-gradient(135deg, #991b1b 0%, #b91c1c 50%, #d97706 100%)',
+    accentColor: '#d97706',
     badge: 'WEIHNACHTEN',
     iconName: 'gift',
     emoji: '🎄',
     vibeTheme: 'christmas_gold'
   },
   {
-    id: 'cov_stage_live',
-    category: 'events_stage',
-    categoryLabel: 'Bühne & Saison',
-    defaultTitle: 'Konzert & Live Auftritt',
-    subTitle: 'Bühnenreif vorbereitet fürs Scheinwerferlicht',
-    gradient: 'linear-gradient(135deg, #581c87 0%, #7e22ce 50%, #f43f5e 100%)',
-    accentColor: '#f43f5e',
-    badge: 'STAGE LIVE',
-    iconName: 'trophy',
-    emoji: '🏆',
+    id: 'cov_living_room_concert',
+    category: 'music_gifts',
+    categoryLabel: 'Musik-Geschenke & Familie',
+    defaultTitle: 'Wohnzimmer-Konzert für die Familie',
+    subTitle: 'Gemütliches Vorspiel im Kreis der Familie',
+    gradient: 'linear-gradient(135deg, #78350f 0%, #92400e 50%, #b45309 100%)',
+    accentColor: '#b45309',
+    badge: 'WOHNZIMMER-KONZERT',
+    iconName: 'music',
+    emoji: '🏡',
+    vibeTheme: 'vintage_charcoal'
+  },
+
+  // 3. Repertoire & Lern-Meilensteine
+  {
+    id: 'cov_first_songs',
+    category: 'repertoire_growth',
+    categoryLabel: 'Repertoire & Meilensteine',
+    defaultTitle: 'Meine ersten Lieblingsstücke',
+    subTitle: 'Die ersten gemeisterten Stücke am Instrument',
+    gradient: 'linear-gradient(135deg, #047857 0%, #059669 50%, #10b981 100%)',
+    accentColor: '#10b981',
+    badge: 'ERSTE STÜCKE',
+    iconName: 'heart',
+    emoji: '🌱',
+    vibeTheme: 'forest_emerald'
+  },
+  {
+    id: 'cov_current_repertoire',
+    category: 'repertoire_growth',
+    categoryLabel: 'Repertoire & Meilensteine',
+    defaultTitle: 'Mein aktuelles Repertoire',
+    subTitle: 'Stücke, die ich flüssig und auswendig kann',
+    gradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
+    accentColor: '#38bdf8',
+    badge: 'REPERTOIRE',
+    iconName: 'music',
+    emoji: '🎼',
+    vibeTheme: 'emerald_studio'
+  },
+  {
+    id: 'cov_masterworks',
+    category: 'repertoire_growth',
+    categoryLabel: 'Repertoire & Meilensteine',
+    defaultTitle: 'Meine großen Meisterwerke',
+    subTitle: 'Anspruchsvolle Paradestücke mit vollem Ausdruck',
+    gradient: 'linear-gradient(135deg, #312e81 0%, #4338ca 50%, #d97706 100%)',
+    accentColor: '#d97706',
+    badge: 'MEISTERWERKE',
+    iconName: 'award',
+    emoji: '🌟',
     vibeTheme: 'royal_velvet'
   },
   {
-    id: 'cov_exam_prep',
-    category: 'events_stage',
-    categoryLabel: 'Bühne & Saison',
-    defaultTitle: 'Prüfungs- & Vorspiel-Repertoire',
-    subTitle: 'Präzise & punktgenau einstudiert',
-    gradient: 'linear-gradient(135deg, #1e1b4b 0%, #4338ca 50%, #06b6d4 100%)',
+    id: 'cov_own_compositions',
+    category: 'repertoire_growth',
+    categoryLabel: 'Repertoire & Meilensteine',
+    defaultTitle: 'Eigene Melodien & Improvisationen',
+    subTitle: 'Kreative Ideen, eigene Songs & Skizzen',
+    gradient: 'linear-gradient(135deg, #0369a1 0%, #0284c7 50%, #06b6d4 100%)',
     accentColor: '#06b6d4',
-    badge: 'PRÜFUNG & VORSPIEL',
-    iconName: 'sliders',
-    emoji: '🎯',
+    badge: 'EIGENE STÜCKE',
+    iconName: 'zap',
+    emoji: '✍️',
+    vibeTheme: 'ocean_breeze'
+  },
+
+  // Fallback / Kompatibilität für bestehende Album-IDs
+  {
+    id: 'cov_gaming_xp',
+    category: 'legacy' as any,
+    categoryLabel: 'Archiv',
+    defaultTitle: 'Meilenstein-Stücke & Fortschritt',
+    subTitle: 'Gemeisterte Stücke & Übe-Erfolge',
+    gradient: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 50%, #10b981 100%)',
+    accentColor: '#06b6d4',
+    badge: 'MEILENSTEINE',
+    iconName: 'award',
+    emoji: '🏆',
+    vibeTheme: 'emerald_studio'
+  },
+  {
+    id: 'cov_comic_pop',
+    category: 'legacy' as any,
+    categoryLabel: 'Archiv',
+    defaultTitle: 'Bunte Melodien & Lieder',
+    subTitle: 'Schwungvolle Stücke & Melodien',
+    gradient: 'linear-gradient(135deg, #ec4899 0%, #f43f5e 50%, #fbbf24 100%)',
+    accentColor: '#ec4899',
+    badge: 'MELODIEN',
+    iconName: 'music',
+    emoji: '🎵',
+    vibeTheme: 'royal_ruby'
+  },
+  {
+    id: 'cov_magic_sounds',
+    category: 'legacy' as any,
+    categoryLabel: 'Archiv',
+    defaultTitle: 'Klangreisen & Klangfarben',
+    subTitle: 'Schöne Melodien & Phrasierung',
+    gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%)',
+    accentColor: '#8b5cf6',
+    badge: 'KLANGREISEN',
+    iconName: 'sparkles',
+    emoji: '✨',
     vibeTheme: 'midnight_neon'
   },
   {
-    id: 'cov_favorites_heart',
-    category: 'events_stage',
-    categoryLabel: 'Bühne & Saison',
-    defaultTitle: 'Meine absoluten Lieblingsstücke',
-    subTitle: 'Herzens-Songs, die ich immer wieder spiele',
-    gradient: 'linear-gradient(135deg, #be123c 0%, #e11d48 50%, #f43f5e 100%)',
-    accentColor: '#f43f5e',
-    badge: 'FAVORITES',
-    iconName: 'heart',
-    emoji: '❤️',
-    vibeTheme: 'vintage_tape'
+    id: 'cov_animal_groove',
+    category: 'legacy' as any,
+    categoryLabel: 'Archiv',
+    defaultTitle: 'Rhythmus- & Groove-Stücke',
+    subTitle: 'Schwungvolle Takte & Rhythmen',
+    gradient: 'linear-gradient(135deg, #15803d 0%, #84cc16 50%, #eab308 100%)',
+    accentColor: '#84cc16',
+    badge: 'RHYTHMUS',
+    iconName: 'music',
+    emoji: '🥁',
+    vibeTheme: 'forest_emerald'
   },
   {
-    id: 'cov_band_jam',
-    category: 'events_stage',
-    categoryLabel: 'Bühne & Saison',
-    defaultTitle: 'Band-Probe & Jam-Session',
-    subTitle: 'Zusammen grooven & Ensemblespiel',
-    gradient: 'linear-gradient(135deg, #1e293b 0%, #ca8a04 50%, #facc15 100%)',
-    accentColor: '#facc15',
-    badge: 'BAND & ENSEMBLE',
-    iconName: 'disc',
-    emoji: '🥁',
-    vibeTheme: 'sunset_gold'
+    id: 'cov_chart_hits',
+    category: 'legacy' as any,
+    categoryLabel: 'Archiv',
+    defaultTitle: 'Moderne Songs & Hits',
+    subTitle: 'Bekannte Hits & moderne Arrangements',
+    gradient: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 50%, #ec4899 100%)',
+    accentColor: '#06b6d4',
+    badge: 'MODERNE SONGS',
+    iconName: 'music',
+    emoji: '🔥',
+    vibeTheme: 'midnight_neon'
+  },
+  {
+    id: 'cov_rock_garage',
+    category: 'legacy' as any,
+    categoryLabel: 'Archiv',
+    defaultTitle: 'Rock & Groove Riffs',
+    subTitle: 'Riffs, Akkorde & Groove',
+    gradient: 'linear-gradient(135deg, #0f172a 0%, #b91c1c 50%, #f97316 100%)',
+    accentColor: '#ef4444',
+    badge: 'ROCK & RIFFS',
+    iconName: 'music',
+    emoji: '🎸',
+    vibeTheme: 'royal_ruby'
+  },
+  {
+    id: 'cov_favorites_heart',
+    category: 'legacy' as any,
+    categoryLabel: 'Archiv',
+    defaultTitle: 'Meine absoluten Lieblingsstücke',
+    subTitle: 'Herzens-Songs, die ich immer wieder gerne spiele',
+    gradient: 'linear-gradient(135deg, #be123c 0%, #e11d48 50%, #f43f5e 100%)',
+    accentColor: '#f43f5e',
+    badge: 'LIEBLINGSSTÜCKE',
+    iconName: 'heart',
+    emoji: '❤️',
+    vibeTheme: 'royal_ruby'
   }
 ];
 
@@ -448,58 +435,76 @@ export interface PlaylistTemplate {
 
 export const PEDAGOGICAL_PLAYLIST_TEMPLATES: PlaylistTemplate[] = [
   {
-    id: 'tpl_weihnachten',
-    title: '🎄 Meine Weihnachts-Playlist',
-    description: 'Festliche Klänge für Heiligabend, Familie & Freunde',
+    id: 'tpl_sommerkonzert',
+    title: '🌸 Mein Frühlings- & Sommerkonzert',
+    description: 'Vorspielstücke für die große Musikschul-Bühne & das Sommerfest',
+    vibeTheme: 'sunset_gold',
+    iconName: 'trophy',
+    emoji: '🌸',
+    tag: 'Bühne & Vorspiel'
+  },
+  {
+    id: 'tpl_klassenvorspiel',
+    title: '🏛️ Klassenvorspiel & Schülerkonzert',
+    description: 'Gemeinsam vorspielen vor Eltern, Familie & Mitschülern',
+    vibeTheme: 'forest_emerald',
+    iconName: 'award',
+    emoji: '🏛️',
+    tag: 'Klassenvorspiel'
+  },
+  {
+    id: 'tpl_eltern_geschenk',
+    title: '💝 Musik-Geschenk für Mama & Papa',
+    description: 'Persönliche Aufnahme für die Eltern zu Muttertag, Vatertag oder als Überraschung',
+    vibeTheme: 'royal_ruby',
+    iconName: 'heart',
+    emoji: '💝',
+    tag: 'Musik-Geschenk'
+  },
+  {
+    id: 'tpl_grosseltern_geburtstag',
+    title: '🎂 Geburtstags-Ständchen (Oma & Opa)',
+    description: 'Glückwünsche und liebevoll eingespielte Stücke für Großeltern',
     vibeTheme: 'vintage_tape',
+    iconName: 'gift',
+    emoji: '🎂',
+    tag: 'Geburtstag'
+  },
+  {
+    id: 'tpl_weihnachten',
+    title: '🎄 Mein Festtags- & Weihnachtsalbum',
+    description: 'Festliche Klänge für Heiligabend, Adventszeit & Familie',
+    vibeTheme: 'christmas_gold',
     iconName: 'gift',
     emoji: '🎄',
     tag: 'Saisonal (Winter)'
   },
   {
-    id: 'tpl_sommerhits',
-    title: '☀️ Meine Sommerhits-Playlist',
-    description: 'Highlights zum Schuljahresabschluss & Urlaubs-Soundtracks',
-    vibeTheme: 'ocean_breeze',
-    iconName: 'sun',
-    emoji: '☀️',
-    tag: 'Saisonal (Sommer)'
-  },
-  {
-    id: 'tpl_lieblingssongs',
-    title: '⭐ Meine Lieblingslieder-Playlist',
-    description: 'Tracks, die ich einfach immer wieder gerne spiele',
-    vibeTheme: 'cyber_neon',
+    id: 'tpl_lieblingsstücke',
+    title: '⭐ Meine aktuellen Lieblingsstücke',
+    description: 'Tracks, die ich einfach immer wieder gerne spiele und flüssig beherrsche',
+    vibeTheme: 'royal_velvet',
     iconName: 'heart',
     emoji: '⭐',
-    tag: 'Lieblingsstücke'
+    tag: 'Repertoire'
   },
   {
-    id: 'tpl_konzert',
-    title: '🏆 Mein Konzert- & Vorspiel-Repertoire',
-    description: 'Auf den Punkt vorbereitet für den großen Auftritt & Prüfungen',
-    vibeTheme: 'royal_velvet',
-    iconName: 'trophy',
+    id: 'tpl_stufenpruefung',
+    title: '🏆 Stufenprüfung & Wettbewerb',
+    description: 'Präzise eingespielte Stücke für D-Prüfung, Leistungsabzeichen & Wettbewerbe',
+    vibeTheme: 'midnight_neon',
+    iconName: 'award',
     emoji: '🏆',
-    tag: 'Bühne & Prüfung'
+    tag: 'Prüfung & Stufen'
   },
   {
-    id: 'tpl_vorher_nachher',
-    title: '🌱 Mein Start: Vorher & Nachher',
-    description: 'Vom allerersten Ton bis zu meinen heutigen Fortschritten',
+    id: 'tpl_ensemble_band',
+    title: '👥 Ensemble, Band & Duette',
+    description: 'Gemeinsam musizieren – Duette mit Lehrkraft, Band-Tracks & Ensemblespiel',
     vibeTheme: 'emerald_studio',
-    iconName: 'sparkles',
-    emoji: '🌱',
-    tag: 'Entwicklung'
-  },
-  {
-    id: 'tpl_band',
-    title: '🥁 Ensemble & Band Songs',
-    description: 'Gemeinsam musizieren – Songs aus Ensemble, Band & Orchester',
-    vibeTheme: 'sunset_gold',
     iconName: 'disc',
-    emoji: '🥁',
-    tag: 'Band & Ensemble'
+    emoji: '👥',
+    tag: 'Zusammenspiel'
   }
 ];
 
@@ -725,7 +730,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [selectedJuniorPlaylistForModal, setSelectedJuniorPlaylistForModal] = useState<CustomPlaylist | null>(null);
   const [showJuniorCreatePlaylistModal, setShowJuniorCreatePlaylistModal] = useState<boolean>(false);
   const [newJuniorPlaylistTitle, setNewJuniorPlaylistTitle] = useState<string>('');
-  const [newJuniorPlaylistCover, setNewJuniorPlaylistCover] = useState<string>('cov_first_songs');
+  const [newJuniorPlaylistCover, setNewJuniorPlaylistCover] = useState<string>('cov_spring_summer_concert');
+  const [juniorCoverCategoryFilter, setJuniorCoverCategoryFilter] = useState<'all' | 'concert_stage' | 'music_gifts' | 'repertoire_growth'>('all');
   const [showAdvancedShareOptions, setShowAdvancedShareOptions] = useState<boolean>(false);
 
   const STORAGE_KEY = `campus_audio_biography_${studentId}`;
@@ -4048,8 +4054,14 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       displayPlaylists = [milestonePlaylist, ...displayPlaylists];
     }
 
-    // 🌟 STRIKTE REGEL 2: Zeige NUR Playlisten an, die tatsächlich mit Songs gefüllt sind!
-    displayPlaylists = displayPlaylists.filter(pl => pl.tracks && pl.tracks.length > 0);
+    // 🌟 STRIKTE ENTERPRISE-REGEL: System-Playlisten nur bei vorhandenen Tracks anzeigen; 
+    // vom Schüler/der Lehrkraft erstellte Alben (customPlaylists) sind immer sofort im Regal sichtbar!
+    displayPlaylists = displayPlaylists.filter(pl => {
+      if (pl.id === 'pl_gifts' || pl.id === 'pl_meilenstein_lp') {
+        return pl.tracks && pl.tracks.length > 0;
+      }
+      return true;
+    });
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', maxWidth: '1040px', margin: '0 auto', width: '100%' }}>
@@ -4650,7 +4662,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               type="button"
               onClick={() => {
                 setNewJuniorPlaylistTitle('');
-                setNewJuniorPlaylistCover('cov_first_songs');
+                setNewJuniorPlaylistCover('cov_spring_summer_concert');
+                setJuniorCoverCategoryFilter('concert_stage');
                 setShowJuniorCreatePlaylistModal(true);
               }}
               style={{
@@ -4769,6 +4782,42 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       seasonGlowColor: isSummerPl ? '#f59e0b' : isChristmasPl ? '#dc2626' : undefined
                     })}
 
+                    {/* Optional Quick Delete Button for custom user-created albums */}
+                    {pl.id !== 'pl_gifts' && pl.id !== 'pl_meilenstein_lp' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          requestDeletePlaylist(pl.id, pl.title);
+                        }}
+                        title="Album löschen"
+                        style={{
+                          position: 'absolute',
+                          top: '6px',
+                          right: '6px',
+                          width: '26px',
+                          height: '26px',
+                          borderRadius: '50%',
+                          background: 'rgba(0, 0, 0, 0.45)',
+                          backdropFilter: 'blur(4px)',
+                          WebkitBackdropFilter: 'blur(4px)',
+                          border: 'none',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          zIndex: 10,
+                          opacity: 0.75,
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = 'rgba(239, 68, 68, 0.85)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.75'; e.currentTarget.style.background = 'rgba(0, 0, 0, 0.45)'; }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+
                     {/* Floating Quick Action FAB: Green Mic / Play Button */}
                     <button
                       type="button"
@@ -4853,7 +4902,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             <div
               onClick={() => {
                 setNewJuniorPlaylistTitle('');
-                setNewJuniorPlaylistCover('cov_first_songs');
+                setNewJuniorPlaylistCover('cov_spring_summer_concert');
+                setJuniorCoverCategoryFilter('concert_stage');
                 setShowJuniorCreatePlaylistModal(true);
               }}
               style={{
@@ -11357,25 +11407,54 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setSelectedJuniorPlaylistForModal(null)}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  border: 'none',
-                  background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.1)',
-                  color: colors.textSecondary,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
-                className="hover-scale"
-              >
-                <X size={18} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {selectedJuniorPlaylistForModal.id !== 'pl_gifts' && selectedJuniorPlaylistForModal.id !== 'pl_meilenstein_lp' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetPl = selectedJuniorPlaylistForModal;
+                      setSelectedJuniorPlaylistForModal(null);
+                      requestDeletePlaylist(targetPl.id, targetPl.title);
+                    }}
+                    title="Album löschen"
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.15)',
+                      color: '#dc2626',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedJuniorPlaylistForModal(null)}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.1)',
+                    color: colors.textSecondary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  className="hover-scale"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}
@@ -11552,12 +11631,44 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   })}
                 </div>
               )}
+
+              {/* Delete Playlist Option at Bottom */}
+              {selectedJuniorPlaylistForModal.id !== 'pl_gifts' && selectedJuniorPlaylistForModal.id !== 'pl_meilenstein_lp' && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '14px', paddingTop: '14px', borderTop: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'}` }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetPl = selectedJuniorPlaylistForModal;
+                      setSelectedJuniorPlaylistForModal(null);
+                      requestDeletePlaylist(targetPl.id, targetPl.title);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#dc2626',
+                      fontSize: '0.80rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Trash2 size={15} />
+                    <span>Dieses Album löschen</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* 🌟 14. JUNIOR NEUE PLAYLIST ANLEGEN MODAL */}
+      {/* 🌟 14. JUNIOR NEUE PLAYLIST ANLEGEN MODAL (Pädagogisches Alben-Studio) */}
       {showJuniorCreatePlaylistModal && (
         <div style={{
           position: 'fixed',
@@ -11576,25 +11687,40 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         }}>
           <div style={{
             background: isLight ? '#ffffff' : '#1e293b',
-            borderRadius: '26px',
-            maxWidth: '460px',
+            borderRadius: '28px',
+            maxWidth: '620px',
             width: '100%',
-            padding: '24px',
+            padding: '28px 30px',
             boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px',
-            border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`
+            gap: '20px',
+            border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
+            maxHeight: '92vh',
+            overflowY: 'auto'
           }}>
+            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '1.5rem' }}>💽</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  boxShadow: '0 6px 16px rgba(16, 185, 129, 0.35)'
+                }}>
+                  <Disc size={26} />
+                </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: colors.textPrimary }}>
-                    Neue Playlist anlegen
+                  <h3 style={{ margin: 0, fontSize: '1.28rem', fontWeight: 900, color: colors.textPrimary, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    Neues Musik-Album anlegen
                   </h3>
-                  <span style={{ fontSize: '0.72rem', color: colors.textSecondary }}>
-                    Erstelle ein neues Album für deine Stücke
+                  <span style={{ fontSize: '0.78rem', color: colors.textSecondary, fontWeight: 600 }}>
+                    Erstelle eine Sammlung für Konzerte, Familie oder dein Repertoire
                   </span>
                 </div>
               </div>
@@ -11602,8 +11728,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 type="button"
                 onClick={() => setShowJuniorCreatePlaylistModal(false)}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '36px',
+                  height: '36px',
                   borderRadius: '50%',
                   border: 'none',
                   background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.1)',
@@ -11613,82 +11739,196 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   justifyContent: 'center',
                   cursor: 'pointer'
                 }}
+                className="hover-scale"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
+            {/* Pedagogical Category Tabs */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: colors.textPrimary, marginBottom: '6px' }}>
-                Wie soll deine Playlist heißen?
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                1. Musikalischer Anlass / Kategorie
               </label>
-              <input
-                type="text"
-                value={newJuniorPlaylistTitle}
-                onChange={(e) => setNewJuniorPlaylistTitle(e.target.value)}
-                placeholder="z. B. Meine Lieblings-Hits, Sommerfest..."
-                style={{
-                  width: '100%',
-                  padding: '11px 13px',
-                  borderRadius: '14px',
-                  border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-                  background: isLight ? '#ffffff' : 'rgba(0, 0, 0, 0.2)',
-                  color: colors.textPrimary,
-                  fontSize: '0.90rem',
-                  fontWeight: 700,
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: colors.textPrimary, marginBottom: '6px' }}>
-                Wähle ein Album-Cover:
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                {UNIVERSAL_PLAYLIST_COVERS.filter((cov: UniversalPlaylistCoverConfig) => cov.category === 'kids' || ['cov_first_songs', 'cov_gaming_xp', 'cov_comic_pop', 'cov_magic_sounds', 'cov_chart_hits', 'cov_rock_garage'].includes(cov.id)).map((cov: UniversalPlaylistCoverConfig) => {
-                  const isChosen = newJuniorPlaylistCover === cov.id;
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '8px',
+                background: isLight ? '#f1f5f9' : 'rgba(0, 0, 0, 0.25)',
+                padding: '5px',
+                borderRadius: '16px'
+              }}>
+                {[
+                  { id: 'concert_stage', label: 'Bühne & Vorspiel', icon: '🏛️' },
+                  { id: 'music_gifts', label: 'Musik-Geschenke', icon: '🎁' },
+                  { id: 'repertoire_growth', label: 'Mein Repertoire', icon: '🎼' }
+                ].map((cat) => {
+                  const isCatChosen = (juniorCoverCategoryFilter === cat.id) || (juniorCoverCategoryFilter === 'all' && cat.id === 'concert_stage');
                   return (
                     <button
-                      key={cov.id}
+                      key={cat.id}
                       type="button"
-                      onClick={() => setNewJuniorPlaylistCover(cov.id)}
+                      onClick={() => setJuniorCoverCategoryFilter(cat.id as any)}
                       style={{
-                        padding: '9px 10px',
+                        padding: '10px 6px',
                         borderRadius: '12px',
-                        border: isChosen ? '2.5px solid #10b981' : `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
-                        background: isChosen ? (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.15)') : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.02)'),
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
+                        border: 'none',
+                        background: isCatChosen ? (isLight ? '#ffffff' : '#334155') : 'transparent',
+                        color: isCatChosen ? '#059669' : colors.textSecondary,
+                        fontSize: '0.78rem',
+                        fontWeight: isCatChosen ? 900 : 700,
                         cursor: 'pointer',
-                        fontSize: '0.76rem',
-                        fontWeight: 800,
-                        color: isChosen ? '#047857' : colors.textPrimary
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: isCatChosen ? '0 3px 10px rgba(0,0,0,0.08)' : 'none',
+                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                       }}
                     >
-                      <span style={{ fontSize: '1.15rem' }}>{cov.emoji}</span>
-                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cov.defaultTitle}</span>
+                      <span style={{ fontSize: '1.2rem' }}>{cat.icon}</span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{cat.label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+            {/* Pedagogical Cover Cards (2x2 Clean Grid) */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                2. Album-Vorlage wählen (Cover & Thema)
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                {UNIVERSAL_PLAYLIST_COVERS
+                  .filter((cov: UniversalPlaylistCoverConfig) => {
+                    const activeCat = juniorCoverCategoryFilter === 'all' ? 'concert_stage' : juniorCoverCategoryFilter;
+                    return cov.category === activeCat;
+                  })
+                  .map((cov: UniversalPlaylistCoverConfig) => {
+                    const isChosen = newJuniorPlaylistCover === cov.id;
+                    return (
+                      <div
+                        key={cov.id}
+                        onClick={() => {
+                          setNewJuniorPlaylistCover(cov.id);
+                          setNewJuniorPlaylistTitle(cov.defaultTitle);
+                        }}
+                        style={{
+                          padding: '12px 14px',
+                          borderRadius: '18px',
+                          border: isChosen ? '2.5px solid #10b981' : `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+                          background: isChosen ? (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.15)') : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.02)'),
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          cursor: 'pointer',
+                          boxShadow: isChosen ? '0 6px 18px rgba(16, 185, 129, 0.22)' : '0 1px 3px rgba(0,0,0,0.02)',
+                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                          minHeight: '68px',
+                          boxSizing: 'border-box'
+                        }}
+                        className="hover-scale"
+                      >
+                        {/* Cover Preview Badge */}
+                        <div style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '14px',
+                          background: cov.gradient,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.18)'
+                        }}>
+                          <span style={{ fontSize: '1.35rem' }}>{cov.emoji}</span>
+                        </div>
+                        
+                        <div style={{ minWidth: 0, flex: 1, textAlign: 'left' }}>
+                          <div style={{
+                            fontSize: '0.84rem',
+                            fontWeight: 850,
+                            color: isChosen ? '#047857' : colors.textPrimary,
+                            lineHeight: 1.25
+                          }}>
+                            {cov.defaultTitle}
+                          </div>
+                          <div style={{
+                            fontSize: '0.70rem',
+                            color: colors.textSecondary,
+                            fontWeight: 600,
+                            lineHeight: 1.3,
+                            marginTop: '2px'
+                          }}>
+                            {cov.subTitle}
+                          </div>
+                        </div>
+
+                        {isChosen && (
+                          <div style={{
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '50%',
+                            background: '#10b981',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.4)'
+                          }}>
+                            <Check size={13} color="#ffffff" strokeWidth={3} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Album Title Input */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
+                3. Album-Titel anpassen
+              </label>
+              <input
+                type="text"
+                value={newJuniorPlaylistTitle}
+                onChange={(e) => setNewJuniorPlaylistTitle(e.target.value)}
+                placeholder="z. B. Mein Sommerkonzert 2026, Geschenk für Oma..."
+                style={{
+                  width: '100%',
+                  padding: '13px 16px',
+                  borderRadius: '16px',
+                  border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                  background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.2)',
+                  color: colors.textPrimary,
+                  fontSize: '0.94rem',
+                  fontWeight: 750,
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                  transition: 'border-color 0.2s ease'
+                }}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
               <button
                 type="button"
                 onClick={() => setShowJuniorCreatePlaylistModal(false)}
                 style={{
                   flex: 1,
-                  padding: '11px',
-                  borderRadius: '12px',
+                  padding: '14px',
+                  borderRadius: '16px',
                   border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
                   background: 'transparent',
                   color: colors.textSecondary,
                   fontWeight: 800,
+                  fontSize: '0.90rem',
                   cursor: 'pointer'
                 }}
+                className="hover-scale"
               >
                 Abbrechen
               </button>
@@ -11697,13 +11937,14 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 disabled={!newJuniorPlaylistTitle.trim()}
                 onClick={() => {
                   if (!newJuniorPlaylistTitle.trim()) return;
+                  const chosenCover = UNIVERSAL_PLAYLIST_COVERS.find((c: UniversalPlaylistCoverConfig) => c.id === newJuniorPlaylistCover) || UNIVERSAL_PLAYLIST_COVERS[0];
                   const newPl: CustomPlaylist = {
                     id: `pl_${Date.now()}`,
                     title: newJuniorPlaylistTitle.trim(),
-                    description: `Erstellt von ${student?.first_name || 'Schüler'}`,
-                    vibeTheme: 'sunset_gold',
-                    iconName: 'disc',
-                    coverPresetId: (newJuniorPlaylistCover as any) || 'cov_first_songs',
+                    description: chosenCover.subTitle || `Erstellt von ${student?.first_name || 'Schüler'}`,
+                    vibeTheme: chosenCover.vibeTheme || 'sunset_gold',
+                    iconName: chosenCover.iconName || 'disc',
+                    coverPresetId: chosenCover.id,
                     schoolYear: '2026/2027',
                     tracks: [],
                     createdAt: new Date().toISOString()
@@ -11711,21 +11952,31 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   savePlaylists([newPl, ...customPlaylists]);
                   setShowJuniorCreatePlaylistModal(false);
                   setNewJuniorPlaylistTitle('');
+                  try {
+                    window.dispatchEvent(new CustomEvent('groovelab_playlists_changed', { detail: [newPl, ...customPlaylists] }));
+                  } catch (e) {}
                 }}
                 style={{
-                  flex: 1.5,
-                  padding: '11px',
-                  borderRadius: '12px',
+                  flex: 1.6,
+                  padding: '14px',
+                  borderRadius: '16px',
                   border: 'none',
                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   color: 'white',
                   fontWeight: 900,
+                  fontSize: '0.94rem',
                   cursor: newJuniorPlaylistTitle.trim() ? 'pointer' : 'not-allowed',
                   opacity: newJuniorPlaylistTitle.trim() ? 1 : 0.5,
-                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                  boxShadow: '0 6px 18px rgba(16, 185, 129, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}
+                className="hover-scale"
               >
-                Erstellen ✨
+                <span>Album anlegen</span>
+                <span>✨</span>
               </button>
             </div>
           </div>
