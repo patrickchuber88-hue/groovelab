@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench, Hash, Filter, Target } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
@@ -274,11 +274,11 @@ export const formatStudentNoteDisplay = (note: string): { isStudentNote: boolean
 };
 
 const SKILL_TAGS = [
-  { key: 'rhythmus', label: 'Rhythmus & Timing', shortLabel: 'Rhythmus', icon: '🥁', category: 'musical' },
-  { key: 'technik', label: 'Spieltechnik & Motorik', shortLabel: 'Technik', icon: '⚡', category: 'musical' },
-  { key: 'intonation', label: 'Klang & Intonation', shortLabel: 'Klang', icon: '🎵', category: 'musical' },
-  { key: 'ausdruck', label: 'Ausdruck & Dynamik', shortLabel: 'Ausdruck', icon: '🎭', category: 'musical' },
-  { key: 'repertoire', label: 'Repertoire & Performance', shortLabel: 'Repertoire', icon: '🌟', category: 'musical' },
+  { key: 'rhythmus', label: 'Rhythmus & Timing', shortLabel: 'Rhythmus', icon: '🥁', color: '#4338ca', bg: '#e0e7ff', lightBg: '#eef2ff', border: '#c7d2fe', dotColor: '#4338ca', category: 'musical' },
+  { key: 'technik', label: 'Spieltechnik & Motorik', shortLabel: 'Technik', icon: '⚡', color: '#1e40af', bg: '#eff6ff', lightBg: '#eff6ff', border: '#bfdbfe', dotColor: '#2563eb', category: 'musical' },
+  { key: 'intonation', label: 'Klang & Intonation', shortLabel: 'Klang', icon: '🎵', color: '#166534', bg: '#e6f4ea', lightBg: '#f0fdf4', border: '#bbf7d0', dotColor: '#16a34a', category: 'musical' },
+  { key: 'ausdruck', label: 'Ausdruck & Dynamik', shortLabel: 'Ausdruck', icon: '🎭', color: '#6b21a8', bg: '#f3e8ff', lightBg: '#faf5ff', border: '#e9d5ff', dotColor: '#9333ea', category: 'musical' },
+  { key: 'repertoire', label: 'Repertoire & Performance', shortLabel: 'Repertoire', icon: '🌟', color: '#854d0e', bg: '#fef9c3', lightBg: '#fefce8', border: '#fef08a', dotColor: '#d97706', category: 'musical' },
 ];
 
 export const SpeechDictationButton: React.FC<{
@@ -590,6 +590,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [isNotesFocused, setIsNotesFocused] = useState(false);
   const isNotesExpanded = isNotesFocused || !!generalHomeworkNotes.trim();
   const homeworkTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const studentNotesTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const studentNotesSelectionRef = React.useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+  const pageNotesTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const pageNotesSelectionRef = React.useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+  const songNotesTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const songNotesSelectionRef = React.useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+  const teacherNotesTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const latestGeneralHomeworkNotesRef = React.useRef<string>(generalHomeworkNotes);
   const latestTeacherNotesRef = React.useRef<string>(teacherNotes);
 
@@ -601,8 +608,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     latestTeacherNotesRef.current = teacherNotes;
   }, [teacherNotes]);
 
+  const adjustTextareaHeight = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(64, el.scrollHeight)}px`;
+    if (start !== null && end !== null && document.activeElement === el) {
+      try { el.setSelectionRange(start, end); } catch {}
+    }
+  };
+
   const lastClickRef = React.useRef<{ pageNum: number; timestamp: number } | null>(null);
   const clickTimeoutRef = React.useRef<any>(null);
+
+  const [activeTagPickerRowIndex, setActiveTagPickerRowIndex] = useState<number | null>(null);
 
   // Song catalog integration
   const [activeInputTab, setActiveInputTab] = useState<'free' | 'catalog' | 'lehrwerk_page' | 'active_song'>('free');
@@ -1072,53 +1092,56 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   });
 
-  const handleImproveSkill = (tagKey: string) => {
+  const handleSetSkillLevel = (tagKey: string, targetLevel: number) => {
+    if (readOnly && !isTeacherTools) return;
+    const validLevel = Math.min(5, Math.max(1, targetLevel));
     setSkillOverrides(prev => {
-      const currentOffset = prev[tagKey] ?? 0;
-      const updated = { ...prev, [tagKey]: currentOffset - 1 };
+      const updated = { ...prev, [tagKey]: validLevel };
       try {
         localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
+    triggerDebouncedAutoSave(350);
+  };
+
+  const handleImproveSkill = (tagKey: string) => {
+    setSkillOverrides(prev => {
+      const current = prev[tagKey] ?? 3;
+      const nextLevel = Math.min(5, current + 1);
+      const updated = { ...prev, [tagKey]: nextLevel };
+      try {
+        localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    triggerDebouncedAutoSave(350);
   };
 
   const handleTriggerSkillQuest = (tagKey: string) => {
-    setSkillOverrides(prev => {
-      const currentOffset = prev[tagKey] ?? 0;
-      
-      // 3-Stufen-Zyklus: Stufe 5 (Offset <= 0) -> Stufe 4 (Offset 1) -> Stufe 3 (Offset 2) -> Reset auf Stufe 5 (Offset -10)
-      let nextOffset: number;
-      if (currentOffset <= 0) {
-        // Prüfe Max-2-Sperre: Wie viele andere Säulen sind aktuell im Fokus (offset > 0)?
-        const activeOtherKeys = Object.keys(prev).filter(k => k !== tagKey && (prev[k] ?? 0) > 0);
-        if (activeOtherKeys.length >= 2) {
-          return prev; // Max 2 erreicht
-        }
-        nextOffset = 1; // Stufe 4 (Wochenfokus)
-      } else if (currentOffset === 1) {
-        nextOffset = 2; // Stufe 3 (Vertiefte Quest)
-      } else {
-        nextOffset = -10; // Reset zurück auf Stufe 5 (100% Souverän)
+    // Toggle active focus tag for this skill (Max 2)
+    setPendingTargetFocusTags(prev => {
+      if (prev.includes(tagKey)) {
+        return prev.filter(k => k !== tagKey);
       }
-
-      const updated = { ...prev, [tagKey]: nextOffset };
-      try {
-        localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
+      if (prev.length >= 2) {
+        return [prev[1], tagKey];
+      }
+      return [...prev, tagKey];
     });
+    triggerImmediateAutoSave();
   };
 
   const handleMasterAllSkills = () => {
     const updated: { [k: string]: number } = {};
     SKILL_TAGS.forEach(t => {
-      updated[t.key] = -10; // Guarantees Stufe 5 (100% Souverän Meister-Level)
+      updated[t.key] = 5; // Level 5 Meister
     });
     setSkillOverrides(updated);
     try {
       localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
     } catch (e) {}
+    triggerImmediateAutoSave();
   };
 
   // Helper for 2-Tier Auto-Detection of Custom Textbausteine to Skill-Radar Tags
@@ -1328,6 +1351,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // 📅 KW Week Navigation Offset (0 = Current Week, -1 = Previous Week, etc.)
   const [viewingWeekOffset, setViewingWeekOffset] = useState<number>(0);
+
+  // 🏷️ Didaktischer Kategorie-Filter (#Technik, #Repertoire, #Theorie, #Konzert, #Hausaufgabe, #Wichtig)
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
 
   // 🔊 Enterprise+ Sequential Phrase-Queue TTS Engine mit 4 wählbaren Varianten
   // 'neural_thorsten' = Option A: Neuronale KI-Stimme (Piper WASM Studio-Hörbuch)
@@ -1742,6 +1768,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   }, [isRecordingAudio, isRecordingMetronomeActive, recordingBpm]);
 
   const [activeNoteTarget, setActiveNoteTarget] = useState<'student' | 'teacher'>('student');
+
+  useEffect(() => {
+    if (studentNotesTextareaRef.current) {
+      adjustTextareaHeight(studentNotesTextareaRef.current);
+    }
+  }, [generalHomeworkNotes, viewingWeekOffset, activeNoteTarget]);
+
+  useEffect(() => {
+    if (teacherNotesTextareaRef.current) {
+      adjustTextareaHeight(teacherNotesTextareaRef.current);
+    }
+  }, [teacherNotes, activeNoteTarget]);
 
   const [hasTresorStorage, setHasTresorStorage] = useState<boolean>(() => {
     if (propHasTresor === true) return true;
@@ -3860,15 +3898,79 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  const PRESET_CHIPS: { label: string; text: string; tagKey?: string; isBpm?: boolean }[] = [
-    { label: 'Tempo halten', text: 'Achte auf ein gleichmäßiges Tempo und übe gezielt mit dem Metronom.', tagKey: 'rhythmus', isBpm: false },
-    { label: 'Sauber spielen', text: 'Spiele diese Stelle besonders sauber, achte auf saubere Töne und klaren Klang.', tagKey: 'intonation', isBpm: false },
-    { label: 'Rhythmus (60 BPM)', text: 'Übe diesen Rhythmus präzise auf den Klick (60 BPM).', tagKey: 'rhythmus', isBpm: true },
-    { label: 'Fingersatz üben', text: 'Halte dich exakt an den notierten Fingersatz und achte auf eine entspannte Handhaltung.', tagKey: 'technik', isBpm: false },
-    { label: 'Ausdruck & Dynamik', text: 'Gestalte die Dynamik bewusst (p/f) und bringe Emotion und Gefühl in deinen Ausdruck.', tagKey: 'ausdruck', isBpm: false },
-    { label: 'Auswendig spielen', text: 'Präge dir diesen Abschnitt auswendig ein und spiele frei ohne Notenblatt.', tagKey: 'auswendig', isBpm: false },
-    { label: 'Kontinuität üben', text: 'Übe diese Stelle täglich 10 Minuten für eine hohe Kontinuität und Sicherheit.', tagKey: 'kontinuitaet', isBpm: false },
-    { label: 'Selbstständig üben', text: 'Erarbeite dir die nächsten Takte selbstständig und achte auf eigene Fehlerkorrektur.', tagKey: 'selbststaendigkeit', isBpm: false }
+  // Didactic Tags definition & styling helper
+  const DIDACTIC_TAG_STYLES: Record<string, { bg: string; color: string; border: string; label: string }> = {
+    technik: { bg: '#eff6ff', color: '#1e40af', border: '#bfdbfe', label: '#Technik' },
+    rhythmus: { bg: '#e0e7ff', color: '#4338ca', border: '#c7d2fe', label: '#Rhythmus' },
+    klang: { bg: '#e6f4ea', color: '#166534', border: '#bbf7d0', label: '#Klang' },
+    intonation: { bg: '#e6f4ea', color: '#166534', border: '#bbf7d0', label: '#Klang' },
+    ausdruck: { bg: '#f3e8ff', color: '#6b21a8', border: '#e9d5ff', label: '#Ausdruck' },
+    repertoire: { bg: '#fef9c3', color: '#854d0e', border: '#fef08a', label: '#Repertoire' },
+    theorie: { bg: '#fef3c7', color: '#b45309', border: '#fde68a', label: '#Theorie' },
+    konzert: { bg: '#ffedd5', color: '#9a3412', border: '#fed7aa', label: '#Konzert' },
+    hausaufgabe: { bg: '#e6f4ea', color: '#166534', border: '#bbf7d0', label: '#Hausaufgabe' },
+    wichtig: { bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3', label: '#Wichtig' }
+  };
+
+  const getDidacticTagStyle = (tag: string) => {
+    const clean = tag.replace(/^#/, '').toLowerCase();
+    return DIDACTIC_TAG_STYLES[clean] || { bg: '#f1f5f9', color: '#475569', border: '#e2e8f0', label: `#${clean}` };
+  };
+
+  const DIDACTIC_QUICK_TAGS = [
+    { tag: '#Technik', desc: 'Motorik & Handhaltung', color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe', skillKey: 'technik' },
+    { tag: '#Rhythmus', desc: 'Metronom & Timing', color: '#4338ca', bg: '#e0e7ff', border: '#c7d2fe', skillKey: 'rhythmus' },
+    { tag: '#Klang', desc: 'Tonkultur & Sauberkeit', color: '#166534', bg: '#e6f4ea', border: '#bbf7d0', skillKey: 'intonation' },
+    { tag: '#Ausdruck', desc: 'Dynamik & Phrasierung', color: '#6b21a8', bg: '#f3e8ff', border: '#e9d5ff', skillKey: 'ausdruck' },
+    { tag: '#Repertoire', desc: 'Songs & Stücke', color: '#854d0e', bg: '#fef9c3', border: '#fef08a', skillKey: 'repertoire' },
+    { tag: '#Theorie', desc: 'Noten & Harmonielehre', color: '#b45309', bg: '#fef3c7', border: '#fde68a', skillKey: 'theorie' },
+    { tag: '#Wichtig', desc: 'Wichtiger Hinweis', color: '#9f1239', bg: '#ffe4e6', border: '#fecdd3' },
+    { tag: '#Konzert', desc: 'Vorspiel & Bühne', color: '#9a3412', bg: '#ffedd5', border: '#fed7aa' }
+  ];
+
+  // Helper to render text with highlighted Smart Badges
+  const renderTextWithDidacticBadges = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(#[a-zA-ZäöüÄÖÜß_-]+)/g);
+    return parts.map((part, pIdx) => {
+      if (part.startsWith('#')) {
+        const style = getDidacticTagStyle(part);
+        return (
+          <span
+            key={`tag-badge-${pIdx}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
+              padding: '1px 6px',
+              borderRadius: '4px',
+              fontSize: '0.70rem',
+              fontWeight: 800,
+              background: style.bg,
+              color: style.color,
+              border: `1px solid ${style.border}`,
+              margin: '0 3px',
+              verticalAlign: 'baseline'
+            }}
+          >
+            <Hash size={9} strokeWidth={2.6} />
+            <span>{part.replace(/^#/, '')}</span>
+          </span>
+        );
+      }
+      return <span key={`text-${pIdx}`}>{part}</span>;
+    });
+  };
+
+  const PRESET_CHIPS: { label: string; text: string; isBpm?: boolean }[] = [
+    { label: 'Tempo halten', text: 'Achte auf ein gleichmäßiges Tempo und übe gezielt mit dem Metronom.', isBpm: false },
+    { label: 'Sauber spielen', text: 'Spiele diese Stelle besonders sauber, achte auf saubere Töne und klaren Klang.', isBpm: false },
+    { label: 'Rhythmus (60 BPM)', text: 'Übe diesen Rhythmus präzise auf den Klick (60 BPM).', isBpm: true },
+    { label: 'Fingersatz üben', text: 'Halte dich exakt an den notierten Fingersatz und achte auf eine entspannte Handhaltung.', isBpm: false },
+    { label: 'Ausdruck & Dynamik', text: 'Gestalte die Dynamik bewusst (p/f) und bringe Emotion und Gefühl in deinen Ausdruck.', isBpm: false },
+    { label: 'Auswendig spielen', text: 'Präge dir diesen Abschnitt auswendig ein und spiele frei ohne Notenblatt.', isBpm: false },
+    { label: 'Kontinuität üben', text: 'Übe diese Stelle täglich 10 Minuten für eine hohe Kontinuität und Sicherheit.', isBpm: false },
+    { label: 'Selbstständig üben', text: 'Erarbeite dir die nächsten Takte selbstständig und achte auf eigene Fehlerkorrektur.', isBpm: false }
   ];
 
   const getHomeworkNoteItems = (notesText: string): string[] => {
@@ -3896,22 +3998,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       localStorage.setItem(`campus_homework_notes_${student.id}`, nextText);
     } catch {}
 
-    // Untag focus tag if this chip was removed
-    const matchingChip = PRESET_CHIPS.find(c => itemToDelete && (c.text === itemToDelete || (c.isBpm && itemToDelete.includes('BPM'))));
-    if (matchingChip?.tagKey) {
-      const isTagStillUsed = updatedLines.some(line => {
-        const c = PRESET_CHIPS.find(chip => chip.text === line || (chip.isBpm && line.includes('BPM')));
-        return c?.tagKey === matchingChip.tagKey;
-      });
-      if (!isTagStillUsed) {
-        setPendingTargetFocusTags(prev => prev.filter(k => k !== matchingChip.tagKey));
-      }
-    }
-
     triggerImmediateAutoSave();
   };
 
-  const handleTogglePresetChip = (chip: { label: string; text: string; tagKey?: string; isBpm?: boolean }, e?: React.MouseEvent) => {
+  const handleTogglePresetChip = (chip: { label: string; text: string; isBpm?: boolean }, e?: React.MouseEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
 
@@ -3920,47 +4010,167 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       : generalHomeworkNotes;
 
     let lines = current.split('\n').map(s => s.trim()).filter(Boolean);
-    let isCurrentlyActive = false;
 
     if (chip.isBpm) {
       const bpmIdx = lines.findIndex(l => l.toLowerCase().includes('bpm'));
       if (bpmIdx !== -1) {
         lines.splice(bpmIdx, 1);
-        isCurrentlyActive = false;
       } else {
         lines.push('Übe diesen Rhythmus präzise auf den Klick (60 BPM).');
-        isCurrentlyActive = true;
       }
     } else {
       const foundIdx = lines.findIndex(l => l === chip.text || l.includes(chip.text));
       if (foundIdx !== -1) {
         lines.splice(foundIdx, 1);
-        isCurrentlyActive = false;
       } else {
         lines.push(chip.text);
-        isCurrentlyActive = true;
       }
     }
 
     const nextText = lines.join('\n');
     latestGeneralHomeworkNotesRef.current = nextText;
     setGeneralHomeworkNotes(nextText);
+    studentNotesSelectionRef.current = { start: nextText.length, end: nextText.length };
+
+    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
+    const noteLines = nextText.split('\n').map(s => s.trim()).filter(Boolean);
+    const combined = [...specialNotes, ...noteLines];
+    setHomeworkNotesList(combined);
 
     try {
-      localStorage.setItem(`campus_homework_notes_${student.id}`, nextText);
+      localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined));
     } catch {}
 
-    if (chip.tagKey) {
+    triggerImmediateAutoSave();
+  };
+
+  const handleSetRowTag = (rowIndex: number, tagKey: string | null) => {
+    const current = latestGeneralHomeworkNotesRef.current !== undefined
+      ? latestGeneralHomeworkNotesRef.current
+      : generalHomeworkNotes;
+
+    const lines = current.split('\n').map(s => s.trim()).filter(Boolean);
+    if (rowIndex >= lines.length) return;
+
+    let line = lines[rowIndex];
+
+    // Remove any existing didactic tag from this line
+    DIDACTIC_QUICK_TAGS.forEach(dt => {
+      const escaped = dt.tag.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1");
+      line = line.replace(new RegExp(`\\s*${escaped}`, 'g'), '');
+    });
+    line = line.trim();
+
+    // If a new tag is selected, append it with a leading space
+    if (tagKey) {
+      const tagObj = DIDACTIC_QUICK_TAGS.find(dt => dt.tag === tagKey || dt.skillKey === tagKey);
+      const tagToAdd = tagObj ? tagObj.tag : (tagKey.startsWith('#') ? tagKey : `#${tagKey}`);
+      line = `${line} ${tagToAdd}`;
+
+      if (tagObj?.skillKey) {
+        setPendingTargetFocusTags(prev => prev.includes(tagObj.skillKey!) ? prev : [...prev, tagObj.skillKey!]);
+      }
+    }
+
+    lines[rowIndex] = line;
+    const nextText = lines.join('\n');
+
+    latestGeneralHomeworkNotesRef.current = nextText;
+    setGeneralHomeworkNotes(nextText);
+    studentNotesSelectionRef.current = { start: nextText.length, end: nextText.length };
+
+    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
+    const noteLines = nextText.split('\n').map(s => s.trim()).filter(Boolean);
+    const combined = [...specialNotes, ...noteLines];
+    setHomeworkNotesList(combined);
+
+    try {
+      localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined));
+    } catch {}
+
+    setActiveTagPickerRowIndex(null);
+    triggerImmediateAutoSave();
+  };
+
+  const insertOrToggleTagInText = (
+    currentText: string,
+    tag: string,
+    selection: { start: number; end: number }
+  ): { nextText: string; newCursorPos: number; isActivated: boolean } => {
+    // If the tag is already present in the text, clicking it removes it cleanly
+    if (currentText.includes(tag)) {
+      const escapedTag = tag.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1");
+      const nextText = currentText.replace(new RegExp(`\\s*${escapedTag}`, 'g'), '').trim();
+      const newCursorPos = Math.min(selection.start, nextText.length);
+      return { nextText, newCursorPos, isActivated: false };
+    }
+
+    // Insert tag at exact cursor position
+    const len = currentText.length;
+    const start = Math.min(Math.max(0, selection.start), len);
+    const end = Math.min(Math.max(start, selection.end), len);
+
+    const before = currentText.slice(0, start);
+    const after = currentText.slice(end);
+
+    const needsLeadingSpace = before.length > 0 && !/[\s\n]/.test(before.slice(-1));
+    const needsTrailingSpace = after.length > 0 && !/[\s\n]/.test(after.slice(0, 1));
+
+    const insertText = `${needsLeadingSpace ? ' ' : ''}${tag}${needsTrailingSpace ? ' ' : ' '}`;
+    const nextText = `${before}${insertText}${after}`;
+    const newCursorPos = before.length + insertText.length;
+
+    return { nextText, newCursorPos, isActivated: true };
+  };
+
+  const handleToggleQuickTag = (t: { tag: string; skillKey?: string }, e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+
+    const current = latestGeneralHomeworkNotesRef.current !== undefined
+      ? latestGeneralHomeworkNotesRef.current
+      : generalHomeworkNotes;
+
+    const { nextText, newCursorPos, isActivated } = insertOrToggleTagInText(
+      current,
+      t.tag,
+      studentNotesSelectionRef.current
+    );
+
+    latestGeneralHomeworkNotesRef.current = nextText;
+    setGeneralHomeworkNotes(nextText);
+    studentNotesSelectionRef.current = { start: newCursorPos, end: newCursorPos };
+
+    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
+    const noteLines = nextText.split('\n').map(s => s.trim()).filter(Boolean);
+    const combined = [...specialNotes, ...noteLines];
+    setHomeworkNotesList(combined);
+
+    try {
+      localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined));
+    } catch {}
+
+    if (t.skillKey) {
       setPendingTargetFocusTags(prev => {
-        if (isCurrentlyActive) {
-          return prev.includes(chip.tagKey!) ? prev : [...prev, chip.tagKey!];
+        if (isActivated) {
+          return prev.includes(t.skillKey!) ? prev : [...prev, t.skillKey!];
         } else {
-          return prev.filter(k => k !== chip.tagKey);
+          return prev.filter(k => k !== t.skillKey);
         }
       });
     }
 
-    triggerImmediateAutoSave();
+    triggerDebouncedAutoSave(350);
+
+    // Re-focus textarea and place cursor right after the inserted tag
+    setTimeout(() => {
+      if (studentNotesTextareaRef.current) {
+        studentNotesTextareaRef.current.focus();
+        try {
+          studentNotesTextareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+        } catch {}
+      }
+    }, 10);
   };
 
   const handleAddNote = async () => {
@@ -5965,6 +6175,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     const currentWeekStr = getISOWeek();
     const allActiveNotesText = [
+      generalHomeworkNotes || '',
+      latestGeneralHomeworkNotesRef.current || '',
       homeworkNotes || '',
       ...(homeworkNotesList || []),
       ...((progressItems || [])
@@ -5973,44 +6185,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     ].join(' ');
 
     const counts = SKILL_TAGS.map(tag => {
-      let baseInterventions = 0;
-      
-      // Match feedbackEntries tags with legacy aliases
-      feedbackEntries.forEach((fb: any) => {
-        if (Array.isArray(fb.tags)) {
-          fb.tags.forEach((t: string) => {
-            const mappedKey = 
-              (t === 'tempo' || t === 'rhythmus') ? 'rhythmus' :
-              (t === 'fingersatz' || t === 'technik') ? 'technik' :
-              (t === 'intonation' || t === 'toene') ? 'intonation' :
-              (t === 'ausdruck' || t === 'dynamik') ? 'ausdruck' :
-              (t === 'auswendig' || t === 'repertoire' || t === 'kontinuitaet' || t === 'selbststaendigkeit') ? 'repertoire' : t;
-            if (mappedKey === tag.key) {
-              baseInterventions++;
-            }
-          });
-        }
-      });
+      let level = skillOverrides[tag.key];
 
-      const offset = skillOverrides[tag.key] ?? 0;
-      const effectiveInterventions = Math.max(0, baseInterventions + offset);
-      
-      // Smooth organic growth percentage (min 0.60 for Level 3 up to 1.0 for Level 5 Meister)
-      const level = effectiveInterventions === 0 ? 5 : (effectiveInterventions === 1 ? 4 : (effectiveInterventions === 2 ? 3 : 2));
-      const pct = effectiveInterventions === 0 ? 1.0 : (effectiveInterventions === 1 ? 0.84 : (effectiveInterventions === 2 ? 0.70 : 0.58));
+      if (typeof level !== 'number' || level < 1 || level > 5) {
+        // Standardmässig Stufe 1 (Fundament 🌱) als didaktische Basis-Geometrie für maximale Progression
+        level = 1;
+      }
+
+      const pct = Math.max(0.20, level / 5);
       
       const rankTitle = 
-        tag.key === 'rhythmus' ? (level === 5 ? 'Groove-Meister' : (level === 4 ? 'Timing-Sicher' : (level === 3 ? 'Puls-Entdecker' : 'Rhythmus-Fundament'))) :
-        tag.key === 'technik' ? (level === 5 ? 'Meister-Virtuose' : (level === 4 ? 'Feinmotoriker' : (level === 3 ? 'Technik-Aufsteiger' : 'Technik-Fundament'))) :
-        tag.key === 'intonation' ? (level === 5 ? 'Klang-Künstler' : (level === 4 ? 'Klang-Bewusst' : (level === 3 ? 'Klang-Gestalter' : 'Klang-Fundament'))) :
-        tag.key === 'ausdruck' ? (level === 5 ? 'Bühnen-Magier' : (level === 4 ? 'Ausdrucksstark' : (level === 3 ? 'Gefühls-Pionier' : 'Ausdrucks-Fundament'))) :
-        (level === 5 ? 'Repertoire-Profi' : (level === 4 ? 'Spielfluss-Star' : (level === 3 ? 'Song-Entdecker' : 'Repertoire-Fundament')));
+        tag.key === 'rhythmus' ? (level === 5 ? 'Groove-Meister' : (level === 4 ? 'Timing-Sicher' : (level === 3 ? 'Puls-Entdecker' : (level === 2 ? 'Rhythmus-Aufbau' : 'Rhythmus-Fundament')))) :
+        tag.key === 'technik' ? (level === 5 ? 'Meister-Virtuose' : (level === 4 ? 'Feinmotoriker' : (level === 3 ? 'Technik-Aufsteiger' : (level === 2 ? 'Technik-Aufbau' : 'Technik-Fundament')))) :
+        tag.key === 'intonation' ? (level === 5 ? 'Klang-Künstler' : (level === 4 ? 'Klang-Bewusst' : (level === 3 ? 'Klang-Gestalter' : (level === 2 ? 'Klang-Aufbau' : 'Klang-Fundament')))) :
+        tag.key === 'ausdruck' ? (level === 5 ? 'Bühnen-Magier' : (level === 4 ? 'Ausdrucksstark' : (level === 3 ? 'Gefühls-Pionier' : (level === 2 ? 'Ausdruck-Aufbau' : 'Ausdrucks-Fundament')))) :
+        (level === 5 ? 'Repertoire-Profi' : (level === 4 ? 'Spielfluss-Star' : (level === 3 ? 'Song-Entdecker' : (level === 2 ? 'Song-Aufbau' : 'Repertoire-Fundament'))));
 
       return {
         ...tag,
-        baseInterventions,
-        interventions: effectiveInterventions,
-        count: effectiveInterventions,
+        baseInterventions: 0,
+        interventions: 5 - level,
+        count: level,
         level,
         pct,
         rankTitle
@@ -6019,30 +6214,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     const tagCounts = counts;
 
-    // Single Source of Truth: Aktive Wochenschwerpunkte (Max. 2)
-    // 1. Manuelle UI-Auswahl oder 2. Säulen mit Entwicklungsbedarf (< 5)
-    const activeGrowthTags = tagCounts.filter(t => t.level < 5).map(t => t.key);
-
+    // Single Source of Truth: Aktive Wochenschwerpunkte (dynamisch alle gesetzten Tags)
     const activeWeeklyTargetTags = SKILL_TAGS.filter(tag => {
-      // Priorität 1: Temporär in der UI angewählt
       if (pendingTargetFocusTags.includes(tag.key)) return true;
-      // Priorität 2: Durch Lehrer aktiv gesetzte Entwicklungs-Säule (Stufe < 5)
-      if (activeGrowthTags.includes(tag.key)) return true;
-      // Priorität 3: Nur falls alle 5 Säulen auf Stufe 5 stehen, gezielte Textbausteine prüfen
-      if (activeGrowthTags.length === 0) {
-        const cleanNotes = allActiveNotesText.trim();
-        if (!cleanNotes) return false;
-        const lowerText = cleanNotes.toLowerCase();
-        if (tag.key === 'rhythmus' && (lowerText.includes('rhythmus-fokus') || lowerText.includes('rhythmustraining') || lowerText.includes('pulsfest'))) return true;
-        if (tag.key === 'technik' && (lowerText.includes('fingersatz-fokus') || lowerText.includes('technik-übung') || lowerText.includes('handhaltung'))) return true;
-        if (tag.key === 'intonation' && (lowerText.includes('intonations-fokus') || lowerText.includes('klangübung') || lowerText.includes('tonbildung'))) return true;
-        if (tag.key === 'ausdruck' && (lowerText.includes('ausdrucks-fokus') || lowerText.includes('dynamik-übung') || lowerText.includes('phrasierungs-fokus'))) return true;
-        if (tag.key === 'repertoire' && (lowerText.includes('repertoire-fokus') || lowerText.includes('auswendig-spiel') || lowerText.includes('bühnentraining'))) return true;
-      }
+      const cleanNotes = allActiveNotesText.trim();
+      if (!cleanNotes) return false;
+      const lowerText = cleanNotes.toLowerCase();
+      if (tag.key === 'rhythmus' && (lowerText.includes('#rhythmus') || lowerText.includes('#timing'))) return true;
+      if (tag.key === 'technik' && (lowerText.includes('#technik') || lowerText.includes('#motorik') || lowerText.includes('#fingersatz'))) return true;
+      if (tag.key === 'intonation' && (lowerText.includes('#klang') || lowerText.includes('#intonation') || lowerText.includes('#tonkultur'))) return true;
+      if (tag.key === 'ausdruck' && (lowerText.includes('#ausdruck') || lowerText.includes('#dynamik') || lowerText.includes('#phrasierung'))) return true;
+      if (tag.key === 'repertoire' && (lowerText.includes('#repertoire') || lowerText.includes('#konzert') || lowerText.includes('#bühne') || lowerText.includes('#song') || lowerText.includes('#stück'))) return true;
       return false;
-    }).map(t => t.key).slice(0, 2);
+    }).map(t => t.key);
+
     const topStrength = tagCounts.find(t => t.level >= 4) || tagCounts[0];
-    const currentFocus = tagCounts.reduce((prev, curr) => curr.interventions > prev.interventions ? curr : prev, tagCounts[0]);
+    const currentFocus = tagCounts.find(t => activeWeeklyTargetTags.includes(t.key)) || tagCounts[0];
 
     const customTagCounts: { key: string; count: number }[] = [];
     feedbackEntries.forEach((fb: any) => {
@@ -6102,34 +6289,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             flexWrap: 'wrap',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '12px',
+            gap: '10px',
             padding: '6px 16px',
-            fontSize: '0.76rem',
-            fontWeight: 700,
-            background: 'rgba(245, 245, 247, 0.85)',
+            fontSize: '0.74rem',
+            fontWeight: 750,
+            background: 'rgba(255, 255, 255, 0.90)',
             backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(0, 0, 0, 0.06)',
+            border: '1px solid #e2e8f0',
             borderRadius: '100px',
+            boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
             zIndex: 5
           }}>
-            <span style={{ color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34c759', display: 'inline-block' }} />
-              <strong>Außen</strong> = Meisterstufe (Stufe 4–5)
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#0f172a' }}>
+              <span>🎯</span>
+              <span>Aktiver Wochenfokus</span>
             </span>
-            <span style={{ color: '#d2d2d7' }}>•</span>
-            <span style={{ color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0a84ff', display: 'inline-block' }} />
-              <strong>Innen</strong> = Aufstiegs-Stufe
+            <span style={{ color: '#cbd5e1' }}>•</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#0f172a' }}>
+              <span>🌟</span>
+              <span>Meisterstufe (Stufe 5)</span>
             </span>
-            {activeWeeklyTargetTags.length > 0 && (
-              <>
-                <span style={{ color: '#d2d2d7' }}>•</span>
-                <span style={{ color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff9f0a', display: 'inline-block' }} />
-                  <strong>🎯</strong> = Aktiver Wochenfokus
-                </span>
-              </>
-            )}
+            <span style={{ color: '#cbd5e1' }}>•</span>
+            <span style={{ color: '#64748b', fontWeight: 650 }}>
+              Stufen 1–5: Kompetenz-Profil
+            </span>
           </div>
 
           {/* Screenreader Accessible Data Table (WCAG 2.2 AA) */}
@@ -6180,15 +6363,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               }}
             >
               <defs>
-                {/* Apple Liquid-Glass Gradient */}
-                <linearGradient id="appleHealthGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#30d158" stopOpacity="0.32" />
-                  <stop offset="100%" stopColor="#0a84ff" stopOpacity="0.12" />
+                {/* Apple Aurora Liquid-Glass Gradient (Harmonizes with Indigo, Blue, Green, Purple, Gold) */}
+                <linearGradient id="appleAuroraGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.22" />
+                  <stop offset="45%" stopColor="#a855f7" stopOpacity="0.18" />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.14" />
                 </linearGradient>
 
-                {/* Soft Apple Polygon Shadow */}
+                {/* Soft Aurora Polygon Diffusion Shadow */}
                 <filter id="applePolyShadow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#34c759" floodOpacity="0.22" />
+                  <feDropShadow dx="0" dy="4" stdDeviation="10" floodColor="#6366f1" floodOpacity="0.18" />
                 </filter>
               </defs>
 
@@ -6200,7 +6384,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     key={i}
                     d={d}
                     fill="none"
-                    stroke={isOuter ? "#d2d2d7" : "#e5e5ea"}
+                    stroke={isOuter ? "#cbd5e1" : "#e2e8f0"}
                     strokeWidth={isOuter ? "1.4" : "0.9"}
                   />
                 );
@@ -6216,18 +6400,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     y1={cy}
                     x2={pt.x}
                     y2={pt.y}
-                    stroke="#e5e5ea"
+                    stroke="#e2e8f0"
                     strokeWidth="0.9"
                   />
                 );
               })}
 
-              {/* 3. Primary Apple Liquid-Glass Radar Polygon */}
+              {/* 3. Primary Apple Aurora Liquid-Glass Radar Polygon */}
               <path
                 d={dataPath}
-                fill="url(#appleHealthGradient)"
-                stroke="#34c759"
-                strokeWidth="2.8"
+                fill="url(#appleAuroraGradient)"
+                stroke="#6366f1"
+                strokeWidth="2.4"
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 filter="url(#applePolyShadow)"
@@ -6239,6 +6423,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 const p = getPoint(i, Math.max(tag.pct, 0.20));
                 const isSuperkraft = tag.level >= 4;
                 const isTargetFocus = activeWeeklyTargetTags.includes(tag.key);
+                const tagThemeColor = tag.color || '#ff9f0a';
                 return (
                   <g key={i}>
                     {isTargetFocus ? (
@@ -6247,15 +6432,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           cx={p.x}
                           cy={p.y}
                           r="15"
-                          fill="rgba(255, 159, 10, 0.16)"
-                          stroke="#ff9f0a"
-                          strokeWidth="1.5"
+                          fill={`${tagThemeColor}22`}
+                          stroke={tagThemeColor}
+                          strokeWidth="1.6"
                         />
                         <circle
                           cx={p.x}
                           cy={p.y}
                           r="6.5"
-                          fill="#ff9f0a"
+                          fill={tagThemeColor}
                           stroke="#ffffff"
                           strokeWidth="2.5"
                           style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.15))' }}
@@ -6276,7 +6461,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         cx={p.x}
                         cy={p.y}
                         r="5"
-                        fill="#0a84ff"
+                        fill={tag.dotColor || '#0a84ff'}
                         stroke="#ffffff"
                         strokeWidth="2"
                         style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.12))' }}
@@ -6286,7 +6471,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 );
               })}
 
-              {/* 5. Apple 2-Line Typographic Labels (Keine klobigen Kasten-Pillen!) */}
+              {/* 5. Apple 2-Line Typographic Labels with Distinct Category Tag Colors */}
               {tagCounts.map((tag, i) => {
                 const p = getPoint(i, 1.25);
                 const isSuperkraft = tag.level >= 4;
@@ -6327,14 +6512,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                 return (
                   <g key={i}>
-                    {/* Zeile 1: Name */}
+                    {/* Zeile 1: Name mit didaktischer Kategoriefarbe */}
                     <text
                       x={posX}
                       y={posY}
                       textAnchor={textAnchor}
                       fontSize="12"
-                      fontWeight="700"
-                      fill="#1d1d1f"
+                      fontWeight="800"
+                      fill={tag.color || '#1d1d1f'}
                       style={{ letterSpacing: '-0.01em', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif' }}
                     >
                       {tag.icon} {tag.shortLabel}
@@ -6345,8 +6530,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       y={posY + 14}
                       textAnchor={textAnchor}
                       fontSize="10.5"
-                      fontWeight="600"
-                      fill={isTargetFocus ? '#d97706' : (isSuperkraft ? '#15803d' : '#0284c7')}
+                      fontWeight="650"
+                      fill={isTargetFocus ? (tag.color || '#d97706') : (isSuperkraft ? '#15803d' : '#0284c7')}
                       style={{ letterSpacing: '0.01em', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif' }}
                     >
                       Stufe {tag.level} · {isTargetFocus ? 'Fokus 🎯' : (isSuperkraft ? 'Meister 🌟' : 'Aufsteiger 🚀')}
@@ -6388,170 +6573,134 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             return (
               <div style={{
                 width: '100%',
-                background: '#fbfbfd',
-                border: '1px solid rgba(0, 0, 0, 0.08)',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
                 borderRadius: '18px',
-                padding: '12px 14px',
+                padding: '14px 16px',
                 marginTop: '10px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '8px',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+                gap: '10px',
+                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
                 zIndex: 5
               }}>
                 {/* Header Row */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', fontWeight: 700, color: '#1d1d1f' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
                     <span>📅</span>
-                    <span>Rückblick KW {prevWeekNum || 'Vorwoche'} & Stundeneinstieg</span>
+                    <span>Vorwochen-Check-In & Stundeneinstieg</span>
                   </div>
-                  <span style={{
-                    fontSize: '0.64rem',
-                    fontWeight: 600,
-                    color: '#86868b',
-                    background: 'rgba(0, 0, 0, 0.04)',
-                    padding: '2px 8px',
-                    borderRadius: '100px'
-                  }}>
-                    Max. 2 Fokus-Ziele
-                  </span>
-                </div>
-
-                {/* Vorwochen-Hausaufgabe (Kompakte Apple-Infozeile) */}
-                <div style={{
-                  background: '#ffffff',
-                  border: '1px solid rgba(0, 0, 0, 0.05)',
-                  borderRadius: '10px',
-                  padding: '6px 10px',
-                  fontSize: '0.70rem',
-                  color: '#424245',
-                  lineHeight: '1.35'
-                }}>
-                  {prevWeekText ? (
-                    <div>
-                      <strong style={{ color: '#1d1d1f' }}>{prevWeekItem?.topic_name || `Hausaufgabe KW ${prevWeekNum}`}:</strong> {prevWeekText}
-                    </div>
-                  ) : (
-                    <span style={{ color: '#86868b', fontStyle: 'italic' }}>
-                      Keine Hausaufgabe in KW {prevWeekNum || 'der Vorwoche'} erfasst.
+                  {prevWeekText && (
+                    <span style={{
+                      fontSize: '0.64rem',
+                      fontWeight: 750,
+                      color: '#0369a1',
+                      background: '#f0f9ff',
+                      border: '1px solid #e0f2fe',
+                      padding: '2px 8px',
+                      borderRadius: '100px'
+                    }}>
+                      KW {prevWeekNum}
                     </span>
                   )}
                 </div>
 
-                {/* Apple Segmented Control Grid */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {/* Master Button */}
-                  <button
-                    type="button"
-                    onClick={handleMasterAllSkills}
-                    style={{
-                      background: 'linear-gradient(180deg, #34c759 0%, #28cd41 100%)',
-                      border: 'none',
-                      color: '#ffffff',
+                {prevWeekText ? (
+                  <>
+                    {/* Vorwochen-Hausaufgabe (Kompakte Apple-Infozeile) */}
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #f1f5f9',
                       borderRadius: '10px',
-                      padding: '7px 12px',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      boxShadow: '0 1px 3px rgba(52, 199, 89, 0.3)',
-                      transition: 'all 0.15s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <span>🌟 Alles super gemeistert (100% Souverän)</span>
-                  </button>
+                      padding: '8px 12px',
+                      fontSize: '0.74rem',
+                      color: '#334155',
+                      lineHeight: '1.4'
+                    }}>
+                      <strong style={{ color: '#0f172a' }}>{prevWeekItem?.topic_name || `Hausaufgabe KW ${prevWeekNum}`}:</strong> {prevWeekText}
+                    </div>
 
-                  {/* 5 Säulen Segmented Action Chips */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '5px' }}>
-                    {(() => {
-                      const activeFocusCount = SKILL_TAGS.filter(t => (tagCounts.find(tc => tc.key === t.key)?.level ?? 5) < 5).length;
-                      return SKILL_TAGS.map(t => {
-                        const tagLevel = tagCounts.find(tc => tc.key === t.key)?.level ?? 5;
-                        const isDifficultyActive = tagLevel < 5;
-                        const isLevel3 = tagLevel <= 3;
-                        const isLocked = activeFocusCount >= 2 && !isDifficultyActive;
+                    {/* 1-Tap Quittierung & Fokus-Ziele */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={handleMasterAllSkills}
+                        style={{
+                          background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                          border: 'none',
+                          color: '#ffffff',
+                          borderRadius: '10px',
+                          padding: '8px 14px',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <span>🌟 Vorwoche super gemeistert (+100 XP)</span>
+                      </button>
 
-                        let btnBg = '#ffffff';
-                        let btnBorder = 'rgba(0, 0, 0, 0.08)';
-                        let btnColor = '#1d1d1f';
-                        let badgeBg = 'rgba(0, 0, 0, 0.04)';
-                        let badgeColor = '#86868b';
-                        let levelText = '5/5';
-
-                        if (isDifficultyActive) {
-                          if (isLevel3) {
-                            btnBg = '#e8f2ff';
-                            btnBorder = '#0071e3';
-                            btnColor = '#0051a8';
-                            badgeBg = '#0071e3';
-                            badgeColor = '#ffffff';
-                            levelText = '3/5 🚀';
-                          } else {
-                            btnBg = '#fff4e5';
-                            btnBorder = '#ff9f0a';
-                            btnColor = '#b25e00';
-                            badgeBg = '#ff9f0a';
-                            badgeColor = '#ffffff';
-                            levelText = '4/5 🎯';
-                          }
-                        }
-
-                        return (
-                          <button
-                            key={t.key}
-                            type="button"
-                            disabled={isLocked}
-                            onClick={() => {
-                              if (!isLocked) handleTriggerSkillQuest(t.key);
-                            }}
-                            style={{
-                              background: btnBg,
-                              border: `1px solid ${btnBorder}`,
-                              color: isLocked ? '#aeaeb2' : btnColor,
-                              borderRadius: '10px',
-                              padding: '5px 8px',
-                              fontSize: '0.69rem',
-                              fontWeight: 700,
-                              cursor: isLocked ? 'not-allowed' : 'pointer',
-                              opacity: isLocked ? 0.35 : 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              boxShadow: isDifficultyActive ? '0 1px 4px rgba(0, 0, 0, 0.08)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className={isLocked ? '' : 'hover-scale'}
-                            title={isLocked ? 'Maximal 2 Schwerpunkte wählbar' : (isDifficultyActive ? `${t.label} ist aktiv (Klick für nächste Stufe/Reset)` : `Markiert ${t.label} als Wochenfokus`)}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {/* 5 Säulen Quick Focus Selector */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                        {SKILL_TAGS.map(t => {
+                          const isTarget = activeWeeklyTargetTags.includes(t.key);
+                          return (
+                            <button
+                              key={t.key}
+                              type="button"
+                              onClick={() => handleTriggerSkillQuest(t.key)}
+                              style={{
+                                background: isTarget ? '#fefce8' : '#f8fafc',
+                                border: `1px solid ${isTarget ? '#fde047' : '#e2e8f0'}`,
+                                color: isTarget ? '#854d0e' : '#475569',
+                                borderRadius: '100px',
+                                padding: '4px 10px',
+                                fontSize: '0.68rem',
+                                fontWeight: 750,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className="hover-scale-mini"
+                            >
                               <span>{t.icon}</span>
-                              <span style={{ whiteSpace: 'nowrap' }}>{t.shortLabel}</span>
-                            </span>
-                            <span style={{
-                              fontSize: '0.60rem',
-                              fontWeight: 800,
-                              background: badgeBg,
-                              color: badgeColor,
-                              padding: '1px 5px',
-                              borderRadius: '6px'
-                            }}>
-                              {levelText}
-                            </span>
-                          </button>
-                        );
-                      });
-                    })()}
+                              <span>{t.shortLabel}</span>
+                              {isTarget && <span style={{ fontSize: '0.60rem' }}>🎯</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #f1f5f9',
+                    borderRadius: '10px',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <span style={{ fontSize: '1.2rem' }}>🎵</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
+                        Bereit für den neuen Stundeneinstieg
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>
+                        Wähle ein Stück oder Lehrwerk aus, um die heutige Einheit zu beginnen.
+                      </span>
+                    </div>
                   </div>
-                </div>
-
-                {/* Subtiler Apple Hilfetext */}
-                <div style={{ fontSize: '0.62rem', color: '#86868b', textAlign: 'center', lineHeight: '1.3' }}>
-                  Klick schaltet Stufe 4 (🎯) → Stufe 3 (🚀) → Stufe 5 (🌟). Maximal 2 Wochenschwerpunkte.
-                </div>
+                )}
               </div>
             );
           })()}
@@ -6604,273 +6753,240 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {/* 1. WEEKLY SPOTLIGHT HERO (Spotify-Wrapped / Apple-Replay Glow Card) */}
-            {activeWeeklyTargetTags.length > 0 && (
-              <div style={{
-                background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                border: '1.5px solid #f59e0b',
-                borderRadius: '22px',
-                padding: '16px 18px',
-                boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.15)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontWeight: 900, fontSize: '0.84rem', letterSpacing: '0.02em' }}>
-                    <span style={{ fontSize: '1.1rem' }}>🎯</span>
-                    <span>AKTIVES ÜBE-LERNZIEL DIESER WOCHE</span>
-                  </div>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#92400e', background: 'rgba(255,255,255,0.9)', padding: '3px 10px', borderRadius: '99px', border: '1px solid #f59e0b', boxShadow: '0 2px 6px rgba(245, 158, 11, 0.1)' }}>
-                    Wochenschwerpunkt
-                  </span>
+            {/* 1. HERO WOCHENFOKUS & LEHRER-IMPULS (Pure White Stage) */}
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '20px',
+              padding: '18px 20px',
+              boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 850, fontSize: '0.86rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🎯</span>
+                  <span>Aktiver Wochenschwerpunkt</span>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  color: activeWeeklyTargetTags.length > 0 ? '#b45309' : '#64748b',
+                  background: activeWeeklyTargetTags.length > 0 ? '#fef3c7' : '#f1f5f9',
+                  border: `1px solid ${activeWeeklyTargetTags.length > 0 ? '#fde68a' : '#e2e8f0'}`,
+                  padding: '2px 9px',
+                  borderRadius: '100px'
+                }}>
+                  {activeWeeklyTargetTags.length > 0 ? 'Fokus aktiv' : 'Ausgeglichen'}
+                </span>
+              </div>
+
+              {activeWeeklyTargetTags.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {activeWeeklyTargetTags.map(tagKey => {
                     const tagObj = SKILL_TAGS.find(t => t.key === tagKey);
                     if (!tagObj) return null;
                     return (
                       <span key={tagKey} style={{
-                        background: '#ffffff',
-                        border: '1.5px solid #f59e0b',
-                        color: '#b45309',
-                        padding: '5px 14px',
+                        background: tagObj.bg || '#fefce8',
+                        border: `1px solid ${tagObj.border || '#fef08a'}`,
+                        color: tagObj.color || '#854d0e',
+                        padding: '4px 12px',
                         borderRadius: '100px',
                         fontSize: '0.78rem',
-                        fontWeight: 850,
+                        fontWeight: 800,
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        boxShadow: '0 2px 8px rgba(245, 158, 11, 0.12)'
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                       }}>
                         {tagObj.icon} {tagObj.label} 🎯
                       </span>
                     );
                   })}
                 </div>
-                <p style={{ margin: 0, fontSize: '0.76rem', color: '#92400e', fontWeight: 600, lineHeight: '1.45' }}>
-                  {activeWeeklyTargetTags.includes('rhythmus') && 'Fokus: Gleichmäßiger Puls, sicheres Einzählen und stabiles Timing bei deinen Stücken. '}
-                  {activeWeeklyTargetTags.includes('technik') && 'Fokus: Lockere Handhaltung, flüssige Fingerwechsel und entspannte Motorik. '}
-                  {activeWeeklyTargetTags.includes('intonation') && 'Fokus: Saubere Tonformung, bewusster Tonansatz und klangvolle Tonkultur. '}
-                  {activeWeeklyTargetTags.includes('ausdruck') && 'Fokus: Lebendige Lautstärken (p bis f), Phrasierung und musikalische Emotion. '}
-                  {activeWeeklyTargetTags.includes('repertoire') && 'Fokus: Spielfluss, sicheres Auswendigspiel und bühnenreife Souveränität. '}
-                </p>
-              </div>
-            )}
+              ) : (
+                <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                  Gleichmäßiges Training aller 5 Kern-Säulen in dieser Unterrichtswoche.
+                </div>
+              )}
 
-            {/* 2. THE 5-PILLAR EQUALIZER STACK (Studio Metering View) */}
+              {/* Didaktischer Wochen-Leitfaden (Tier-1 Enterprise+ Goldstandard) */}
+              {(() => {
+                const currentWeekStr = getISOWeek();
+                const currentItem = (progressItems || []).find((item: any) => 
+                  (item.updated_at && getISOWeek(item.updated_at) === currentWeekStr) ||
+                  (item.created_at && getISOWeek(item.created_at) === currentWeekStr) ||
+                  item.is_current_homework
+                );
+
+                let rawImpulseLines: string[] = [];
+                if (currentItem?.teacher_notes) {
+                  const cleaned = String(currentItem.teacher_notes).replace(/\["STICKER:[^\]]+"\]/g, '').replace(/STICKER:[^|]+\|[^|]+\|[^|]+/g, '').replace(/AUDIO:[^\s]+/g, '').trim();
+                  if (cleaned) rawImpulseLines = cleaned.split('\n').map(s => s.trim()).filter(Boolean);
+                }
+                if (rawImpulseLines.length === 0 && currentItem?.homework_notes) {
+                  try {
+                    const parsed = JSON.parse(currentItem.homework_notes);
+                    if (Array.isArray(parsed)) {
+                      rawImpulseLines = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('STICKER:') && !n.startsWith('AUDIO:') && !n.startsWith('FEEDBACK:')).map(s => s.trim()).filter(Boolean);
+                    }
+                  } catch (e) {
+                    const cleaned = String(currentItem.homework_notes).replace(/\["STICKER:[^\]]+"\]/g, '').replace(/STICKER:[^|]+\|[^|]+\|[^|]+/g, '').replace(/AUDIO:[^\s]+/g, '').trim();
+                    if (cleaned) rawImpulseLines = cleaned.split('\n').map(s => s.trim()).filter(Boolean);
+                  }
+                }
+                if (rawImpulseLines.length === 0 && generalHomeworkNotes) {
+                  rawImpulseLines = String(generalHomeworkNotes).split('\n').map(s => s.trim()).filter(Boolean);
+                }
+
+                return (
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #f1f5f9',
+                    borderRadius: '14px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Target size={11} color="#64748b" strokeWidth={2.6} />
+                      <span>Didaktischer Wochen-Leitfaden</span>
+                    </span>
+                    {rawImpulseLines.length > 1 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '2px' }}>
+                        {rawImpulseLines.map((line, lIdx) => (
+                          <div key={`impulse-line-${lIdx}`} style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.45, fontWeight: 550 }}>
+                            <span style={{ color: '#94a3b8', fontSize: '0.70rem', flexShrink: 0 }}>•</span>
+                            <span>{renderTextWithDidacticBadges(line)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : rawImpulseLines.length === 1 ? (
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.45, fontWeight: 550 }}>
+                        „{renderTextWithDidacticBadges(rawImpulseLines[0])}“
+                      </p>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic', lineHeight: 1.45 }}>
+                        „Jede musikalische Meisterleistung beginnt mit Freude am Entdecken und geduldigem Wachsen.“
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* 2. 5-SÄULEN KOMPETENZ-ÜBERSICHT (Minimalist Apple-Dots Equalizer) */}
             <div style={{
-              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-              border: '1.5px solid #86efac',
-              borderRadius: '22px',
-              padding: '16px 18px',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '20px',
+              padding: '18px 20px',
+              boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px',
-              boxShadow: '0 10px 25px -5px rgba(34, 197, 94, 0.10)'
+              gap: '12px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>👑</span>
-                  <span>Deine Musikalischen Superkräfte (5 Säulen)</span>
-                </span>
-                <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#166534', background: '#ffffff', padding: '3px 10px', borderRadius: '99px', border: '1px solid #86efac', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                  Universell aktiv
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 850, fontSize: '0.86rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>📊</span>
+                  <span>Kompetenz-Übersicht (5 Säulen)</span>
+                </div>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>
+                  5 Stufen System
                 </span>
               </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', margin: '2px 0' }}>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {tagCounts.map(s => {
                   const isTarget = activeWeeklyTargetTags.includes(s.key);
-                  const isSuper = s.level >= 4;
+                  const isMeister = s.level >= 5;
                   return (
-                    <div key={s.key} style={{
-                      background: isTarget ? '#fffbeb' : '#ffffff',
-                      border: `1.5px solid ${isTarget ? '#f59e0b' : '#86efac'}`,
-                      borderRadius: '14px',
-                      padding: '8px 12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                      boxShadow: isTarget ? '0 3px 10px rgba(245, 158, 11, 0.15)' : '0 2px 6px rgba(0,0,0,0.03)',
-                      transition: 'all 0.2s ease'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.76rem', fontWeight: 900, color: isTarget ? '#b45309' : '#14532d' }}>
-                          {s.icon} {s.shortLabel}
+                    <div
+                      key={s.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderRadius: '12px',
+                        background: isTarget ? (s.lightBg || '#fffbeb') : '#f8fafc',
+                        border: `1px solid ${isTarget ? (s.border || '#fde68a') : '#f1f5f9'}`,
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '130px' }}>
+                        <span style={{ fontSize: '0.84rem' }}>{s.icon}</span>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: s.color || '#0f172a' }}>
+                          {s.shortLabel}
                         </span>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 850, color: isTarget ? '#b45309' : (isSuper ? '#15803d' : '#0369a1') }}>
-                          Stufe {s.level}/5
-                        </span>
+                        {isTarget && (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 850, color: s.color || '#b45309', background: s.bg || '#fef3c7', border: `1px solid ${s.border || '#fde68a'}`, padding: '1px 6px', borderRadius: '100px' }}>
+                            Fokus
+                          </span>
+                        )}
                       </div>
 
-                      <span style={{ fontSize: '0.68rem', fontWeight: 750, color: isTarget ? '#92400e' : '#166534' }}>
-                        {s.rankTitle} {isTarget ? '🎯' : (isSuper ? '🌟' : '🚀')}
-                      </span>
-
-                      {/* 5-Segment Studio Audio Equalizer LED Meter */}
-                      <div style={{ display: 'flex', gap: '3px', alignItems: 'center', marginTop: '3px' }}>
+                      {/* 5 Apple-Dots (Direkt klickbar für Lehrkräfte) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {[1, 2, 3, 4, 5].map(seg => {
                           const isFilled = s.level >= seg;
-                          let segColor = '#e2e8f0';
+                          let dotColor = '#e2e8f0';
                           if (isFilled) {
-                            if (isTarget) {
-                              segColor = '#f59e0b';
-                            } else if (s.level >= 4) {
-                              segColor = '#16a34a';
-                            } else {
-                              segColor = '#0284c7';
-                            }
+                            if (isTarget) dotColor = s.dotColor || s.color || '#f59e0b';
+                            else if (isMeister) dotColor = '#16a34a';
+                            else dotColor = s.dotColor || s.color || '#3b82f6';
                           }
                           return (
-                            <div
+                            <button
                               key={seg}
-                              style={{
-                                flex: 1,
-                                height: '5px',
-                                borderRadius: '2px',
-                                background: segColor,
-                                boxShadow: isFilled ? `0 0 5px ${segColor}88` : 'none',
-                                transition: 'all 0.3s ease'
+                              type="button"
+                              disabled={readOnly && !isTeacherTools}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSetSkillLevel(s.key, seg);
                               }}
+                              title={`Stufe ${seg}/5 für ${s.shortLabel} festlegen`}
+                              style={{
+                                width: '11px',
+                                height: '11px',
+                                borderRadius: '50%',
+                                background: dotColor,
+                                border: 'none',
+                                padding: 0,
+                                cursor: (readOnly && !isTeacherTools) ? 'default' : 'pointer',
+                                transition: 'all 0.15s ease',
+                                boxShadow: isFilled ? `0 1px 3px ${dotColor}66` : 'none'
+                              }}
+                              className={(!readOnly || isTeacherTools) ? 'hover-scale-mini' : ''}
                             />
                           );
                         })}
+                      </div>
+
+                      {/* Level / Meister Badge */}
+                      <div style={{ minWidth: '85px', textAlign: 'right' }}>
+                        {isMeister ? (
+                          <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#16a34a' }}>
+                            🌟 Meister
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.72rem', fontWeight: 750, color: s.color || '#64748b' }}>
+                            Stufe {s.level}/5
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              <p style={{ margin: '2px 0 0', fontSize: '0.73rem', color: '#166534', lineHeight: 1.35, fontWeight: 600 }}>
-                Eindrucksvolles musikalisches Fundament! In diesen 5 Säulen wachsen deine Fähigkeiten mit jedem geübten Song kontinuierlich weiter.
-              </p>
+              <div style={{ fontSize: '0.70rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500, marginTop: '2px' }}>
+                Mit jedem geübten Song und jeder Vorwochen-Quittierung wachsen deine musikalischen Fähigkeiten kontinuierlich weiter.
+              </div>
             </div>
-
-            {/* 3. DEINE NÄCHSTE MUSIKER-EXPEDITION */}
-            {(() => {
-              const growthList = tagCounts.filter(t => t.level < 5);
-              const nextQuest = growthList.length > 0
-                ? growthList.reduce((prev, curr) => curr.level < prev.level ? curr : prev, growthList[0])
-                : null;
-
-              if (!nextQuest) {
-                return (
-                  <div style={{
-                    background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-                    border: '1.5px solid #fde047',
-                    borderRadius: '22px',
-                    padding: '16px 18px',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px',
-                    boxShadow: '0 8px 20px -4px rgba(234, 179, 8, 0.12)'
-                  }}>
-                    <div style={{ fontSize: '1.5rem', lineHeight: 1 }}>🏆</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Pädagogische Meisterstufe Erreicht
-                      </span>
-                      <h4 style={{ margin: 0, fontSize: '0.90rem', fontWeight: 900, color: '#854d0e' }}>
-                        100% Souveränität auf allen 5 Säulen!
-                      </h4>
-                      <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: '#713f12', lineHeight: 1.4, fontWeight: 600 }}>
-                        Du beherrschst alle 5 Kern-Dimensionen auf höchster Meister-Stufe! Neue Meisterwerke werden dich weiter inspirieren.
-                      </p>
-                    </div>
-                  </div>
-                );
-              }
-
-              let questText = 'Spiele deine aktuellen Songs im stabilen Puls mit Metronom, um dein nächstes Level freizuschalten!';
-              if (nextQuest.key === 'technik') questText = 'Achte auf lockere Haltung und saubere Wechsel, um deine Virtuosen-Stufe zu meistern!';
-              else if (nextQuest.key === 'intonation') questText = 'Forme deine Töne bewusst, sauber und klangvoll für maximalen Hörgenuss!';
-              else if (nextQuest.key === 'ausdruck') questText = 'Gestalte lebendige Lautstärken (p bis f) und Phrasen für tiefe musikalische Emotion!';
-              else if (nextQuest.key === 'repertoire') questText = 'Festige deine Stücke für freies, bühnensicheres Spiel auswendig!';
-
-              return (
-                <div style={{
-                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                  border: '1.5px solid #93c5fd',
-                  borderRadius: '22px',
-                  padding: '16px 18px',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  boxShadow: '0 8px 20px -4px rgba(59, 130, 246, 0.10)'
-                }}>
-                  <div style={{ fontSize: '1.4rem', lineHeight: 1 }}>🚀</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Deine Nächste Musiker-Expedition
-                    </span>
-                    <h4 style={{ margin: 0, fontSize: '0.90rem', fontWeight: 900, color: '#1e40af' }}>
-                      {nextQuest.icon} {nextQuest.label} • Stufe {nextQuest.level}/5
-                    </h4>
-                    <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: '#1e3a8a', lineHeight: 1.4, fontWeight: 600 }}>
-                      {questText}
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* 4. DIDAKTISCHER IMPULS DEINER LEHRKRAFT (Editorial Quote Capsule) */}
-            {(() => {
-              const currentWeekStr = getISOWeek();
-              const currentItem = (progressItems || []).find((item: any) => 
-                (item.updated_at && getISOWeek(item.updated_at) === currentWeekStr) ||
-                (item.created_at && getISOWeek(item.created_at) === currentWeekStr) ||
-                item.is_current_homework
-              );
-
-              let teacherImpulse = '';
-              if (currentItem?.teacher_notes) {
-                teacherImpulse = String(currentItem.teacher_notes).replace(/\["STICKER:[^\]]+"\]/g, '').replace(/STICKER:[^|]+\|[^|]+\|[^|]+/g, '').replace(/AUDIO:[^\s]+/g, '').trim();
-              }
-              if (!teacherImpulse && currentItem?.homework_notes) {
-                try {
-                  const parsed = JSON.parse(currentItem.homework_notes);
-                  if (Array.isArray(parsed)) {
-                    teacherImpulse = parsed.filter((n: string) => !n.startsWith('STICKER:') && !n.startsWith('AUDIO:')).join(' ').trim();
-                  }
-                } catch (e) {
-                  teacherImpulse = String(currentItem.homework_notes).replace(/\["STICKER:[^\]]+"\]/g, '').replace(/STICKER:[^|]+\|[^|]+\|[^|]+/g, '').replace(/AUDIO:[^\s]+/g, '').trim();
-                }
-              }
-              if (!teacherImpulse && homeworkNotes) {
-                teacherImpulse = String(homeworkNotes).replace(/\["STICKER:[^\]]+"\]/g, '').replace(/STICKER:[^|]+\|[^|]+\|[^|]+/g, '').replace(/AUDIO:[^\s]+/g, '').trim();
-              }
-
-              return (
-                <div style={{
-                  background: '#f8fafc',
-                  border: '1.5px solid #e2e8f0',
-                  borderRadius: '22px',
-                  padding: '14px 18px',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.03)'
-                }}>
-                  <span style={{ fontSize: '1.3rem', flexShrink: 0, marginTop: '2px' }}>💬</span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Didaktischer Impuls deiner Lehrkraft
-                    </span>
-                    <p style={{ margin: 0, fontSize: '0.76rem', color: '#1e293b', lineHeight: 1.4, fontWeight: 600, fontStyle: 'italic' }}>
-                      {teacherImpulse ? (
-                        <span>„{teacherImpulse}“</span>
-                      ) : (
-                        <span style={{ color: '#64748b' }}>
-                          „Jede musikalische Meisterleistung beginnt mit Freude am Entdecken und geduldigem Wachsen.“
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
           </div>
 
           {/* Custom tag pills */}
@@ -13780,10 +13896,45 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         />
                       </div>
                       <textarea
+                        ref={(el) => { pageNotesTextareaRef.current = el; }}
                         placeholder="Trage hier die Hausaufgabe oder Notizen für diese Seite ein..."
                         value={pageHomeworkNotes}
+                        onInput={(e) => {
+                          const target = e.currentTarget;
+                          pageNotesSelectionRef.current = {
+                            start: target.selectionStart ?? target.value.length,
+                            end: target.selectionEnd ?? target.value.length
+                          };
+                        }}
+                        onSelect={(e) => {
+                          const target = e.currentTarget;
+                          pageNotesSelectionRef.current = {
+                            start: target.selectionStart ?? target.value.length,
+                            end: target.selectionEnd ?? target.value.length
+                          };
+                        }}
+                        onClick={(e) => {
+                          const target = e.currentTarget;
+                          pageNotesSelectionRef.current = {
+                            start: target.selectionStart ?? target.value.length,
+                            end: target.selectionEnd ?? target.value.length
+                          };
+                        }}
+                        onKeyUp={(e) => {
+                          const target = e.currentTarget;
+                          pageNotesSelectionRef.current = {
+                            start: target.selectionStart ?? target.value.length,
+                            end: target.selectionEnd ?? target.value.length
+                          };
+                        }}
                         onChange={(e) => {
-                          setPageHomeworkNotes(e.target.value);
+                          const val = e.target.value;
+                          const target = e.currentTarget;
+                          pageNotesSelectionRef.current = {
+                            start: target.selectionStart ?? val.length,
+                            end: target.selectionEnd ?? val.length
+                          };
+                          setPageHomeworkNotes(val);
                           triggerDebouncedAutoSave();
                         }}
                         style={{
@@ -13805,15 +13956,75 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         onFocus={e => {
                           e.currentTarget.style.borderColor = '#34a853';
                           e.currentTarget.style.boxShadow = '0 0 0 3px rgba(19, 115, 51, 0.15)';
+                          const target = e.currentTarget;
+                          pageNotesSelectionRef.current = {
+                            start: target.selectionStart ?? target.value.length,
+                            end: target.selectionEnd ?? target.value.length
+                          };
                         }}
                         onBlur={e => {
                           e.currentTarget.style.borderColor = '#cbd5e1';
                           e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
+                          const target = e.currentTarget;
+                          pageNotesSelectionRef.current = {
+                            start: target.selectionStart ?? target.value.length,
+                            end: target.selectionEnd ?? target.value.length
+                          };
                         }}
                       />
                       
+                      {/* Didactic Quick-Tag Chips */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '4px' }}>
+                        {DIDACTIC_QUICK_TAGS.map((t) => {
+                          const isActive = pageHomeworkNotes.includes(t.tag);
+                          return (
+                            <button
+                              key={t.tag}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const { nextText, newCursorPos } = insertOrToggleTagInText(
+                                  pageHomeworkNotes,
+                                  t.tag,
+                                  pageNotesSelectionRef.current
+                                );
+                                setPageHomeworkNotes(nextText);
+                                pageNotesSelectionRef.current = { start: newCursorPos, end: newCursorPos };
+                                triggerDebouncedAutoSave();
+                                setTimeout(() => {
+                                  if (pageNotesTextareaRef.current) {
+                                    pageNotesTextareaRef.current.focus();
+                                    try { pageNotesTextareaRef.current.setSelectionRange(newCursorPos, newCursorPos); } catch {}
+                                  }
+                                }, 10);
+                              }}
+                              style={{
+                                background: isActive ? t.color : t.bg,
+                                color: isActive ? '#ffffff' : t.color,
+                                border: `1px solid ${isActive ? t.color : t.border}`,
+                                padding: '3px 8px',
+                                borderRadius: '100px',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                transition: 'all 0.15s'
+                              }}
+                              className="hover-scale-mini"
+                            >
+                              <Hash size={9} strokeWidth={2.5} />
+                              <span>{t.tag.replace(/^#/, '')}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       {/* Presets Grid */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
                         {[
                           { label: '🎯 Ziel-Tempo', text: '🎯 Ziel-Tempo: Metronom schrittweise auf Ziel-Geschwindigkeit steigern.' },
                           { label: '🐢 Langsam & sauber', text: '🐢 Langsam & sauber: Knifflige Takte isoliert im Schnecken-Tempo üben.' },
@@ -14187,7 +14398,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     }}>
                                       <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {pNum}:</span>
                                       <span style={{ fontWeight: 650, color: pageNoteText ? '#1e293b' : '#94a3b8', fontStyle: pageNoteText ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
-                                        {pageNoteText || 'Keine Hausaufgabe eingetragen'}
+                                        {pageNoteText ? renderTextWithDidacticBadges(pageNoteText) : 'Keine Hausaufgabe eingetragen'}
                                       </span>
                                     </div>
                                   );
@@ -14351,10 +14562,44 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           />
                         </div>
                         <textarea
+                          ref={(el) => { songNotesTextareaRef.current = el; }}
                           placeholder="Passagen, Anschlagstechniken oder Rhythmen eintragen..."
                           value={songHomeworkNotes}
+                          onInput={(e) => {
+                            const target = e.currentTarget;
+                            songNotesSelectionRef.current = {
+                              start: target.selectionStart ?? target.value.length,
+                              end: target.selectionEnd ?? target.value.length
+                            };
+                          }}
+                          onSelect={(e) => {
+                            const target = e.currentTarget;
+                            songNotesSelectionRef.current = {
+                              start: target.selectionStart ?? target.value.length,
+                              end: target.selectionEnd ?? target.value.length
+                            };
+                          }}
+                          onClick={(e) => {
+                            const target = e.currentTarget;
+                            songNotesSelectionRef.current = {
+                              start: target.selectionStart ?? target.value.length,
+                              end: target.selectionEnd ?? target.value.length
+                            };
+                          }}
+                          onKeyUp={(e) => {
+                            const target = e.currentTarget;
+                            songNotesSelectionRef.current = {
+                              start: target.selectionStart ?? target.value.length,
+                              end: target.selectionEnd ?? target.value.length
+                            };
+                          }}
                           onChange={(e) => {
                             const val = e.target.value;
+                            const target = e.currentTarget;
+                            songNotesSelectionRef.current = {
+                              start: target.selectionStart ?? val.length,
+                              end: target.selectionEnd ?? val.length
+                            };
                             setSongHomeworkNotes(val);
                             setHasChanges(true);
                             if (selectedActiveSongId) {
@@ -14383,14 +14628,80 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           onFocus={e => {
                             e.currentTarget.style.borderColor = 'var(--primary-color, #34a853)';
                             e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.15)';
+                            const target = e.currentTarget;
+                            songNotesSelectionRef.current = {
+                              start: target.selectionStart ?? target.value.length,
+                              end: target.selectionEnd ?? target.value.length
+                            };
                           }}
                           onBlur={e => {
                             e.currentTarget.style.borderColor = '#cbd5e1';
                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
+                            const target = e.currentTarget;
+                            songNotesSelectionRef.current = {
+                              start: target.selectionStart ?? target.value.length,
+                              end: target.selectionEnd ?? target.value.length
+                            };
                           }}
                         />
+                        {/* Didactic Quick-Tag Chips */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '4px' }}>
+                          {DIDACTIC_QUICK_TAGS.map((t) => {
+                            const isActive = songHomeworkNotes.includes(t.tag);
+                            return (
+                              <button
+                                key={t.tag}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const { nextText, newCursorPos } = insertOrToggleTagInText(
+                                    songHomeworkNotes,
+                                    t.tag,
+                                    songNotesSelectionRef.current
+                                  );
+                                  setSongHomeworkNotes(nextText);
+                                  songNotesSelectionRef.current = { start: newCursorPos, end: newCursorPos };
+                                  setHasChanges(true);
+                                  if (selectedActiveSongId) {
+                                    try {
+                                      localStorage.setItem(`song_note_${student.id}_${selectedActiveSongId}`, nextText);
+                                    } catch (err) {}
+                                    triggerDebouncedSongSave(nextText);
+                                  }
+                                  setTimeout(() => {
+                                    if (songNotesTextareaRef.current) {
+                                      songNotesTextareaRef.current.focus();
+                                      try { songNotesTextareaRef.current.setSelectionRange(newCursorPos, newCursorPos); } catch {}
+                                    }
+                                  }, 10);
+                                }}
+                                style={{
+                                  background: isActive ? t.color : t.bg,
+                                  color: isActive ? '#ffffff' : t.color,
+                                  border: `1px solid ${isActive ? t.color : t.border}`,
+                                  padding: '3px 8px',
+                                  borderRadius: '100px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  transition: 'all 0.15s'
+                                }}
+                                className="hover-scale-mini"
+                              >
+                                <Hash size={9} strokeWidth={2.5} />
+                                <span>{t.tag.replace(/^#/, '')}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
                         {/* Schnell-Textbausteine */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
                           {[
                             { label: '🐌 Schnecke', text: '• 🐌 Schnecken-Tempo: Schwierige Passage ganz langsam & präzise üben.' },
                             { label: '🔂 Ritter-Drei', text: '• 🔂 Ritter-Drei: Kniffligen Übergang 3x hintereinander fehlerfrei spielen.' },
@@ -14697,7 +15008,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                         const viewingWeekIso = getTargetWeekIso(viewingWeekOffset);
                         const viewingWeekNum = viewingWeekIso.split('-W')[1] || '';
-                        const isPastWeek = viewingWeekOffset !== 0;
+                        const isPastWeek = viewingWeekOffset < 0;
+                        const isFutureWeek = viewingWeekOffset > 0;
+                        const isCurrentWeek = viewingWeekOffset === 0;
 
                         // 1. Deduplicate progress items
                         const uniqueItemsMap = new Map<string, any>();
@@ -14711,153 +15024,240 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         });
                         const deduplicatedItems = Array.from(uniqueItemsMap.values());
 
-                        const activeHWs = deduplicatedItems.filter(item => {
-                          if (item.topic_name && item.topic_name.includes(' - Seite ')) {
-                            const parts = item.topic_name.split(' - Seite ');
-                            const bookTitle = parts[0].trim();
-                            const pageNum = parseInt(parts[1], 10);
-                            const book = globalLehrwerke.find(g => g.title === bookTitle);
-                            if (book) {
-                              const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
-                              const pageState = assignment?.pageStates?.[pageNum];
-                              return pageState?.status === 'homework' || pageState?.isCurrentHomework;
-                            }
-                          }
-                          return Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
-                        });
+                        let lehrwerkeList: { title: string; pages: number[]; notes: string[] }[] = [];
+                        let otherHWs: any[] = [];
+                        let audioNotes: any[] = [];
+                        let homeworkNoteItems: string[] = [];
 
-                        const activeTheories = deduplicatedItems.filter(item => {
-                          if (item.topic_name && item.topic_name.includes(' - Seite ')) {
-                            const parts = item.topic_name.split(' - Seite ');
-                            const bookTitle = parts[0].trim();
-                            const pageNum = parseInt(parts[1], 10);
-                            const book = globalLehrwerke.find(g => g.title === bookTitle);
-                            if (book) {
-                              const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
-                              const pageState = assignment?.pageStates?.[pageNum];
-                              return pageState?.status === 'purple';
+                        if (isCurrentWeek) {
+                          // === LIVE DRAFT FOR CURRENT ACTIVE LESSON WEEK ===
+                          const activeHWs = deduplicatedItems.filter(item => {
+                            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+                              const parts = item.topic_name.split(' - Seite ');
+                              const bookTitle = parts[0].trim();
+                              const pageNum = parseInt(parts[1], 10);
+                              const book = globalLehrwerke.find(g => g.title === bookTitle);
+                              if (book) {
+                                const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
+                                const pageState = assignment?.pageStates?.[pageNum];
+                                return pageState?.status === 'homework' || pageState?.isCurrentHomework;
+                              }
                             }
-                          }
-                          return item.status === 'THEORY_DONE' && 
-                                 item.updated_at && 
-                                 getISOWeek(item.updated_at) === viewingWeekIso &&
-                                 !item.topic_name?.startsWith('Hausaufgabe KW ');
-                        });
+                            return Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
+                          });
 
-                        const groupedLehrwerke: Record<string, { pages: number[]; notes: string[] }> = {};
-                        const otherHWs: any[] = [];
-                        
-                        // Process assignedLehrwerke page states
-                        (assignedLehrwerke || []).forEach(assignment => {
-                          const book = globalLehrwerke.find(g => g.id === assignment.lehrwerkId);
-                          if (!book || !assignment.pageStates) return;
+                          const activeTheories = deduplicatedItems.filter(item => {
+                            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+                              const parts = item.topic_name.split(' - Seite ');
+                              const bookTitle = parts[0].trim();
+                              const pageNum = parseInt(parts[1], 10);
+                              const book = globalLehrwerke.find(g => g.title === bookTitle);
+                              if (book) {
+                                const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
+                                const pageState = assignment?.pageStates?.[pageNum];
+                                return pageState?.status === 'purple';
+                              }
+                            }
+                            return item.status === 'THEORY_DONE' && 
+                                   item.updated_at && 
+                                   getISOWeek(item.updated_at) === viewingWeekIso &&
+                                   !item.topic_name?.startsWith('Hausaufgabe KW ');
+                          });
+
+                          const groupedLehrwerke: Record<string, { pages: number[]; notes: string[] }> = {};
                           
-                          Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
-                            if (pState?.status === 'homework' || pState?.isCurrentHomework) {
-                              const pageNum = parseInt(pNumStr, 10);
-                              if (!isNaN(pageNum)) {
-                                if (!groupedLehrwerke[book.title]) {
-                                  groupedLehrwerke[book.title] = { pages: [], notes: [] };
-                                }
-                                if (!groupedLehrwerke[book.title].pages.includes(pageNum)) {
-                                  groupedLehrwerke[book.title].pages.push(pageNum);
-                                  const cleanNote = getCleanPageNotes(pState.homeworkNotes || pState.homework_notes);
-                                  if (cleanNote) {
-                                    groupedLehrwerke[book.title].notes.push(`Seite ${pageNum}: ${cleanNote}`);
+                          // Process assignedLehrwerke page states
+                          (assignedLehrwerke || []).forEach(assignment => {
+                            const book = globalLehrwerke.find(g => g.id === assignment.lehrwerkId);
+                            if (!book || !assignment.pageStates) return;
+                            
+                            Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
+                              if (pState?.status === 'homework' || pState?.isCurrentHomework) {
+                                const pageNum = parseInt(pNumStr, 10);
+                                if (!isNaN(pageNum)) {
+                                  if (!groupedLehrwerke[book.title]) {
+                                    groupedLehrwerke[book.title] = { pages: [], notes: [] };
+                                  }
+                                  if (!groupedLehrwerke[book.title].pages.includes(pageNum)) {
+                                    groupedLehrwerke[book.title].pages.push(pageNum);
+                                    const cleanNote = getCleanPageNotes(pState.homeworkNotes || pState.homework_notes);
+                                    if (cleanNote) {
+                                      groupedLehrwerke[book.title].notes.push(`Seite ${pageNum}: ${cleanNote}`);
+                                    }
                                   }
                                 }
                               }
-                            }
+                            });
                           });
-                        });
 
-                        const allActive = [...activeHWs, ...activeTheories];
-                        allActive.forEach(item => {
-                          if (item.topic_name && item.topic_name.includes(' - Seite ')) {
-                            const parts = item.topic_name.split(' - Seite ');
-                            const bookTitle = parts[0].trim();
-                            const book = globalLehrwerke.find(g => g.title === bookTitle);
-                            const isBookAssigned = book && assignedLehrwerke.some(a => a.lehrwerkId === book.id);
-                            if (!isBookAssigned) return;
+                          const allActive = [...activeHWs, ...activeTheories];
+                          allActive.forEach(item => {
+                            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+                              const parts = item.topic_name.split(' - Seite ');
+                              const bookTitle = parts[0].trim();
+                              const book = globalLehrwerke.find(g => g.title === bookTitle);
+                              const isBookAssigned = book && assignedLehrwerke.some(a => a.lehrwerkId === book.id);
+                              if (!isBookAssigned) return;
 
-                            const pageNum = parseInt(parts[1], 10);
-                            if (!groupedLehrwerke[bookTitle]) {
-                              groupedLehrwerke[bookTitle] = { pages: [], notes: [] };
-                            }
-                            if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
-                              groupedLehrwerke[bookTitle].pages.push(pageNum);
-                              if (item.homework_notes) {
-                                const cleanNote = getCleanPageNotes(item.homework_notes);
-                                if (cleanNote && !groupedLehrwerke[bookTitle].notes.includes(`Seite ${pageNum}: ${cleanNote}`)) {
-                                  groupedLehrwerke[bookTitle].notes.push(`Seite ${pageNum}: ${cleanNote}`);
+                              const pageNum = parseInt(parts[1], 10);
+                              if (!groupedLehrwerke[bookTitle]) {
+                                groupedLehrwerke[bookTitle] = { pages: [], notes: [] };
+                              }
+                              if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
+                                groupedLehrwerke[bookTitle].pages.push(pageNum);
+                                if (item.homework_notes) {
+                                  const cleanNote = getCleanPageNotes(item.homework_notes);
+                                  if (cleanNote && !groupedLehrwerke[bookTitle].notes.includes(`Seite ${pageNum}: ${cleanNote}`)) {
+                                    groupedLehrwerke[bookTitle].notes.push(`Seite ${pageNum}: ${cleanNote}`);
+                                  }
                                 }
                               }
+                            } else {
+                              const cleanTopic = getNormalizedSongTitle(item);
+                              const canKey = getCanonicalSongKey(item);
+                              if (cleanTopic && !otherHWs.some(existing => getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic)) {
+                                const cachedNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
+                                                   localStorage.getItem(`song_note_${student.id}_${item.song_id}`) ||
+                                                   item.homework_notes || '';
+                                otherHWs.push({
+                                  ...item,
+                                  homework_notes: cachedNote
+                                });
+                              }
                             }
-                          } else {
-                            const cleanTopic = getNormalizedSongTitle(item);
-                            const canKey = getCanonicalSongKey(item);
-                            if (cleanTopic && !otherHWs.some(existing => getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic)) {
-                              const cachedNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
-                                                 localStorage.getItem(`song_note_${student.id}_${item.song_id}`) ||
-                                                 item.homework_notes || '';
-                              otherHWs.push({
-                                ...item,
-                                homework_notes: cachedNote
-                              });
+                          });
+
+                          // Also check activeSongSkills with localStorage backup for instant sync
+                          (activeSongSkills || []).forEach(skill => {
+                            const isHwInLs = localStorage.getItem(`song_hw_${student.id}_${skill.id}`) === 'true' ||
+                                             localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true';
+                            if (isHwInLs) {
+                              const cleanTopic = getNormalizedSongTitle(skill);
+                              const canKey = getCanonicalSongKey(skill);
+                              const alreadyExists = otherHWs.some(existing => 
+                                getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic
+                              );
+                              if (!alreadyExists) {
+                                const songArtist = skill.songs?.artist || skill.artist || '';
+                                const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                                const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
+                                const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+                                const cachedNote = localStorage.getItem(`song_note_${student.id}_${skill.id}`) ||
+                                                   localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) || '';
+                                otherHWs.push({
+                                  id: skill.id,
+                                  topic_name: fullTitle,
+                                  is_current_homework: true,
+                                  status: 'IN_PROGRESS',
+                                  homework_notes: cachedNote
+                                });
+                              }
+                            }
+                          });
+                          
+                          lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => {
+                            info.pages.sort((a: number, b: number) => a - b);
+                            return { title, pages: info.pages, notes: info.notes };
+                          });
+
+                          audioNotes = (homeworkNotesList || [])
+                            .map((note, idx) => ({ note: typeof note === 'string' ? note : String(note || ''), idx }))
+                            .filter(item => item.note.includes("AUDIO:"))
+                            .map((item, index) => {
+                              const cleanStr = item.note.startsWith('[') ? item.note.replace(/[\[\]"]/g, '') : item.note;
+                              const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+                              return {
+                                url: parts[0]?.trim(),
+                                duration: parseInt(parts[1] || '0', 10),
+                                label: parts[3]?.trim() || `Play-Along #${index + 1}`,
+                                originalIdx: item.idx,
+                                idx: item.idx
+                              };
+                            })
+                            .filter(a => !!a.url);
+
+                          homeworkNoteItems = getHomeworkNoteItems(generalHomeworkNotes);
+                        } else {
+                          // === HISTORICAL OR FUTURE WEEK ARCHIVED SNAPSHOT ===
+                          const histWeekItem = (progressItems || []).find((item: any) => {
+                            return item.topic_name === `Hausaufgabe KW ${viewingWeekNum}` ||
+                                   (item.created_at && getISOWeek(item.created_at) === viewingWeekIso) ||
+                                   (item.updated_at && getISOWeek(item.updated_at) === viewingWeekIso && item.topic_name.startsWith('Hausaufgabe KW '));
+                          });
+
+                          if (histWeekItem && histWeekItem.homework_notes) {
+                            try {
+                              const parsedNotes = typeof histWeekItem.homework_notes === 'string' 
+                                ? JSON.parse(histWeekItem.homework_notes) 
+                                : histWeekItem.homework_notes;
+                              
+                              if (Array.isArray(parsedNotes)) {
+                                audioNotes = parsedNotes
+                                  .filter((n: string) => typeof n === 'string' && n.includes('AUDIO:'))
+                                  .map((cleanStr: string, index: number) => {
+                                    const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+                                    return {
+                                      url: parts[0]?.trim(),
+                                      duration: parseInt(parts[1] || '0', 10),
+                                      label: parts[3]?.trim() || `Play-Along #${index + 1}`,
+                                      originalIdx: index,
+                                      idx: index
+                                    };
+                                  })
+                                  .filter(a => !!a.url);
+
+                                homeworkNoteItems = parsedNotes
+                                  .filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_'))
+                                  .map((s: string) => s.trim())
+                                  .filter(Boolean);
+                              } else if (typeof parsedNotes === 'string') {
+                                homeworkNoteItems = getHomeworkNoteItems(parsedNotes);
+                              }
+                            } catch (err) {
+                              homeworkNoteItems = getHomeworkNoteItems(histWeekItem.homework_notes);
                             }
                           }
-                        });
 
-                        // Also check activeSongSkills with localStorage backup for instant sync
-                        (activeSongSkills || []).forEach(skill => {
-                          const isHwInLs = localStorage.getItem(`song_hw_${student.id}_${skill.id}`) === 'true' ||
-                                           localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true';
-                          if (isHwInLs) {
-                            const cleanTopic = getNormalizedSongTitle(skill);
-                            const canKey = getCanonicalSongKey(skill);
-                            const alreadyExists = otherHWs.some(existing => 
-                              getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic
-                            );
-                            if (!alreadyExists) {
-                              const songArtist = skill.songs?.artist || skill.artist || '';
-                              const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-                              const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-                              const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                              const cachedNote = localStorage.getItem(`song_note_${student.id}_${skill.id}`) ||
-                                                 localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) || '';
-                              otherHWs.push({
-                                id: skill.id,
-                                topic_name: fullTitle,
-                                is_current_homework: true,
-                                status: 'IN_PROGRESS',
-                                homework_notes: cachedNote
-                              });
+                          // Historical week Lehrwerke / Songs that were specifically active or updated in that week
+                          const weekProgressItems = (progressItems || []).filter((item: any) => {
+                            const itemWeek = (item.created_at && getISOWeek(item.created_at)) || 
+                                             (item.updated_at && getISOWeek(item.updated_at));
+                            return itemWeek === viewingWeekIso && !item.topic_name?.startsWith('Hausaufgabe KW ');
+                          });
+
+                          const groupedHistLehrwerke: Record<string, { pages: number[]; notes: string[] }> = {};
+                          weekProgressItems.forEach((item: any) => {
+                            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+                              const parts = item.topic_name.split(' - Seite ');
+                              const bookTitle = parts[0].trim();
+                              const pageNum = parseInt(parts[1], 10);
+                              if (!groupedHistLehrwerke[bookTitle]) {
+                                groupedHistLehrwerke[bookTitle] = { pages: [], notes: [] };
+                              }
+                              if (!isNaN(pageNum) && !groupedHistLehrwerke[bookTitle].pages.includes(pageNum)) {
+                                groupedHistLehrwerke[bookTitle].pages.push(pageNum);
+                                if (item.homework_notes) {
+                                  const cleanNote = getCleanPageNotes(item.homework_notes);
+                                  if (cleanNote) groupedHistLehrwerke[bookTitle].notes.push(`Seite ${pageNum}: ${cleanNote}`);
+                                }
+                              }
+                            } else if (item.topic_name) {
+                              const cleanTopic = getNormalizedSongTitle(item);
+                              if (cleanTopic && !otherHWs.some(existing => getNormalizedSongTitle(existing) === cleanTopic)) {
+                                otherHWs.push({
+                                  ...item,
+                                  homework_notes: getCleanPageNotes(item.homework_notes)
+                                });
+                              }
                             }
-                          }
-                        });
-                        
-                        const lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => {
-                          info.pages.sort((a: number, b: number) => a - b);
-                          return { title, pages: info.pages, notes: info.notes };
-                        });
+                          });
 
-                        const audioNotes = (homeworkNotesList || [])
-                          .map((note, idx) => ({ note: typeof note === 'string' ? note : String(note || ''), idx }))
-                          .filter(item => item.note.includes("AUDIO:"))
-                          .map((item, index) => {
-                            const cleanStr = item.note.startsWith('[') ? item.note.replace(/[\[\]"]/g, '') : item.note;
-                            const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
-                            return {
-                              url: parts[0]?.trim(),
-                              duration: parseInt(parts[1] || '0', 10),
-                              label: parts[3]?.trim() || `Play-Along #${index + 1}`,
-                              originalIdx: item.idx,
-                              idx: item.idx
-                            };
-                          })
-                          .filter(a => !!a.url);
+                          lehrwerkeList = Object.entries(groupedHistLehrwerke).map(([title, info]) => {
+                            info.pages.sort((a: number, b: number) => a - b);
+                            return { title, pages: info.pages, notes: info.notes };
+                          });
+                        }
 
-                        const homeworkNoteItems = getHomeworkNoteItems(generalHomeworkNotes);
                         const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0;
                         
                         const currentHour = getSimulatedNow().getHours();
@@ -15215,7 +15615,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     const pagesWithNotes = assignedBook ? item.pages.filter((p: number) => {
                                       const pState = assignedBook.pageStates?.[p];
                                       if (pState && getCleanPageNotes(pState.homeworkNotes || pState.homework_notes) !== '') return true;
-                                      const dbItem = allActive.find(x => x.topic_name === `${item.title} - Seite ${p}`);
+                                      const dbItem = deduplicatedItems.find((x: any) => x.topic_name === `${item.title} - Seite ${p}`);
                                       if (dbItem && getCleanPageNotes(dbItem.homework_notes) !== '') return true;
                                       return false;
                                     }) : [];
@@ -15327,7 +15727,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           const pState = assignedBook?.pageStates?.[p];
                                           let noteText = getCleanPageNotes(pState?.homeworkNotes || pState?.homework_notes);
                                           if (!noteText) {
-                                            const dbItem = allActive.find(x => x.topic_name === `${item.title} - Seite ${p}`);
+                                            const dbItem = deduplicatedItems.find((x: any) => x.topic_name === `${item.title} - Seite ${p}`);
                                             if (dbItem?.homework_notes) {
                                               noteText = getCleanPageNotes(dbItem.homework_notes);
                                             }
@@ -15483,7 +15883,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               }}>
                                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
                                                   <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0 }}>📌 Fahrplan:</span>
-                                                  <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{songNote}</span>
+                                                  <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {renderTextWithDidacticBadges(songNote)}
+                                                  </span>
                                                 </div>
                                                 <button
                                                   type="button"
@@ -15537,12 +15939,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       paddingTop: (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0) ? '6px' : '0',
                                       borderTop: (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0) ? '1px dashed #e2e8f0' : 'none'
                                     }}>
-                                      {homeworkNoteItems.map((noteItem, nIdx) => {
+                                      {homeworkNoteItems
+                                        .filter(item => !selectedCategoryFilter || item.toLowerCase().includes(selectedCategoryFilter.toLowerCase()))
+                                        .map((noteItem, nIdx) => {
                                         const isSpeakingThisNote = isTtsSpeaking && activeTtsKey === `general_note_${nIdx}`;
+                                        const currentTag = DIDACTIC_QUICK_TAGS.find(t => noteItem.includes(t.tag));
+                                        const cleanNoteText = currentTag 
+                                          ? noteItem.replace(new RegExp(`\\s*${currentTag.tag.replace('#', '\\#')}`, 'g'), '').trim() 
+                                          : noteItem;
+                                        const isPickerOpen = activeTagPickerRowIndex === nIdx;
+
                                         return (
                                           <div
                                             key={`hw-note-row-${nIdx}`}
                                             style={{
+                                              position: 'relative',
                                               display: 'flex',
                                               alignItems: 'center',
                                               justifyContent: 'space-between',
@@ -15556,8 +15967,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               transition: 'all 0.15s ease'
                                             }}
                                           >
-                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px', minWidth: 0, flex: 1 }}>
-                                              <FileText size={13} style={{ color: '#16a34a', flexShrink: 0, transform: 'translateY(1px)' }} />
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0, flex: 1 }}>
+                                              <FileText size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
                                               <span style={{
                                                 color: '#334155',
                                                 fontWeight: 650,
@@ -15566,17 +15977,170 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                 textOverflow: 'ellipsis',
                                                 whiteSpace: 'nowrap'
                                               }}>
-                                                {noteItem}
+                                                {cleanNoteText}
                                               </span>
                                             </div>
 
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                                              {/* Contextual Inline Tag Picker / Badge */}
+                                              {!readOnly ? (
+                                                <div style={{ position: 'relative' }}>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setActiveTagPickerRowIndex(isPickerOpen ? null : nIdx);
+                                                    }}
+                                                    style={{
+                                                      border: currentTag ? `1px solid ${currentTag.border}` : '1px dashed #cbd5e1',
+                                                      background: currentTag ? currentTag.bg : '#f8fafc',
+                                                      color: currentTag ? currentTag.color : '#64748b',
+                                                      fontSize: '0.66rem',
+                                                      fontWeight: 800,
+                                                      padding: '2px 7px',
+                                                      borderRadius: '100px',
+                                                      cursor: 'pointer',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '3px',
+                                                      transition: 'all 0.15s ease'
+                                                    }}
+                                                    className="hover-scale-mini"
+                                                    title={currentTag ? `Tag: ${currentTag.tag} (Klicken zum Ändern)` : 'Didaktischen Tag zuweisen'}
+                                                  >
+                                                    {currentTag ? (
+                                                      <>
+                                                        <Hash size={8} strokeWidth={2.8} />
+                                                        <span>{currentTag.tag.replace(/^#/, '')}</span>
+                                                        <ChevronDown size={9} strokeWidth={2.5} style={{ opacity: 0.7 }} />
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Plus size={9} strokeWidth={2.8} />
+                                                        <span>Tag</span>
+                                                      </>
+                                                    )}
+                                                  </button>
+
+                                                  {/* Floating Apple Glassmorphism Popover */}
+                                                  {isPickerOpen && (
+                                                    <>
+                                                      <div
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          setActiveTagPickerRowIndex(null);
+                                                        }}
+                                                        style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+                                                      />
+                                                      <div
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{
+                                                          position: 'absolute',
+                                                          right: 0,
+                                                          top: '100%',
+                                                          marginTop: '4px',
+                                                          background: '#ffffff',
+                                                          border: '1px solid #e2e8f0',
+                                                          borderRadius: '12px',
+                                                          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 4px 6px -2px rgba(0,0,0,0.05)',
+                                                          padding: '8px',
+                                                          zIndex: 1000,
+                                                          display: 'flex',
+                                                          flexDirection: 'column',
+                                                          gap: '4px',
+                                                          minWidth: '180px'
+                                                        }}
+                                                      >
+                                                        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '2px 4px' }}>
+                                                          Schwerpunkt wählen:
+                                                        </div>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                                                          {DIDACTIC_QUICK_TAGS.map(t => {
+                                                            const isSelected = currentTag?.tag === t.tag;
+                                                            return (
+                                                              <button
+                                                                key={t.tag}
+                                                                type="button"
+                                                                onClick={() => handleSetRowTag(nIdx, isSelected ? null : t.tag)}
+                                                                style={{
+                                                                  background: isSelected ? t.color : t.bg,
+                                                                  color: isSelected ? '#ffffff' : t.color,
+                                                                  border: `1px solid ${isSelected ? t.color : t.border}`,
+                                                                  borderRadius: '8px',
+                                                                  padding: '4px 6px',
+                                                                  fontSize: '0.68rem',
+                                                                  fontWeight: 800,
+                                                                  cursor: 'pointer',
+                                                                  display: 'flex',
+                                                                  alignItems: 'center',
+                                                                  gap: '4px',
+                                                                  justifyContent: 'flex-start',
+                                                                  transition: 'all 0.15s ease'
+                                                                }}
+                                                                className="hover-scale-mini"
+                                                              >
+                                                                <Hash size={8} strokeWidth={2.8} />
+                                                                <span>{t.tag.replace(/^#/, '')}</span>
+                                                              </button>
+                                                            );
+                                                          })}
+                                                        </div>
+                                                        {currentTag && (
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => handleSetRowTag(nIdx, null)}
+                                                            style={{
+                                                              border: 'none',
+                                                              background: '#fef2f2',
+                                                              color: '#dc2626',
+                                                              borderRadius: '6px',
+                                                              padding: '4px',
+                                                              fontSize: '0.66rem',
+                                                              fontWeight: 750,
+                                                              cursor: 'pointer',
+                                                              marginTop: '4px',
+                                                              display: 'flex',
+                                                              alignItems: 'center',
+                                                              justifyContent: 'center',
+                                                              gap: '4px'
+                                                            }}
+                                                          >
+                                                            <Trash2 size={10} />
+                                                            <span>Tag entfernen</span>
+                                                          </button>
+                                                        )}
+                                                      </div>
+                                                    </>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                currentTag && (
+                                                  <span
+                                                    style={{
+                                                      background: currentTag.bg,
+                                                      color: currentTag.color,
+                                                      border: `1px solid ${currentTag.border}`,
+                                                      fontSize: '0.66rem',
+                                                      fontWeight: 800,
+                                                      padding: '2px 7px',
+                                                      borderRadius: '100px',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '3px'
+                                                    }}
+                                                  >
+                                                    <Hash size={8} strokeWidth={2.8} />
+                                                    <span>{currentTag.tag.replace(/^#/, '')}</span>
+                                                  </span>
+                                                )
+                                              )}
+
                                               {/* Micro TTS Speaker Pill */}
                                               <button
                                                 type="button"
                                                 onClick={(e) => {
                                                   e.stopPropagation();
-                                                  handleSpeakText(noteItem, `general_note_${nIdx}`);
+                                                  handleSpeakText(cleanNoteText, `general_note_${nIdx}`);
                                                 }}
                                                 style={{
                                                   border: 'none',
@@ -15644,7 +16208,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         type="button"
                                         onClick={() => {
                                           setActiveSubView('hub');
-                                          setActiveInputTab('free');
+                                          setHubTab('protocol');
+                                          if (isMobileView) {
+                                            setMobileProtokollTab('repertoire');
+                                          }
                                         }}
                                         style={{
                                           background: 'transparent',
@@ -15779,231 +16346,364 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 </div>
 
                                 {/* SECTION 2: Unified Notes Area with Segmented Switcher */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                    {/* Apple Segmented Switcher */}
-                                    <div style={{
-                                      display: 'flex',
-                                      background: '#f8fafc',
-                                      border: '1px solid #f1f5f9',
-                                      padding: '2px',
-                                      borderRadius: '10px',
-                                      gap: '2px'
-                                    }}>
-                                      <button
-                                        type="button"
-                                        onClick={() => setActiveNoteTarget('student')}
-                                        style={{
-                                          border: 'none',
-                                          background: activeNoteTarget === 'student' ? '#ffffff' : 'transparent',
-                                          color: activeNoteTarget === 'student' ? '#0f172a' : '#64748b',
-                                          fontWeight: activeNoteTarget === 'student' ? 800 : 600,
-                                          fontSize: '0.72rem',
-                                          padding: '4px 10px',
-                                          borderRadius: '8px',
-                                          cursor: 'pointer',
-                                          boxShadow: activeNoteTarget === 'student' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '5px'
-                                        }}
-                                      >
-                                        <BookOpen size={12} />
-                                        <span>Hausaufgaben-Bemerkung</span>
-                                        {generalHomeworkNotes.trim() && (
-                                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853' }} />
-                                        )}
-                                      </button>
+                                  {(() => {
+                                    const toolboxViewingWeekIso = (() => {
+                                      if (viewingWeekOffset === 0) return getISOWeek();
+                                      const d = new Date();
+                                      d.setDate(d.getDate() + (viewingWeekOffset * 7));
+                                      return getISOWeek(d);
+                                    })();
+                                    const toolboxViewingWeekNum = toolboxViewingWeekIso.split('-W')[1] || '';
 
-                                      <button
-                                        type="button"
-                                        onClick={() => setActiveNoteTarget('teacher')}
-                                        style={{
-                                          border: 'none',
-                                          background: activeNoteTarget === 'teacher' ? '#ffffff' : 'transparent',
-                                          color: activeNoteTarget === 'teacher' ? '#0f172a' : '#64748b',
-                                          fontWeight: activeNoteTarget === 'teacher' ? 800 : 600,
-                                          fontSize: '0.72rem',
-                                          padding: '4px 10px',
-                                          borderRadius: '8px',
-                                          cursor: 'pointer',
-                                          boxShadow: activeNoteTarget === 'teacher' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '5px'
-                                        }}
-                                      >
-                                        <Lock size={11} />
-                                        <span>Interne Notiz (Nur Lehrer)</span>
-                                        {teacherNotes.trim() && (
-                                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#64748b' }} />
-                                        )}
-                                      </button>
-                                    </div>
+                                    const getViewingNotesForCurrentOffset = (): string => {
+                                      if (viewingWeekOffset === 0) {
+                                        return generalHomeworkNotes;
+                                      }
+                                      const histWeekItem = (progressItems || []).find((item: any) => {
+                                        return item.topic_name === `Hausaufgabe KW ${toolboxViewingWeekNum}` ||
+                                               (item.created_at && getISOWeek(item.created_at) === toolboxViewingWeekIso) ||
+                                               (item.updated_at && getISOWeek(item.updated_at) === toolboxViewingWeekIso && item.topic_name.startsWith('Hausaufgabe KW '));
+                                      });
 
-                                    {/* Speech Dictation Button */}
-                                    <SpeechDictationButton
-                                      onTranscript={(text) => {
-                                        if (activeNoteTarget === 'student') {
-                                          const current = latestGeneralHomeworkNotesRef.current !== undefined
-                                            ? latestGeneralHomeworkNotesRef.current
-                                            : generalHomeworkNotes;
-                                          const trimmed = current.trim();
-                                          const next = trimmed ? `${trimmed}\n${text}` : text;
-                                          latestGeneralHomeworkNotesRef.current = next;
-                                          setGeneralHomeworkNotes(next);
-                                          try { localStorage.setItem(`campus_homework_notes_${student.id}`, next); } catch {}
-                                        } else {
-                                          const current = latestTeacherNotesRef.current !== undefined
-                                            ? latestTeacherNotesRef.current
-                                            : teacherNotes;
-                                          const trimmed = current.trim();
-                                          const next = trimmed ? `${trimmed}\n${text}` : text;
-                                          latestTeacherNotesRef.current = next;
-                                          setTeacherNotes(next);
-                                          try { localStorage.setItem(`campus_teacher_notes_${student.id}`, next); } catch {}
+                                      if (!histWeekItem || !histWeekItem.homework_notes) return '';
+                                      try {
+                                        const parsed = typeof histWeekItem.homework_notes === 'string'
+                                          ? JSON.parse(histWeekItem.homework_notes)
+                                          : histWeekItem.homework_notes;
+                                        if (Array.isArray(parsed)) {
+                                          return parsed
+                                            .filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_'))
+                                            .join('\n')
+                                            .trim();
+                                        } else if (typeof parsed === 'string') {
+                                          return parsed.split('\n').filter((s: string) => !s.startsWith('AUDIO:') && !s.startsWith('STICKER:') && !s.startsWith('FEEDBACK:')).join('\n').trim();
                                         }
-                                        triggerDebouncedAutoSave(350);
-                                      }}
-                                      title="Diktieren"
-                                    />
-                                  </div>
+                                      } catch (e) {
+                                        return String(histWeekItem.homework_notes).replace(/\["STICKER:[^\]]+"\]/g, '').replace(/STICKER:[^|]+\|[^|]+\|[^|]+/g, '').replace(/AUDIO:[^\s]+/g, '').trim();
+                                      }
+                                      return '';
+                                    };
 
-                                  {/* Single Dynamic Textarea (Auto-Expanding with Content) */}
-                                  {activeNoteTarget === 'student' ? (
-                                    <textarea
-                                      ref={(el) => {
-                                        if (el) {
-                                          el.style.height = 'auto';
-                                          el.style.height = `${Math.max(54, el.scrollHeight)}px`;
-                                        }
-                                      }}
-                                      placeholder="Trage hier zusätzliche Bemerkungen zur Hausaufgabe ein..."
-                                      value={generalHomeworkNotes}
-                                      onInput={(e) => {
-                                        const target = e.currentTarget;
-                                        target.style.height = 'auto';
-                                        target.style.height = `${Math.max(54, target.scrollHeight)}px`;
-                                      }}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        latestGeneralHomeworkNotesRef.current = val;
-                                        setGeneralHomeworkNotes(val);
-                                        const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
-                                        const noteLines = val.split('\n').map(s => s.trim()).filter(Boolean);
-                                        const combined = [...specialNotes, ...noteLines];
-                                        setHomeworkNotesList(combined);
-                                        try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
-                                        triggerDebouncedAutoSave(350);
-                                      }}
-                                      onFocus={() => setIsNotesFocused(true)}
-                                      onBlur={() => {
-                                        triggerImmediateAutoSave();
-                                        if (!generalHomeworkNotes.trim()) setIsNotesFocused(false);
-                                      }}
-                                      style={{
-                                        width: '100%',
-                                        minHeight: '54px',
-                                        padding: '8px 12px',
-                                        borderRadius: '10px',
-                                        border: '1px solid #e2e8f0',
-                                        fontSize: '0.84rem',
-                                        fontWeight: 550,
-                                        lineHeight: 1.45,
-                                        outline: 'none',
-                                        resize: 'none',
-                                        overflowY: 'hidden',
-                                        background: '#f8fafc',
-                                        color: '#0f172a',
-                                        boxSizing: 'border-box',
-                                        transition: 'height 0.1s ease'
-                                      }}
-                                    />
-                                  ) : (
-                                    <textarea
-                                      ref={(el) => {
-                                        if (el) {
-                                          el.style.height = 'auto';
-                                          el.style.height = `${Math.max(54, el.scrollHeight)}px`;
-                                        }
-                                      }}
-                                      placeholder="Vertrauliche Notizen zum Schüler (nur für dich sichtbar)..."
-                                      value={teacherNotes}
-                                      onInput={(e) => {
-                                        const target = e.currentTarget;
-                                        target.style.height = 'auto';
-                                        target.style.height = `${Math.max(54, target.scrollHeight)}px`;
-                                      }}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        latestTeacherNotesRef.current = val;
-                                        setTeacherNotes(val);
-                                        try { localStorage.setItem(`campus_teacher_notes_${student.id}`, val); } catch {}
-                                        triggerDebouncedAutoSave(350);
-                                      }}
-                                      onBlur={() => triggerImmediateAutoSave()}
-                                      style={{
-                                        width: '100%',
-                                        minHeight: '54px',
-                                        padding: '8px 12px',
-                                        borderRadius: '10px',
-                                        border: '1px solid #e2e8f0',
-                                        fontSize: '0.84rem',
-                                        fontWeight: 550,
-                                        lineHeight: 1.45,
-                                        outline: 'none',
-                                        resize: 'none',
-                                        overflowY: 'hidden',
-                                        background: '#f8fafc',
-                                        color: '#334155',
-                                        boxSizing: 'border-box',
-                                        transition: 'height 0.1s ease'
-                                      }}
-                                    />
-                                  )}
+                                    const activeViewingStudentNotes = getViewingNotesForCurrentOffset();
 
-                                  {/* SECTION 3: Monochrome Preset Chips (Only for Student Homework) */}
-                                  {activeNoteTarget === 'student' && (
-                                    <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', padding: '2px 0' }} className="hide-scrollbar">
-                                      {PRESET_CHIPS.map((chip, cIdx) => {
-                                        const currentText = latestGeneralHomeworkNotesRef.current !== undefined
-                                          ? latestGeneralHomeworkNotesRef.current
-                                          : generalHomeworkNotes;
-                                        const isActive = chip.isBpm 
-                                          ? currentText.toLowerCase().includes('bpm')
-                                          : currentText.includes(chip.text);
+                                    return (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                          {/* Apple Segmented Switcher */}
+                                          <div style={{
+                                            display: 'flex',
+                                            background: '#f8fafc',
+                                            border: '1px solid #f1f5f9',
+                                            padding: '2px',
+                                            borderRadius: '10px',
+                                            gap: '2px'
+                                          }}>
+                                            <button
+                                              type="button"
+                                              onClick={() => setActiveNoteTarget('student')}
+                                              style={{
+                                                border: 'none',
+                                                background: activeNoteTarget === 'student' ? '#ffffff' : 'transparent',
+                                                color: activeNoteTarget === 'student' ? '#0f172a' : '#64748b',
+                                                fontWeight: activeNoteTarget === 'student' ? 800 : 600,
+                                                fontSize: '0.72rem',
+                                                padding: '4px 10px',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                boxShadow: activeNoteTarget === 'student' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '5px'
+                                              }}
+                                            >
+                                              <BookOpen size={12} />
+                                              <span>Hausaufgaben-Bemerkung</span>
+                                              {activeViewingStudentNotes.trim() && (
+                                                <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853' }} />
+                                              )}
+                                            </button>
 
-                                        return (
-                                          <button
-                                            key={`chip-${cIdx}`}
-                                            type="button"
-                                            onClick={(e) => handleTogglePresetChip(chip, e)}
-                                            style={{
-                                              flexShrink: 0,
-                                              background: isActive ? '#0f172a' : '#f1f5f9',
-                                              color: isActive ? '#ffffff' : '#475569',
-                                              border: 'none',
-                                              padding: '4px 10px',
-                                              borderRadius: '100px',
-                                              fontSize: '0.70rem',
-                                              fontWeight: 750,
-                                              cursor: 'pointer',
-                                              transition: 'all 0.15s'
+                                            <button
+                                              type="button"
+                                              onClick={() => setActiveNoteTarget('teacher')}
+                                              style={{
+                                                border: 'none',
+                                                background: activeNoteTarget === 'teacher' ? '#ffffff' : 'transparent',
+                                                color: activeNoteTarget === 'teacher' ? '#0f172a' : '#64748b',
+                                                fontWeight: activeNoteTarget === 'teacher' ? 800 : 600,
+                                                fontSize: '0.72rem',
+                                                padding: '4px 10px',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                boxShadow: activeNoteTarget === 'teacher' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '5px'
+                                              }}
+                                            >
+                                              <Lock size={11} />
+                                              <span>Interne Notiz (Nur Lehrer)</span>
+                                              {teacherNotes.trim() && (
+                                                <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#64748b' }} />
+                                              )}
+                                            </button>
+                                          </div>
+
+                                          {/* Speech Dictation Button */}
+                                          <SpeechDictationButton
+                                            onTranscript={(text) => {
+                                              if (activeNoteTarget === 'student') {
+                                                const current = latestGeneralHomeworkNotesRef.current !== undefined
+                                                  ? latestGeneralHomeworkNotesRef.current
+                                                  : generalHomeworkNotes;
+                                                const trimmed = current.trim();
+                                                const next = trimmed ? `${trimmed}\n${text}` : text;
+                                                latestGeneralHomeworkNotesRef.current = next;
+                                                setGeneralHomeworkNotes(next);
+                                                try { localStorage.setItem(`campus_homework_notes_${student.id}`, next); } catch {}
+                                              } else {
+                                                const current = latestTeacherNotesRef.current !== undefined
+                                                  ? latestTeacherNotesRef.current
+                                                  : teacherNotes;
+                                                const trimmed = current.trim();
+                                                const next = trimmed ? `${trimmed}\n${text}` : text;
+                                                latestTeacherNotesRef.current = next;
+                                                setTeacherNotes(next);
+                                                try { localStorage.setItem(`campus_teacher_notes_${student.id}`, next); } catch {}
+                                              }
+                                              triggerDebouncedAutoSave(350);
                                             }}
-                                            className="hover-scale-mini"
-                                          >
-                                            {chip.label}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
+                                            title="Diktieren"
+                                          />
+                                        </div>
+
+                                        {/* Notice Pill when in historical or future week */}
+                                        {viewingWeekOffset !== 0 && activeNoteTarget === 'student' && (
+                                          <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            background: viewingWeekOffset < 0 ? '#f8fafc' : '#f0fdf4',
+                                            border: `1px solid ${viewingWeekOffset < 0 ? '#e2e8f0' : '#bbf7d0'}`,
+                                            borderRadius: '10px',
+                                            padding: '6px 12px',
+                                            fontSize: '0.72rem',
+                                            fontWeight: 650,
+                                            color: viewingWeekOffset < 0 ? '#475569' : '#166534'
+                                          }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                              <span>{viewingWeekOffset < 0 ? '📅' : '🚀'}</span>
+                                              <span>
+                                                {viewingWeekOffset < 0
+                                                  ? `Archivierte Woche (KW ${toolboxViewingWeekNum})`
+                                                  : `Planungs-Vorschau (KW ${toolboxViewingWeekNum})`}
+                                              </span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => setViewingWeekOffset(0)}
+                                              style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                color: viewingWeekOffset < 0 ? '#2563eb' : '#16a34a',
+                                                fontWeight: 800,
+                                                fontSize: '0.70rem',
+                                                cursor: 'pointer',
+                                                padding: 0
+                                              }}
+                                            >
+                                              ➔ Zur aktuellen Woche (KW {getISOWeek().split('-W')[1]})
+                                            </button>
+                                          </div>
+                                        )}
+
+                                        {/* Single Dynamic Textarea (Auto-Expanding with Content & Precision Cursor Tracking) */}
+                                        {activeNoteTarget === 'student' ? (
+                                          <textarea
+                                            ref={studentNotesTextareaRef}
+                                            placeholder={viewingWeekOffset === 0
+                                              ? "Trage hier zusätzliche Bemerkungen zur Hausaufgabe ein..."
+                                              : (viewingWeekOffset < 0
+                                                ? `Keine zusätzlichen Hausaufgaben-Notizen in KW ${toolboxViewingWeekNum} archiviert.`
+                                                : `Noch keine Notizen für KW ${toolboxViewingWeekNum} geplant.`)}
+                                            value={activeViewingStudentNotes}
+                                            onInput={(e) => {
+                                              adjustTextareaHeight(e.currentTarget);
+                                              studentNotesSelectionRef.current = {
+                                                start: e.currentTarget.selectionStart ?? e.currentTarget.value.length,
+                                                end: e.currentTarget.selectionEnd ?? e.currentTarget.value.length
+                                              };
+                                            }}
+                                            onSelect={(e) => {
+                                              const target = e.currentTarget;
+                                              studentNotesSelectionRef.current = {
+                                                start: target.selectionStart ?? target.value.length,
+                                                end: target.selectionEnd ?? target.value.length
+                                              };
+                                            }}
+                                            onClick={(e) => {
+                                              const target = e.currentTarget;
+                                              studentNotesSelectionRef.current = {
+                                                start: target.selectionStart ?? target.value.length,
+                                                end: target.selectionEnd ?? target.value.length
+                                              };
+                                            }}
+                                            onKeyUp={(e) => {
+                                              const target = e.currentTarget;
+                                              studentNotesSelectionRef.current = {
+                                                start: target.selectionStart ?? target.value.length,
+                                                end: target.selectionEnd ?? target.value.length
+                                              };
+                                            }}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              const target = e.currentTarget;
+                                              adjustTextareaHeight(target);
+                                              studentNotesSelectionRef.current = {
+                                                start: target.selectionStart ?? val.length,
+                                                end: target.selectionEnd ?? val.length
+                                              };
+                                              if (viewingWeekOffset === 0) {
+                                                latestGeneralHomeworkNotesRef.current = val;
+                                                setGeneralHomeworkNotes(val);
+                                                const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
+                                                const noteLines = val.split('\n').map(s => s.trim()).filter(Boolean);
+                                                const combined = [...specialNotes, ...noteLines];
+                                                setHomeworkNotesList(combined);
+                                                try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
+                                                triggerDebouncedAutoSave(350);
+                                              }
+                                            }}
+                                            onFocus={(e) => {
+                                              setIsNotesFocused(true);
+                                              adjustTextareaHeight(e.currentTarget);
+                                              const target = e.currentTarget;
+                                              studentNotesSelectionRef.current = {
+                                                start: target.selectionStart ?? target.value.length,
+                                                end: target.selectionEnd ?? target.value.length
+                                              };
+                                            }}
+                                            onBlur={(e) => {
+                                              const target = e.currentTarget;
+                                              studentNotesSelectionRef.current = {
+                                                start: target.selectionStart ?? target.value.length,
+                                                end: target.selectionEnd ?? target.value.length
+                                              };
+                                              triggerImmediateAutoSave();
+                                              if (!activeViewingStudentNotes.trim()) setIsNotesFocused(false);
+                                            }}
+                                            style={{
+                                              width: '100%',
+                                              minHeight: '64px',
+                                              height: 'auto',
+                                              padding: '10px 14px',
+                                              borderRadius: '12px',
+                                              border: '1px solid #e2e8f0',
+                                              fontSize: '0.84rem',
+                                              fontWeight: 550,
+                                              lineHeight: 1.5,
+                                              outline: 'none',
+                                              resize: 'none',
+                                              overflow: 'hidden',
+                                              background: '#f8fafc',
+                                              color: '#0f172a',
+                                              boxSizing: 'border-box',
+                                              display: 'block'
+                                            }}
+                                          />
+                                        ) : (
+                                          <textarea
+                                            ref={teacherNotesTextareaRef}
+                                            placeholder="Vertrauliche Notizen zum Schüler (nur für dich sichtbar)..."
+                                            value={teacherNotes}
+                                            onInput={(e) => {
+                                              adjustTextareaHeight(e.currentTarget);
+                                            }}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              adjustTextareaHeight(e.currentTarget);
+                                              latestTeacherNotesRef.current = val;
+                                              setTeacherNotes(val);
+                                              try { localStorage.setItem(`campus_teacher_notes_${student.id}`, val); } catch {}
+                                              triggerDebouncedAutoSave(350);
+                                            }}
+                                            onBlur={() => triggerImmediateAutoSave()}
+                                            style={{
+                                              width: '100%',
+                                              minHeight: '64px',
+                                              height: 'auto',
+                                              padding: '10px 14px',
+                                              borderRadius: '12px',
+                                              border: '1px solid #e2e8f0',
+                                              fontSize: '0.84rem',
+                                              fontWeight: 550,
+                                              lineHeight: 1.5,
+                                              outline: 'none',
+                                              resize: 'none',
+                                              overflow: 'hidden',
+                                              background: '#f8fafc',
+                                              color: '#334155',
+                                              boxSizing: 'border-box',
+                                              display: 'block'
+                                            }}
+                                          />
+                                        )}
+
+                                        {/* SECTION 3: Apple QuickType Soft-Pills for 1-Tap iPad Speed */}
+                                        {activeNoteTarget === 'student' && (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            {/* Apple QuickType Soft-Pills for 1-Tap iPad Speed */}
+                                            <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', padding: '2px 0', alignItems: 'center' }} className="hide-scrollbar">
+                                              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                <Sparkles size={10} color="#94a3b8" />
+                                                <span>Vorlagen:</span>
+                                              </span>
+                                              {PRESET_CHIPS.map((chip, cIdx) => {
+                                                const isActive = chip.isBpm 
+                                                  ? activeViewingStudentNotes.toLowerCase().includes('bpm')
+                                                  : activeViewingStudentNotes.includes(chip.text);
+
+                                                return (
+                                                  <button
+                                                    key={`chip-${cIdx}`}
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={(e) => handleTogglePresetChip(chip, e)}
+                                                    style={{
+                                                      flexShrink: 0,
+                                                      background: isActive ? '#f0fdf4' : '#ffffff',
+                                                      color: isActive ? '#166534' : '#475569',
+                                                      border: `1px solid ${isActive ? '#86efac' : '#e2e8f0'}`,
+                                                      padding: '3px 9px',
+                                                      borderRadius: '100px',
+                                                      fontSize: '0.68rem',
+                                                      fontWeight: isActive ? 800 : 650,
+                                                      cursor: 'pointer',
+                                                      boxShadow: isActive ? '0 1px 3px rgba(22, 101, 52, 0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
+                                                      transition: 'all 0.15s ease',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '4px'
+                                                    }}
+                                                    className="hover-scale-mini"
+                                                    title={chip.text}
+                                                  >
+                                                    {isActive && <Check size={10} color="#166534" strokeWidth={3} />}
+                                                    <span>{chip.label}</span>
+                                                  </button>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
+                              )}
+                            </div>
+                          );
+                        })()}
                     </div>
                   </div>
                   {/* Clean Bottom Spacing */}

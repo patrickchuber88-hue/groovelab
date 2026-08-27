@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 export interface UserNote {
   id: string;
   user_id: string;
+  author_name?: string | null;
   school_id: number | string;
   student_id?: string | null;
   student_name?: string | null;
@@ -10,9 +11,12 @@ export interface UserNote {
   title?: string;
   content: string;
   tags: string[];
-  note_type: 'scratchpad' | 'student_note' | 'todo' | 'audio_memo';
+  note_type: 'scratchpad' | 'student_note' | 'todo' | 'audio_memo' | 'room_issue';
   audio_url?: string | null;
   audio_duration_seconds?: number | null;
+  due_date?: string | null;
+  is_acknowledged?: boolean;
+  acknowledged_at?: string | null;
   is_pinned: boolean;
   is_archived: boolean;
   is_completed?: boolean;
@@ -75,7 +79,7 @@ export const parseSmartTags = (text: string) => {
   }
 
   // Extract @Mentions (e.g. @Benedikt L. or @Finja)
-  const mentionMatches = text.match(/@([A-Za-z0-9äöüÄÖÜß\.\s]+?)(?=[\s,;!#]|$)/g);
+  const mentionMatches = text.match(/@([A-Za-z0-9äöüÄÖÜß.\s]+?)(?=[\s,;!#]|$)/g);
   if (mentionMatches) {
     mentionMatches.forEach(m => {
       const name = m.substring(1).trim();
@@ -92,8 +96,8 @@ export const parseSmartTags = (text: string) => {
     });
   }
 
-  // Extract !Rooms (e.g. !Raum4, !Konzertsaal)
-  const roomMatches = text.match(/!([A-Za-z0-9äöüÄÖÜß_-]+)/g);
+  // Extract !Rooms (e.g. !Raum 4, !Raum4, !Konzertsaal, !Groovelab Nebenraum)
+  const roomMatches = text.match(/!([A-Za-z0-9äöüÄÖÜß_-]+(?:\s+(?:\d+|Nebenraum|Studio|Saal))?)/gi);
   if (roomMatches) {
     roomMatches.forEach(r => {
       const room = r.substring(1).trim();
@@ -102,6 +106,17 @@ export const parseSmartTags = (text: string) => {
   }
 
   return { studentMentions, tags, rooms, isTodo };
+};
+
+// GDPR-compliant student name masking (Vorname + N.)
+export const maskStudentName = (rawName: string | null | undefined): string | null => {
+  if (!rawName) return null;
+  const parts = String(rawName).trim().split(/\s+/);
+  if (parts.length <= 1) return parts[0] || null;
+  const fName = parts[0];
+  const lName = parts.slice(1).join(' ');
+  const maskedL = lName ? `${lName[0]}.` : '';
+  return `${fName} ${maskedL}`.trim();
 };
 
 export const notesService = {
@@ -228,34 +243,39 @@ export const notesService = {
     userId: string;
     schoolId: number | string;
     content: string;
+    authorName?: string | null;
     title?: string;
     studentId?: string | null;
     studentName?: string | null;
     roomId?: string | null;
-    noteType?: 'scratchpad' | 'student_note' | 'todo' | 'audio_memo';
+    noteType?: 'scratchpad' | 'student_note' | 'todo' | 'audio_memo' | 'room_issue';
     audioUrl?: string | null;
     audioDurationSeconds?: number | null;
+    dueDate?: string | null;
     isPinned?: boolean;
     visibility?: 'private' | 'school_admin' | 'student_shared';
   }): Promise<UserNote> {
     const { studentMentions, tags, rooms, isTodo } = parseSmartTags(params.content);
 
     const detectedType = params.noteType || 
-      (params.audioUrl ? 'audio_memo' : isTodo ? 'todo' : params.studentId ? 'student_note' : 'scratchpad');
+      (params.audioUrl ? 'audio_memo' : isTodo ? 'todo' : params.studentId ? 'student_note' : (rooms.length > 0 && params.visibility === 'school_admin') ? 'room_issue' : 'scratchpad');
 
     const newNote: UserNote = {
       id: 'note_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
       user_id: params.userId,
+      author_name: params.authorName || null,
       school_id: params.schoolId,
       student_id: params.studentId || null,
-      student_name: params.studentName || (studentMentions.length > 0 ? studentMentions[0] : null),
+      student_name: params.studentName ? maskStudentName(params.studentName) : (params.studentId && studentMentions.length > 0 ? maskStudentName(studentMentions[0]) : null),
       room_id: params.roomId || (rooms.length > 0 ? rooms[0] : null),
       title: params.title || undefined,
       content: params.content,
-      tags: Array.from(new Set([...tags, ...(isTodo ? ['todo'] : [])])),
+      tags: Array.from(new Set([...tags, ...(isTodo ? ['todo'] : []), ...(detectedType === 'room_issue' ? ['#Mangel'] : [])])),
       note_type: detectedType,
       audio_url: params.audioUrl || null,
       audio_duration_seconds: params.audioDurationSeconds || null,
+      due_date: params.dueDate || null,
+      is_acknowledged: false,
       is_pinned: params.isPinned || false,
       is_archived: false,
       is_completed: false,
@@ -275,6 +295,43 @@ export const notesService = {
     }
 
     return newNote;
+  },
+
+  // Fetch all room issues for the school (for Secretariat & Admin dashboards)
+  async fetchSchoolRoomIssues(schoolId: number | string): Promise<UserNote[]> {
+    if (!schoolId) return [];
+    try {
+      const { data, error } = await supabase
+        .from('user_notes')
+        .select('*')
+        .eq('school_id', schoolId)
+        .or('note_type.eq.room_issue,visibility.eq.school_admin')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        return data as UserNote[];
+      }
+    } catch (err) {
+      console.warn('Could not fetch school room issues:', err);
+    }
+    return [];
+  },
+
+  // Resolve / Mark room issue as completed (by Secretariat)
+  async resolveRoomIssue(noteId: string): Promise<void> {
+    const patch = {
+      is_completed: true,
+      is_acknowledged: true,
+      acknowledged_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    try {
+      await supabase
+        .from('user_notes')
+        .update(patch)
+        .eq('id', noteId);
+    } catch (e) {}
+    this.notifySync('NOTE_RESOLVED', noteId);
   },
 
   // Update existing note

@@ -46,6 +46,8 @@ import {
   isTestOrGenericStudent, 
   deduplicateRoster 
 } from '../services/studentRosterService';
+import { notesService, UserNote } from '../services/notesService';
+import { formatCleanNoteContent } from './notes/TeacherNotesBoardModal';
 function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
   let prefix = 'C';
   if (role === 'admin' || role === 'secretary') {
@@ -1353,7 +1355,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [newDutyTitle, setNewDutyTitle] = useState('');
   const [newDutyDescription, setNewDutyDescription] = useState('');
   const [newDutyType, setNewDutyType] = useState<'todo' | 'questionnaire'>('todo');
-  const [newDutyQuestions, setNewDutyQuestions] = useState<string[]>([]);
+  const [newDutyQuestions, setNewDutyQuestions] = useState<any[]>([]);
+  const [newDutyQuestionType, setNewDutyQuestionType] = useState<'text' | 'choice' | 'boolean'>('text');
+  const [newDutyQuestionOptions, setNewDutyQuestionOptions] = useState<string>('Ja, Nein, Vielleicht');
   const [newDutyPriority, setNewDutyPriority] = useState<'standard' | 'critical'>('standard');
   const [newDutyTargetType, setNewDutyTargetType] = useState<'all' | 'group' | 'individual'>('all');
   const [newDutyTargetGroup, setNewDutyTargetGroup] = useState('guitar');
@@ -1620,6 +1624,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<any>(null);
   const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
   const [tickets, setTickets] = useState<any[]>([]);
+  const [roomIssues, setRoomIssues] = useState<UserNote[]>([]);
   const [schoolEvents, setSchoolEvents] = useState<any[]>([]);
   const [showAddEventModal, setShowAddEventModal] = useState<boolean>(false);
   const [showLogbookModal, setShowLogbookModal] = useState<boolean>(false);
@@ -3275,6 +3280,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       .on('postgres_changes', { event: '*', schema: 'public', table: 'help_requests' }, () => {
         fetchLiveStatusData();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_notes' }, async () => {
+        try {
+          const updated = await notesService.fetchSchoolRoomIssues(schoolId);
+          setRoomIssues(updated);
+        } catch (e) {}
+      })
       .subscribe();
 
     return () => {
@@ -4902,6 +4913,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setTickets(ticketsData);
       }
 
+      // Fetch school room issues & facility defects
+      try {
+        const fetchedIssues = await notesService.fetchSchoolRoomIssues(schoolId);
+        setRoomIssues(fetchedIssues);
+      } catch (err) {
+        console.warn('Could not fetch room issues:', err);
+      }
+
       // Fetch subjects
       const { data: subjectsData } = await supabase
         .from('subjects')
@@ -5255,7 +5274,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     let csvContent = '\uFEFF'; // Add BOM for excel support
     
     if (duty.questions && duty.questions.length > 0) {
-      const headers = ['Lehrkraft', 'Status', 'Abgabe-Datum', ...duty.questions];
+      const headers = ['Lehrkraft', 'Status', 'Abgabe-Datum', ...duty.questions.map((q: any) => typeof q === 'string' ? q : q.text)];
       csvContent += headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
       
       targeted.forEach((t: any) => {
@@ -5272,12 +5291,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         }
         
         const row = [
-          `${t.firstName || t.first_name} ${t.lastName || t.last_name}`,
+          formatTeacherFullName(t),
           hasCompleted ? 'Erledigt' : 'Offen',
           hasCompleted ? new Date(response.created_at).toLocaleDateString('de-DE') : '-',
-          ...duty.questions.map((q: string) => {
+          ...duty.questions.map((q: any) => {
+            const qKey = typeof q === 'string' ? q : q.text;
             if (!hasCompleted) return '-';
-            const ans = answersObj[q] !== undefined ? answersObj[q] : (response.response_text || '');
+            const ans = answersObj[qKey] !== undefined ? answersObj[qKey] : (response.response_text || '');
             return ans;
           })
         ];
@@ -5293,10 +5313,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         const hasCompleted = !!response;
         
         const row = [
-          `${t.firstName || t.first_name} ${t.lastName || t.last_name}`,
+          formatTeacherFullName(t),
           hasCompleted ? 'Erledigt' : 'Offen',
           hasCompleted ? new Date(response.created_at).toLocaleDateString('de-DE') : '-',
-          hasCompleted ? response.response_text : '-'
+          hasCompleted ? (response.response_text || 'Erledigt') : '-'
         ];
         
         csvContent += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
@@ -5307,7 +5327,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `auswertung_${duty.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`);
+    link.setAttribute('download', `Dienstaufgabe_${duty.title.replace(/[^a-zA-Z0-9]/g, '_')}_Auswertung.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -9744,80 +9764,147 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   >
                     <option value="">Lehrkraft wählen...</option>
                     {allUniqueTeachers.map((t: any) => (
-                      <option key={t.id} value={t.id}>{t.firstName || t.first_name} {t.lastName || t.last_name}</option>
+                      <option key={t.id} value={t.id}>{formatTeacherFullName(t)}</option>
                     ))}
                   </select>
                 </div>
               )}
             </div>
 
-            {/* SECTION 3: FRAGEBOGEN-DESIGN */}
+            {/* SECTION 3: FRAGEBOGEN-DESIGN (MULTI-TYPE) */}
             {newDutyType === 'questionnaire' && (
               <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
                 <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea4335', textTransform: 'uppercase', letterSpacing: '0.05em' }}>3. Fragebogen-Design (Fragen)</div>
                 
+                {/* Questions List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {newDutyQuestions.map((q, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifySelf: 'stretch', alignItems: 'center', gap: '6px', background: 'white', padding: '8px 12px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
-                      <span style={{ fontSize: '0.78rem', color: '#1e293b', fontWeight: 600, flex: 1 }}>{q}</span>
-                      
-                      <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-                        <button
-                          type="button"
-                          disabled={idx === 0}
-                          onClick={() => handleMoveQuestion(idx, 'up')}
-                          style={{ border: 'none', background: 'transparent', color: idx === 0 ? '#cbd5e1' : '#64748b', cursor: idx === 0 ? 'not-allowed' : 'pointer', padding: '4px', borderRadius: '6px' }}
-                        >
-                          <ArrowUp size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={idx === newDutyQuestions.length - 1}
-                          onClick={() => handleMoveQuestion(idx, 'down')}
-                          style={{ border: 'none', background: 'transparent', color: idx === newDutyQuestions.length - 1 ? '#cbd5e1' : '#64748b', cursor: idx === newDutyQuestions.length - 1 ? 'not-allowed' : 'pointer', padding: '4px', borderRadius: '6px' }}
-                        >
-                          <ArrowDown size={14} />
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => setNewDutyQuestions(newDutyQuestions.filter((_, qIdx) => qIdx !== idx))}
-                          style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', padding: '4px', borderRadius: '6px' }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                  {newDutyQuestions.map((q, idx) => {
+                    const qText = typeof q === 'string' ? q : q.text;
+                    const qType = typeof q === 'string' ? 'text' : (q.type || 'text');
+                    const qOptions = typeof q === 'object' && q.options ? q.options : [];
+
+                    return (
+                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'white', padding: '10px 12px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '6px', background: qType === 'choice' ? '#e0f2fe' : (qType === 'boolean' ? '#fef3c7' : '#f1f5f9'), color: qType === 'choice' ? '#0369a1' : (qType === 'boolean' ? '#b45309' : '#475569') }}>
+                            {qType === 'choice' ? 'Auswahl' : (qType === 'boolean' ? 'Ja/Nein' : 'Freitext')}
+                          </span>
+                          <span style={{ fontSize: '0.80rem', color: '#1e293b', fontWeight: 700, flex: 1 }}>{qText}</span>
+                          
+                          <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => handleMoveQuestion(idx, 'up')}
+                              style={{ border: 'none', background: 'transparent', color: idx === 0 ? '#cbd5e1' : '#64748b', cursor: idx === 0 ? 'not-allowed' : 'pointer', padding: '4px', borderRadius: '6px' }}
+                            >
+                              <ArrowUp size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === newDutyQuestions.length - 1}
+                              onClick={() => handleMoveQuestion(idx, 'down')}
+                              style={{ border: 'none', background: 'transparent', color: idx === newDutyQuestions.length - 1 ? '#cbd5e1' : '#64748b', cursor: idx === newDutyQuestions.length - 1 ? 'not-allowed' : 'pointer', padding: '4px', borderRadius: '6px' }}
+                            >
+                              <ArrowDown size={14} />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => setNewDutyQuestions(newDutyQuestions.filter((_, qIdx) => qIdx !== idx))}
+                              style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', padding: '4px', borderRadius: '6px' }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                        {qOptions && qOptions.length > 0 && (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
+                            {qOptions.map((opt: string, oIdx: number) => (
+                              <span key={oIdx} style={{ fontSize: '0.66rem', background: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                • {opt}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                {/* Add New Question Controls */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px', background: 'white', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  {/* Question Type Selector */}
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', marginRight: '4px' }}>Typ:</span>
+                    {[
+                      { id: 'text', label: '📝 Freitext' },
+                      { id: 'choice', label: '🔘 Auswahl (Pills)' },
+                      { id: 'boolean', label: '⚡ Ja / Nein' }
+                    ].map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setNewDutyQuestionType(t.id as any)}
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: newDutyQuestionType === t.id ? '#fce8e6' : '#f1f5f9',
+                          color: newDutyQuestionType === t.id ? '#ea4335' : '#475569',
+                          fontSize: '0.70rem',
+                          fontWeight: newDutyQuestionType === t.id ? 800 : 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
                   <input
                     type="text"
                     value={newDutyQuestionInput}
                     onChange={(e) => setNewDutyQuestionInput(e.target.value)}
-                    placeholder="Neue Frage hinzufügen..."
-                    style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.82rem', outline: 'none' }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (newDutyQuestionInput.trim()) {
-                          setNewDutyQuestions([...newDutyQuestions, newDutyQuestionInput.trim()]);
-                          setNewDutyQuestionInput('');
-                        }
-                      }
-                    }}
+                    placeholder="Fragetext eingeben..."
+                    style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.80rem', outline: 'none' }}
                   />
+
+                  {newDutyQuestionType === 'choice' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <label style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b' }}>Antwort-Optionen (durch Komma getrennt):</label>
+                      <input
+                        type="text"
+                        value={newDutyQuestionOptions}
+                        onChange={(e) => setNewDutyQuestionOptions(e.target.value)}
+                        placeholder="z. B. Ja, Nein, Vielleicht oder Termin A, Termin B"
+                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none' }}
+                      />
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => {
-                      if (newDutyQuestionInput.trim()) {
-                        setNewDutyQuestions([...newDutyQuestions, newDutyQuestionInput.trim()]);
-                        setNewDutyQuestionInput('');
+                      if (!newDutyQuestionInput.trim()) return;
+                      let newQ: any;
+                      if (newDutyQuestionType === 'text') {
+                        newQ = { text: newDutyQuestionInput.trim(), type: 'text' };
+                      } else if (newDutyQuestionType === 'boolean') {
+                        newQ = { text: newDutyQuestionInput.trim(), type: 'boolean', options: ['Ja', 'Nein'] };
+                      } else if (newDutyQuestionType === 'choice') {
+                        const opts = newDutyQuestionOptions.split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
+                        newQ = {
+                          text: newDutyQuestionInput.trim(),
+                          type: 'choice',
+                          options: opts.length > 0 ? opts : ['Ja', 'Nein']
+                        };
                       }
+                      setNewDutyQuestions([...newDutyQuestions, newQ]);
+                      setNewDutyQuestionInput('');
                     }}
-                    style={{ background: '#ea4335', color: 'white', border: 'none', borderRadius: '12px', padding: '0 16px', fontSize: '0.9rem', fontWeight: 800, cursor: 'pointer' }}
+                    style={{ background: '#ea4335', color: 'white', border: 'none', borderRadius: '10px', padding: '8px 14px', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                   >
-                    +
+                    <Plus size={13} /> Frage hinzufügen
                   </button>
                 </div>
               </div>
@@ -10378,18 +10465,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         return filtered.map((t: any) => {
                           const response = dutyResponsesList.find(res => res.teacher_id === t.id);
                           const hasCompleted = !!response;
+                          const teacherName = formatTeacherFullName(t);
 
                           return (
                             <div key={t.id} style={{ display: 'flex', justifySelf: 'stretch', alignItems: 'flex-start', gap: '12px', background: 'white', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
                               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fce8e6', display: 'flex', alignItems: 'center', justifySelf: 'flex-start', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
                                 <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea4335' }}>
-                                  {(t.firstName || t.first_name || 'U')?.[0]}
+                                  {teacherName?.[0] || 'L'}
                                 </span>
                               </div>
                               
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
-                                  {t.firstName || t.first_name} {t.lastName || t.last_name}
+                                  {teacherName}
                                 </div>
                                 {t.instrument && (
                                   <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>{t.instrument}</div>
@@ -10483,10 +10571,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   </div>
                 )}
 
-                {/* TAB CONTENT: FRAGEN & ANTWORTEN CLUSTERED */}
+                {/* TAB CONTENT: FRAGEN & ANTWORTEN CLUSTERED MIT AGGREGIERTEN STATS */}
                 {statsModalTab === 'qa' && selectedDutyForStats.questions && selectedDutyForStats.questions.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
-                    {selectedDutyForStats.questions.map((q: string, qIdx: number) => {
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
+                    {selectedDutyForStats.questions.map((qItem: any, qIdx: number) => {
+                      const qText = typeof qItem === 'string' ? qItem : qItem.text;
+                      const qType = typeof qItem === 'string' ? 'text' : (qItem.type || 'text');
+                      const qOptions: string[] = typeof qItem === 'object' && qItem.options ? qItem.options : (qType === 'boolean' ? ['Ja', 'Nein'] : []);
+
                       // Find all parsed answers for this question
                       const answersList: { teacherName: string; answer: string; date: string }[] = [];
                       
@@ -10498,7 +10590,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           try {
                             if (response.response_text.startsWith('{')) {
                               const parsed = JSON.parse(response.response_text);
-                              ans = parsed[q] || '';
+                              ans = parsed[qText] || '';
                             } else {
                               ans = response.response_text;
                             }
@@ -10507,7 +10599,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           }
                           
                           answersList.push({
-                            teacherName: `${t.firstName || t.first_name} ${t.lastName || t.last_name}`,
+                            teacherName: formatTeacherFullName(t),
                             answer: ans.trim(),
                             date: new Date(response.created_at).toLocaleDateString('de-DE')
                           });
@@ -10522,15 +10614,54 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         return true;
                       });
 
+                      // Calculate breakdown if options are present
+                      const hasOptions = qOptions && qOptions.length > 0;
+                      const optionCounts: Record<string, number> = {};
+                      if (hasOptions) {
+                        qOptions.forEach(opt => { optionCounts[opt] = 0; });
+                        filteredAnswers.forEach(item => {
+                          if (optionCounts[item.answer] !== undefined) {
+                            optionCounts[item.answer]++;
+                          }
+                        });
+                      }
+
                       return (
-                        <div key={qIdx} style={{ background: '#f8fafc', padding: '14px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea4335', marginBottom: '8px' }}>
-                            Frage {qIdx + 1}: {q}
+                        <div key={qIdx} style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                              Frage {qIdx + 1}: {qText}
+                            </div>
+                            <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: '#f1f5f9', color: '#64748b' }}>
+                              {filteredAnswers.length} {filteredAnswers.length === 1 ? 'Antwort' : 'Antworten'}
+                            </span>
                           </div>
+
+                          {/* Aggregated Visual Bars for Choice / Boolean Questions */}
+                          {hasOptions && filteredAnswers.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px', background: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Ergebnis-Verteilung:</div>
+                              {qOptions.map(opt => {
+                                const count = optionCounts[opt] || 0;
+                                const pct = filteredAnswers.length > 0 ? Math.round((count / filteredAnswers.length) * 100) : 0;
+                                return (
+                                  <div key={opt} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 700, color: '#1e293b' }}>
+                                      <span>{opt}</span>
+                                      <span>{pct}% ({count} von {filteredAnswers.length})</span>
+                                    </div>
+                                    <div style={{ height: '8px', width: '100%', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                                      <div style={{ height: '100%', width: `${pct}%`, background: opt === 'Ja' ? '#34a853' : (opt === 'Nein' ? '#ef4444' : '#ea4335'), borderRadius: '100px', transition: 'width 0.3s ease' }} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                           
                           {filteredAnswers.length === 0 ? (
                             <div style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', padding: '4px' }}>
-                              Keine Antworten vorhanden.
+                              Noch keine Antworten eingegangen.
                             </div>
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -14480,9 +14611,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       const { error } = await supabase.from('school_equipment').delete().eq('id', id);
       if (error) throw error;
       setSchoolEquipment(prev => prev.filter(e => e.id !== id));
-      // Optionally re-fetch rooms or manually pull it out from rooms locally
       const { data: roomsData } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
-      setRooms((roomsData || []).map(r => ({ ...r, equipment: r.allowed_instruments || [] })));
+      const localMap = (() => {
+        try { return JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}'); }
+        catch { return {}; }
+      })();
+      setRooms((roomsData || []).map(r => ({ 
+        ...r, 
+        equipment: r.allowed_instruments || [],
+        room_instruments: r.room_instruments || localMap[r.id] || []
+      })));
     } catch (err: any) {
       console.error('Error deleting equipment:', err);
       alert('Fehler beim Löschen: ' + err.message);
@@ -17079,6 +17217,133 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       </div>
                     )}
                   </div>
+
+                  {/* WIDGET: Offene Raum-Meldungen & Mängel */}
+                  {(() => {
+                    const openIssues = roomIssues.filter(i => !i.is_completed && !i.is_acknowledged);
+                    return (
+                      <div id="tour-secretary-room-issues" style={{
+                        background: '#ffffff',
+                        borderRadius: '24px',
+                        padding: '24px',
+                        boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                        border: '1px solid rgba(0, 0, 0, 0.05)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ background: '#fef2f2', color: '#dc2626', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Wrench size={16} />
+                            </div>
+                            <div>
+                              <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                Offene Raum-Meldungen & Mängel
+                              </h3>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 750, color: openIssues.length > 0 ? '#dc2626' : '#94a3b8', textTransform: 'uppercase' }}>
+                                {openIssues.length > 0 ? `${openIssues.length} ${openIssues.length === 1 ? 'Mangel gemeldet' : 'Mängel gemeldet'}` : 'Keine offenen Meldungen'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {openIssues.length === 0 ? (
+                          <div style={{
+                            background: 'rgba(52, 168, 83, 0.04)',
+                            border: '1px solid rgba(52, 168, 83, 0.1)',
+                            color: '#34a853',
+                            borderRadius: '16px',
+                            padding: '16px 20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px'
+                          }}>
+                            <CheckCircle size={20} color="#34a853" />
+                            <div>
+                              <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>Alle Räume & Ausstattung intakt</strong>
+                              <span style={{ fontSize: '0.74rem', opacity: 0.9 }}>Aktuell liegen keine offenen Mängel- oder Reparaturbedarfe von Lehrkräften vor.</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {openIssues.map((issue) => {
+                              const createdDate = new Date(issue.created_at);
+                              const dateFormatted = createdDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                              const cleanContent = formatCleanNoteContent(issue.content, issue.student_name);
+                              const authorDisplay = issue.author_name || 'Lehrkraft';
+
+                              return (
+                                <div key={issue.id} style={{
+                                  background: '#fffbfb',
+                                  border: '1px solid #fee2e2',
+                                  borderRadius: '16px',
+                                  padding: '16px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '16px',
+                                  flexWrap: 'wrap'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: '240px' }}>
+                                    <div style={{
+                                      background: '#fee2e2',
+                                      color: '#dc2626',
+                                      borderRadius: '10px',
+                                      padding: '6px 10px',
+                                      fontWeight: 800,
+                                      fontSize: '0.75rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      flexShrink: 0
+                                    }}>
+                                      <DoorOpen size={12} />
+                                      <span>{issue.room_id || 'Raum'}</span>
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
+                                        {cleanContent || issue.content}
+                                      </div>
+                                      <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span>Gemeldet von <strong>{authorDisplay}</strong></span>
+                                        <span>•</span>
+                                        <span>{dateFormatted} Uhr</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await notesService.resolveRoomIssue(issue.id);
+                                        setRoomIssues(prev => prev.map(n => n.id === issue.id ? { ...n, is_completed: true, is_acknowledged: true, acknowledged_at: new Date().toISOString() } : n));
+                                      }}
+                                      style={{
+                                        background: '#16a34a',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '10px',
+                                        padding: '8px 14px',
+                                        fontSize: '0.76rem',
+                                        fontWeight: 750,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        boxShadow: '0 2px 8px rgba(22, 163, 74, 0.2)'
+                                      }}
+                                    >
+                                      <Check size={13} />
+                                      <span>Als behoben markieren</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* WIDGET: Systemische Terminkonflikte (Apple / Enterprise SaaS Level) */}
                   <div style={{
@@ -30781,7 +31046,30 @@ status: status,
                                       {initials}
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.name}</span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.name}</span>
+                                        {(() => {
+                                          const roomOpenIssues = roomIssues.filter(i => (!i.is_completed && !i.is_acknowledged) && (i.room_id === room.id || i.room_id === room.name || (room.name && i.room_id && room.name.toLowerCase().includes(i.room_id.toLowerCase()))));
+                                          if (roomOpenIssues.length === 0) return null;
+                                          return (
+                                            <span style={{ 
+                                              fontSize: '0.62rem', 
+                                              color: '#dc2626', 
+                                              background: '#fee2e2', 
+                                              border: '1px solid #fca5a5', 
+                                              borderRadius: '6px', 
+                                              padding: '1px 6px', 
+                                              fontWeight: 800, 
+                                              display: 'inline-flex', 
+                                              alignItems: 'center', 
+                                              gap: '3px' 
+                                            }}>
+                                              <Wrench size={9} />
+                                              {roomOpenIssues.length === 1 ? '1 Mangel' : `${roomOpenIssues.length} Mängel`}
+                                            </span>
+                                          );
+                                        })()}
+                                      </div>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                         <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700 }}>
                                           {room.floor || localFloorMappings[room.id] || 'Allgemein'}
@@ -31329,8 +31617,8 @@ status: status,
                                 flex: 1,
                                 padding: '12px',
                                 borderRadius: '12px',
-                                border: roomFormIsCampusActive !== false ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
-                                background: roomFormIsCampusActive !== false ? '#fce8e6' : '#ffffff',
+                                border: roomFormIsCampusActive !== false ? '1.5px solid #34a853' : '1.5px solid #cbd5e1',
+                                background: roomFormIsCampusActive !== false ? '#e6f4ea' : '#ffffff',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px',
@@ -31343,11 +31631,11 @@ status: status,
                                 type="checkbox"
                                 checked={roomFormIsCampusActive !== false}
                                 readOnly
-                                style={{ width: '16px', height: '16px', accentColor: '#ea4335', cursor: 'pointer' }}
+                                style={{ width: '16px', height: '16px', accentColor: '#34a853', cursor: 'pointer' }}
                               />
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Campus</span>
-                                <span style={{ fontSize: '0.62rem', color: '#64748b' }}>Für Campus freischalten</span>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: roomFormIsCampusActive !== false ? '#137333' : '#0f172a', fontFamily: 'Urbanist' }}>Campus</span>
+                                <span style={{ fontSize: '0.62rem', color: roomFormIsCampusActive !== false ? '#1e7e34' : '#64748b' }}>Für Campus freischalten</span>
                               </div>
                             </div>
 
@@ -31357,8 +31645,8 @@ status: status,
                                 flex: 1,
                                 padding: '12px',
                                 borderRadius: '12px',
-                                border: roomFormIsGroovelabActive ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
-                                background: roomFormIsGroovelabActive ? '#fce8e6' : '#ffffff',
+                                border: roomFormIsGroovelabActive ? '1.5px solid #eab308' : '1.5px solid #cbd5e1',
+                                background: roomFormIsGroovelabActive ? '#fefce8' : '#ffffff',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px',
@@ -31371,11 +31659,11 @@ status: status,
                                 type="checkbox"
                                 checked={!!roomFormIsGroovelabActive}
                                 readOnly
-                                style={{ width: '16px', height: '16px', accentColor: '#ea4335', cursor: 'pointer' }}
+                                style={{ width: '16px', height: '16px', accentColor: '#eab308', cursor: 'pointer' }}
                               />
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Groovelab</span>
-                                <span style={{ fontSize: '0.62rem', color: '#64748b' }}>Für Groovelab freischalten</span>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: roomFormIsGroovelabActive ? '#854d0e' : '#0f172a', fontFamily: 'Urbanist' }}>GrooveLab</span>
+                                <span style={{ fontSize: '0.62rem', color: roomFormIsGroovelabActive ? '#a16207' : '#64748b' }}>Für GrooveLab freischalten</span>
                               </div>
                             </div>
                           </div>

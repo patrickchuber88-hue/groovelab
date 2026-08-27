@@ -96,9 +96,9 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
           ? data.special_offers.find((o: any) => o?.id === '__cg_master_pricing_overrides__')
           : null;
 
-        let rawC = data.price_module_campus ?? overrides?.price_module_campus;
-        let rawG = data.price_module_groovelab ?? overrides?.price_module_groovelab;
-        let rawK = data.price_module_kombi ?? overrides?.price_module_kombi;
+        const rawC = data.price_module_campus ?? overrides?.price_module_campus;
+        const rawG = data.price_module_groovelab ?? overrides?.price_module_groovelab;
+        const rawK = data.price_module_kombi ?? overrides?.price_module_kombi;
 
         let c = rawC !== null && rawC !== undefined ? Number(rawC) : 14.90;
         let g = rawG !== null && rawG !== undefined ? Number(rawG) : 9.90;

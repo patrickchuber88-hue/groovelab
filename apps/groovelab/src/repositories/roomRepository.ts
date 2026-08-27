@@ -39,7 +39,7 @@ export async function fetchRoomsBySchool(schoolId: string, force = false): Promi
     }
   }
 
-  const persistentKey = `campus_rooms_${schoolId}`;
+  const persistentKey = `campus_all_rooms_${schoolId}`;
   if (!force) {
     const cached = getItemWithTTL<RoomRecord[]>(persistentKey);
     if (cached && cached.length > 0) {
@@ -53,7 +53,6 @@ export async function fetchRoomsBySchool(schoolId: string, force = false): Promi
       .from('rooms')
       .select('*')
       .eq('school_id', schoolId)
-      .eq('is_groovelab_active', true)
       .order('sort_order', { ascending: true });
 
     if (error) {

@@ -7,6 +7,7 @@ import {
   CheckCheck, 
   Circle, 
   CheckCircle2, 
+  Plus,
   BookOpen, 
   Send, 
   Trash2, 
@@ -17,18 +18,26 @@ import {
   Volume2, 
   Play, 
   Pause, 
+  Square,
   Lock, 
   User, 
   Sparkles,
   Calendar,
   Layers,
   Archive,
-  Square
+  Hash,
+  DoorOpen,
+  Music,
+  AlertTriangle,
+  Zap,
+  CheckSquare,
+  ChevronDown,
+  Clock
 } from 'lucide-react';
 import { useNotes } from '../../hooks/useNotes';
 import { useVoiceToText } from '../../hooks/useVoiceToText';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
-import { UserNote } from '../../services/notesService';
+import { UserNote, maskStudentName } from '../../services/notesService';
 import { supabase } from '../../lib/supabase';
 
 interface BriefingNotesCardProps {
@@ -36,43 +45,157 @@ interface BriefingNotesCardProps {
   schoolId?: number | string;
   activeStudent?: any;
   allStudents?: any[];
+  todayStudents?: any[];
+  rooms?: any[];
   onOpenDrawer?: () => void;
   onOpenHomeworkModal?: (student: any) => void;
 }
+
+const COMMON_TAGS = ['Hausaufgabe', 'Technik', 'Repertoire', 'Theorie', 'Konzert', 'Wichtig', 'Audio'];
+
+export const QUICK_SNIPPETS = [
+  { id: 'takt', label: 'Takt & BPM', icon: Zap, snippet: 'Takt 1-8 bei 80 BPM üben', desc: 'Übe-Auftrag mit Metronom' },
+  { id: 'tonleiter', label: 'Tonleiter', icon: Music, snippet: 'Tonleiter G-Dur flüssig mit Metronom wiederholen', desc: 'Technik & Gehörbildung' },
+  { id: 'playalong', label: 'Play-Along', icon: Sparkles, snippet: 'Play-Along Track anhören und mitspielen', desc: 'Song-Begleitung' },
+  { id: 'buch', label: 'Notenbuch', icon: BookOpen, snippet: 'Bitte Notenheft zur nächsten Stunde mitbringen', desc: 'Material-Erinnerung' },
+  { id: 'todo', label: 'To-Do', icon: CheckSquare, snippet: '- Noten kopieren für nächste Stunde', desc: 'Persönliche Aufgabe' },
+  { id: 'raum', label: 'Raum-Mangel', icon: DoorOpen, snippet: '!Raum 4: Mangel melden: ', desc: 'Meldung an Sekretariat' }
+];
+
+// Helper to strictly ensure "Musiker" is NEVER displayed as an instrument
+const resolveCleanInstrument = (s: any, teacherInst?: string | null): string => {
+  const raw = (s?.instrument || s?.subject || '').trim();
+  const isInvalid = !raw || raw.toLowerCase() === 'musiker' || raw.toLowerCase() === 'allgemein' || raw.toLowerCase() === 'student';
+  if (!isInvalid) return raw;
+  if (teacherInst && teacherInst.toLowerCase() !== 'musiker' && teacherInst.toLowerCase() !== 'allgemein') {
+    return teacherInst.trim();
+  }
+  return 'Gitarre';
+};
+
+// Date calculation helpers for quick Due Date presets
+const getQuickDate = (type: 'today' | 'tomorrow' | 'friday' | 'next_week'): string => {
+  const d = new Date();
+  if (type === 'tomorrow') d.setDate(d.getDate() + 1);
+  if (type === 'friday') {
+    const day = d.getDay();
+    const diff = (5 - day + 7) % 7 || 7;
+    d.setDate(d.getDate() + diff);
+  }
+  if (type === 'next_week') d.setDate(d.getDate() + 7);
+  return d.toISOString().split('T')[0];
+};
+
+const formatDueDateBadge = (dateStr: string): { label: string; isOverdue: boolean; isToday: boolean } => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (dateStr < todayStr) {
+    const diffDays = Math.max(1, Math.round((new Date(todayStr).getTime() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)));
+    return { label: `Überfällig (${diffDays}T)`, isOverdue: true, isToday: false };
+  }
+  if (dateStr === todayStr) {
+    return { label: 'Heute fällig', isOverdue: false, isToday: true };
+  }
+  const parts = dateStr.split('-');
+  return { label: `Bis ${parts[2]}.${parts[1]}.`, isOverdue: false, isToday: false };
+};
+
+import { 
+  TeacherNotesBoardModal, 
+  STUDENT_SKILL_TAGS, 
+  TEACHER_ORGANIZATION_TAGS, 
+  getAllTagStyle,
+  formatCleanNoteContent,
+  renderMonochromeTagIcon,
+  CategoryTagPickerPopover
+} from './TeacherNotesBoardModal';
+
+const getTagBadgeStyle = (tag: string) => {
+  return getAllTagStyle(tag);
+};
 
 export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   user,
   schoolId,
   activeStudent,
   allStudents = [],
+  todayStudents = [],
+  rooms = [],
   onOpenDrawer,
   onOpenHomeworkModal
 }) => {
   const {
+    notes,
     filteredNotes,
     searchQuery,
     setSearchQuery,
     createNote,
+    updateNote,
+    acknowledgeNote,
     deleteNote,
     togglePin,
     toggleCompleteTodo,
     toggleArchive,
     syncToHomeworkBook,
+    dueAlerts,
     saveStatus
   } = useNotes({ user, schoolId, activeStudent });
 
+  const [internalRooms, setInternalRooms] = useState<any[]>([]);
+
+  useEffect(() => {
+    const effectiveSchoolId = schoolId || user?.school_id || (user as any)?.schoolId;
+    if (!effectiveSchoolId) return;
+
+    let isMounted = true;
+    const loadRooms = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('rooms')
+          .select('id, name, floor, building_id, max_students, equipment, room_instruments, is_campus_active, is_groovelab_active')
+          .eq('school_id', effectiveSchoolId)
+          .order('sort_order', { ascending: true });
+
+        if (data && isMounted && data.length > 0) {
+          setInternalRooms(data);
+        }
+      } catch (err) {
+        console.warn('Could not load rooms for notes autocomplete:', err);
+      }
+    };
+    loadRooms();
+    return () => { isMounted = false; };
+  }, [schoolId, user]);
+
+  const [showBoardModal, setShowBoardModal] = useState(false);
+  const [activeTagPickerNoteId, setActiveTagPickerNoteId] = useState<string | null>(null);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState<string>('');
   const [inputContent, setInputContent] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-  const [filterMode, setFilterMode] = useState<'all' | 'todos' | 'pinned' | 'student'>('all');
+  const [filterMode, setFilterMode] = useState<'all' | 'todos' | 'homework' | 'pinned' | 'archived'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [syncedIds, setSyncedIds] = useState<Set<string>>(new Set());
+  const [showQuickTemplates, setShowQuickTemplates] = useState(false);
 
-  // Audio Recording State
+  // 📅 Due Date State
+  const [selectedDueDate, setSelectedDueDate] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
+
+  // ⏱️ WebAudio Precision Metronome State
+  const [activeMetronomeBpm, setActiveMetronomeBpm] = useState<number | null>(null);
+  const metronomeIntervalRef = useRef<any>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // 🔍 Typeahead / Autocomplete State (@, #, !, /)
+  const [autocompleteType, setAutocompleteType] = useState<'student' | 'tag' | 'room' | 'macro' | null>(null);
+  const [autocompleteQuery, setAutocompleteQuery] = useState<string>('');
+  const [suggestionIndex, setSuggestionIndex] = useState<number>(0);
+
+  // 🎙️ Audio Recording State
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [audioSeconds, setAudioSeconds] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [showTresorLockPrompt, setShowTresorLockPrompt] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -80,19 +203,93 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   const hasTresor = checkIsAudioTresorActive(user);
 
+  // WebAudio Metronome Control
+  const toggleMetronome = (bpm: number) => {
+    if (activeMetronomeBpm === bpm) {
+      stopMetronome();
+      return;
+    }
+    stopMetronome();
+    setActiveMetronomeBpm(bpm);
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioCtx();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const playClick = (accent: boolean) => {
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(accent ? 980 : 680, ctx.currentTime);
+          gain.gain.setValueAtTime(0.25, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.09);
+        } catch {}
+      };
+
+      let beat = 0;
+      playClick(true);
+      const intervalMs = (60 / bpm) * 1000;
+      metronomeIntervalRef.current = setInterval(() => {
+        beat = (beat + 1) % 4;
+        playClick(beat === 0);
+      }, intervalMs);
+    } catch (e) {
+      console.warn('Metronome error:', e);
+    }
+  };
+
+  const stopMetronome = () => {
+    if (metronomeIntervalRef.current) {
+      clearInterval(metronomeIntervalRef.current);
+      metronomeIntervalRef.current = null;
+    }
+    setActiveMetronomeBpm(null);
+  };
+
+  // Adjust Textarea Height Dynamically
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.max(54, textareaRef.current.scrollHeight)}px`;
+    }
+  };
+
+  // Snapshot of text before dictation starts to eliminate interim accumulation stuttering
+  const initialTextBeforeVoiceRef = useRef<string>('');
+
   // Live Voice-to-Text (SpeechRecognition)
-  const { isListening, startListening, stopListening, resetTranscript, isSupported: voiceSupported } = useVoiceToText({
-    onResult: (text) => {
-      setInputContent(prev => {
-        const clean = prev.trim();
-        return clean ? `${clean} ${text}` : text;
-      });
+  const { isListening, startListening, stopListening, resetTranscript } = useVoiceToText({
+    onResult: (liveFormattedText) => {
+      const base = initialTextBeforeVoiceRef.current;
+      const cleanSpoken = liveFormattedText.trim();
+      const next = base ? `${base} ${cleanSpoken}` : cleanSpoken;
+      setInputContent(next);
+      setTimeout(adjustTextareaHeight, 10);
     }
   });
+
+  const handleToggleVoiceDictation = () => {
+    if (isListening) {
+      stopListening();
+      initialTextBeforeVoiceRef.current = '';
+    } else {
+      initialTextBeforeVoiceRef.current = inputContent.trim();
+      resetTranscript();
+      startListening();
+      showToast('🎙️ Live Diktat aktiv • Sprich frei');
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -112,8 +309,24 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   useEffect(() => {
     return () => {
       stopHardwareStream();
+      stopMetronome();
       if (timerRef.current) clearInterval(timerRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        try { audioCtxRef.current.close(); } catch {}
+      }
     };
+  }, []);
+
+  // Keyboard shortcut: Cmd+J / Ctrl+J to focus
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'j' || e.key === 'J')) {
+        e.preventDefault();
+        textareaRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
   // 1. Natural Language Entity Recognition (Apple Intelligence Style)
@@ -123,16 +336,46 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
 
     const lower = text.toLowerCase();
 
-    // Student match (from active timeline student or roster)
-    let detectedStudent = activeStudent || null;
-    if (!detectedStudent && allStudents.length > 0) {
-      for (const s of allStudents) {
-        const fName = (s.first_name || s.name?.split(' ')[0] || '').toLowerCase();
-        if (fName && fName.length > 2 && lower.includes(fName)) {
-          detectedStudent = s;
-          break;
+    // Student match:
+    // Only link a student if:
+    // 1. Explicit @mention is typed (e.g. '@Jonah'), OR
+    // 2. A specific student's name is explicitly written in the text (e.g. 'Jonah soll ...')
+    // Otherwise, it remains a 100% NEUTRAL GENERAL NOTE.
+    let detectedStudent: any = null;
+    const mentionMatch = text.match(/@([A-Za-z0-9äöüÄÖÜß.\s]+?)(?=[\s,;!#]|$)/);
+    const candidatePool = (todayStudents && todayStudents.length > 0) ? todayStudents.concat(allStudents || []) : (allStudents || []);
+
+    if (mentionMatch) {
+      const q = mentionMatch[1].trim().toLowerCase();
+      const match = candidatePool.find(s => {
+        const fName = (s.first_name || s.name || '').toLowerCase();
+        return fName.includes(q) || q.includes(fName);
+      });
+      if (match) detectedStudent = match;
+    } else if (candidatePool.length > 0) {
+      // Check if a specific student's first name is explicitly typed as a word
+      for (const s of candidatePool) {
+        const fName = (s.first_name || s.name?.split(' ')[0] || '').toLowerCase().trim();
+        if (fName && fName.length >= 3) {
+          const regex = new RegExp(`\\b${fName}\\b`, 'i');
+          if (regex.test(lower)) {
+            detectedStudent = s;
+            break;
+          }
         }
       }
+    }
+
+    // Natural Language Due Date parsing
+    let naturalDueDate: string | null = selectedDueDate || null;
+    if (!naturalDueDate) {
+      if (lower.includes('bis freitag') || lower.includes('am freitag')) naturalDueDate = getQuickDate('friday');
+      else if (lower.includes('übermorgen')) {
+        const d = new Date(); d.setDate(d.getDate() + 2); naturalDueDate = d.toISOString().split('T')[0];
+      }
+      else if (lower.includes('morgen')) naturalDueDate = getQuickDate('tomorrow');
+      else if (lower.includes('bis heute') || lower.includes('heute')) naturalDueDate = getQuickDate('today');
+      else if (lower.includes('nächste woche') || lower.includes('in 1 woche')) naturalDueDate = getQuickDate('next_week');
     }
 
     // Homework detection
@@ -148,65 +391,345 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     const bpmMatch = text.match(/\b(?:bpm|tempo|metronom)\s*:?\s*(\d{2,3})\b/i) || text.match(/\b(\d{2,3})\s*bpm\b/i);
     const bpm = bpmMatch ? parseInt(bpmMatch[1], 10) : null;
 
-    // Room / Repair detection
-    const isRoomIssue = lower.includes('raum') || 
+    // Room / Repair detection & Room extraction
+    const rawRoomMatches = text.match(/!([A-Za-z0-9äöüÄÖÜß_-]+(?:\s+(?:\d+|Nebenraum|Studio|Saal))?)/i);
+    let detectedRoomName: string | null = rawRoomMatches ? rawRoomMatches[1].trim() : null;
+
+    if (!detectedRoomName) {
+      const allR = (internalRooms && internalRooms.length > 0) ? internalRooms : (rooms || []);
+      for (const r of allR) {
+        const rName = typeof r === 'string' ? r : (r.name || '');
+        if (rName && rName.length >= 3 && new RegExp(`\\b${rName}\\b`, 'i').test(text)) {
+          detectedRoomName = rName;
+          break;
+        }
+      }
+    }
+
+    const isRoomIssue = !!detectedRoomName || 
+                        lower.includes('raum') || 
                         lower.includes('saite') || 
                         lower.includes('kabel') || 
+                        lower.includes('notenständer') ||
+                        lower.includes('kaputt') ||
                         lower.includes('defekt') || 
                         lower.includes('stimmen') || 
-                        lower.includes('klavier');
+                        lower.includes('mangel');
 
     // ToDo detection
     const isTodo = text.startsWith('- ') || text.startsWith('//') || text.startsWith('[ ]') || lower.startsWith('todo');
 
     return {
       detectedStudent,
+      detectedRoomName,
       isHomework,
       bpm,
       isRoomIssue,
-      isTodo
+      isTodo,
+      naturalDueDate
     };
-  }, [inputContent, activeStudent, allStudents]);
+  }, [inputContent, allStudents, todayStudents, selectedDueDate, rooms, internalRooms]);
 
-  // Handle Note Save
+  // Autocomplete Suggestions List (Prioritizes Tagesplan Students)
+  const suggestions = useMemo(() => {
+    if (!autocompleteType) return [];
+    const q = autocompleteQuery.toLowerCase().trim();
+
+    if (autocompleteType === 'student') {
+      const teacherInst = user?.instrument || 'Gitarre';
+      
+      // 1. Process today's students from Tagesplan
+      const todayList = (todayStudents && todayStudents.length > 0) ? todayStudents : [];
+      const mappedToday = todayList.map(s => {
+        const fName = s.first_name || (s.name ? s.name.split(' ')[0] : 'Schüler');
+        const lName = s.last_name || (s.name ? s.name.split(' ').slice(1).join(' ') : '');
+        const maskedLn = lName ? `${lName[0]}.` : '';
+        const cleanInst = resolveCleanInstrument(s, teacherInst);
+        const sub = s.timeSlot ? `${cleanInst} • ${s.timeSlot} Uhr` : cleanInst;
+        return {
+          type: 'student' as const,
+          isToday: true,
+          label: `${fName} ${maskedLn}`.trim(),
+          sub,
+          value: `@${fName}`,
+          item: { ...s, first_name: fName, last_name: lName, instrument: cleanInst }
+        };
+      });
+
+      // 2. Process other students in roster
+      const todayKeys = new Set(todayList.map(s => String(s.id || s.name || s.first_name).toLowerCase()));
+      const otherList = (allStudents || []).filter(s => {
+        const sKey = String(s.id || s.name || s.first_name).toLowerCase();
+        return !todayKeys.has(sKey);
+      });
+
+      const mappedOther = otherList.map(s => {
+        const fName = s.first_name || (s.name ? s.name.split(' ')[0] : 'Schüler');
+        const lName = s.last_name || (s.name ? s.name.split(' ').slice(1).join(' ') : '');
+        const maskedLn = lName ? `${lName[0]}.` : '';
+        const cleanInst = resolveCleanInstrument(s, teacherInst);
+        return {
+          type: 'student' as const,
+          isToday: false,
+          label: `${fName} ${maskedLn}`.trim(),
+          sub: cleanInst,
+          value: `@${fName}`,
+          item: { ...s, first_name: fName, last_name: lName, instrument: cleanInst }
+        };
+      });
+
+      if (!q) {
+        // Default when typing '@': show all of today's Tagesplan students first!
+        if (mappedToday.length > 0) {
+          return mappedToday;
+        }
+        return mappedOther.slice(0, 6);
+      }
+
+      // Filter query against both
+      const filteredToday = mappedToday.filter(s => 
+        s.label.toLowerCase().includes(q) || 
+        s.sub.toLowerCase().includes(q)
+      );
+      const filteredOther = mappedOther.filter(s => 
+        s.label.toLowerCase().includes(q) || 
+        s.sub.toLowerCase().includes(q)
+      );
+
+      return [...filteredToday, ...filteredOther].slice(0, 6);
+    }
+
+    if (autocompleteType === 'tag') {
+      const isStudentLinked = !!(parsedIntent?.detectedStudent || activeStudent);
+      const tagPool = isStudentLinked ? STUDENT_SKILL_TAGS : TEACHER_ORGANIZATION_TAGS;
+      return tagPool
+        .filter(t => t.label.toLowerCase().includes(q) || t.tag.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q))
+        .map(t => ({
+          type: 'tag' as const,
+          isToday: false,
+          label: `${t.tag} (${t.label})`,
+          sub: t.desc,
+          value: t.tag,
+          item: t.tag
+        }));
+    }
+
+    if (autocompleteType === 'room') {
+      const uniqueMap = new Map<string, any>();
+      if (Array.isArray(internalRooms)) {
+        internalRooms.forEach((r: any) => {
+          const key = String(r.id || r.name || '').trim();
+          if (key) uniqueMap.set(key, r);
+        });
+      }
+      if (Array.isArray(rooms)) {
+        rooms.forEach((r: any) => {
+          const key = String(r.id || r.name || '').trim();
+          if (key && !uniqueMap.has(key)) uniqueMap.set(key, r);
+        });
+      }
+      const activeRoomsList = Array.from(uniqueMap.values());
+      return activeRoomsList
+        .filter((r: any) => {
+          const rName = typeof r === 'string' ? r : (r.name || '');
+          const rFloor = typeof r === 'object' ? (r.floor || '') : '';
+          const rDesc = typeof r === 'object' ? (r.description || '') : '';
+          const fullText = `${rName} ${rFloor} ${rDesc}`.toLowerCase();
+          return fullText.includes(q);
+        })
+        .sort((a: any, b: any) => {
+          const nameA = typeof a === 'string' ? a : (a.name || '');
+          const nameB = typeof b === 'string' ? b : (b.name || '');
+          return nameA.localeCompare(nameB, 'de-DE', { numeric: true, sensitivity: 'base' });
+        })
+        .map((r: any) => {
+          const name = typeof r === 'string' ? r : (r.name || 'Raum');
+          const floor = typeof r === 'object' && r.floor && r.floor !== 'Allgemein' ? r.floor : 'EG';
+          const capacity = typeof r === 'object' && r.max_students ? ` • max. ${r.max_students} Schüler` : '';
+          return {
+            type: 'room' as const,
+            isToday: false,
+            label: `!${name}`,
+            sub: `${floor}${capacity}`,
+            value: `!${name}`,
+            item: r
+          };
+        });
+    }
+
+    if (autocompleteType === 'macro') {
+      return QUICK_SNIPPETS
+        .filter(m => m.label.toLowerCase().includes(q) || m.id.toLowerCase().includes(q) || m.snippet.toLowerCase().includes(q))
+        .map(m => ({
+          type: 'macro' as const,
+          isToday: false,
+          label: `/${m.id} • ${m.label}`,
+          sub: m.snippet,
+          value: m.snippet,
+          item: m
+        }));
+    }
+
+    return [];
+  }, [autocompleteType, autocompleteQuery, allStudents, todayStudents, user?.instrument, rooms, internalRooms]);
+
+  // Insert Quick Snippet directly from macro chip
+  const insertSnippet = (snippetText: string) => {
+    setInputContent(snippetText);
+    adjustTextareaHeight();
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(snippetText.length, snippetText.length);
+      }
+    }, 10);
+  };
+
+  // Handle Input Change with Autocomplete Detection
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInputContent(val);
+    adjustTextareaHeight();
+
+    const cursor = e.target.selectionStart || 0;
+    const textBeforeCursor = val.slice(0, cursor);
+    const lastWord = textBeforeCursor.split(/\s/).pop() || '';
+
+    if (lastWord.startsWith('@') && lastWord.length >= 1) {
+      setAutocompleteType('student');
+      setAutocompleteQuery(lastWord.slice(1));
+      setSuggestionIndex(0);
+    } else if (lastWord.startsWith('#') && lastWord.length >= 1) {
+      setAutocompleteType('tag');
+      setAutocompleteQuery(lastWord.slice(1));
+      setSuggestionIndex(0);
+    } else if (lastWord.startsWith('!') && lastWord.length >= 1) {
+      setAutocompleteType('room');
+      setAutocompleteQuery(lastWord.slice(1));
+      setSuggestionIndex(0);
+    } else if (lastWord.startsWith('/') && lastWord.length >= 1) {
+      setAutocompleteType('macro');
+      setAutocompleteQuery(lastWord.slice(1));
+      setSuggestionIndex(0);
+    } else {
+      setAutocompleteType(null);
+    }
+  };
+
+  // Apply Autocomplete Suggestion
+  const applySuggestion = (suggestion: { value: string; label: string; item?: any }) => {
+    if (!textareaRef.current) return;
+    const val = inputContent;
+    const cursor = textareaRef.current.selectionStart || val.length;
+    const textBeforeCursor = val.slice(0, cursor);
+    const textAfterCursor = val.slice(cursor);
+    const words = textBeforeCursor.split(/\s/);
+    words.pop(); // remove incomplete trigger word
+
+    if (autocompleteType === 'macro') {
+      const newBefore = words.length > 0 ? `${words.join(' ')} ${suggestion.value}` : suggestion.value;
+      const newContent = `${newBefore}${textAfterCursor}`;
+      setInputContent(newContent);
+      setAutocompleteType(null);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(newBefore.length, newBefore.length);
+          adjustTextareaHeight();
+        }
+      }, 10);
+      return;
+    }
+
+    const newBefore = words.length > 0 ? `${words.join(' ')} ${suggestion.value} ` : `${suggestion.value} `;
+    const newContent = `${newBefore}${textAfterCursor}`;
+    setInputContent(newContent);
+    setAutocompleteType(null);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(newBefore.length, newBefore.length);
+        adjustTextareaHeight();
+      }
+    }, 10);
+  };
+
+  // Handle Save
   const handleSave = async (extraAudioUrl?: string, duration?: number) => {
+    if (isListening) {
+      stopListening();
+      initialTextBeforeVoiceRef.current = '';
+    }
+
     const textToSave = inputContent.trim();
     if (!textToSave && !extraAudioUrl) return;
 
     const studentToLink = parsedIntent?.detectedStudent;
+    const rawStudentName = studentToLink?.first_name ? `${studentToLink.first_name} ${studentToLink.last_name || ''}`.trim() : studentToLink?.name;
+    const maskedStudentName = studentToLink ? (maskStudentName(rawStudentName) || rawStudentName) : null;
+
+    const isRoomReport = parsedIntent?.isRoomIssue || !!parsedIntent?.detectedRoomName;
+    const authorFullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Lehrkraft';
 
     await createNote(textToSave || 'Audio-Memo', {
       studentId: studentToLink?.id || null,
-      studentName: studentToLink?.first_name ? `${studentToLink.first_name} ${studentToLink.last_name || ''}`.trim() : null,
+      studentName: maskedStudentName,
+      roomId: parsedIntent?.detectedRoomName || (parsedIntent?.isRoomIssue ? 'Raum' : null),
+      authorName: authorFullName,
       audioUrl: extraAudioUrl || null,
       audioDurationSeconds: duration || null,
-      noteType: extraAudioUrl ? 'audio_memo' : parsedIntent?.isTodo ? 'todo' : parsedIntent?.isHomework ? 'student_note' : 'scratchpad'
+      dueDate: selectedDueDate || parsedIntent?.naturalDueDate || null,
+      noteType: extraAudioUrl ? 'audio_memo' : isRoomReport ? 'room_issue' : parsedIntent?.isTodo ? 'todo' : studentToLink ? 'student_note' : 'scratchpad',
+      visibility: isRoomReport ? 'school_admin' : 'private'
     });
 
     setInputContent('');
+    setSelectedDueDate(null);
+    setShowDatePicker(false);
     resetTranscript();
     setAudioBlob(null);
     setAudioUrl(null);
-    showToast('Notiz gesichert');
+    setAutocompleteType(null);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '54px';
+    }
+    showToast(
+      isRoomReport
+        ? `✓ Mangel für ${parsedIntent?.detectedRoomName || 'Raum'} an Sekretariat gemeldet`
+        : studentToLink 
+          ? `Notiz für ${studentToLink.first_name || studentToLink.name} gesichert` 
+          : 'Allgemeine Notiz gesichert'
+    );
   };
 
-  // 1-Click Homework Transfer
+  // 1-Click Direct Homework Transfer
   const handleDirectHomeworkTransfer = async () => {
+    if (isListening) {
+      stopListening();
+      initialTextBeforeVoiceRef.current = '';
+    }
+
     const student = parsedIntent?.detectedStudent || activeStudent;
     if (!student) {
       showToast('Kein Schüler zugeordnet');
       return;
     }
 
+    const rawName = student.first_name ? `${student.first_name} ${student.last_name || ''}`.trim() : student.name;
+    const studentName = maskStudentName(rawName) || rawName;
     const newNote = await createNote(inputContent.trim(), {
       studentId: student.id,
-      studentName: student.first_name ? `${student.first_name} ${student.last_name || ''}`.trim() : student.name,
+      studentName,
       noteType: 'student_note'
     });
 
-    syncToHomeworkBook(newNote, student.id);
+    await syncToHomeworkBook(newNote, student.id, studentName);
+    setSyncedIds(prev => new Set([...Array.from(prev), newNote.id]));
     setInputContent('');
-    showToast(`Ins Hausaufgabenheft von ${student.first_name || student.name} übertragen`);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '54px';
+    }
+    showToast(`✓ Ins Hausaufgabenheft von ${student.first_name || studentName} übertragen`);
   };
 
   // Audio Recording (Audio-Tresor Gated)
@@ -255,525 +778,836 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     setIsRecordingAudio(false);
   };
 
-  const formatSecs = (s: number) => {
-    const m = Math.floor(s / 60);
-    const rem = s % 60;
-    return `${m}:${rem < 10 ? '0' : ''}${rem}`;
-  };
+  // SINGLE FOCUS NOTE: Determine primary active note to show (prioritize pinned, then newest unarchived)
+  const focusNote = useMemo(() => {
+    const unarchivedNotes = notes.filter(n => !n.is_archived);
+    if (unarchivedNotes.length === 0) return null;
+    const pinned = unarchivedNotes.find(n => n.is_pinned);
+    if (pinned) return pinned;
+    return unarchivedNotes[0];
+  }, [notes]);
 
-  // Display notes filtered by clean mode
-  const displayNotes = useMemo(() => {
-    return filteredNotes.filter(n => {
-      if (filterMode === 'todos') return n.note_type === 'todo' || n.tags.includes('todo');
-      if (filterMode === 'pinned') return n.is_pinned;
-      if (filterMode === 'student') return n.student_id || n.student_name;
-      return true;
-    });
-  }, [filteredNotes, filterMode]);
+  const activeNotesCount = useMemo(() => {
+    return notes.filter(n => !n.is_archived).length;
+  }, [notes]);
 
   return (
     <div style={{
       background: '#ffffff',
       border: '1px solid rgba(226, 232, 240, 0.9)',
       borderRadius: '20px',
-      padding: '20px 22px',
+      padding: '16px 18px',
       boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
       display: 'flex',
       flexDirection: 'column',
-      gap: '14px',
+      gap: '10px',
       position: 'relative',
       fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif"
     }}>
-      {/* Toast Overlay */}
+      {/* Toast Notification */}
       {toastMessage && (
         <div style={{
           position: 'absolute',
           top: '-12px',
-          right: '18px',
+          right: '16px',
           background: '#0f172a',
           color: '#ffffff',
-          padding: '6px 14px',
+          padding: '5px 12px',
           borderRadius: '100px',
-          fontSize: '0.75rem',
+          fontSize: '0.72rem',
           fontWeight: 700,
-          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
+          boxShadow: '0 6px 16px rgba(0, 0, 0, 0.15)',
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
-          zIndex: 30
+          gap: '5px',
+          zIndex: 40
         }}>
-          <Check size={12} strokeWidth={3} />
+          <Check size={11} strokeWidth={3} />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* 1. Calm Apple Header */}
+      {/* 1. Calm Apple Header Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+          <span style={{ fontSize: '1.0rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
             Notizen
           </span>
-          {displayNotes.length > 0 && (
-            <span style={{
-              background: '#f1f5f9',
-              color: '#64748b',
-              borderRadius: '100px',
+          {activeMetronomeBpm && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: '#e6f4ea',
+              color: '#166534',
               padding: '2px 8px',
-              fontSize: '0.68rem',
-              fontWeight: 750
+              borderRadius: '100px',
+              fontSize: '0.66rem',
+              fontWeight: 800
             }}>
-              {displayNotes.length}
-            </span>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', animation: 'pulse 1s infinite' }} />
+              <span>{activeMetronomeBpm} BPM Klick</span>
+              <button
+                type="button"
+                onClick={stopMetronome}
+                style={{ background: 'none', border: 'none', color: '#166534', cursor: 'pointer', padding: 0, display: 'flex' }}
+                title="Metronom stoppen"
+              >
+                <X size={10} />
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Minimalist Action Cluster (100% Monochrome Icons) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {/* Quick Filter Switcher */}
+        {/* Apple Action Cluster */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Prominent Apple Board Pill Button */}
           <button
-            onClick={() => setFilterMode(prev => prev === 'all' ? 'todos' : prev === 'todos' ? 'pinned' : 'all')}
-            title="Filter umschalten (Alle / To-Dos / Angepinnt)"
+            type="button"
+            onClick={() => setShowBoardModal(true)}
             style={{
-              background: filterMode !== 'all' ? '#f1f5f9' : 'transparent',
-              border: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              background: '#f8fafc',
+              color: '#0f172a',
+              border: '1px solid #e2e8f0',
               borderRadius: '8px',
-              padding: '6px',
-              color: filterMode !== 'all' ? '#0f172a' : '#94a3b8',
+              padding: '4px 9px',
+              fontSize: '0.70rem',
+              fontWeight: 750,
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center'
+              transition: 'all 0.15s ease',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
             }}
+            className="hover-scale-mini"
+            title="Vollwertiges Notizen-Board öffnen (Kanban, Archiv & Suche)"
           >
-            <SlidersHorizontal size={15} />
-          </button>
-
-          {/* Search Toggle */}
-          <button
-            onClick={() => setShowSearch(prev => !prev)}
-            title="Suche öffnen"
-            style={{
-              background: showSearch ? '#f1f5f9' : 'transparent',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '6px',
-              color: showSearch ? '#0f172a' : '#94a3b8',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <Search size={15} />
+            <Layers size={11} color="#64748b" />
+            <span>Notizen-Board</span>
+            {activeNotesCount > 0 && (
+              <span style={{
+                background: '#ffffff',
+                color: '#475569',
+                borderRadius: '5px',
+                padding: '0px 4px',
+                fontSize: '0.64rem',
+                fontWeight: 800,
+                border: '1px solid #cbd5e1'
+              }}>
+                {activeNotesCount}
+              </span>
+            )}
+            <ArrowUpRight size={10} color="#94a3b8" />
           </button>
 
           {/* Live Voice Dictation Button */}
           <button
-            onClick={() => isListening ? stopListening() : startListening()}
+            type="button"
+            onClick={handleToggleVoiceDictation}
             title={isListening ? 'Diktat beenden' : 'Live Diktat (Sprache zu Text)'}
             style={{
-              background: isListening ? '#0f172a' : 'transparent',
-              color: isListening ? '#ffffff' : '#94a3b8',
-              border: 'none',
+              background: isListening ? '#0f172a' : '#f8fafc',
+              color: isListening ? '#ffffff' : '#64748b',
+              border: isListening ? '1px solid #0f172a' : '1px solid #e2e8f0',
               borderRadius: '8px',
-              padding: '6px',
+              padding: '4px 7px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              transition: 'all 0.15s'
+              gap: '4px',
+              fontSize: '0.68rem',
+              fontWeight: 700,
+              transition: 'all 0.15s ease'
             }}
           >
-            <Mic size={15} />
+            <Mic size={12} color={isListening ? '#ffffff' : '#64748b'} />
+            {isListening && <span>Höre zu...</span>}
           </button>
         </div>
       </div>
 
-      {/* Inline Search Bar (Progressive Disclosure) */}
-      {showSearch && (
+      {/* Overdue / Due Today Attention Banner (if present) */}
+      {dueAlerts.length > 0 && (
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          background: '#f8fafc',
+          background: '#fff1f2',
+          border: '1px solid #fecdd3',
           borderRadius: '10px',
           padding: '6px 10px',
-          border: '1px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           gap: '8px'
         }}>
-          <Search size={13} color="#94a3b8" />
-          <input
-            type="text"
-            placeholder="Notizen durchsuchen..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              background: 'none',
-              border: 'none',
-              outline: 'none',
-              fontSize: '0.80rem',
-              color: '#0f172a',
-              width: '100%',
-              fontFamily: 'inherit'
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
+            <AlertTriangle size={13} color="#e11d48" style={{ flexShrink: 0 }} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9f1239', letterSpacing: '0.01em' }}>
+                {dueAlerts.length === 1 ? '1 fällige Notiz' : `${dueAlerts.length} fällige Notizen`}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#881337', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {dueAlerts[0].content}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              acknowledgeNote(dueAlerts[0].id);
+              showToast('✓ Als erledigt markiert');
             }}
-            autoFocus
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
-            >
-              <X size={13} />
-            </button>
-          )}
+            style={{
+              background: '#e11d48',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '3px 7px',
+              fontSize: '0.65rem',
+              fontWeight: 750,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
+            }}
+          >
+            <Check size={10} strokeWidth={3} />
+            <span>Erledigt</span>
+          </button>
         </div>
       )}
 
       {/* 2. The Pure Paper Canvas (Zero Clutter Writing Surface) */}
       <div style={{
         background: '#f8fafc',
-        borderRadius: '14px',
-        padding: '12px 14px',
+        borderRadius: '12px',
+        padding: '10px 12px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
+        gap: '6px',
         border: '1px solid #f1f5f9',
-        transition: 'border 0.2s, background 0.2s'
+        position: 'relative'
       }}>
-        {/* Active lesson watermark clue if student is in room */}
-        {activeStudent && !inputContent && (
-          <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <User size={11} color="#94a3b8" />
-            <span>Unterricht mit {activeStudent.first_name || activeStudent.name}</span>
+        {/* Autocomplete Floating Dropdown */}
+        {autocompleteType && suggestions.length > 0 && (
+          <div style={{
+            position: 'absolute',
+            bottom: '100%',
+            left: '8px',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '4px',
+            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.12), 0 4px 10px -2px rgba(0,0,0,0.04)',
+            zIndex: 50,
+            minWidth: '220px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+            marginBottom: '6px'
+          }}>
+            <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', padding: '3px 6px', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+              {autocompleteType === 'student' ? 'Schüler auswählen (@)' : autocompleteType === 'tag' ? 'Themen-Tag (#)' : autocompleteType === 'macro' ? 'Schnell-Baustein (/)' : 'Raum auswählen (!)'}
+            </div>
+            {suggestions.map((s, idx) => (
+              <button
+                key={`sug-${idx}`}
+                type="button"
+                onClick={() => applySuggestion(s)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  padding: '5px 8px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: idx === suggestionIndex ? '#f1f5f9' : 'transparent',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  fontSize: '0.76rem',
+                  fontWeight: 650
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  {s.type === 'student' ? (
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      background: s.isToday ? '#e6f4ea' : '#f1f5f9',
+                      color: s.isToday ? '#34a853' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.58rem',
+                      fontWeight: 800
+                    }}>
+                      {s.label[0] || 'S'}
+                    </div>
+                  ) : s.type === 'tag' ? (
+                    <Hash size={11} color="#64748b" />
+                  ) : s.type === 'macro' ? (
+                    <Zap size={11} color="#64748b" />
+                  ) : (
+                    <DoorOpen size={11} color="#64748b" />
+                  )}
+                  <span>{s.label}</span>
+                </div>
+                <span style={{ fontSize: '0.64rem', color: s.isToday ? '#166534' : '#94a3b8', fontWeight: s.isToday ? 700 : 550 }}>
+                  {s.sub}
+                </span>
+              </button>
+            ))}
           </div>
         )}
 
         <textarea
           ref={textareaRef}
           value={inputContent}
-          onChange={(e) => setInputContent(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={(e) => {
+            if (autocompleteType && suggestions.length > 0) {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSuggestionIndex(prev => (prev + 1) % suggestions.length);
+                return;
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSuggestionIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
+                return;
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                if (suggestions[suggestionIndex]) {
+                  applySuggestion(suggestions[suggestionIndex]);
+                  return;
+                }
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setAutocompleteType(null);
+                return;
+              }
+            }
+
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
               e.preventDefault();
               handleSave();
             }
           }}
-          placeholder={isListening ? 'Höre zu...' : 'Gedanke, Hausaufgabe oder To-Do notieren...'}
-          rows={inputContent.includes('\n') ? 3 : 2}
+          placeholder={isListening ? 'Höre zu... Diktat aktiv...' : 'Gedanke, @Schüler, - To-Do, !Raum oder BPM... (⌘J)'}
           style={{
             width: '100%',
+            minHeight: '44px',
             background: 'transparent',
             border: 'none',
             outline: 'none',
             resize: 'none',
-            fontSize: '0.88rem',
+            fontSize: '0.84rem',
             color: '#0f172a',
-            fontWeight: 500,
-            lineHeight: 1.45,
-            fontFamily: 'inherit'
+            fontWeight: 550,
+            lineHeight: 1.4,
+            fontFamily: 'inherit',
+            transition: 'height 0.1s ease',
+            boxSizing: 'border-box'
           }}
         />
 
-        {/* Dynamic Voice Recording Waveform Bar */}
-        {isListening && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: '#ffffff',
-            padding: '6px 10px',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0'
-          }}>
-            <div style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: '#0f172a',
-              animation: 'pulse 1s infinite'
-            }} />
-            <span style={{ fontSize: '0.74rem', color: '#0f172a', fontWeight: 700 }}>
-              Live Diktat aktiv • Spreche einfach frei
-            </span>
-          </div>
-        )}
+        {/* Dynamic Context Helpers & Progressive Action Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
+          {/* Subtle Input Hints / Triggers when empty */}
+          {!inputContent.trim() && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setAutocompleteType('student');
+                  setAutocompleteQuery('');
+                  if (!inputContent.includes('@')) setInputContent('@');
+                  setTimeout(() => textareaRef.current?.focus(), 10);
+                }}
+                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 4px' }}
+              >
+                <User size={10} />
+                <span>@Schüler</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputContent('- ');
+                  setTimeout(() => textareaRef.current?.focus(), 10);
+                }}
+                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 4px' }}
+              >
+                <CheckSquare size={10} />
+                <span>To-Do</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowQuickTemplates(prev => !prev)}
+                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 4px' }}
+              >
+                <Sparkles size={10} />
+                <span>Vorlagen</span>
+              </button>
+            </div>
+          )}
 
-        {/* 3. Progressive Action Pill Bar (Only reveals when text is present) */}
-        {inputContent.trim() && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingTop: '6px',
-            borderTop: '1px solid #e2e8f0',
-            flexWrap: 'wrap',
-            gap: '6px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              {/* Natural Homework Detection Pill */}
-              {parsedIntent?.isHomework && (
-                <button
-                  onClick={handleDirectHomeworkTransfer}
-                  style={{
-                    background: '#0f172a',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '5px 10px',
-                    fontSize: '0.72rem',
-                    fontWeight: 750,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  <BookOpen size={12} />
-                  <span>Ins Hausaufgabenheft {parsedIntent.detectedStudent ? `(${parsedIntent.detectedStudent.first_name || parsedIntent.detectedStudent.name})` : ''} ➔</span>
-                </button>
-              )}
+          {/* Progressive Action Pill Bar when text is entered */}
+          {inputContent.trim() && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '6px', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                {Boolean(parsedIntent?.detectedStudent) && (
+                  <button
+                    type="button"
+                    onClick={handleDirectHomeworkTransfer}
+                    style={{
+                      background: '#0f172a',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
+                      fontSize: '0.70rem',
+                      fontWeight: 750,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <BookOpen size={11} />
+                    <span>Ins Hausaufgabenheft ({parsedIntent?.detectedStudent.first_name || parsedIntent?.detectedStudent.name}) ➔</span>
+                  </button>
+                )}
 
-              {/* BPM / Tempo Pill */}
-              {parsedIntent?.bpm && (
-                <span style={{
-                  background: '#f1f5f9',
-                  color: '#0f172a',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '8px',
-                  padding: '4px 8px',
-                  fontSize: '0.72rem',
+                {/* Due Date Trigger */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDatePicker(prev => !prev)}
+                    style={{
+                      background: (selectedDueDate || parsedIntent?.naturalDueDate) ? '#eff6ff' : '#ffffff',
+                      color: (selectedDueDate || parsedIntent?.naturalDueDate) ? '#1e40af' : '#475569',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      padding: '3px 7px',
+                      fontSize: '0.68rem',
+                      fontWeight: 750,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}
+                  >
+                    <Calendar size={10} />
+                    <span>{(selectedDueDate || parsedIntent?.naturalDueDate) ? formatDueDateBadge(selectedDueDate || parsedIntent!.naturalDueDate!).label : 'Fälligkeit'}</span>
+                  </button>
+                  {showDatePicker && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      left: 0,
+                      marginBottom: '6px',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      padding: '4px',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
+                      zIndex: 60,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                      minWidth: '120px'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedDueDate(getQuickDate('today')); setShowDatePicker(false); }}
+                        style={{ padding: '4px 6px', border: 'none', background: 'transparent', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}
+                      >
+                        📅 Heute
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedDueDate(getQuickDate('tomorrow')); setShowDatePicker(false); }}
+                        style={{ padding: '4px 6px', border: 'none', background: 'transparent', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}
+                      >
+                        📅 Morgen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedDueDate(getQuickDate('friday')); setShowDatePicker(false); }}
+                        style={{ padding: '4px 6px', border: 'none', background: 'transparent', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}
+                      >
+                        📅 Bis Freitag
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {parsedIntent?.bpm && (
+                  <button
+                    type="button"
+                    onClick={() => toggleMetronome(parsedIntent.bpm!)}
+                    style={{
+                      background: activeMetronomeBpm === parsedIntent.bpm ? '#34a853' : '#ffffff',
+                      color: activeMetronomeBpm === parsedIntent.bpm ? '#ffffff' : '#0f172a',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      padding: '3px 7px',
+                      fontSize: '0.68rem',
+                      fontWeight: 750,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}
+                  >
+                    <Play size={9} />
+                    <span>{parsedIntent.bpm} BPM</span>
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleSave()}
+                style={{
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  fontSize: '0.70rem',
                   fontWeight: 750,
+                  cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px'
-                }}>
-                  <Play size={10} />
-                  <span>{parsedIntent.bpm} BPM</span>
-                </span>
-              )}
+                }}
+              >
+                <Check size={11} strokeWidth={2.5} />
+                <span>Sichern (⌘↵)</span>
+              </button>
+            </div>
+          )}
+        </div>
 
-              {/* Room Issue Pill */}
-              {parsedIntent?.isRoomIssue && (
+        {/* Quick Templates Popover Trigger (when clicked) */}
+        {showQuickTemplates && !inputContent.trim() && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            overflowX: 'auto',
+            paddingTop: '6px',
+            borderTop: '1px dashed #e2e8f0',
+            scrollbarWidth: 'none'
+          }}>
+            {QUICK_SNIPPETS.map((snippet) => {
+              const IconComp = snippet.icon;
+              const snippetStyles: Record<string, { bg: string; border: string; color: string }> = {
+                takt: { bg: '#eff6ff', border: '#bfdbfe', color: '#1e40af' },
+                tonleiter: { bg: '#fef9c3', border: '#fef08a', color: '#854d0e' },
+                playalong: { bg: '#f3e8ff', border: '#e9d5ff', color: '#6b21a8' },
+                buch: { bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d' },
+                todo: { bg: '#eff6ff', border: '#bfdbfe', color: '#2563eb' },
+                raum: { bg: '#fee2e2', border: '#fecaca', color: '#dc2626' }
+              };
+              const sStyle = snippetStyles[snippet.id] || { bg: '#f8fafc', border: '#e2e8f0', color: '#475569' };
+              return (
                 <button
-                  onClick={() => {
-                    handleSave();
-                    showToast('An Schulleitung / Sekretariat weitergeleitet');
-                  }}
+                  key={snippet.id}
+                  type="button"
+                  onClick={() => insertSnippet(snippet.snippet)}
                   style={{
-                    background: '#f1f5f9',
-                    color: '#334155',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    padding: '4px 8px',
-                    fontSize: '0.72rem',
+                    background: sStyle.bg,
+                    border: `1px solid ${sStyle.border}`,
+                    borderRadius: '100px',
+                    padding: '2px 8px',
+                    fontSize: '0.64rem',
                     fontWeight: 750,
+                    color: sStyle.color,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    gap: '4px',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                   }}
                 >
-                  <Send size={11} />
-                  <span>Meldung an Sekretariat ➔</span>
+                  <IconComp size={9} color={sStyle.color} />
+                  <span>{snippet.label}</span>
                 </button>
-              )}
-            </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-            {/* Quick Save Button */}
+      {/* 3. The Single Focus Note Stage ("Zuletzt Notiert" / "Aktiver Fokus") */}
+      {focusNote ? (
+        <div style={{
+          background: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
+          padding: '9px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '5px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+          position: 'relative'
+        }}>
+          {/* Focus Card Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Clock size={9} color="#94a3b8" />
+              <span>{focusNote.is_pinned ? '📌 Angepinnter Fokus' : 'Zuletzt notiert'}</span>
+            </span>
+
             <button
-              onClick={() => handleSave()}
+              type="button"
+              onClick={() => setShowBoardModal(true)}
               style={{
-                background: '#0f172a',
-                color: '#ffffff',
+                background: 'none',
                 border: 'none',
-                borderRadius: '8px',
-                padding: '5px 12px',
-                fontSize: '0.74rem',
-                fontWeight: 750,
+                color: '#64748b',
+                fontSize: '0.65rem',
+                fontWeight: 700,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '2px',
+                padding: 0
               }}
             >
-              <Check size={13} />
-              <span>Sichern</span>
+              <span>Alle {activeNotesCount} im Board</span>
+              <ArrowUpRight size={10} />
             </button>
           </div>
-        )}
-      </div>
 
-      {/* Audio-Tresor Storage Lock Notice (if triggered) */}
-      {showTresorLockPrompt && (
+          {/* Focus Card Content */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px', flex: 1, minWidth: 0 }}>
+              {(focusNote.note_type === 'todo' || focusNote.tags.includes('todo') || focusNote.content.startsWith('- ')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggleCompleteTodo(focusNote.id);
+                    showToast(focusNote.is_completed ? 'Als offen markiert' : '✓ Erledigt');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: focusNote.is_completed ? '#34a853' : '#94a3b8',
+                    cursor: 'pointer',
+                    padding: 0,
+                    marginTop: '1px',
+                    display: 'flex',
+                    flexShrink: 0
+                  }}
+                >
+                  {focusNote.is_completed ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+                </button>
+              )}
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: '0.80rem',
+                  color: focusNote.is_completed ? '#94a3b8' : '#0f172a',
+                  textDecoration: focusNote.is_completed ? 'line-through' : 'none',
+                  lineHeight: 1.35,
+                  fontWeight: 600,
+                  wordBreak: 'break-word'
+                }}>
+                  {formatCleanNoteContent(focusNote.content, focusNote.student_name)}
+                </div>
+
+                {/* Focus Card Badges (Student, Tag, Due Date) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', marginTop: '3px' }}>
+                  {focusNote.student_name && (
+                    <span style={{ fontSize: '0.64rem', color: '#166534', fontWeight: 750, background: '#e6f4ea', padding: '1px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <User size={8} />
+                      {maskStudentName(focusNote.student_name)}
+                    </span>
+                  )}
+                  {focusNote.tags && focusNote.tags.filter(t => t !== 'todo' && t !== '#To-Do').map(tag => {
+                    const style = getTagBadgeStyle(tag);
+                    return (
+                      <span
+                        key={tag}
+                        style={{
+                          fontSize: '0.62rem',
+                          fontWeight: 750,
+                          padding: '1px 5px',
+                          borderRadius: '4px',
+                          background: style.bg,
+                          color: style.color,
+                          border: `1px solid ${style.border}`,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px'
+                        }}
+                      >
+                        {renderMonochromeTagIcon(style.iconName, 8, style.color)}
+                        <span>{tag.replace(/^#/, '')}</span>
+                      </span>
+                    );
+                  })}
+                  {focusNote.due_date && (
+                    <span style={{
+                      fontSize: '0.62rem',
+                      fontWeight: 750,
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px',
+                      background: formatDueDateBadge(focusNote.due_date).isOverdue ? '#fee2e2' : formatDueDateBadge(focusNote.due_date).isToday ? '#fef3c7' : '#eff6ff',
+                      color: formatDueDateBadge(focusNote.due_date).isOverdue ? '#991b1b' : formatDueDateBadge(focusNote.due_date).isToday ? '#92400e' : '#1e40af'
+                    }}>
+                      <Calendar size={8} />
+                      <span>{formatDueDateBadge(focusNote.due_date).label}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions for Focus Note */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+              {!syncedIds.has(focusNote.id) && focusNote.visibility !== 'student_shared' && (focusNote.student_id || focusNote.student_name) && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const sId = focusNote.student_id;
+                    const sName = focusNote.student_name;
+                    if (sId) {
+                      await syncToHomeworkBook(focusNote, sId, sName || undefined);
+                      setSyncedIds(prev => new Set([...Array.from(prev), focusNote.id]));
+                      showToast('✓ Ins Hausaufgabenheft übertragen');
+                    }
+                  }}
+                  title="Ins Hausaufgabenheft übertragen"
+                  style={{
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    color: '#166534',
+                    cursor: 'pointer',
+                    padding: '3px 6px',
+                    borderRadius: '5px',
+                    fontSize: '0.64rem',
+                    fontWeight: 750,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}
+                >
+                  <BookOpen size={10} />
+                  <span>Hausaufgabe</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => togglePin(focusNote.id)}
+                title={focusNote.is_pinned ? 'Lösen' : 'Anpinnen'}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: focusNote.is_pinned ? '#0f172a' : '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '3px'
+                }}
+              >
+                <Pin size={11} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteNote(focusNote.id);
+                  showToast('Notiz gelöscht');
+                }}
+                title="Löschen"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#cbd5e1',
+                  cursor: 'pointer',
+                  padding: '3px'
+                }}
+              >
+                <Trash2 size={11} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
         <div style={{
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-          borderRadius: '12px',
-          padding: '10px 12px',
+          padding: '8px 10px',
+          textAlign: 'center',
+          fontSize: '0.72rem',
+          color: '#94a3b8',
+          fontWeight: 550,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '8px',
-          fontSize: '0.74rem',
-          color: '#64748b'
+          justifyContent: 'center',
+          gap: '5px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Lock size={13} color="#64748b" />
-            <span>Audio-Memos sind im Zusatz-Speichervolumen <strong>Audio-Tresor</strong> verfügbar. Live-Diktat ist 100% inklusive.</span>
-          </div>
-          <button
-            onClick={() => setShowTresorLockPrompt(false)}
-            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
-          >
-            <X size={13} />
-          </button>
+          <Sparkles size={11} color="#cbd5e1" />
+          <span>Keine offenen Notizen • Schreibe oben eine Notiz oder ein To-Do</span>
         </div>
       )}
 
-      {/* 4. The Notes Stream (Clean Magazine-Typography) */}
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '6px',
-        maxHeight: '260px',
-        overflowY: 'auto',
-        paddingRight: '2px'
-      }}>
-        {displayNotes.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '18px 10px',
-            color: '#94a3b8',
-            fontSize: '0.78rem',
-            fontWeight: 500
-          }}>
-            {searchQuery ? 'Keine Treffer.' : 'Alles erledigt. Schreibe eine Notiz oben.'}
-          </div>
-        ) : (
-          displayNotes.map((note) => {
-            const isTodo = note.note_type === 'todo' || note.tags.includes('todo') || note.content.startsWith('- ');
-            const isSynced = syncedIds.has(note.id) || note.visibility === 'student_shared';
-
-            return (
-              <div
-                key={note.id}
-                style={{
-                  padding: '9px 12px',
-                  borderRadius: '10px',
-                  background: note.is_pinned ? '#f8fafc' : 'transparent',
-                  border: note.is_pinned ? '1px solid #e2e8f0' : '1px solid transparent',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: '10px',
-                  transition: 'all 0.15s'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1, minWidth: 0 }}>
-                  {/* Monochrome ToDo Checkbox */}
-                  {isTodo ? (
-                    <button
-                      onClick={() => toggleCompleteTodo(note.id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: note.is_completed ? '#34a853' : '#94a3b8',
-                        cursor: 'pointer',
-                        padding: 0,
-                        marginTop: '1px',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    >
-                      {note.is_completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-                    </button>
-                  ) : (
-                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#94a3b8', marginTop: '7px', flexShrink: 0 }} />
-                  )}
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: '0.82rem',
-                      color: note.is_completed ? '#94a3b8' : '#0f172a',
-                      textDecoration: note.is_completed ? 'line-through' : 'none',
-                      lineHeight: 1.4,
-                      fontWeight: 500,
-                      wordBreak: 'break-word'
-                    }}>
-                      {note.content}
-                    </div>
-
-                    {/* Meta info: Student, synced tag */}
-                    {(note.student_name || isSynced) && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
-                        {note.student_name && (
-                          <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 650, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                            <User size={10} />
-                            {note.student_name}
-                          </span>
-                        )}
-                        {isSynced && (
-                          <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                            <CheckCheck size={11} />
-                            Im Hausaufgabenheft
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Quiet Item Actions */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                  <button
-                    onClick={() => togglePin(note.id)}
-                    title={note.is_pinned ? 'Lösen' : 'Anpinnen'}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: note.is_pinned ? '#0f172a' : '#cbd5e1',
-                      cursor: 'pointer',
-                      padding: '3px'
-                    }}
-                  >
-                    <Pin size={12} />
-                  </button>
-                  <button
-                    onClick={() => deleteNote(note.id)}
-                    title="Löschen"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#cbd5e1',
-                      cursor: 'pointer',
-                      padding: '3px'
-                    }}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* 5. Minimalist Footer */}
+      {/* 4. Minimalist Footer */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: '8px',
+        paddingTop: '6px',
         borderTop: '1px solid #f1f5f9',
-        fontSize: '0.68rem',
+        fontSize: '0.65rem',
         color: '#94a3b8',
         fontWeight: 600
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853' }} />
-          <span>Automatisch synchronisiert</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#34a853' }} />
+          <span>Auto-Sync</span>
         </div>
-        <div>
-          Shortcut <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '1px 4px', fontFamily: 'monospace' }}>⌘J</kbd>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span 
+            onClick={() => setShowBoardModal(true)}
+            style={{ color: '#64748b', cursor: 'pointer', fontWeight: 700 }}
+          >
+            Board öffnen ➔
+          </span>
+          <span>
+            Shortcut <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '1px 3px', fontFamily: 'monospace' }}>⌘J</kbd>
+          </span>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 4. FULL-FEATURED TRELLO-INSPIRED NOTIZEN-BOARD MODAL                     */}
+      {/* ========================================================================= */}
+      <TeacherNotesBoardModal
+        isOpen={showBoardModal}
+        onClose={() => setShowBoardModal(false)}
+        notes={notes}
+        allStudents={allStudents}
+        todayStudents={todayStudents}
+        user={user}
+        onCreateNote={createNote}
+        onUpdateNote={updateNote}
+        onDeleteNote={deleteNote}
+        onTogglePin={togglePin}
+        onToggleCompleteTodo={toggleCompleteTodo}
+        onToggleArchive={toggleArchive}
+        onSyncToHomeworkBook={syncToHomeworkBook}
+        onOpenHomeworkModal={onOpenHomeworkModal}
+      />
     </div>
   );
 };

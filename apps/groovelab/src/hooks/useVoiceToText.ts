@@ -6,6 +6,41 @@ interface UseVoiceToTextOptions {
   onError?: (error: string) => void;
 }
 
+/**
+ * Intelligent German Dictation & Punctuation Formatter
+ * Converts spoken keywords ("punkt", "komma", "neue zeile", "bindestrich") into clean punctuation
+ * and handles capitalization rules.
+ */
+export const formatGermanDictation = (text: string): string => {
+  if (!text) return '';
+
+  let res = text;
+
+  // Replace spoken punctuation keywords (case-insensitive)
+  res = res.replace(/\s*\b(punkt|full stop)\b\s*/gi, '. ');
+  res = res.replace(/\s*\b(komma|comma)\b\s*/gi, ', ');
+  res = res.replace(/\s*\b(ausrufezeichen|ausrufungszeichen|exclamation mark)\b\s*/gi, '! ');
+  res = res.replace(/\s*\b(fragezeichen|question mark)\b\s*/gi, '? ');
+  res = res.replace(/\s*\b(doppelpunkt|colon)\b\s*/gi, ': ');
+  res = res.replace(/\s*\b(semikolon|semicolon)\b\s*/gi, '; ');
+  res = res.replace(/\s*\b(neue zeile|absatz|new line)\b\s*/gi, '\n');
+  res = res.replace(/\s*\b(bindestrich|spiegelstrich|gedankenstrich|hyphen)\b\s*/gi, ' - ');
+
+  // Clean up duplicate spaces
+  res = res.replace(/[ \t]+/g, ' ');
+  res = res.replace(/\s+([.,!?:;])/g, '$1');
+
+  // Auto-capitalize first character of string and after [.!?\n]
+  res = res.replace(/(^|[.!?\n]\s+)([a-zäöü])/g, (_, prefix, char) => prefix + char.toUpperCase());
+
+  // Capitalize first letter overall if not capitalized
+  if (res.length > 0 && /^[a-zäöü]/.test(res)) {
+    res = res.charAt(0).toUpperCase() + res.slice(1);
+  }
+
+  return res;
+};
+
 export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
   const { lang = 'de-DE', onResult, onError } = options;
   const [isListening, setIsListening] = useState(false);
@@ -14,6 +49,7 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
   const [isSupported, setIsSupported] = useState(false);
 
   const recognitionRef = useRef<any>(null);
+  const finalTranscriptRef = useRef<string>('');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -48,6 +84,9 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
         try { recognitionRef.current.abort(); } catch (e) {}
       }
 
+      finalTranscriptRef.current = '';
+      setTranscript('');
+
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
@@ -59,12 +98,27 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
       };
 
       recognition.onresult = (event: any) => {
-        let currentTranscript = '';
-        for (let i = 0; i < event.results.length; i++) {
-          currentTranscript += event.results[i][0].transcript;
+        let interim = '';
+        let newlyFinalized = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const chunk = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            newlyFinalized += (newlyFinalized ? ' ' : '') + chunk;
+          } else {
+            interim += (interim ? ' ' : '') + chunk;
+          }
         }
-        setTranscript(currentTranscript);
-        if (onResult) onResult(currentTranscript);
+
+        if (newlyFinalized) {
+          finalTranscriptRef.current = (finalTranscriptRef.current ? `${finalTranscriptRef.current} ${newlyFinalized}` : newlyFinalized).trim();
+        }
+
+        const rawCombined = (finalTranscriptRef.current + (interim ? ' ' + interim : '')).trim();
+        const formatted = formatGermanDictation(rawCombined);
+        
+        setTranscript(formatted);
+        if (onResult) onResult(formatted);
       };
 
       recognition.onerror = (event: any) => {
@@ -99,6 +153,7 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
   }, []);
 
   const resetTranscript = useCallback(() => {
+    finalTranscriptRef.current = '';
     setTranscript('');
   }, []);
 

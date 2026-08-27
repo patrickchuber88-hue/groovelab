@@ -147,3 +147,8 @@
 ## Production Dev-Tools & Debug Immunity (Verbot von Entwickler-UI im Produktionsbetrieb)
 - **Absolute Live Isolation**: Im produktiven Live-Betrieb (auf `campus-groovelab.de` und allen Produktiv-Domains) dürfen NIEMALS Entwickler-Buttons, Debug-Overlays, Floating Simulator Badges (wie `[ 🛠️ Dev Simulator Shift+D ]`) oder Test-Login-Widgets für reguläre Endnutzer gerendert werden.
 - **Environment-Gating Pflicht**: Alle Simulator-, Debug- und Entwickler-Komponenten (z. B. `DeviceSimulator.tsx`) müssen strikt durch `import.meta.env.DEV` und Hostname-Prüfungen (`localhost`, `127.0.0.1`) abgesichert sein. Im Produktionsbetrieb (`!isDev`) rendern diese Komponenten ausschließlich transparenten `{children}` Inhalt ohne DOM-Overhead oder Event-Listener.
+
+## Raumbuchungen & Sekretariats-Bestätigung Rule
+- **Zwingende Sekretariats-Bestätigung für Lehrkraft-Buchungen**: Wenn eine Lehrkraft einen Raum bucht, muss die Buchung IMMER initial im Status unbestätigt (`status: 'pending'`, `is_confirmed: false`) angelegt werden und zwingend durch das Sekretariat bzw. die Schulleitung bestätigt werden.
+- **Doppelrollen-Gültigkeit**: Diese Regel gilt ausnahmslos auch dann, wenn die buchende Lehrkraft eine Doppelrolle als Administrator (`admin`) oder Sekretariat (`secretary`) innehat. Buchungen aus dem Lehrkraft-Kontext/Buchungsformular dürfen sich niemals selbst automatisch freigeben.
+

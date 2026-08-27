@@ -6536,7 +6536,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const secondsToDisplayMinutes = useCallback((totalSeconds: number): number => {
     if (!totalSeconds || totalSeconds <= 0) return 0;
-    return Math.floor(totalSeconds / 60);
+    return Math.round(totalSeconds / 60);
   }, []);
 
   const getFlameCategory = (streak: number): 'kleine' | 'mittlere' | 'helden' => {
@@ -9306,10 +9306,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         return;
       }
 
-      // Filter classmates (same teacher)
-      const classmates = schoolStudents.filter(s => s.teacher_id === teacherId);
-      setClassCount(classmates.length);
-      setClassmateIds(classmates.map(c => c.id));
+      // Canonical class resolution: All students in teacher's class or school class
+      const allClassStudents = schoolStudents;
+      const classmateAndSelfIds = Array.from(new Set([...allClassStudents.map(c => c.id), studentId]));
+      
+      setClassCount(allClassStudents.length);
+      setClassmateIds(classmateAndSelfIds);
 
       const studentIds = schoolStudents.map(s => s.id);
 
@@ -9338,7 +9340,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       const queryStartDate = resetDate && resetDate < startOfCurrentMonth ? resetDate : startOfCurrentMonth;
 
-      const classmateAndSelfIds = Array.from(new Set([...classmates.map(c => c.id), studentId]));
       const otherStudentIds = studentIds.filter(id => !classmateAndSelfIds.includes(id));
 
       const [classmateLogsRes, otherLogsRes] = await Promise.all([
@@ -9356,15 +9357,20 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       let focusLogs = [...(classmateLogsRes.data || []), ...(otherLogsRes.data || [])];
 
-      // Merge local personal logs for offline resilience and immediate UI reflection
+      // Merge local personal logs from all students for offline resilience and multi-student testing
       try {
-        const localLogsKey = `cg_local_fokus_logs_${studentId}`;
-        const localLogs = JSON.parse(localStorage.getItem(localLogsKey) || '[]');
-        if (localLogs && localLogs.length > 0) {
-          const remoteIds = new Set(focusLogs.map((l: any) => l.id));
-          const missingLocal = localLogs.filter((l: any) => !remoteIds.has(l.id));
-          focusLogs = [...missingLocal, ...focusLogs];
-        }
+        (schoolStudents || []).forEach((st: any) => {
+          const localLogsKey = `cg_local_fokus_logs_${st.id}`;
+          const localLogsStr = typeof window !== 'undefined' ? localStorage.getItem(localLogsKey) : null;
+          if (localLogsStr) {
+            const parsed = JSON.parse(localLogsStr);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const remoteIds = new Set(focusLogs.map((l: any) => l.id));
+              const missing = parsed.filter((l: any) => !remoteIds.has(l.id));
+              focusLogs = [...missing, ...focusLogs];
+            }
+          }
+        });
       } catch (e) {}
 
       setClassFocusLogs(focusLogs || []);
@@ -9379,10 +9385,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       // 4. Compute highlights for classmates ONLY
       const highlights: any[] = [];
       const classmateIdsSet = new Set(classmateAndSelfIds);
-      
-      const allClassStudents = classmates.some(c => c.id === studentId) 
-        ? classmates 
-        : [...classmates, { id: studentId, first_name: studentUser?.first_name || '', last_name: studentUser?.last_name || '' }];
 
       allClassStudents.forEach((student: any) => {
         const studentLogs = (focusLogs || []).filter(log => {
@@ -15102,11 +15104,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     const targets = classGoals || [];
                     const totalGoals = targets.length;
                     const masteredGoals = targets.filter((target: any) => {
-                      const targetPercent = Math.round((classWeeklyFocus / target.minutes) * 100);
+                      const targetProgressMins = target.title?.toLowerCase().includes('woche') ? classWeeklyFocus : liveClassMins;
+                      const targetPercent = Math.round((targetProgressMins / target.minutes) * 100);
                       return targetPercent >= 100;
                     }).length;
                     const highestPercent = targets.length > 0 
-                      ? Math.max(...targets.map((target: any) => Math.round((classWeeklyFocus / target.minutes) * 100)))
+                      ? Math.max(...targets.map((target: any) => {
+                          const targetProgressMins = target.title?.toLowerCase().includes('woche') ? classWeeklyFocus : liveClassMins;
+                          return Math.round((targetProgressMins / target.minutes) * 100);
+                        }))
                       : 0;
 
                     return (
@@ -15198,7 +15204,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             </div>
                           ) : (
                             targets.map((target: any) => {
-                              const targetPercent = Math.round((classWeeklyFocus / target.minutes) * 100);
+                              const targetProgressMins = target.title?.toLowerCase().includes('woche') ? classWeeklyFocus : liveClassMins;
+                              const targetPercent = Math.round((targetProgressMins / target.minutes) * 100);
                               const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
                               
                               const maxPercentOnBar = 133;
@@ -15283,7 +15290,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   {/* Row 3: Current / Target & Status label */}
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
                                     <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
-                                      <span style={{ fontWeight: 700, color: '#ffffff' }}>{classWeeklyFocus}</span> / {target.minutes} Min.
+                                      <span style={{ fontWeight: 700, color: '#ffffff' }}>{targetProgressMins}</span> / {target.minutes} Min.
                                     </span>
                                     <span style={{
                                       fontWeight: 700,
@@ -15291,7 +15298,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       whiteSpace: 'normal',
                                       textAlign: 'right'
                                     }}>
-                                      {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - classWeeklyFocus)} Min.`}
+                                      {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - targetProgressMins)} Min.`}
                                     </span>
                                   </div>
                                 </div>

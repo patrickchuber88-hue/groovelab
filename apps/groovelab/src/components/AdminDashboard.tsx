@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb, Disc, XCircle, Volume2 } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -253,6 +253,62 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
   if (num === 7 || num === 8) return '#eab308'; // Yellow
   return '#64748b';
+};
+
+export const checkRoomMatchesInstrumentFilter = (room: any, filterType: string, schoolId?: string): boolean => {
+  if (!filterType || filterType === 'Alle') return true;
+  if (!room) return false;
+
+  const localMap = (() => {
+    const sId = schoolId || room.school_id;
+    if (!sId) return {};
+    try {
+      return JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${sId}`) || '{}');
+    } catch { return {}; }
+  })();
+
+  const rawInsts = (Array.isArray(room.room_instruments) && room.room_instruments.length > 0)
+    ? room.room_instruments
+    : (localMap[room.id] || []);
+
+  const assignedNames: string[] = [];
+  if (Array.isArray(rawInsts)) {
+    rawInsts.forEach((item: any) => {
+      if (typeof item === 'string') {
+        assignedNames.push(item);
+      } else if (item && typeof item === 'object') {
+        if (item.name) assignedNames.push(item.name);
+        if (item.model) assignedNames.push(item.model);
+      }
+    });
+  }
+
+  if (Array.isArray(room.equipment)) {
+    room.equipment.forEach((eq: any) => {
+      if (typeof eq === 'string') assignedNames.push(eq);
+    });
+  }
+
+  // Pure inventory corpus: room name + description + assigned instruments (clean, without unsuitable_instruments blacklist)
+  const searchCorpus = `${room.name || ''} ${room.description || ''} ${assignedNames.join(' ')}`.toLowerCase();
+  const filterKey = filterType.toLowerCase();
+
+  if (filterKey === 'klavier' || filterKey === 'piano') {
+    return ['klavier', 'piano', 'flügel', 'e-piano', 'epiano', 'keyboard', 'keys', 'stagepiano', 'digitalpiano', 'tasten']
+      .some(term => searchCorpus.includes(term));
+  }
+
+  if (filterKey === 'schlagzeug' || filterKey === 'drums' || filterKey === 'drum') {
+    return ['schlagzeug', 'drum', 'e-drum', 'edrum', 'percussion', 'perkussion', 'cajon', 'becken', 'snare']
+      .some(term => searchCorpus.includes(term));
+  }
+
+  if (filterKey === 'pa') {
+    return ['pa', 'gesang', 'gesangsanlage', 'box', 'boxen', 'lautsprecher', 'mikrofon', 'mic', 'mischpult', 'mixer', 'monitor']
+      .some(term => searchCorpus.includes(term));
+  }
+
+  return searchCorpus.includes(filterKey);
 };
 
 interface AdminDashboardProps {
@@ -634,6 +690,7 @@ export function AdminDashboard({
   const [roomSearchQuery, setRoomSearchQuery] = useState<string>('');
   const [isRoomSearchDropdownOpen, setIsRoomSearchDropdownOpen] = useState<boolean>(false);
   const [showMyBookingsOnly, setShowMyBookingsOnly] = useState<boolean>(false);
+  const [showOnlyFreeNow, setShowOnlyFreeNow] = useState<boolean>(false);
   const [isDateFilterActive, setIsDateFilterActive] = useState<boolean>(false);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const [draftBooking, setDraftBooking] = useState<{
@@ -2642,11 +2699,23 @@ export function AdminDashboard({
         
         const { data: roomsData } = await roomsQuery.order('sort_order', { ascending: true });
         if (roomsData) {
-          setRooms(roomsData);
+          const schoolId = adminData.school_id;
+          const localInstMap = (() => {
+            try {
+              return JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
+            } catch { return {}; }
+          })();
+          const mappedRooms = roomsData.map(r => ({
+            ...r,
+            room_instruments: (Array.isArray(r.room_instruments) && r.room_instruments.length > 0) 
+              ? r.room_instruments 
+              : (localInstMap[r.id] || [])
+          }));
+          setRooms(mappedRooms);
           const favKey = `groovelab_favorite_room_id_${userId}`;
           const favoriteRoomId = localStorage.getItem(favKey);
           if (favoriteRoomId) {
-            const favRoom = roomsData.find(r => r.id === favoriteRoomId);
+            const favRoom = mappedRooms.find(r => r.id === favoriteRoomId);
             if (favRoom) {
               setSelectedCampusRoomId(favRoom.id);
             }
@@ -6887,16 +6956,87 @@ export function AdminDashboard({
       };
     };
 
-    // Filter rooms by floor, equipment AND search query
+    // Check if room is occupied *right now* (Ist-Zustand)
+    const isRoomOccupiedNow = (roomId: string) => {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+      const currentMin = now.getHours() * 60 + now.getMinutes();
+
+      const isHolidayNow = holidays.some(h => todayStr >= h.start && todayStr <= h.end);
+      if (isHolidayNow) {
+        // If it is a holiday right now, only check if there is an active Nachholtermin right now
+        const hasDynamicNow = scheduleOccurrences.some((occ: any) => {
+          const rId = occ.schedules?.room_id || null;
+          if (rId !== roomId) return false;
+          if (occ.date !== todayStr) return false;
+          if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+            return false;
+          }
+          const isRescheduledFromOutside = occ.original_date && 
+            occ.original_date !== occ.date && 
+            !holidays.some(h => occ.original_date >= h.start && occ.original_date <= h.end);
+          if (!isRescheduledFromOutside) return false;
+
+          const durationMin = occ.duration || 45;
+          const [shStr, smStr] = occ.start_time.split(':');
+          const sh = parseInt(shStr) || 0;
+          const sm = parseInt(smStr) || 0;
+          const occStartMin = sh * 60 + sm;
+          const occEndMin = occStartMin + durationMin;
+          return currentMin >= occStartMin && currentMin < occEndMin;
+        });
+        return hasDynamicNow;
+      }
+
+      const todayBookings = campusBookings.filter((b: any) => b.roomId === roomId && b.date === todayStr);
+      const hasBookingNow = todayBookings.some((b: any) => {
+        const [sh, sm] = b.startTime.split(':').map(Number);
+        const [eh, em] = b.endTime.split(':').map(Number);
+        const bStart = sh * 60 + sm;
+        const bEnd = eh * 60 + em;
+        return currentMin >= bStart && currentMin < bEnd;
+      });
+
+      if (hasBookingNow) return true;
+
+      const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayVal = now.getDay();
+      const targetDay = DAYS_MAP[dayVal];
+      const targetDayInt = dayVal === 0 ? 7 : dayVal;
+
+      const hasScheduleNow = mergedSchedules.some((s: any) => {
+        if (s.room_id !== roomId) return false;
+        const startTimeStr = s.time_slot || s.start_time;
+        if (!startTimeStr) return false;
+        
+        const matchesDay = s.day_of_week === targetDay || 
+                           s.day_of_week === targetDayInt || 
+                           String(s.day_of_week) === String(targetDayInt);
+        if (!matchesDay) return false;
+
+        const durationMin = s.duration || s.duration_minutes || 45;
+        const [shStr, smStr] = startTimeStr.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const schedStartMin = sh * 60 + sm;
+        const schedEndMin = schedStartMin + durationMin;
+
+        return currentMin >= schedStartMin && currentMin < schedEndMin;
+      });
+
+      return hasScheduleNow;
+    };
+
+    // Filter rooms by floor, equipment, search query AND availability filters
     const roomsToRender = (rooms.filter(room => {
       if (selectedFloor !== 'Alle' && room.floor !== selectedFloor) return false;
       if (selectedEquipmentFilter !== 'Alle') {
-        const text = `${room.name || ''} ${room.description || ''} ${JSON.stringify(room.equipment || '')}`.toLowerCase();
-        const eq = selectedEquipmentFilter.toLowerCase();
-        if (eq === 'klavier' && !text.includes('klavier') && !text.includes('piano') && !text.includes('flügel')) return false;
-        if (eq === 'schlagzeug' && !text.includes('schlagzeug') && !text.includes('drum')) return false;
-        if (eq === 'pa' && !text.includes('pa') && !text.includes('gesang') && !text.includes('box')) return false;
-        if (eq === 'groovelab' && !text.includes('groovelab') && !text.includes('band') && !(room as any).is_groovelab) return false;
+        if (!checkRoomMatchesInstrumentFilter(room, selectedEquipmentFilter, admin?.school_id)) {
+          return false;
+        }
       }
       if (roomSearchQuery.trim()) {
         const query = roomSearchQuery.toLowerCase();
@@ -6904,6 +7044,50 @@ export function AdminDashboard({
         const matchesFloor = room.floor?.toLowerCase().includes(query);
         const matchesDesc = room.description?.toLowerCase().includes(query);
         if (!matchesName && !matchesFloor && !matchesDesc) return false;
+      }
+      // Instant Availability Filter: "Jetzt frei"
+      if (showOnlyFreeNow && isRoomOccupiedNow(room.id)) {
+        return false;
+      }
+      // Slot Availability Filter: "Freier Slot"
+      if (isDateFilterActive) {
+        const toMin = (t: string) => { const [h, m] = t.split(':'); return parseInt(h || '0') * 60 + parseInt(m || '0'); };
+        const newStart = toMin(bookingStartTime);
+        const newEnd = toMin(bookingEndTime);
+        
+        const hasBooking = campusBookings.some((b: any) => {
+          if (b.roomId !== room.id || b.date !== bookingDate) return false;
+          const bStart = toMin(b.startTime);
+          const bEnd = toMin(b.endTime);
+          return bStart < newEnd && bEnd > newStart;
+        });
+        if (hasBooking) return false;
+
+        const parsedD = parseLocalDate(bookingDate);
+        const rawDay = parsedD.getUTCDay();
+        const targetDayInt = rawDay === 0 ? 7 : rawDay;
+        const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const targetDay = DAYS_MAP[rawDay];
+
+        const hasSchedule = mergedSchedules.some((s: any) => {
+          if (s.room_id !== room.id) return false;
+          const matchesDay = s.day_of_week === targetDay || s.day_of_week === targetDayInt || String(s.day_of_week) === String(targetDayInt);
+          if (!matchesDay) return false;
+          const startTimeStr = s.time_slot || s.start_time;
+          if (!startTimeStr) return false;
+          const sStart = toMin(startTimeStr);
+          const sEnd = sStart + (s.duration || 45);
+          return sStart < newEnd && sEnd > newStart;
+        });
+        if (hasSchedule) return false;
+
+        const hasBlockedSlot = roomBlockedSlots.some((s: any) => {
+          if (s.room_id !== room.id || s.day_of_week !== targetDayInt) return false;
+          const blockStart = toMin(s.start_time.substring(0, 5));
+          const blockEnd = toMin(s.end_time.substring(0, 5));
+          return blockStart < newEnd && blockEnd > newStart;
+        });
+        if (hasBlockedSlot) return false;
       }
       return true;
     })).sort((a, b) => {
@@ -7404,82 +7588,6 @@ export function AdminDashboard({
       return hasBooking || hasSchedule || hasDynamic || hasBlockedSlot;
     };
 
-    // Check if room is occupied *right now* (Ist-Zustand)
-    const isRoomOccupiedNow = (roomId: string) => {
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      const todayStr = `${yyyy}-${mm}-${dd}`;
-      const currentMin = now.getHours() * 60 + now.getMinutes();
-
-      const isHolidayNow = holidays.some(h => todayStr >= h.start && todayStr <= h.end);
-      if (isHolidayNow) {
-        // If it is a holiday right now, only check if there is an active Nachholtermin right now
-        const hasDynamicNow = scheduleOccurrences.some((occ: any) => {
-          const rId = occ.schedules?.room_id || null;
-          if (rId !== roomId) return false;
-          if (occ.date !== todayStr) return false;
-          if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
-            return false;
-          }
-          const isRescheduledFromOutside = occ.original_date && 
-            occ.original_date !== occ.date && 
-            !holidays.some(h => occ.original_date >= h.start && occ.original_date <= h.end);
-          if (!isRescheduledFromOutside) return false;
-
-          const durationMin = occ.duration || 45;
-          const [shStr, smStr] = occ.start_time.split(':');
-          const sh = parseInt(shStr) || 0;
-          const sm = parseInt(smStr) || 0;
-          const occStartMin = sh * 60 + sm;
-          const occEndMin = occStartMin + durationMin;
-          return currentMin >= occStartMin && currentMin < occEndMin;
-        });
-        return hasDynamicNow;
-      }
-
-      const todayBookings = campusBookings.filter((b: any) => b.roomId === roomId && b.date === todayStr);
-      const hasBookingNow = todayBookings.some((b: any) => {
-        const [sh, sm] = b.startTime.split(':').map(Number);
-        const [eh, em] = b.endTime.split(':').map(Number);
-        const bStart = sh * 60 + sm;
-        const bEnd = eh * 60 + em;
-        return currentMin >= bStart && currentMin < bEnd;
-      });
-
-      if (hasBookingNow) return true;
-
-      const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const dayVal = now.getDay();
-      const targetDay = DAYS_MAP[dayVal];
-      const targetDayInt = dayVal === 0 ? 7 : dayVal;
-
-      const hasScheduleNow = mergedSchedules.some((s: any) => {
-        if (s.room_id !== roomId) return false;
-        const startTimeStr = s.time_slot || s.start_time;
-        if (!startTimeStr) return false;
-        
-        const matchesDay = s.day_of_week === targetDay || 
-                           s.day_of_week === targetDayInt || 
-                           String(s.day_of_week) === String(targetDayInt);
-        if (!matchesDay) return false;
-
-        const durationMin = s.duration || s.duration_minutes || 45;
-        const [shStr, smStr] = startTimeStr.split(':');
-        const sh = parseInt(shStr) || 0;
-        const sm = parseInt(smStr) || 0;
-        const schedStartMin = sh * 60 + sm;
-        const schedEndMin = schedStartMin + durationMin;
-
-        return currentMin >= schedStartMin && currentMin < schedEndMin;
-      });
-
-      return hasScheduleNow;
-    };
-
-
-
     const handleAddBooking = async (roomId: string) => {
       const roomName = rooms.find(r => r.id === roomId)?.name || 'Raum';
       const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
@@ -7567,7 +7675,9 @@ export function AdminDashboard({
         }
       } else {
         const resolvedSchoolId = admin?.school_id || (rooms.find(r => r.id === roomId)?.school_id);
-        const status = isStaff ? 'approved' : 'pending';
+        // Regel: Wenn ein Lehrer einen Raum bucht, muss er immer durch das Sekretariat bestätigt werden.
+        // Dies gilt ausnahmslos auch, wenn der Lehrer eine Doppelrolle als Admin oder Sekretariat hat.
+        const status = 'pending';
         const finalTitle = bookingTargetType === 'external'
           ? `[EXTERN] ${externalInstitutionName}` + (bookingPurpose ? ` | ${bookingPurpose}` : '')
           : finalPurpose;
@@ -7614,6 +7724,23 @@ export function AdminDashboard({
       setCustomCooperationName('');
     };
 
+    const handleApproveBooking = async (bookingId: string) => {
+      try {
+        const { error } = await supabase
+          .from('room_bookings')
+          .update({ status: 'approved' })
+          .eq('id', bookingId);
+
+        if (error) throw error;
+
+        window.dispatchEvent(new CustomEvent('refresh-bookings'));
+        await fetchData();
+        alert('Raumbuchung erfolgreich vom Sekretariat freigegeben.');
+      } catch (err: any) {
+        alert('Fehler beim Bestätigen der Raumbuchung: ' + err.message);
+      }
+    };
+
     const handleUpdateBooking = async () => {
       if (!selectedBooking) return;
 
@@ -7637,7 +7764,8 @@ export function AdminDashboard({
       if (selectedBooking.isSchedule) {
         // Schedule blocks are recurring – create a manual booking override for this specific date
         const resolvedSchoolId = admin?.school_id || (rooms.find((r: any) => r.id === selectedBooking.roomId)?.school_id);
-        const status = isStaff ? 'approved' : 'pending';
+        // Regel: Wenn ein Lehrer einen Raum bucht, muss er immer durch das Sekretariat bestätigt werden.
+        const status = 'pending';
 
         try {
           const { error } = await supabase
@@ -7664,7 +7792,8 @@ export function AdminDashboard({
         }
       } else {
         // Update database booking
-        const status = isStaff ? 'approved' : 'pending';
+        // Regel: Wenn ein Lehrer einen Raum bucht/anpasst, muss er immer durch das Sekretariat bestätigt werden.
+        const status = 'pending';
         try {
           const { error } = await supabase
             .from('room_bookings')
@@ -8316,379 +8445,419 @@ export function AdminDashboard({
                 boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
               }}
             >
-              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', marginBottom: '16px', gap: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <h2 style={{ fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: 900, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, letterSpacing: '-0.02em' }}>
-                    <div style={{ background: `${brandColor}12`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
-                      <Box size={16} />
-                    </div>
-                    Campus Räumlichkeiten
-                    <span style={{ fontSize: '0.72rem', background: '#f2f2f7', color: '#636366', padding: '3px 8px', borderRadius: '100px', fontWeight: 800 }}>
-                      {rooms.length} Räume
+              {/* Apple Unified High-Density 1-Row Toolbar */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                flexWrap: isMobile ? 'wrap' : 'nowrap',
+                position: 'relative',
+                marginBottom: '18px'
+              }}>
+                {/* 1. Branding / Title Cluster */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  <div style={{ background: `${brandColor}12`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
+                    <Box size={16} />
+                  </div>
+                  <h2 style={{ fontSize: '1.02rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>Campus Räume</span>
+                    <span style={{ fontSize: '0.68rem', background: '#f2f2f7', color: '#636366', padding: '2px 7px', borderRadius: '100px', fontWeight: 800 }}>
+                      {rooms.length}
                     </span>
                   </h2>
+                </div>
 
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    {/* Instant Room Finder Toggle Button */}
-                    <button
-                      type="button"
-                      onClick={() => setShowRoomFinderBar(prev => !prev)}
-                      style={{
-                        background: showRoomFinderBar ? brandColor : '#f2f2f7',
-                        color: showRoomFinderBar ? '#ffffff' : '#1c1c1e',
-                        border: 'none',
-                        borderRadius: '12px',
-                        padding: '6px 12px',
-                        fontSize: '0.74rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        height: '34px',
-                        whiteSpace: 'nowrap',
-                        boxShadow: showRoomFinderBar ? `0 4px 12px ${brandColor}30` : 'none',
-                        transition: 'all 0.2s'
+                {/* 2. Apple Spotlight Search Input (Pure, Dedicated Search) */}
+                <div style={{ position: 'relative', flex: isMobile ? '1 1 100%' : '0 1 180px', minWidth: isMobile ? '100%' : '130px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: '#f2f2f7',
+                    border: '1px solid rgba(0,0,0,0.04)',
+                    borderRadius: '11px',
+                    padding: '3px 8px 3px 10px',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}>
+                    <Search size={13} color="#8e8e93" style={{ flexShrink: 0 }} />
+                    <input
+                      type="text"
+                      placeholder="Raum suchen..."
+                      value={roomSearchQuery}
+                      onChange={(e) => {
+                        setRoomSearchQuery(e.target.value);
+                        setIsRoomSearchDropdownOpen(true);
                       }}
-                    >
-                      <Search size={13} color={showRoomFinderBar ? '#ffffff' : '#1c1c1e'} />
-                      <span>Freien Raum suchen</span>
-                    </button>
-
-                    {/* Header Trigger for Room Info Sheet */}
-                    {isMobile && (
+                      onFocus={() => setIsRoomSearchDropdownOpen(true)}
+                      onBlur={() => {
+                        setTimeout(() => setIsRoomSearchDropdownOpen(false), 200);
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        outline: 'none',
+                        fontSize: '0.75rem',
+                        color: '#1c1c1e',
+                        fontWeight: 600,
+                        width: '100%',
+                        minWidth: '50px',
+                        padding: '3px 0'
+                      }}
+                    />
+                    {roomSearchQuery && (
                       <button
                         type="button"
-                        onClick={() => setShowMobileRoomSlider(true)}
-                        style={{
-                          background: `${brandColor}15`,
-                          color: brandColor,
-                          border: `1.5px solid ${brandColor}40`,
-                          borderRadius: '12px',
-                          padding: '6px 12px',
-                          fontSize: '0.74rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          height: '34px',
-                          whiteSpace: 'nowrap'
+                        onClick={() => {
+                          setRoomSearchQuery('');
+                          setIsRoomSearchDropdownOpen(false);
                         }}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
                       >
-                        <Zap size={13} fill={brandColor} />
-                        <span>Infos</span>
+                        <X size={11} color="#8e8e93" />
                       </button>
                     )}
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '8px', alignItems: isMobile ? 'stretch' : 'center', width: isMobile ? '100%' : 'auto' }}>
-                  {/* Smart Room Search Field */}
-                  <div style={{ position: 'relative', width: isMobile ? '100%' : '200px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', background: '#f2f2f7', borderRadius: '12px', padding: '8px 12px', gap: '6px', border: '1px solid rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box', transition: 'all 0.2s' }}>
-                      <Search size={14} color="#8e8e93" />
-                      <input
-                        type="text"
-                        placeholder="Raumname suchen..."
-                        value={roomSearchQuery}
-                        onChange={(e) => {
-                          setRoomSearchQuery(e.target.value);
-                          setIsRoomSearchDropdownOpen(true);
-                        }}
-                        onFocus={() => setIsRoomSearchDropdownOpen(true)}
-                        onBlur={() => {
-                          setTimeout(() => setIsRoomSearchDropdownOpen(false), 200);
-                        }}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          outline: 'none',
-                          fontSize: '0.78rem',
-                          color: '#1c1c1e',
-                          fontWeight: 600,
-                          width: '100%',
-                          padding: 0
-                        }}
-                      />
-                      {roomSearchQuery && (
+                {/* 3. Availability Quick-Filters Cluster (Tier-1 SaaS Enterprise) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0, position: 'relative' }}>
+                  {/* Quick-Toggle: Jetzt frei */}
+                  <button
+                    type="button"
+                    onClick={() => setShowOnlyFreeNow(prev => !prev)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      background: showOnlyFreeNow ? '#ecfdf5' : '#f2f2f7',
+                      color: showOnlyFreeNow ? '#15803d' : '#475569',
+                      border: showOnlyFreeNow ? '1.5px solid #86efac' : '1px solid rgba(0,0,0,0.03)',
+                      borderRadius: '11px',
+                      padding: '5px 9px',
+                      fontSize: '0.70rem',
+                      fontWeight: showOnlyFreeNow ? 850 : 650,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      boxShadow: showOnlyFreeNow ? '0 2px 6px rgba(34, 197, 94, 0.12)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="Nur Räume anzeigen, die jetzt im Moment frei sind"
+                  >
+                    <Zap size={11} fill={showOnlyFreeNow ? '#15803d' : 'none'} color={showOnlyFreeNow ? '#15803d' : '#64748b'} />
+                    <span>Jetzt frei</span>
+                  </button>
+
+                  {/* Slot-Finder / Date-Filter Pill */}
+                  {isDateFilterActive ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDateFilterActive(false);
+                        setFinderResultCount(null);
+                      }}
+                      title="Zeitfilter zurücksetzen"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: '#dcfce7',
+                        color: '#15803d',
+                        border: '1.5px solid #86efac',
+                        borderRadius: '11px',
+                        padding: '5px 9px',
+                        fontSize: '0.70rem',
+                        fontWeight: 850,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 6px rgba(34, 197, 94, 0.12)'
+                      }}
+                    >
+                      <Clock size={11} strokeWidth={2.4} />
+                      <span>{bookingStartTime}-{bookingEndTime}</span>
+                      <X size={11} strokeWidth={3} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowRoomFinderBar(prev => !prev)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        background: showRoomFinderBar ? `${brandColor}18` : '#f2f2f7',
+                        color: showRoomFinderBar ? brandColor : '#475569',
+                        border: showRoomFinderBar ? `1.5px solid ${brandColor}50` : '1px solid rgba(0,0,0,0.03)',
+                        borderRadius: '11px',
+                        padding: '5px 9px',
+                        fontSize: '0.70rem',
+                        fontWeight: showRoomFinderBar ? 850 : 650,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title="Freien Zeitraum oder Slot suchen"
+                    >
+                      <Clock size={11} strokeWidth={2.2} color={showRoomFinderBar ? brandColor : '#64748b'} />
+                      <span>Freier Slot</span>
+                      <ChevronDown size={10} strokeWidth={2.5} />
+                    </button>
+                  )}
+
+                  {/* Apple Popover: Smart Slot Finder */}
+                  {showRoomFinderBar && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      left: 0,
+                      width: isMobile ? '100%' : '320px',
+                      background: '#ffffff',
+                      borderRadius: '18px',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                      padding: '16px',
+                      boxShadow: '0 14px 34px -4px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.06)',
+                      zIndex: 100,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      animation: 'fadeIn 0.15s ease'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Clock size={14} color={brandColor} strokeWidth={2.4} />
+                          Freien Zeitraum finden
+                        </span>
                         <button
                           type="button"
-                          onClick={() => {
-                            setRoomSearchQuery('');
-                            setIsRoomSearchDropdownOpen(false);
-                          }}
-                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                          onClick={() => setShowRoomFinderBar(false)}
+                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
                         >
-                          <X size={12} color="#8e8e93" />
+                          <X size={14} />
                         </button>
-                      )}
-                    </div>
-                  </div>
+                      </div>
 
-                  {/* Filter Controls Flex Row */}
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '2px' }}>
-                    {/* Segmented Control for Floor filter */}
-                    <div style={{ 
-                      background: '#f2f2f7', 
-                      borderRadius: '14px', 
-                      padding: '3px', 
-                      display: 'flex', 
-                      gap: '2px', 
-                      border: '1px solid rgba(0,0,0,0.01)',
-                      alignItems: 'center',
-                      flexShrink: 0
-                    }}>
-                      {['Alle', ...uniqueFloors].map((floor) => {
-                        const isSelected = selectedFloor === floor;
-                        return (
-                          <button
-                            key={floor}
-                            onClick={() => setSelectedFloor(floor)}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '11px',
-                              border: 'none',
-                              background: isSelected ? '#ffffff' : 'transparent',
-                              color: isSelected ? brandColor : '#636366',
-                              fontWeight: isSelected ? 800 : 600,
-                              fontSize: '0.75rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                              boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                              whiteSpace: 'nowrap'
-                            }}
+                      {/* Quick Date Chips */}
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {[
+                          { label: 'Heute', offset: 0 },
+                          { label: 'Morgen', offset: 1 },
+                          { label: 'In 2 Tagen', offset: 2 }
+                        ].map((chip) => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + chip.offset);
+                          const dateStr = d.toISOString().split('T')[0];
+                          const isSelected = bookingDate === dateStr;
+                          return (
+                            <button
+                              key={chip.label}
+                              type="button"
+                              onClick={() => setBookingDate(dateStr)}
+                              style={{
+                                flex: 1,
+                                padding: '4px 8px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: isSelected ? `${brandColor}15` : '#f1f5f9',
+                                color: isSelected ? brandColor : '#475569',
+                                fontSize: '0.68rem',
+                                fontWeight: isSelected ? 850 : 650,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {chip.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Inputs Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <label style={{ fontSize: '0.60rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Datum</label>
+                          <input
+                            type="date"
+                            value={bookingDate}
+                            onChange={(e) => setBookingDate(e.target.value)}
+                            style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 700, background: '#f8fafc', color: '#1c1c1e', width: '100%', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <label style={{ fontSize: '0.60rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Von</label>
+                          <select
+                            value={finderStartTime}
+                            onChange={(e) => setFinderStartTime(e.target.value)}
+                            style={{ padding: '6px 6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 700, background: '#f8fafc', color: '#1c1c1e', width: '100%', boxSizing: 'border-box' }}
                           >
-                            {floor}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Equipment Filter Bar */}
-                    <div style={{ 
-                      background: '#f2f2f7', 
-                      borderRadius: '14px', 
-                      padding: '3px', 
-                      display: 'flex', 
-                      gap: '2px', 
-                      alignItems: 'center',
-                      flexShrink: 0
-                    }}>
-                      {[
-                        { label: 'Alle', value: 'Alle' },
-                        { label: '🎹 Klavier', value: 'klavier' },
-                        { label: '🥁 Schlagzeug', value: 'schlagzeug' },
-                        { label: '🔊 PA', value: 'pa' },
-                        { label: '⚡ GrooveLab', value: 'groovelab' }
-                      ].map((eq) => {
-                        const isSelected = selectedEquipmentFilter === eq.value;
-                        return (
-                          <button
-                            key={eq.value}
-                            onClick={() => setSelectedEquipmentFilter(eq.value)}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '11px',
-                              border: 'none',
-                              background: isSelected ? brandColor : 'transparent',
-                              color: isSelected ? '#ffffff' : '#636366',
-                              fontWeight: isSelected ? 800 : 600,
-                              fontSize: '0.72rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              whiteSpace: 'nowrap'
-                            }}
+                            {Array.from({ length: 27 }, (_, i) => {
+                              const min = i * 30 + 480;
+                              const hh = String(Math.floor(min / 60)).padStart(2, '0');
+                              const mm = String(min % 60).padStart(2, '0');
+                              return `${hh}:${mm}`;
+                            }).map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <label style={{ fontSize: '0.60rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bis</label>
+                          <select
+                            value={finderEndTime}
+                            onChange={(e) => setFinderEndTime(e.target.value)}
+                            style={{ padding: '6px 6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 700, background: '#f8fafc', color: '#1c1c1e', width: '100%', boxSizing: 'border-box' }}
                           >
-                            {eq.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                            {Array.from({ length: 27 }, (_, i) => {
+                              const min = i * 30 + 480;
+                              const hh = String(Math.floor(min / 60)).padStart(2, '0');
+                              const mm = String(min % 60).padStart(2, '0');
+                              return `${hh}:${mm}`;
+                            }).map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                      </div>
 
-                    {/* Highlighted "Meine Buchungen" Button */}
-                    <button
-                      onClick={() => setShowMyBookingsOnly(prev => !prev)}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '14px',
-                        border: showMyBookingsOnly ? 'none' : '1.5px solid #af52de40',
-                        background: showMyBookingsOnly 
-                          ? 'linear-gradient(135deg, #af52de, #8b5cf6)' 
-                          : '#f6f0ff',
-                        color: showMyBookingsOnly ? '#ffffff' : '#6d28d9',
-                        fontWeight: 800,
-                        fontSize: '0.75rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: showMyBookingsOnly 
-                          ? '0 6px 16px rgba(175, 82, 222, 0.35)' 
-                          : '0 2px 4px rgba(0,0,0,0.01)',
-                        flexShrink: 0,
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      <span>Meine Buchungen</span>
-                      <span style={{ 
-                        fontSize: '0.7rem', 
-                        background: showMyBookingsOnly ? '#ffffff' : '#af52de', 
-                        color: showMyBookingsOnly ? '#af52de' : '#ffffff', 
-                        padding: '2px 6px', 
-                        borderRadius: '8px', 
-                        fontWeight: 900 
-                      }}>
-                        {myBookings.length}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Expandable Instant Room Finder Tool */}
-              {showRoomFinderBar && (
-                <div style={{
-                  background: 'linear-gradient(135deg, #f0fdf4, #e6f4ea)',
-                  border: `1.5px solid ${brandColor}40`,
-                  borderRadius: '18px',
-                  padding: '14px 16px',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px',
-                  animation: 'fadeIn 0.2s ease'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Zap size={16} color={brandColor} fill={brandColor} />
-                      <span>Smart Room Finder (Freien Raum für Zeitraum suchen)</span>
-                    </div>
-                    <button
-                      onClick={() => setShowRoomFinderBar(false)}
-                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#166534' }}
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr auto', gap: '10px', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>Datum</label>
-                      <input
-                        type="date"
-                        value={bookingDate}
-                        onChange={(e) => setBookingDate(e.target.value)}
-                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '0.78rem', fontWeight: 700, background: '#ffffff', color: '#1c1c1e' }}
-                      />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>Von</label>
-                      <select
-                        value={finderStartTime}
-                        onChange={(e) => setFinderStartTime(e.target.value)}
-                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '0.78rem', fontWeight: 700, background: '#ffffff', color: '#1c1c1e' }}
+                      {/* Action Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBookingStartTime(finderStartTime);
+                          setBookingEndTime(finderEndTime);
+                          setIsDateFilterActive(true);
+                          const freeRooms = roomsToRender.filter(r => !isRoomOccupiedNow(r.id));
+                          setFinderResultCount(freeRooms.length);
+                          setShowRoomFinderBar(false);
+                        }}
+                        style={{
+                          padding: '8px',
+                          borderRadius: '10px',
+                          background: brandColor,
+                          color: '#ffffff',
+                          border: 'none',
+                          fontWeight: 850,
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          boxShadow: `0 4px 12px ${brandColor}30`
+                        }}
                       >
-                        {Array.from({ length: 27 }, (_, i) => {
-                          const min = i * 30 + 480;
-                          const hh = String(Math.floor(min / 60)).padStart(2, '0');
-                          const mm = String(min % 60).padStart(2, '0');
-                          return `${hh}:${mm}`;
-                        }).map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>Bis</label>
-                      <select
-                        value={finderEndTime}
-                        onChange={(e) => setFinderEndTime(e.target.value)}
-                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '0.78rem', fontWeight: 700, background: '#ffffff', color: '#1c1c1e' }}
-                      >
-                        {Array.from({ length: 27 }, (_, i) => {
-                          const min = i * 30 + 480;
-                          const hh = String(Math.floor(min / 60)).padStart(2, '0');
-                          const mm = String(min % 60).padStart(2, '0');
-                          return `${hh}:${mm}`;
-                        }).map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        setBookingStartTime(finderStartTime);
-                        setBookingEndTime(finderEndTime);
-                        setIsDateFilterActive(true);
-                        const freeRooms = roomsToRender.filter(r => !isRoomOccupiedNow(r.id));
-                        setFinderResultCount(freeRooms.length);
-                      }}
-                      style={{
-                        padding: '10px 18px',
-                        borderRadius: '12px',
-                        background: brandColor,
-                        color: '#ffffff',
-                        border: 'none',
-                        fontWeight: 900,
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        marginTop: isMobile ? '4px' : '16px',
-                        boxShadow: `0 4px 12px ${brandColor}40`,
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      🔍 Freie Räume prüfen
-                    </button>
-                  </div>
-
-                  {finderResultCount !== null && (
-                    <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '6px 12px', borderRadius: '10px', marginTop: '4px' }}>
-                      ✨ {finderResultCount} Räume sind am {new Date(bookingDate).toLocaleDateString('de-DE')} von {finderStartTime} - {finderEndTime} Uhr verfügbar!
+                        <Search size={12} strokeWidth={2.5} />
+                        <span>Freie Räume anzeigen</span>
+                      </button>
                     </div>
                   )}
                 </div>
-              )}
 
-              {/* Active Filter Info Banner */}
-              {isDateFilterActive && (
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  background: '#fff9e6', 
-                  border: '1px solid #ffe699', 
-                  borderRadius: '14px', 
-                  padding: '10px 16px', 
-                  marginBottom: '16px',
-                  animation: 'fadeIn 0.25s ease'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#b27b00', fontWeight: 700 }}>
-                    <span>📅</span>
-                    <span>Anzeige gefiltert für: {new Date(bookingDate).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' })}, {bookingStartTime} - {bookingEndTime} Uhr</span>
+                {/* 4. Filter Controls Cluster (Floor + Equipment) */}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'nowrap', overflowX: isMobile ? 'auto' : 'visible' }}>
+                  {/* Floor Segmented Control */}
+                  <div style={{ 
+                    background: '#f2f2f7', 
+                    borderRadius: '11px', 
+                    padding: '2px', 
+                    display: 'flex', 
+                    gap: '2px', 
+                    border: '1px solid rgba(0,0,0,0.02)',
+                    alignItems: 'center',
+                    flexShrink: 0
+                  }}>
+                    {['Alle', ...uniqueFloors].map((floor) => {
+                      const isSelected = selectedFloor === floor;
+                      return (
+                        <button
+                          key={floor}
+                          onClick={() => setSelectedFloor(floor)}
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '9px',
+                            border: 'none',
+                            background: isSelected ? '#ffffff' : 'transparent',
+                            color: isSelected ? brandColor : '#636366',
+                            fontWeight: isSelected ? 850 : 600,
+                            fontSize: '0.72rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {floor}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <button 
-                    onClick={() => {
-                      setIsDateFilterActive(false);
-                      setBookingDate(new Date().toISOString().split('T')[0]);
-                      setFinderResultCount(null);
-                    }}
-                    style={{ 
-                      background: 'transparent', 
-                      border: 'none', 
-                      color: '#b27b00', 
-                      fontWeight: 800, 
-                      fontSize: '0.75rem', 
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    Filter zurücksetzen ✕
-                  </button>
+
+                  {/* Equipment Filter Bar */}
+                  <div style={{ 
+                    background: '#f2f2f7', 
+                    borderRadius: '11px', 
+                    padding: '2px', 
+                    display: 'flex', 
+                    gap: '2px', 
+                    alignItems: 'center',
+                    flexShrink: 0
+                  }}>
+                    {[
+                      { label: 'Alle', value: 'Alle', icon: null },
+                      { label: 'Klavier', value: 'klavier', icon: Music },
+                      { label: 'Drums', value: 'schlagzeug', icon: Disc },
+                      { label: 'PA', value: 'pa', icon: Volume2 }
+                    ].map((eq) => {
+                      const isSelected = selectedEquipmentFilter === eq.value;
+                      const IconComponent = eq.icon;
+                      return (
+                        <button
+                          key={eq.value}
+                          onClick={() => setSelectedEquipmentFilter(eq.value)}
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '9px',
+                            border: 'none',
+                            background: isSelected ? brandColor : 'transparent',
+                            color: isSelected ? '#ffffff' : '#636366',
+                            fontWeight: isSelected ? 850 : 600,
+                            fontSize: '0.70rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {IconComponent && <IconComponent size={11} strokeWidth={2.2} />}
+                          <span>{eq.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Mobile Info Trigger */}
+                  {isMobile && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileRoomSlider(true)}
+                      style={{
+                        background: `${brandColor}15`,
+                        color: brandColor,
+                        border: `1.5px solid ${brandColor}40`,
+                        borderRadius: '10px',
+                        padding: '4px 8px',
+                        fontSize: '0.70rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        height: '28px',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <Zap size={11} fill={brandColor} />
+                      <span>Infos</span>
+                    </button>
+                  )}
                 </div>
-              )}
+              </div>
 
               {/* Rooms List Container */}
               <div 
@@ -8697,6 +8866,7 @@ export function AdminDashboard({
                   display: 'flex', 
                   gap: '12px', 
                   overflowX: 'auto', 
+                  paddingTop: '6px',
                   paddingBottom: '8px', 
                   width: '100%', 
                   minWidth: 0,
@@ -8706,12 +8876,10 @@ export function AdminDashboard({
                 {roomsToRender.map((room) => {
                   const isSelected = selectedCampusRoomId === room.id;
                   const occupiedNow = isRoomOccupiedNow(room.id);
-                  const text = `${room.name || ''} ${room.description || ''} ${JSON.stringify(room.equipment || '')}`.toLowerCase();
-                  
-                  const hasPiano = text.includes('klavier') || text.includes('piano') || text.includes('flügel');
-                  const hasDrums = text.includes('schlagzeug') || text.includes('drum');
-                  const hasPA = text.includes('pa') || text.includes('gesang') || text.includes('box');
-                  const isGroovelab = text.includes('groovelab') || (room as any).is_groovelab;
+                  const hasPiano = checkRoomMatchesInstrumentFilter(room, 'klavier', admin?.school_id);
+                  const hasDrums = checkRoomMatchesInstrumentFilter(room, 'schlagzeug', admin?.school_id);
+                  const hasPA = checkRoomMatchesInstrumentFilter(room, 'pa', admin?.school_id);
+                  const isGroovelab = (room.name || '').toLowerCase().includes('groovelab') || (room as any).is_groovelab;
                   const roomFloor = (!room.floor || room.floor === 'Allgemein') ? 'EG' : room.floor;
 
                   return (
@@ -8778,22 +8946,27 @@ export function AdminDashboard({
                       </div>
 
                       {/* Equipment Icons */}
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '0.72rem', color: '#636366' }}>
-                        <span style={{ fontSize: '0.62rem', background: '#f2f2f7', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>📍 {roomFloor}</span>
-                        {hasPiano && <span>🎹</span>}
-                        {hasDrums && <span>🥁</span>}
-                        {hasPA && <span>🔊</span>}
-                        {isGroovelab && <span>⚡</span>}
+                      <div style={{ display: 'flex', gap: '5px', alignItems: 'center', fontSize: '0.72rem', color: '#636366' }}>
+                        <span style={{ fontSize: '0.62rem', background: '#f2f2f7', color: '#475569', padding: '1px 6px', borderRadius: '5px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                          <MapPin size={9} strokeWidth={2.5} />
+                          {roomFloor}
+                        </span>
+                        {hasPiano && <span title="Klavier vorhanden" style={{ display: 'inline-flex', alignItems: 'center' }}><Music size={11} color="#64748b" strokeWidth={2.2} /></span>}
+                        {hasDrums && <span title="Schlagzeug vorhanden" style={{ display: 'inline-flex', alignItems: 'center' }}><Disc size={11} color="#64748b" strokeWidth={2.2} /></span>}
+                        {hasPA && <span title="PA vorhanden" style={{ display: 'inline-flex', alignItems: 'center' }}><Volume2 size={11} color="#64748b" strokeWidth={2.2} /></span>}
+                        {isGroovelab && <span title="GrooveLab Raum" style={{ display: 'inline-flex', alignItems: 'center' }}><Zap size={11} color="#d97706" strokeWidth={2.4} /></span>}
                       </div>
 
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: 'auto' }}>
                         {occupiedNow ? (
-                          <span style={{ padding: '3px 8px', background: '#ffebeb', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 800, color: '#ff453a' }}>
-                            🔴 Belegt
+                          <span style={{ padding: '3px 8px', background: '#fce8e6', borderRadius: '8px', fontSize: '0.66rem', fontWeight: 800, color: '#c5221f', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ea4335' }} />
+                            Belegt
                           </span>
                         ) : (
-                          <span style={{ padding: '3px 8px', background: '#eafaf1', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 800, color: '#1e7a44' }}>
-                            🟢 Jetzt frei
+                          <span style={{ padding: '3px 8px', background: '#e6f4ea', borderRadius: '8px', fontSize: '0.66rem', fontWeight: 800, color: '#137333', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34a853', boxShadow: '0 0 4px #34a853' }} />
+                            Jetzt frei
                           </span>
                         )}
                       </div>
@@ -9127,7 +9300,7 @@ export function AdminDashboard({
                     </div>
 
                     {/* Hourly Rows */}
-                    <div ref={calendarScrollRef} className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto', position: 'relative' }}>
+                    <div ref={calendarScrollRef} className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto', position: 'relative', paddingTop: '1px' }}>
                       {TIME_SLOTS.map((hour) => {
                         const slotHourInt = parseInt(hour.split(':')[0]);
                         
@@ -9480,77 +9653,128 @@ export function AdminDashboard({
                                         </>
                                       ) : isSchedule ? (
                                         isOwnBooking ? (
-                                          <>
-                                            {/* Integrated Flush White Header Bar for Own Schedules */}
+                                          durationHrs <= 0.55 ? (
                                             <div style={{
-                                              background: '#ffffff',
-                                              padding: '6px 8px',
-                                              borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-                                              width: '100%',
                                               display: 'flex',
-                                              flexDirection: 'column',
-                                              gap: '2px',
-                                              boxSizing: 'border-box'
+                                              alignItems: 'center',
+                                              justifyContent: 'space-between',
+                                              width: '100%',
+                                              height: '100%',
+                                              padding: '4px 6px',
+                                              boxSizing: 'border-box',
+                                              gap: '4px',
+                                              background: '#34a853',
+                                              color: '#ffffff'
                                             }}>
                                               <div style={{
-                                                 fontSize: '0.64rem',
-                                                 fontWeight: 800,
-                                                 color: isGroovelabBlock ? '#09090b' : '#34a853',
-                                                 display: 'flex',
-                                                 alignItems: 'center',
-                                                 gap: '4px'
-                                               }}>
-                                                 <Clock size={10} strokeWidth={2.5} />
-                                                 {b.startTime} - {b.endTime}
-                                               </div>
-                                               <div style={{
-                                                 fontSize: '0.74rem',
-                                                 fontWeight: 900,
-                                                 color: '#1c1c1e',
-                                                 whiteSpace: 'nowrap',
-                                                 overflow: 'hidden',
-                                                 textOverflow: 'ellipsis'
-                                               }}>
-                                                 {(!b.teacherName || b.teacherName === 'Patrick H.' || b.teacherName === 'Patrick H') ? 'Patrick Huber' : b.teacherName}
-                                               </div>
-                                             </div>
-
-                                             {/* Subtitle & Lock Icon at the very bottom */}
-                                             <div style={{
-                                               padding: '6px 8px',
-                                               display: 'flex',
-                                               flexDirection: 'column',
-                                               justifyContent: 'space-between',
-                                               flex: 1,
-                                               boxSizing: 'border-box',
-                                               width: '100%'
-                                             }}>
-                                               <div style={{
-                                                 fontSize: '0.64rem',
-                                                 fontWeight: 800,
-                                                 color: '#ffffff'
-                                               }}>
-                                                 {b.isDuringHoliday ? '🌴 Regulärer Unterricht (Ferien)' : 'Regulärer Unterricht'}
-                                               </div>
-
-                                               {/* Lock Icon at the bottom right */}
-                                               <div 
-                                                 title="Regulärer Unterrichtsblock"
-                                                 style={{
+                                                fontSize: '0.66rem',
+                                                fontWeight: 850,
+                                                color: '#ffffff',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                flex: 1
+                                              }}>
+                                                {b.isDuringHoliday ? '🌴 Regulär (Ferien)' : 'Regulärer Unterricht'}
+                                              </div>
+                                              <Lock size={11} color="#ffffff" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                                            </div>
+                                          ) : (
+                                            <>
+                                              {/* Integrated Flush White Header Bar for Own Schedules */}
+                                              <div style={{
+                                                background: '#ffffff',
+                                                padding: '6px 8px',
+                                                borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+                                                width: '100%',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '2px',
+                                                boxSizing: 'border-box'
+                                              }}>
+                                                <div style={{
+                                                   fontSize: '0.64rem',
+                                                   fontWeight: 800,
+                                                   color: isGroovelabBlock ? '#09090b' : '#34a853',
                                                    display: 'flex',
                                                    alignItems: 'center',
-                                                   justifyContent: 'flex-end',
-                                                   marginTop: 'auto',
-                                                   paddingTop: '4px'
-                                                 }}
-                                               >
-                                                 <Lock size={12} color="#ffffff" strokeWidth={2.5} />
+                                                   gap: '4px'
+                                                 }}>
+                                                   <Clock size={10} strokeWidth={2.5} />
+                                                   {b.startTime} - {b.endTime}
+                                                 </div>
+                                                 <div style={{
+                                                   fontSize: '0.74rem',
+                                                   fontWeight: 900,
+                                                   color: '#1c1c1e',
+                                                   whiteSpace: 'nowrap',
+                                                   overflow: 'hidden',
+                                                   textOverflow: 'ellipsis'
+                                                 }}>
+                                                   {(!b.teacherName || b.teacherName === 'Patrick H.' || b.teacherName === 'Patrick H') ? 'Patrick Huber' : b.teacherName}
+                                                 </div>
                                                </div>
-                                             </div>
-                                          </>
+
+                                               {/* Subtitle & Lock Icon at the very bottom */}
+                                               <div style={{
+                                                 padding: '6px 8px',
+                                                 display: 'flex',
+                                                 flexDirection: 'column',
+                                                 justifyContent: 'space-between',
+                                                 flex: 1,
+                                                 boxSizing: 'border-box',
+                                                 width: '100%'
+                                               }}>
+                                                 <div style={{
+                                                   fontSize: '0.64rem',
+                                                   fontWeight: 800,
+                                                   color: '#ffffff'
+                                                 }}>
+                                                   {b.isDuringHoliday ? '🌴 Regulärer Unterricht (Ferien)' : 'Regulärer Unterricht'}
+                                                 </div>
+
+                                                 {/* Lock Icon at the bottom right */}
+                                                 <div 
+                                                   title="Regulärer Unterrichtsblock"
+                                                   style={{
+                                                     display: 'flex',
+                                                     alignItems: 'center',
+                                                     justifyContent: 'flex-end',
+                                                     marginTop: 'auto',
+                                                     paddingTop: '4px'
+                                                   }}
+                                                 >
+                                                   <Lock size={12} color="#ffffff" strokeWidth={2.5} />
+                                                 </div>
+                                               </div>
+                                            </>
+                                          )
                                         ) : (
-                                          <>
-                                            {/* Other Teachers' Schedule Blocks / GrooveLab Block Layout */}
+                                          durationHrs <= 0.55 ? (
+                                            <div style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'space-between',
+                                              width: '100%',
+                                              height: '100%',
+                                              padding: '4px 6px',
+                                              boxSizing: 'border-box',
+                                              gap: '4px'
+                                            }}>
+                                              <div style={{
+                                                fontSize: '0.66rem',
+                                                fontWeight: 850,
+                                                color: isGroovelabBlock ? '#451a03' : '#1e7a44',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                flex: 1
+                                              }}>
+                                                {isGroovelabBlock ? 'GrooveLab' : (b.teacherName || 'Regulärer Unterricht')}
+                                              </div>
+                                              <Lock size={11} color={isGroovelabBlock ? '#eab308' : '#34a853'} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                                            </div>
+                                          ) : (
                                             <div style={{
                                               display: 'flex',
                                               flexDirection: 'column',
@@ -9613,17 +9837,46 @@ export function AdminDashboard({
                                                 <Lock size={11} color={isGroovelabBlock ? '#eab308' : '#34a853'} strokeWidth={2.5} />
                                               </div>
                                             </div>
-                                          </>
-                                        )
-                                       ) : (
-                                         <>
-                                           {/* Time range with User icon */}
-                                           <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.66rem', marginBottom: '2px', fontWeight: 800, color: leftAccentColor, paddingRight: (canDelete || b.isPreview) ? '24px' : 0 }}>
-                                             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                               <User size={13} strokeWidth={2.2} />
-                                               {b.startTime} - {b.endTime}
-                                             </span>
-                                           </div>
+                                          )
+                                         )
+                                        ) : (
+                                          durationHrs <= 0.55 ? (
+                                            <div style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'space-between',
+                                              width: '100%',
+                                              height: '100%',
+                                              padding: '4px 6px',
+                                              boxSizing: 'border-box',
+                                              gap: '4px'
+                                            }}>
+                                              <div style={{
+                                                fontSize: '0.66rem',
+                                                fontWeight: 850,
+                                                color: textColor,
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                flex: 1
+                                              }}>
+                                                {b.teacherName || b.purpose || 'Buchung'}
+                                              </div>
+                                              {isBookingConfirmed ? (
+                                                <CheckCircle2 size={11} color="#15803d" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                                              ) : (
+                                                <Clock size={11} color="#9a3412" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <>
+                                              {/* Time range with User icon */}
+                                              <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.66rem', marginBottom: '2px', fontWeight: 800, color: leftAccentColor, paddingRight: (canDelete || b.isPreview) ? '24px' : 0 }}>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                  <User size={13} strokeWidth={2.2} />
+                                                  {b.startTime} - {b.endTime}
+                                                </span>
+                                              </div>
 
                                            {/* Person/Teacher Name */}
                                            <div style={{
@@ -9679,7 +9932,8 @@ export function AdminDashboard({
                                              </div>
                                            )}
                                          </>
-                                       )}
+                                        )
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -9729,7 +9983,76 @@ export function AdminDashboard({
 
           {/* Right Sidebar: Booking Form OR Meine Buchungen */}
           {!isMobile && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', alignSelf: 'stretch' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', height: '100%', alignSelf: 'stretch' }}>
+              {/* Apple / Linear Segmented Control Header */}
+              <div style={{
+                display: 'flex',
+                background: '#f2f2f7',
+                padding: '4px',
+                borderRadius: '16px',
+                gap: '4px',
+                border: '1px solid rgba(0,0,0,0.04)'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setShowMyBookingsOnly(false)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: !showMyBookingsOnly ? '#ffffff' : 'transparent',
+                    color: !showMyBookingsOnly ? '#0f172a' : '#64748b',
+                    fontWeight: !showMyBookingsOnly ? 850 : 650,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: !showMyBookingsOnly ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Zap size={14} color={!showMyBookingsOnly ? brandColor : '#64748b'} strokeWidth={2.4} />
+                  <span>Raum buchen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMyBookingsOnly(true)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: showMyBookingsOnly ? '#ffffff' : 'transparent',
+                    color: showMyBookingsOnly ? '#0f172a' : '#64748b',
+                    fontWeight: showMyBookingsOnly ? 850 : 650,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: showMyBookingsOnly ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Calendar size={14} color={showMyBookingsOnly ? '#7c3aed' : '#64748b'} strokeWidth={2.4} />
+                  <span>Meine Buchungen</span>
+                  <span style={{
+                    fontSize: '0.66rem',
+                    fontWeight: 900,
+                    background: showMyBookingsOnly ? '#7c3aed' : '#cbd5e1',
+                    color: '#ffffff',
+                    padding: '1px 6px',
+                    borderRadius: '100px'
+                  }}>
+                    {myBookings.length}
+                  </span>
+                </button>
+              </div>
+
               {showMyBookingsOnly ? (
               /* Meine Buchungen (Shown only when showMyBookingsOnly is true) */
               <div 
@@ -9889,10 +10212,37 @@ export function AdminDashboard({
                                 </>
                               ) : (
                                 <>
-                                  <span>⏳</span> Unbestätigt
+                                  <Clock size={11} strokeWidth={2.4} style={{ color: '#9a3412' }} />
+                                  <span>Unbestätigt</span>
                                 </>
                               )}
                             </span>
+
+                            {!isBookingConfirmed && isStaff && !b.isSchedule && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleApproveBooking(b.id); }}
+                                style={{
+                                  background: '#34c75918',
+                                  color: '#16a34a',
+                                  border: '1px solid #86efac',
+                                  borderRadius: '10px',
+                                  padding: '0 8px',
+                                  height: '32px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '0.70rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  transition: 'background 0.2s',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title="Buchung als Sekretariat freigeben"
+                              >
+                                <Check size={13} strokeWidth={3} />
+                                <span>Freigeben</span>
+                              </button>
+                            )}
 
                             <button
                               onClick={(e) => { e.stopPropagation(); handleCancelBooking(b.ids || b.id); }}
@@ -9945,7 +10295,10 @@ export function AdminDashboard({
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0, gap: '10px' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-                    <span style={{ color: brandColor }}>⚡</span> Raum buchen
+                    <div style={{ background: `${brandColor}15`, color: brandColor, padding: '4px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                      <Zap size={13} strokeWidth={2.5} />
+                    </div>
+                    <span>Raum buchen</span>
                   </h3>
                   <select
                     value={selectedCampusRoomId || ''}
@@ -10018,19 +10371,20 @@ export function AdminDashboard({
                         borderRadius: '10px',
                         border: '1px solid',
                         borderColor: showPreviewField ? brandColor : '#e5e5ea',
-                        background: showPreviewField ? 'rgba(0, 122, 255, 0.08)' : '#ffffff',
-                        color: showPreviewField ? brandColor : '#8e8e93',
+                        background: showPreviewField ? `${brandColor}15` : '#ffffff',
+                        color: showPreviewField ? brandColor : '#64748b',
                         fontSize: '0.74rem',
-                        fontWeight: 700,
+                        fontWeight: 750,
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px',
+                        gap: '6px',
                         transition: 'all 0.15s',
                         whiteSpace: 'nowrap'
                       }}
                     >
-                      👁️ Vorschau
+                      <Eye size={13} strokeWidth={2.2} />
+                      <span>Vorschau</span>
                     </button>
                   </div>
                 </div>
@@ -10586,7 +10940,10 @@ export function AdminDashboard({
                                       }}
                                       className="hover-scale-mini"
                                     >
-                                      🔗 {inst.name}
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <ExternalLink size={10} strokeWidth={2.4} />
+                                        {inst.name}
+                                      </span>
                                     </a>
                                   ) : (
                                     <span style={{
@@ -10660,13 +11017,17 @@ export function AdminDashboard({
                                   fontSize: '0.74rem', 
                                   background: '#fef2f2', 
                                   color: '#b91c1c', 
-                                  padding: '4px 10px', 
+                                  padding: '4px 8px', 
                                   borderRadius: '8px', 
-                                  fontWeight: 700,
-                                  border: '1px solid #fee2e2'
+                                  fontWeight: 750,
+                                  border: '1px solid #fee2e2',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
                                 }}
                               >
-                                ❌ {inst}
+                                <XCircle size={11} strokeWidth={2.4} style={{ color: '#ef4444' }} />
+                                <span>{inst}</span>
                               </span>
                             ))}
                           </div>
@@ -10785,6 +11146,75 @@ export function AdminDashboard({
 
                 {/* Sheet Body (Scrollable Content) */}
                 <div style={{ padding: '16px 20px 40px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Apple / Linear Segmented Control Header (Mobile) */}
+                  <div style={{
+                    display: 'flex',
+                    background: '#f2f2f7',
+                    padding: '4px',
+                    borderRadius: '16px',
+                    gap: '4px',
+                    border: '1px solid rgba(0,0,0,0.04)'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowMyBookingsOnly(false)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        background: !showMyBookingsOnly ? '#ffffff' : 'transparent',
+                        color: !showMyBookingsOnly ? '#0f172a' : '#64748b',
+                        fontWeight: !showMyBookingsOnly ? 850 : 650,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        boxShadow: !showMyBookingsOnly ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Zap size={14} color={!showMyBookingsOnly ? brandColor : '#64748b'} strokeWidth={2.4} />
+                      <span>Raum buchen</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowMyBookingsOnly(true)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        background: showMyBookingsOnly ? '#ffffff' : 'transparent',
+                        color: showMyBookingsOnly ? '#0f172a' : '#64748b',
+                        fontWeight: showMyBookingsOnly ? 850 : 650,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        boxShadow: showMyBookingsOnly ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Calendar size={14} color={showMyBookingsOnly ? '#7c3aed' : '#64748b'} strokeWidth={2.4} />
+                      <span>Meine Buchungen</span>
+                      <span style={{
+                        fontSize: '0.68rem',
+                        background: showMyBookingsOnly ? '#7c3aed' : '#cbd5e1',
+                        color: '#ffffff',
+                        padding: '2px 6px',
+                        borderRadius: '100px',
+                        fontWeight: 900
+                      }}>
+                        {myBookings.length}
+                      </span>
+                    </button>
+                  </div>
+
                   {showMyBookingsOnly ? (
                     /* Meine Buchungen (Shown only when showMyBookingsOnly is true) */
                     <div 
@@ -12489,25 +12919,23 @@ export function AdminDashboard({
       </div>
     );
 
-    // Format minutes to hours/minutes
-    const formatMins = (mins: number) => {
-      const h = Math.floor(mins / 60);
-      const m = mins % 60;
-      if (h === 0) return `${m} Min.`;
-      return `${h} Std. ${m} Min.`;
+    const getExactLogSeconds = (log: any): number => {
+      if (!log) return 0;
+      if (typeof log.duration_seconds === 'number' && log.duration_seconds > 0) return log.duration_seconds;
+      if (typeof log.duration_minutes === 'number' && log.duration_minutes > 0) return log.duration_minutes * 60;
+      return 0;
     };
 
-    const formatMinsToMMSS = (mins: number) => {
-      const totalSeconds = Math.round(mins * 60);
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = totalSeconds % 60;
-      const sStr = s < 10 ? `0${s}` : `${s}`;
-      if (h > 0) {
-        const mStr = m < 10 ? `0${m}` : `${m}`;
-        return `${h}:${mStr}:${sStr} Min.`;
-      }
-      return `${m}:${sStr} Min.`;
+    const secondsToDisplayMinutes = (totalSeconds: number): number => {
+      if (!totalSeconds || totalSeconds <= 0) return 0;
+      return Math.round(totalSeconds / 60);
+    };
+
+    const formatMins = (mins: number) => {
+      if (mins < 60) return `${Math.round(mins)} Min.`;
+      const hrs = Math.floor(mins / 60);
+      const rem = Math.round(mins % 60);
+      return rem > 0 ? `${hrs} Std. ${rem} Min.` : `${hrs} Std.`;
     };
 
     // Formatted reset date
@@ -12517,13 +12945,52 @@ export function AdminDashboard({
 
     if (activePlatform === 'campus') {
       const brandColor = '#34a853';
-      const myClassMins = stats.myClassMins || 0;
+      const now = getSimulatedNow();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const startOfCurrentMonth = new Date(currentYear, currentMonth, 1, 0, 0, 0, 0);
+
+      // Academic Year Start (Sep 1st)
+      const startYear = currentMonth >= 8 ? currentYear : currentYear - 1;
+      const annualStartDate = new Date(startYear, 8, 1, 0, 0, 0, 0);
+
+      // Rolling 7 days for weekly team practice
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const isTeacherDashboardMode = admin?.role === 'teacher' || (typeof window !== 'undefined' && (sessionStorage.getItem('groovelab_active_workspace') === 'teacher' || localStorage.getItem('groovelab_active_workspace') === 'teacher')) || userId === 'teacher';
+      const myStudentsList = isTeacherDashboardMode ? (students || []) : (students || []).filter((s: any) => s.teacher_id === userId);
+      const classmateIds = myStudentsList.map((s: any) => s.id);
+      const classCount = classmateIds.length;
+
+      const classFocusLogs = stats?.focusLogs || [];
+
+      // 1. Current Month Practice Minutes
+      const currentMonthSecs = classFocusLogs.filter((log: any) => {
+        if (!log.created_at) return false;
+        const d = new Date(log.created_at);
+        return classmateIds.includes(log.user_id) && d >= startOfCurrentMonth && d <= now;
+      }).reduce((sum: number, log: any) => sum + getExactLogSeconds(log), 0);
+      const currentMonthMins = secondsToDisplayMinutes(currentMonthSecs);
+
+      // 2. Weekly Practice Minutes (Rolling 7 days)
+      const classWeeklySecs = classFocusLogs.filter((log: any) => {
+        if (!log.created_at) return false;
+        const d = new Date(log.created_at);
+        return classmateIds.includes(log.user_id) && d >= oneWeekAgo && d <= now;
+      }).reduce((sum: number, log: any) => sum + getExactLogSeconds(log), 0);
+      const classWeeklyMins = secondsToDisplayMinutes(classWeeklySecs);
+
+      // 3. Annual Academic Year Practice Minutes (Sep - Aug)
+      const classAnnualSecs = classFocusLogs.filter((log: any) => {
+        if (!log.created_at) return false;
+        const d = new Date(log.created_at);
+        return classmateIds.includes(log.user_id) && d >= annualStartDate && d <= now;
+      }).reduce((sum: number, log: any) => sum + getExactLogSeconds(log), 0);
+      const classAnnualMins = secondsToDisplayMinutes(classAnnualSecs);
+
+      const myClassMins = currentMonthMins;
       const otherClassMins = stats.otherClassMins || 0;
       const totalSchoolMins = myClassMins + otherClassMins;
-
-      const classWeeklyMins = stats.classWeeklyMins || 0;
-      const weeklyTarget = stats.weeklyTargets?.[0]?.minutes || 300;
-      const targetPercent = Math.min(100, Math.round((classWeeklyMins / weeklyTarget) * 100));
 
       // Pie chart data
       const pieData = myClassMins === 0 && otherClassMins === 0 
@@ -12538,100 +13005,79 @@ export function AdminDashboard({
 
       const contributionPercent = totalSchoolMins > 0 
         ? Math.round((myClassMins / totalSchoolMins) * 100) 
-        : 0;
-
-      const isTeacherDashboardMode = admin?.role === 'teacher' || (typeof window !== 'undefined' && (sessionStorage.getItem('groovelab_active_workspace') === 'teacher' || localStorage.getItem('groovelab_active_workspace') === 'teacher')) || userId === 'teacher';
-      const myStudentsList = isTeacherDashboardMode ? (students || []) : (students || []).filter((s: any) => s.teacher_id === userId);
-      const classmateIds = myStudentsList.map((s: any) => s.id);
-      const classCount = classmateIds.length;
-
-      // MoM performance percentage
-      const now = getSimulatedNow();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-      const startOfCurrentMonth = new Date(currentYear, currentMonth, 1, 0, 0, 0, 0);
-      const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-      const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-      const startOfPreviousMonth = new Date(prevYear, prevMonth, 1, 0, 0, 0, 0);
-      const daysElapsed = now.getDate();
-      const limitOfPreviousMonth = new Date(prevYear, prevMonth, daysElapsed, now.getHours(), now.getMinutes(), now.getSeconds());
-
-      const classFocusLogs = stats?.focusLogs || [];
-
-      const currentMonthMins = classFocusLogs.filter((log: any) => {
-        if (!log.created_at) return false;
-        const d = new Date(log.created_at);
-        return classmateIds.includes(log.user_id) && d >= startOfCurrentMonth && d <= now;
-      }).reduce((sum: number, log: any) => sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0)), 0);
-
-      const previousMonthMins = classFocusLogs.filter((log: any) => {
-        if (!log.created_at) return false;
-        const d = new Date(log.created_at);
-        return classmateIds.includes(log.user_id) && d >= startOfPreviousMonth && d <= limitOfPreviousMonth;
-      }).reduce((sum: number, log: any) => sum + (log.duration_minutes || (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0)), 0);
-
-      const momPercent = previousMonthMins > 0
-        ? Math.round(((currentMonthMins - previousMonthMins) / previousMonthMins) * 100)
-        : (currentMonthMins > 0 ? 100 : 0);
-
-      // Weekly activity rate
-      const startOfWeek = new Date(now);
-      const day = startOfWeek.getDay();
-      const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
-      startOfWeek.setDate(diff);
-      startOfWeek.setHours(0, 0, 0, 0);
-
-      const activeThisWeekCount = (classmateIds || []).filter(id => {
-        return classFocusLogs.some((log: any) => {
-          if (!log.created_at) return false;
-          const d = new Date(log.created_at);
-          return log.user_id === id && d >= startOfWeek && d <= now;
-        });
-      }).length;
-
-      const activityRate = classCount > 0
-        ? Math.round((activeThisWeekCount / classCount) * 100)
-        : 0;
+        : (myClassMins > 0 ? 100 : 0);
 
       return (
         <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden', paddingBottom: isMobile ? '120px' : '0px' }}>
           {/* Top Section: Header & Contribution */}
           <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch', width: '100%', boxSizing: 'border-box' }}>
-            {/* Top Left: Header and summary cards */}
+            {/* Top Left: Header and 3 Focused Pedagogical Hero Cards (Tier-1 Apple Goldstandard) */}
             <div className="glass-panel" style={{ padding: isMobile ? '16px' : '20px 24px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '18px' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Award size={24} />
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <h2 style={{ fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word' }}>Highlights & Fortschritt</h2>
-                  <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: isMobile ? '0.8rem' : '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
+                  <h2 style={{ fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word' }}>Highlights &amp; Fortschritt</h2>
+                  <p style={{ color: '#64748b', margin: '3px 0 0 0', fontWeight: 600, fontSize: isMobile ? '0.8rem' : '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '10px', width: '100%', boxSizing: 'border-box' }}>
-                {[
-                  { label: 'Deine Schüler', value: stats.myClassCount || 0, icon: Users, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                  { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                  { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                  { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                  { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#34a853' : '#ea4335', bg: momPercent >= 0 ? '#e6f4ea' : '#fce8e6', isNeutral: false },
-                  { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                  { label: 'Ø Zeit / Kopf (Woche)', value: formatMinsToMMSS(classCount > 0 ? (classWeeklyMins / classCount) : 0), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                  { label: 'Ø Zeit / Kopf (Monat)', value: formatMinsToMMSS(classCount > 0 ? (currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: '#f8fafc', isNeutral: true }
-                ].map((stat, idx) => (
-                  <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}25`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px', width: '100%', boxSizing: 'border-box' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
-                      <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}15`, flexShrink: 0 }}>
-                        <stat.icon size={16} />
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '4px' }}>{stat.value}</div>
+              {/* 3 Focused Hero Cards (Pädagogisch wertschätzend & DSGVO-konform) */}
+              <div className="stat-cards-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+                {/* Card 1: Deine Schüler */}
+                <div style={{ padding: '14px 16px', background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '96px', width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Deine Schüler</span>
+                    <div style={{ padding: '6px', borderRadius: '10px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Users size={16} />
                     </div>
                   </div>
-                ))}
+                  <div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '4px' }}>
+                      {classCount} <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#475569' }}>Schüler</span>
+                    </div>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#166534', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      Gemeinsam im Team
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 2: Diese Woche im Team */}
+                <div style={{ padding: '14px 16px', background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '96px', width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Diese Woche im Team</span>
+                    <div style={{ padding: '6px', borderRadius: '10px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Clock size={16} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '4px' }}>
+                      {formatMins(classWeeklyMins)}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#166534', marginTop: '2px' }}>
+                      Jede Minute zählt fürs Team
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 3: Schuljahr Gesamt */}
+                <div style={{ padding: '14px 16px', background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '96px', width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schuljahr Gesamt</span>
+                    <div style={{ padding: '6px', borderRadius: '10px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Award size={16} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '4px' }}>
+                      {formatMins(classAnnualMins)}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#166534', marginTop: '2px' }}>
+                      Klassen-Pool (Sep – Aug)
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -12756,11 +13202,15 @@ export function AdminDashboard({
                 const targets = stats?.weeklyTargets || [];
                 const totalGoals = targets.length;
                 const masteredGoals = targets.filter((target: any) => {
-                  const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                  const targetProgressMins = target.title?.toLowerCase().includes('woche') ? classWeeklyMins : currentMonthMins;
+                  const targetPercent = Math.round((targetProgressMins / target.minutes) * 100);
                   return targetPercent >= 100;
                 }).length;
                 const highestPercent = targets.length > 0 
-                  ? Math.max(...targets.map((target: any) => Math.round((classWeeklyMins / target.minutes) * 100)))
+                  ? Math.max(...targets.map((target: any) => {
+                      const targetProgressMins = target.title?.toLowerCase().includes('woche') ? classWeeklyMins : currentMonthMins;
+                      return Math.round((targetProgressMins / target.minutes) * 100);
+                    }))
                   : 0;
 
                 return (
@@ -12789,7 +13239,8 @@ export function AdminDashboard({
                         </p>
                       ) : (
                         targets.map((target: any) => {
-                          const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                          const targetProgressMins = target.title?.toLowerCase().includes('woche') ? classWeeklyMins : currentMonthMins;
+                          const targetPercent = Math.round((targetProgressMins / target.minutes) * 100);
                           const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
                           
                           const maxPercentOnBar = 133;
@@ -12846,7 +13297,7 @@ export function AdminDashboard({
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
                                 <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
-                                  <span style={{ fontWeight: 700, color: '#ffffff' }}>{formatMins(classWeeklyMins)}</span> von {target.minutes} Min.
+                                  <span style={{ fontWeight: 700, color: '#ffffff' }}>{formatMins(targetProgressMins)}</span> von {target.minutes} Min.
                                 </span>
                                 <span style={{
                                   fontWeight: 700,
@@ -12854,7 +13305,7 @@ export function AdminDashboard({
                                   whiteSpace: 'normal',
                                   textAlign: 'right'
                                 }}>
-                                  {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - classWeeklyMins)} Min.`}
+                                  {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - targetProgressMins)} Min.`}
                                 </span>
                               </div>
                             </div>
@@ -12974,10 +13425,10 @@ export function AdminDashboard({
                           return classmateIds.includes(log.user_id) && logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
                         });
                         const totalSecs = logsForMonth.reduce((sum: number, log: any) => {
-                          return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
+                          return sum + getExactLogSeconds(log);
                         }, 0);
 
-                        const minutes = Math.round(totalSecs / 60);
+                        const minutes = secondsToDisplayMinutes(totalSecs);
 
                         // Heatmap calculations
                         let bg = '#f8fafc';

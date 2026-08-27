@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
@@ -17,6 +17,7 @@ import { deleteStudentFully } from '../utils/studentDeletionService';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
 import { BriefingNotesCard } from './notes/BriefingNotesCard';
 import { GlobalNotesDrawer } from './notes/GlobalNotesDrawer';
+import { CommandPaletteModal } from './common/CommandPaletteModal';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -1017,6 +1018,7 @@ export function TeacherDashboard({
     toggleRealNames(true);
   }, []);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
 
   const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
   const [activeChatOcc, setActiveChatOcc] = useState<any | null>(null);
@@ -2551,9 +2553,10 @@ export function TeacherDashboard({
     if (isQuestionnaire) {
       const answersObj: Record<string, string> = {};
       let hasAnyAnswer = false;
-      request.questions.forEach((q: string) => {
-        const ans = (questionnaireAnswers[q] || '').trim();
-        answersObj[q] = ans;
+      request.questions.forEach((q: any) => {
+        const qKey = typeof q === 'string' ? q : q.text;
+        const ans = (questionnaireAnswers[qKey] || '').trim();
+        answersObj[qKey] = ans;
         if (ans) hasAnyAnswer = true;
       });
       if (!hasAnyAnswer) {
@@ -3026,6 +3029,56 @@ export function TeacherDashboard({
       s.isRescheduledPending
     ).length;
   }, [briefingData?.timeline]);
+
+  // Extract active students scheduled in today's Tagesplan for Note widget suggestions
+  const todayTagesplanStudents = useMemo(() => {
+    if (!briefingData?.timeline) return [];
+    const list: any[] = [];
+    const seen = new Set<string>();
+
+    briefingData.timeline.forEach((slot: any) => {
+      if (
+        (slot.student || (slot.students && slot.students.length > 0) || slot.isGroup) &&
+        !slot.is_room_booking &&
+        !slot.isRoomBooking &&
+        slot.status !== 'canceled_by_student' &&
+        slot.status !== 'teacher_sick' &&
+        slot.status !== 'cancelled' &&
+        slot.status !== 'canceled_by_teacher_sick' &&
+        slot.status !== 'rescheduled_away'
+      ) {
+        const slotStudents = splitAndNormalizeStudents(
+          slot.students && slot.students.length > 0 ? slot.students : [slot.student],
+          allStudents
+        );
+
+        slotStudents.forEach((st: any) => {
+          if (!st) return;
+          const found = allStudents.find(s => s.id === st.id) || st;
+          const sId = String(st.id || found?.id || st.name || '');
+          if (!sId || seen.has(sId)) return;
+          seen.add(sId);
+
+          const rawInst = slot.instrument || st.instrument || found?.instrument || teacher?.instrument || 'Gitarre';
+          const resolvedInst = resolveStudentInstrument(rawInst, st.instrument || found?.instrument, teacher?.instrument);
+
+          list.push({
+            ...found,
+            ...st,
+            id: st.id || found?.id,
+            first_name: st.first_name || found?.first_name || (st.name ? st.name.split(' ')[0] : 'Schüler'),
+            last_name: st.last_name || found?.last_name || (st.name ? st.name.split(' ').slice(1).join(' ') : ''),
+            name: st.name || found?.name || `${st.first_name || ''} ${st.last_name || ''}`.trim(),
+            instrument: resolvedInst,
+            timeSlot: slot.timeSlot,
+            room: slot.room
+          });
+        });
+      }
+    });
+
+    return list;
+  }, [briefingData?.timeline, allStudents, teacher?.instrument]);
 
 
   // New Right Sidebar Sickness & Administrative feedback states
@@ -3817,6 +3870,10 @@ export function TeacherDashboard({
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault();
         setShowNotesDrawer(prev => !prev);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -6551,6 +6608,23 @@ useEffect(() => {
     ).length;
     return openFeedback + activePlanningEvents.length + pendingFeedbackPoints;
   }, [adminFeedbackRequests, adminFeedbackResponses, mySubmittedProgramPoints, activePlanningEvents]);
+
+  const openCriticalDuty = useMemo(() => {
+    return adminFeedbackRequests.find((req: any) => {
+      if (req.priority !== 'critical') return false;
+      if (req.target_type === 'individual' && req.target_teacher_id !== userId) return false;
+      if (req.target_type === 'group') {
+        const inst = (teacher?.instrument || (teacher as any)?.main_instrument || '').toLowerCase();
+        const grp = (req.target_group || '').toLowerCase();
+        if (grp === 'guitar' && !(inst.includes('gitarre') || inst.includes('guitar') || inst.includes('bass'))) return false;
+        if (grp === 'piano' && !(inst.includes('klavier') || inst.includes('piano') || inst.includes('keyboard') || inst.includes('keys'))) return false;
+        if (grp === 'vocals' && !(inst.includes('gesang') || inst.includes('vocal') || inst.includes('sing'))) return false;
+        if (grp === 'drums' && !(inst.includes('schlagzeug') || inst.includes('drum'))) return false;
+      }
+      const isCompleted = adminFeedbackResponses.some((res: any) => res.request_id === req.id);
+      return !isCompleted;
+    }) || null;
+  }, [adminFeedbackRequests, adminFeedbackResponses, teacher, userId]);
 
   const teacherScheduleChangesCount = (myChangedAppointments || []).length;
 
@@ -9462,56 +9536,173 @@ useEffect(() => {
 
                       {openItems.map(item => {
                         const isResponding = respondingToRequestId === item.id;
+                        const isQuestionnaire = item.questions && item.questions.length > 0;
+
                         return (
                           <div 
                             key={item.id} 
                             style={{ 
                               display: 'flex', 
                               flexDirection: 'column', 
-                              gap: '8px',
+                              gap: '10px',
                               border: '1px solid #f1f5f9',
-                              borderLeft: '4px solid #34a853',
-                              background: '#ffffff',
+                              borderLeft: `4px solid ${item.priority === 'critical' ? '#ef4444' : '#34a853'}`,
+                              background: item.priority === 'critical' ? '#fff5f5' : '#ffffff',
                               borderRadius: '12px',
-                              padding: '12px 14px',
+                              padding: '14px',
                               boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)'
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>{item.title}</h4>
+                                <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.3 }}>{item.title}</h4>
                                 {item.description && (
-                                  <p style={{ margin: 0, fontSize: '0.76rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
+                                  <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
                                     {item.description}
                                   </p>
                                 )}
                               </div>
-                              <span style={{ fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: '#e6f4ea', color: '#34a853', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <AlertCircle size={11} /> Aktion erforderlich
+                              <span style={{ fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: item.priority === 'critical' ? '#fee2e2' : '#e6f4ea', color: item.priority === 'critical' ? '#ef4444' : '#34a853', display: 'inline-flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+                                <AlertCircle size={11} /> {item.priority === 'critical' ? 'Kritisch' : 'Aktion erforderlich'}
                               </span>
                             </div>
 
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
-                              <button
-                                onClick={() => handleMarkRequestAsDone(item.id)}
-                                disabled={submittingFeedback}
-                                style={{ 
-                                  background: '#34a853', 
-                                  color: '#ffffff', 
-                                  border: 'none', 
-                                  padding: '5px 12px', 
-                                  borderRadius: '8px', 
-                                  fontWeight: 600, 
-                                  fontSize: '0.74rem', 
-                                  cursor: 'pointer', 
+                            {/* Attachment Link if present */}
+                            {item.attachment_url && (
+                              <a
+                                href={item.attachment_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '4px' 
+                                  gap: '6px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  color: '#2563eb',
+                                  textDecoration: 'none'
                                 }}
                               >
-                                <CheckCircle size={12} /> Erledigt
-                              </button>
-                            </div>
+                                <Download size={12} /> Anhang öffnen
+                              </a>
+                            )}
+
+                            {/* Questionnaire Expansion / Form */}
+                            {isQuestionnaire ? (
+                              isResponding ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                                  {item.questions.map((qItem: any, qIdx: number) => {
+                                    const qKey = typeof qItem === 'string' ? qItem : qItem.text;
+                                    const qType = typeof qItem === 'string' ? 'text' : (qItem.type || 'text');
+                                    const qOptions: string[] = typeof qItem === 'object' && qItem.options ? qItem.options : (qType === 'boolean' ? ['Ja', 'Nein'] : []);
+                                    const currentAns = questionnaireAnswers[qKey] || '';
+
+                                    return (
+                                      <div key={qIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <label style={{ fontSize: '0.76rem', fontWeight: 750, color: '#334155' }}>
+                                          {qIdx + 1}. {qKey}
+                                        </label>
+                                        {qType === 'choice' || qType === 'boolean' ? (
+                                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                            {qOptions.map((opt: string) => {
+                                              const isSelected = currentAns === opt;
+                                              return (
+                                                <button
+                                                  key={opt}
+                                                  type="button"
+                                                  onClick={() => setQuestionnaireAnswers(prev => ({ ...prev, [qKey]: opt }))}
+                                                  style={{
+                                                    padding: '4px 10px',
+                                                    borderRadius: '8px',
+                                                    border: isSelected ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+                                                    background: isSelected ? '#34a853' : '#ffffff',
+                                                    color: isSelected ? '#ffffff' : '#475569',
+                                                    fontWeight: isSelected ? 800 : 600,
+                                                    fontSize: '0.74rem',
+                                                    cursor: 'pointer'
+                                                  }}
+                                                >
+                                                  {opt}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <textarea
+                                            value={currentAns}
+                                            onChange={(e) => setQuestionnaireAnswers(prev => ({ ...prev, [qKey]: e.target.value }))}
+                                            placeholder="Antwort eingeben..."
+                                            rows={2}
+                                            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none' }}
+                                          />
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+
+                                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '4px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setRespondingToRequestId(null)}
+                                      style={{ background: '#e2e8f0', color: '#475569', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 650, cursor: 'pointer' }}
+                                    >
+                                      Abbrechen
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={submittingFeedback}
+                                      onClick={() => handleSubmitFeedbackResponse(item.id)}
+                                      style={{ background: '#34a853', color: '#ffffff', border: 'none', padding: '5px 12px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 750, cursor: 'pointer' }}
+                                    >
+                                      {submittingFeedback ? 'Senden...' : 'Absenden'}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
+                                  <button
+                                    onClick={() => setRespondingToRequestId(item.id)}
+                                    style={{
+                                      background: '#3b82f6',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      padding: '6px 12px',
+                                      borderRadius: '8px',
+                                      fontWeight: 700,
+                                      fontSize: '0.74rem',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <Edit3 size={12} /> Fragebogen ausfüllen
+                                  </button>
+                                </div>
+                              )
+                            ) : (
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '2px' }}>
+                                <button
+                                  onClick={() => handleMarkRequestAsDone(item.id)}
+                                  disabled={submittingFeedback}
+                                  style={{ 
+                                    background: '#34a853', 
+                                    color: '#ffffff', 
+                                    border: 'none', 
+                                    padding: '6px 12px', 
+                                    borderRadius: '8px', 
+                                    fontWeight: 700, 
+                                    fontSize: '0.74rem', 
+                                    cursor: 'pointer', 
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px' 
+                                  }}
+                                >
+                                  <CheckCircle size={12} /> Erledigt
+                                </button>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -9972,6 +10163,45 @@ useEffect(() => {
           }}
         />
       )}
+
+      {/* Spotlight Command Palette (⌘K) */}
+      <CommandPaletteModal
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        allStudents={allStudents}
+        onOpenNotesBoard={() => {
+          setLeftColumnTab('notes');
+        }}
+        onOpenQuickNote={() => {
+          setLeftColumnTab('notes');
+        }}
+        onOpenStudentHomework={(student) => {
+          setDocStudent({
+            ...student,
+            id: student.id,
+            first_name: student.first_name || student.name?.split(' ')[0],
+            last_name: student.last_name || student.name?.split(' ').slice(1).join(' '),
+            photo_url: student.photo_url || '/avatar_ghost.jpg',
+            is_campus_active: student.is_campus_active ?? false,
+            school_id: student.school_id || teacher?.school_id,
+            schoolId: student.school_id || teacher?.school_id
+          });
+        }}
+        onOpenSchedule={() => {
+          if (onTabChange) onTabChange('schedule');
+        }}
+        onOpenRoomPlanner={() => {
+          if (onTabChange) onTabChange('rooms');
+        }}
+        onOpenMeisterwerk={() => {
+          if (allStudents.length > 0) {
+            setDocStudent(allStudents[0]);
+          }
+        }}
+        onOpenGrooveLab={() => {
+          if (onLocationModeChange) onLocationModeChange('lab');
+        }}
+      />
 
       {/* Invite Student Modal */}
       {showInviteStudent && (
@@ -11209,6 +11439,8 @@ useEffect(() => {
                           schoolId={teacher?.school_id || (teacher as any)?.schoolId || schoolData?.id}
                           activeStudent={activeStudent}
                           allStudents={allStudents}
+                          todayStudents={todayTagesplanStudents}
+                          rooms={rooms}
                           onOpenDrawer={() => setShowNotesDrawer(true)}
                           onOpenHomeworkModal={(stud) => {
                             setDocStudent({
@@ -19236,6 +19468,8 @@ useEffect(() => {
         schoolId={teacher?.school_id || (teacher as any)?.schoolId || schoolData?.id}
         activeStudent={activeStudent}
         allStudents={allStudents}
+        todayStudents={todayTagesplanStudents}
+        rooms={rooms}
         onOpenHomeworkModal={(stud) => {
           setDocStudent({
             ...stud,
@@ -19249,6 +19483,183 @@ useEffect(() => {
           });
         }}
       />
+
+      {/* 🚨 COMPLIANCE SHIELD MODAL: BLOCKIERENDE PFLICHTMITTEILUNG */}
+      {openCriticalDuty && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.82)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999999,
+          padding: isMobileDevice ? '16px' : '24px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '28px',
+            maxWidth: '580px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 60px -15px rgba(239, 68, 68, 0.3), 0 0 0 1px rgba(239, 68, 68, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px',
+            padding: isMobileDevice ? '22px 18px' : '32px 28px',
+            textAlign: 'left',
+            animation: 'fadeIn 0.25s ease'
+          }}>
+            {/* Header Badge Cluster */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ background: '#fef2f2', color: '#ef4444', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <AlertTriangle size={24} strokeWidth={2.4} />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.68rem', fontWeight: 900, background: '#ef4444', color: '#ffffff', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Dienstliche Pflichtmitteilung
+                </span>
+                <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                  {openCriticalDuty.title}
+                </h3>
+              </div>
+            </div>
+
+            {/* Description / Instructions */}
+            {(openCriticalDuty.description || openCriticalDuty.message) && (
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#334155', lineHeight: '1.55', whiteSpace: 'pre-wrap' }}>
+                {openCriticalDuty.description || openCriticalDuty.message}
+              </div>
+            )}
+
+            {/* Attachment */}
+            {openCriticalDuty.attachment_url && (
+              <a
+                href={openCriticalDuty.attachment_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  border: '1px solid #bfdbfe',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 750,
+                  textDecoration: 'none'
+                }}
+              >
+                <Download size={14} /> Anhang öffnen / herunterladen
+              </a>
+            )}
+
+            {/* If Questionnaire: Render Interactive Questions */}
+            {openCriticalDuty.questions && openCriticalDuty.questions.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                  Bitte beantworte folgende Fragen:
+                </div>
+                {openCriticalDuty.questions.map((qItem: any, qIdx: number) => {
+                  const qKey = typeof qItem === 'string' ? qItem : qItem.text;
+                  const qType = typeof qItem === 'string' ? 'text' : (qItem.type || 'text');
+                  const qOptions: string[] = typeof qItem === 'object' && qItem.options ? qItem.options : (qType === 'boolean' ? ['Ja', 'Nein'] : []);
+                  const currentAns = questionnaireAnswers[qKey] || '';
+
+                  return (
+                    <div key={qIdx} style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <label style={{ fontSize: '0.80rem', fontWeight: 800, color: '#1e293b' }}>
+                        {qIdx + 1}. {qKey}
+                      </label>
+
+                      {qType === 'choice' || qType === 'boolean' ? (
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {qOptions.map((opt: string) => {
+                            const isSelected = currentAns === opt;
+                            return (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => setQuestionnaireAnswers(prev => ({ ...prev, [qKey]: opt }))}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: '10px',
+                                  border: isSelected ? '1.5px solid #ea4335' : '1px solid #cbd5e1',
+                                  background: isSelected ? '#ea4335' : '#ffffff',
+                                  color: isSelected ? '#ffffff' : '#475569',
+                                  fontWeight: isSelected ? 850 : 650,
+                                  fontSize: '0.78rem',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <textarea
+                          value={currentAns}
+                          onChange={(e) => setQuestionnaireAnswers(prev => ({ ...prev, [qKey]: e.target.value }))}
+                          placeholder="Deine Antwort eingeben..."
+                          rows={2}
+                          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.80rem', outline: 'none', resize: 'vertical' }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {/* Notice */}
+            <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', lineHeight: '1.4' }}>
+              ℹ️ Dies ist eine vom Sekretariat als kritisch eingestufte Pflichtaufgabe. Nach deiner Bestätigung wird dein Dashboard sofort freigeschaltet.
+            </div>
+
+            {/* Submission CTA */}
+            <button
+              type="button"
+              disabled={submittingFeedback}
+              onClick={() => {
+                if (openCriticalDuty.questions && openCriticalDuty.questions.length > 0) {
+                  handleSubmitFeedbackResponse(openCriticalDuty.id);
+                } else {
+                  handleMarkRequestAsDone(openCriticalDuty.id);
+                }
+              }}
+              style={{
+                background: '#ea4335',
+                color: '#ffffff',
+                border: 'none',
+                padding: '14px',
+                borderRadius: '16px',
+                fontSize: '0.88rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 8px 24px rgba(234, 67, 53, 0.35)',
+                transition: 'transform 0.15s ease'
+              }}
+            >
+              <CheckCircle size={18} />
+              <span>{submittingFeedback ? 'Wird übermittelt...' : 'Kenntnisnahme bestätigen & Dashboard freischalten'}</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
