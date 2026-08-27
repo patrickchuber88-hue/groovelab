@@ -181,22 +181,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       const targetKey = studentId || token || 'demo_student';
       const plKey = targetPlaylistId || 'all';
 
-      // 0. Auto-unlock if valid PIN was provided in URL
-      if (urlPin) {
-        let currentPin = '4829';
-        if (targetPlaylistId) {
-          const pPin = localStorage.getItem(`campus_share_pin_${targetKey}_${targetPlaylistId}`);
-          if (pPin && /^\d{4}$/.test(pPin)) currentPin = pPin;
-        }
-        if (currentPin === '4829') {
-          const sPin = localStorage.getItem(`campus_share_pin_${targetKey}`);
-          if (sPin && /^\d{4}$/.test(sPin)) currentPin = sPin;
-        }
-        const isUrlPinMatch = (urlPinHash && computePinHash(urlPin) === urlPinHash) || urlPin === currentPin || urlPin === '4829' || urlPin === '1234';
-        if (isUrlPinMatch) return true;
-      }
-
-      // 1. Check persistent device token (365 days / 1 school year)
+      // 1. Check persistent device token (365 days / 1 school year) only if explicit PIN was entered on device
       const persistentKey = `campus_bio_unlocked_${targetKey}_${plKey}`;
       const expiryKey = `campus_bio_expiry_${targetKey}_${plKey}`;
       const pinHashKey = `campus_bio_pin_${targetKey}_${plKey}`;
@@ -216,7 +201,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       }
 
       if (isPersistent && expiry > Date.now()) {
-        if (!storedPin || storedPin === currentPin || (urlPinHash && computePinHash(storedPin) === urlPinHash) || storedPin === '4829' || storedPin === '1234') {
+        if (storedPin && (storedPin === currentPin || (urlPinHash && computePinHash(storedPin) === urlPinHash) || storedPin === '4829' || storedPin === '1234')) {
           return true;
         }
       }

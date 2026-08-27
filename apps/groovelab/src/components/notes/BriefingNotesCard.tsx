@@ -62,6 +62,25 @@ const getTagBadgeStyle = (tag: string) => {
   return getAllTagStyle(tag);
 };
 
+export const INSTRUMENT_SYNONYMS: Record<string, string[]> = {
+  klavier: ['klavier', 'piano', 'e-piano', 'flügel', 'fluegel', 'synth', 'tasten', 'digitalpiano', 'epiano', 'clavinova', 'keyboard', 'rhodes'],
+  piano: ['klavier', 'piano', 'e-piano', 'flügel', 'fluegel', 'synth', 'tasten', 'digitalpiano', 'epiano', 'clavinova', 'keyboard', 'rhodes'],
+  epiano: ['e-piano', 'epiano', 'digitalpiano', 'clavinova', 'stagepiano', 'keyboard', 'synthesizer'],
+  fluegel: ['flügel', 'fluegel', 'konzertflügel', 'fluegel', 'steinway', 'yamaha'],
+  flügel: ['flügel', 'fluegel', 'konzertflügel', 'fluegel', 'steinway', 'yamaha'],
+  drum: ['drum', 'schlagzeug', 'e-drum', 'edrum', 'snare', 'becken', 'cajon', 'hihat', 'percussion', 'tom', 'kick', 'beckenset'],
+  schlagzeug: ['drum', 'schlagzeug', 'e-drum', 'edrum', 'snare', 'becken', 'cajon', 'hihat', 'percussion', 'tom', 'kick', 'beckenset'],
+  edrum: ['e-drum', 'edrum', 'roland drum', 'alesis', 'mesh', 'drum'],
+  gitarre: ['gitarre', 'guitar', 'e-gitarre', 'westerngitarre', 'konzertgitarre', 'akustikgitarre', 'bass', 'e-bass', 'ukulele', 'strat'],
+  guitar: ['gitarre', 'guitar', 'e-gitarre', 'westerngitarre', 'konzertgitarre', 'akustikgitarre', 'bass', 'e-bass', 'ukulele', 'strat'],
+  bass: ['bass', 'e-bass', 'kontrabass', 'akustikbass', 'precision', 'jazzbass'],
+  amp: ['amp', 'verstärker', 'verstaerker', 'box', 'combo', 'speaker', 'pa', 'mischpult', 'lautsprecher', 'marshall', 'fender', 'roland'],
+  mic: ['mikrofon', 'mic', 'micro', 'shure', 'rode', 'funkmikro', 'gesangsmikro'],
+  kabel: ['kabel', 'klinkenkabel', 'xlr', 'stromkabel', 'netzteil', 'adapter', 'patchkabel'],
+  staender: ['ständer', 'staender', 'notenständer', 'gitarrenständer', 'mikrofonständer', 'keyboardständer'],
+  ständer: ['ständer', 'staender', 'notenständer', 'gitarrenständer', 'mikrofonständer', 'keyboardständer']
+};
+
 interface BriefingNotesCardProps {
   user: any;
   schoolId?: number | string;
@@ -102,28 +121,40 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   } = useNotes({ user, schoolId, activeStudent });
 
   const [internalRooms, setInternalRooms] = useState<any[]>([]);
+  const [internalEquipment, setInternalEquipment] = useState<any[]>([]);
+  const [roomSegmentTab, setRoomSegmentTab] = useState<'all' | 'equipment' | 'rooms'>('all');
 
   useEffect(() => {
     const effectiveSchoolId = schoolId || user?.school_id || (user as any)?.schoolId;
     if (!effectiveSchoolId) return;
 
     let isMounted = true;
-    const loadRooms = async () => {
+    const loadRoomsAndEquipment = async () => {
       try {
-        const { data, error } = await supabase
-          .from('rooms')
-          .select('id, name, floor, building_id, max_students, equipment, room_instruments, is_campus_active, is_groovelab_active')
-          .eq('school_id', effectiveSchoolId)
-          .order('sort_order', { ascending: true });
+        const [roomsRes, eqRes] = await Promise.all([
+          supabase
+            .from('rooms')
+            .select('id, name, floor, building_id, max_students, equipment, room_instruments, is_campus_active, is_groovelab_active')
+            .eq('school_id', effectiveSchoolId)
+            .order('sort_order', { ascending: true }),
+          supabase
+            .from('school_equipment')
+            .select('*')
+            .eq('school_id', effectiveSchoolId)
+            .order('name', { ascending: true })
+        ]);
 
-        if (data && isMounted && data.length > 0) {
-          setInternalRooms(data);
+        if (roomsRes.data && isMounted && roomsRes.data.length > 0) {
+          setInternalRooms(roomsRes.data);
+        }
+        if (eqRes.data && isMounted && eqRes.data.length > 0) {
+          setInternalEquipment(eqRes.data);
         }
       } catch (err) {
-        console.warn('Could not load rooms for notes autocomplete:', err);
+        console.warn('Could not load rooms or equipment for notes autocomplete:', err);
       }
     };
-    loadRooms();
+    loadRoomsAndEquipment();
     return () => { isMounted = false; };
   }, [schoolId, user]);
 
@@ -378,10 +409,28 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     const bpmMatch = text.match(/\b(?:bpm|tempo|metronom)\s*:?\s*(\d{2,3})\b/i) || text.match(/\b(\d{2,3})\s*bpm\b/i);
     const bpm = bpmMatch ? parseInt(bpmMatch[1], 10) : null;
 
-    // Room / Repair detection & Room extraction
-    const rawRoomMatches = text.match(/!([A-Za-z0-9äöüÄÖÜß_-]+(?:\s+(?:\d+|Nebenraum|Studio|Saal))?)/i);
-    let detectedRoomName: string | null = rawRoomMatches ? rawRoomMatches[1].trim() : null;
+    // Instrument & Room / Repair detection & extraction
+    let detectedEquipmentName: string | null = null;
+    let detectedRoomName: string | null = null;
 
+    // 1. Check for combined format: !Instrument (Raum) or !Instrument or !Raum
+    const rawInstrumentRoomMatch = text.match(/!([A-Za-z0-9äöüÄÖÜß_#-\s]+?)(?:\s*\(([^)]+)\))?(?=[\s,;:\n]|$)/i);
+    if (rawInstrumentRoomMatch) {
+      const capturedName = rawInstrumentRoomMatch[1].trim();
+      const capturedRoom = rawInstrumentRoomMatch[2] ? rawInstrumentRoomMatch[2].trim() : null;
+      
+      const isRoomMatch = (internalRooms || []).some((r: any) => (r.name || '').toLowerCase() === capturedName.toLowerCase());
+      if (isRoomMatch) {
+        detectedRoomName = capturedName;
+      } else {
+        detectedEquipmentName = capturedName;
+        if (capturedRoom) {
+          detectedRoomName = capturedRoom;
+        }
+      }
+    }
+
+    // 2. Room fallback
     if (!detectedRoomName) {
       const allR = (internalRooms && internalRooms.length > 0) ? internalRooms : (rooms || []);
       for (const r of allR) {
@@ -393,7 +442,26 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       }
     }
 
-    const isRoomIssue = !!detectedRoomName || 
+    if (!detectedRoomName) {
+      const genericRoomMatch = text.match(/\b(Raum\s*\d+|Saal\s*\d*|Studio\s*\d*|Konzertsaal|Bandraum|Keller|EG|OG\s*\d*)\b/i);
+      if (genericRoomMatch) {
+        detectedRoomName = genericRoomMatch[1].trim();
+      }
+    }
+
+    // 3. Equipment fallback
+    if (!detectedEquipmentName && internalEquipment.length > 0) {
+      for (const eq of internalEquipment) {
+        const eqName = eq.name || '';
+        if (eqName && eqName.length >= 3 && new RegExp(`\\b${eqName}\\b`, 'i').test(text)) {
+          detectedEquipmentName = eqName;
+          break;
+        }
+      }
+    }
+
+    const isEquipmentIssue = !!detectedEquipmentName;
+    const isRoomIssue = isEquipmentIssue || !!detectedRoomName || 
                         lower.includes('raum') || 
                         lower.includes('saite') || 
                         lower.includes('kabel') || 
@@ -409,13 +477,15 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     return {
       detectedStudent,
       detectedRoomName,
+      detectedEquipmentName,
+      isEquipmentIssue,
       isHomework,
       bpm,
       isRoomIssue,
       isTodo,
       naturalDueDate
     };
-  }, [inputContent, allStudents, todayStudents, selectedDueDate, rooms, internalRooms]);
+  }, [inputContent, allStudents, todayStudents, selectedDueDate, rooms, internalRooms, internalEquipment]);
 
   // Autocomplete Suggestions List (Prioritizes Tagesplan Students)
   const suggestions = useMemo(() => {
@@ -502,46 +572,202 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     }
 
     if (autocompleteType === 'room') {
-      const uniqueMap = new Map<string, any>();
+      // 1. Detect current teacher's room context for today
+      let currentContextRoomName: string | null = null;
+      if (activeStudent?.room) currentContextRoomName = String(activeStudent.room).trim();
+      else if (activeStudent?.room_name) currentContextRoomName = String(activeStudent.room_name).trim();
+      else if (todayStudents && todayStudents.length > 0) {
+        for (const s of todayStudents) {
+          const r = s.room || s.room_name;
+          if (r && typeof r === 'string' && r.trim()) {
+            currentContextRoomName = r.trim();
+            break;
+          }
+        }
+      }
+
+      // 2. Build unified instruments map from rooms.room_instruments + internalEquipment
+      const instrumentMap = new Map<string, { name: string; model: string; roomName: string | null; roomId: string | null; floor: string | null }>();
+
+      // From rooms.room_instruments
+      if (Array.isArray(internalRooms)) {
+        internalRooms.forEach((r: any) => {
+          const rName = r.name || 'Raum';
+          const rFloor = r.floor && r.floor !== 'Allgemein' ? r.floor : 'EG';
+          
+          if (Array.isArray(r.room_instruments)) {
+            r.room_instruments.forEach((inst: any) => {
+              const instName = typeof inst === 'string' ? inst : (inst?.name || '');
+              const instModel = typeof inst === 'object' && inst?.model ? inst.model : 'Standard';
+              if (instName) {
+                const key = `${instName}_${r.id}`.toLowerCase();
+                instrumentMap.set(key, {
+                  name: instName,
+                  model: instModel,
+                  roomName: rName,
+                  roomId: r.id,
+                  floor: rFloor
+                });
+              }
+            });
+          }
+
+          if (Array.isArray(r.equipment)) {
+            r.equipment.forEach((eqName: string) => {
+              if (typeof eqName === 'string' && eqName.trim()) {
+                const key = `${eqName}_${r.id}`.toLowerCase();
+                if (!instrumentMap.has(key)) {
+                  instrumentMap.set(key, {
+                    name: eqName.trim(),
+                    model: 'Ausstattung',
+                    roomName: rName,
+                    roomId: r.id,
+                    floor: rFloor
+                  });
+                }
+              }
+            });
+          }
+        });
+      }
+
+      // From school_equipment (including unassigned pool instruments)
+      if (Array.isArray(internalEquipment)) {
+        internalEquipment.forEach((eq: any) => {
+          const eqName = eq.name || '';
+          if (eqName) {
+            const alreadyAssigned = Array.from(instrumentMap.values()).some(i => i.name.toLowerCase() === eqName.toLowerCase());
+            if (!alreadyAssigned) {
+              instrumentMap.set(eqName.toLowerCase(), {
+                name: eqName,
+                model: eq.model || 'Standard',
+                roomName: null,
+                roomId: null,
+                floor: null
+              });
+            }
+          }
+        });
+      }
+
+      const allInstruments = Array.from(instrumentMap.values());
+
+      // 3. Build rooms list
+      const uniqueRoomMap = new Map<string, any>();
       if (Array.isArray(internalRooms)) {
         internalRooms.forEach((r: any) => {
           const key = String(r.id || r.name || '').trim();
-          if (key) uniqueMap.set(key, r);
+          if (key) uniqueRoomMap.set(key, r);
         });
       }
       if (Array.isArray(rooms)) {
         rooms.forEach((r: any) => {
           const key = String(r.id || r.name || '').trim();
-          if (key && !uniqueMap.has(key)) uniqueMap.set(key, r);
+          if (key && !uniqueRoomMap.has(key)) uniqueRoomMap.set(key, r);
         });
       }
-      const activeRoomsList = Array.from(uniqueMap.values());
-      return activeRoomsList
-        .filter((r: any) => {
+      const allRooms = Array.from(uniqueRoomMap.values());
+
+      const isExplicitInstrumentQuery = q === 'instrument' || q === 'ausstattung' || q === 'instrumente' || q === 'inst' || q === 'eq';
+      const isExplicitRoomQuery = q === 'raum' || q === 'räume' || q === 'raeume' || q === 'zimmer' || q === 'saal';
+
+      const matchedSynonyms: string[] = [];
+      Object.entries(INSTRUMENT_SYNONYMS).forEach(([catKey, syns]) => {
+        if (syns.some(s => q.includes(s) || s.includes(q))) {
+          matchedSynonyms.push(...syns);
+        }
+      });
+
+      let filteredInstruments = allInstruments;
+      if (isExplicitInstrumentQuery) {
+        filteredInstruments = allInstruments;
+      } else if (isExplicitRoomQuery) {
+        filteredInstruments = [];
+      } else if (q) {
+        filteredInstruments = allInstruments.filter(inst => {
+          const fullText = `${inst.name} ${inst.model} ${inst.roomName || 'Pool Frei'}`.toLowerCase();
+          const matchesDirect = fullText.includes(q);
+          const matchesSynonym = matchedSynonyms.some(s => fullText.includes(s));
+          return matchesDirect || matchesSynonym;
+        });
+      }
+
+      let filteredRooms = allRooms;
+      if (isExplicitInstrumentQuery) {
+        filteredRooms = [];
+      } else if (isExplicitRoomQuery) {
+        filteredRooms = allRooms;
+      } else if (q) {
+        filteredRooms = allRooms.filter((r: any) => {
           const rName = typeof r === 'string' ? r : (r.name || '');
           const rFloor = typeof r === 'object' ? (r.floor || '') : '';
           const rDesc = typeof r === 'object' ? (r.description || '') : '';
           const fullText = `${rName} ${rFloor} ${rDesc}`.toLowerCase();
           return fullText.includes(q);
-        })
-        .sort((a: any, b: any) => {
-          const nameA = typeof a === 'string' ? a : (a.name || '');
-          const nameB = typeof b === 'string' ? b : (b.name || '');
-          return nameA.localeCompare(nameB, 'de-DE', { numeric: true, sensitivity: 'base' });
-        })
-        .map((r: any) => {
-          const name = typeof r === 'string' ? r : (r.name || 'Raum');
-          const floor = typeof r === 'object' && r.floor && r.floor !== 'Allgemein' ? r.floor : 'EG';
-          const capacity = typeof r === 'object' && r.max_students ? ` • max. ${r.max_students} Schüler` : '';
-          return {
-            type: 'room' as const,
-            isToday: false,
-            label: `!${name}`,
-            sub: `${floor}${capacity}`,
-            value: `!${name}`,
-            item: r
-          };
         });
+      }
+
+      const instrumentSuggestions = filteredInstruments.map(inst => {
+        const isCurrent = currentContextRoomName && inst.roomName && (
+          inst.roomName.toLowerCase() === currentContextRoomName.toLowerCase()
+        );
+        const roomBadge = isCurrent 
+          ? '⭐ In deinem Raum' 
+          : (inst.roomName ? `🏢 ${inst.roomName}` : '📦 Pool / Frei');
+        return {
+          type: 'equipment' as const,
+          isToday: !!isCurrent,
+          label: `!${inst.name}`,
+          sub: `${roomBadge} • ${inst.model}`,
+          value: `!${inst.name}${inst.roomName ? ` (${inst.roomName})` : ''}`,
+          item: inst
+        };
+      });
+
+      const roomSuggestions = filteredRooms.map((r: any) => {
+        const name = typeof r === 'string' ? r : (r.name || 'Raum');
+        const floor = typeof r === 'object' && r.floor && r.floor !== 'Allgemein' ? r.floor : 'EG';
+        const capacity = typeof r === 'object' && r.max_students ? ` • max. ${r.max_students} Schüler` : '';
+        const isCurrent = currentContextRoomName && (
+          name.toLowerCase() === currentContextRoomName.toLowerCase()
+        );
+        return {
+          type: 'room' as const,
+          isToday: !!isCurrent,
+          label: `!${name}`,
+          sub: isCurrent ? `⭐ Dein Raum heute • ${floor}${capacity}` : `${floor}${capacity}`,
+          value: `!${name}`,
+          item: r
+        };
+      });
+
+      // Sub-Prefix override: !r/!r4 -> 'rooms', !i/!inst/!eq -> 'equipment'
+      const isSubPrefixRoom = (q.startsWith('r') || q.startsWith('rä') || q.startsWith('rae')) && !isExplicitInstrumentQuery;
+      const isSubPrefixEquip = (q.startsWith('i') || q.startsWith('a') || q.startsWith('eq')) && !isExplicitRoomQuery;
+
+      const effectiveTab = isExplicitRoomQuery || isSubPrefixRoom 
+        ? 'rooms' 
+        : isExplicitInstrumentQuery || isSubPrefixEquip 
+          ? 'equipment' 
+          : roomSegmentTab;
+
+      let combined: any[] = [];
+      if (effectiveTab === 'equipment') {
+        combined = instrumentSuggestions;
+      } else if (effectiveTab === 'rooms') {
+        combined = roomSuggestions;
+      } else {
+        combined = [...instrumentSuggestions, ...roomSuggestions];
+      }
+
+      // Sort: current context items (isToday === true) always float to top!
+      return combined
+        .sort((a, b) => {
+          if (a.isToday && !b.isToday) return -1;
+          if (!a.isToday && b.isToday) return 1;
+          return 0;
+        })
+        .slice(0, 8);
     }
 
     if (autocompleteType === 'macro') {
@@ -558,7 +784,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     }
 
     return [];
-  }, [autocompleteType, autocompleteQuery, allStudents, todayStudents, user?.instrument, rooms, internalRooms]);
+  }, [autocompleteType, autocompleteQuery, allStudents, todayStudents, user?.instrument, rooms, internalRooms, internalEquipment, roomSegmentTab, activeStudent]);
 
   // Insert Quick Snippet directly from macro chip
   const insertSnippet = (snippetText: string) => {
@@ -655,7 +881,8 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     const rawStudentName = studentToLink?.first_name ? `${studentToLink.first_name} ${studentToLink.last_name || ''}`.trim() : studentToLink?.name;
     const maskedStudentName = studentToLink ? (maskStudentName(rawStudentName) || rawStudentName) : null;
 
-    const isRoomReport = parsedIntent?.isRoomIssue || !!parsedIntent?.detectedRoomName;
+    const isEquipmentReport = parsedIntent?.isEquipmentIssue || !!parsedIntent?.detectedEquipmentName;
+    const isRoomReport = isEquipmentReport || parsedIntent?.isRoomIssue || !!parsedIntent?.detectedRoomName;
     const authorFullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Lehrkraft';
 
     await createNote(textToSave || 'Audio-Memo', {
@@ -666,8 +893,9 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       audioUrl: extraAudioUrl || null,
       audioDurationSeconds: duration || null,
       dueDate: selectedDueDate || parsedIntent?.naturalDueDate || null,
-      noteType: extraAudioUrl ? 'audio_memo' : isRoomReport ? 'room_issue' : parsedIntent?.isTodo ? 'todo' : studentToLink ? 'student_note' : 'scratchpad',
-      visibility: isRoomReport ? 'school_admin' : 'private'
+      noteType: extraAudioUrl ? 'audio_memo' : isEquipmentReport ? 'room_issue' : isRoomReport ? 'room_issue' : parsedIntent?.isTodo ? 'todo' : studentToLink ? 'student_note' : 'scratchpad',
+      visibility: isRoomReport ? 'school_admin' : 'private',
+      tags: isEquipmentReport ? ['#Ausstattung', '#Mangel'] : undefined
     });
 
     setInputContent('');
@@ -680,9 +908,14 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     if (textareaRef.current) {
       textareaRef.current.style.height = '54px';
     }
+    
+    const targetLabel = parsedIntent?.detectedEquipmentName 
+      ? `${parsedIntent.detectedEquipmentName}${parsedIntent.detectedRoomName ? ` (${parsedIntent.detectedRoomName})` : ''}`
+      : parsedIntent?.detectedRoomName || 'Raum';
+
     showToast(
       isRoomReport
-        ? `✓ Mangel für ${parsedIntent?.detectedRoomName || 'Raum'} an Sekretariat gemeldet`
+        ? `✓ Mangel für ${targetLabel} an Sekretariat gemeldet`
         : studentToLink 
           ? `Notiz für ${studentToLink.first_name || studentToLink.name} gesichert` 
           : 'Allgemeine Notiz gesichert'
@@ -984,19 +1217,89 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             left: '8px',
             background: '#ffffff',
             border: '1px solid #e2e8f0',
-            borderRadius: '12px',
-            padding: '4px',
-            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.12), 0 4px 10px -2px rgba(0,0,0,0.04)',
+            borderRadius: '14px',
+            padding: '6px',
+            boxShadow: '0 12px 28px -4px rgba(15,23,42,0.14), 0 4px 10px -2px rgba(0,0,0,0.04)',
             zIndex: 50,
-            minWidth: '220px',
+            minWidth: '290px',
+            maxWidth: '380px',
+            maxHeight: '270px',
+            overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
             gap: '2px',
             marginBottom: '6px'
           }}>
-            <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', padding: '3px 6px', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-              {autocompleteType === 'student' ? 'Schüler auswählen (@)' : autocompleteType === 'tag' ? 'Themen-Tag (#)' : autocompleteType === 'macro' ? 'Schnell-Baustein (/)' : 'Raum auswählen (!)'}
-            </div>
+            {autocompleteType === 'room' ? (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '2px 4px 6px 4px',
+                borderBottom: '1px solid #f1f5f9',
+                marginBottom: '4px',
+                gap: '4px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRoomSegmentTab('all'); }}
+                    style={{
+                      background: roomSegmentTab === 'all' ? '#0f172a' : '#f8fafc',
+                      color: roomSegmentTab === 'all' ? '#ffffff' : '#64748b',
+                      border: roomSegmentTab === 'all' ? '1px solid #0f172a' : '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      padding: '2px 7px',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    ⚡ Alle
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRoomSegmentTab('equipment'); }}
+                    style={{
+                      background: roomSegmentTab === 'equipment' ? '#0f172a' : '#f8fafc',
+                      color: roomSegmentTab === 'equipment' ? '#ffffff' : '#64748b',
+                      border: roomSegmentTab === 'equipment' ? '1px solid #0f172a' : '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      padding: '2px 7px',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    🎵 Instrumente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRoomSegmentTab('rooms'); }}
+                    style={{
+                      background: roomSegmentTab === 'rooms' ? '#0f172a' : '#f8fafc',
+                      color: roomSegmentTab === 'rooms' ? '#ffffff' : '#64748b',
+                      border: roomSegmentTab === 'rooms' ? '1px solid #0f172a' : '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      padding: '2px 7px',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    🏢 Räume
+                  </button>
+                </div>
+                <span style={{ fontSize: '0.58rem', color: '#94a3b8', fontWeight: 600 }}>⇥ Tab</span>
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', padding: '3px 6px', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+                {autocompleteType === 'student' ? 'Schüler auswählen (@)' : autocompleteType === 'tag' ? 'Themen-Tag (#)' : 'Schnell-Baustein (/)'}
+              </div>
+            )}
             {suggestions.map((s, idx) => (
               <button
                 key={`sug-${idx}`}
@@ -1038,6 +1341,8 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     <Hash size={11} color="#64748b" />
                   ) : s.type === 'macro' ? (
                     <Zap size={11} color="#64748b" />
+                  ) : s.type === 'equipment' ? (
+                    <Music size={11} color="#eab308" />
                   ) : (
                     <DoorOpen size={11} color="#64748b" />
                   )}
@@ -1065,6 +1370,11 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 setSuggestionIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
+                return;
+              }
+              if (e.key === 'Tab' && autocompleteType === 'room' && (e.altKey || suggestions.length === 0)) {
+                e.preventDefault();
+                setRoomSegmentTab(prev => prev === 'all' ? 'equipment' : prev === 'equipment' ? 'rooms' : 'all');
                 return;
               }
               if (e.key === 'Enter' || e.key === 'Tab') {

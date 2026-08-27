@@ -68,3 +68,86 @@ export function generateStudentGoBdCode(studentId: string, customDate?: Date): s
 
   return `CG-${hexHash}-${yearShort}${monthStr}`;
 }
+
+/**
+ * Calculates dynamic remaining school year months and total fee (ending August 31st).
+ * - Registration month is 100% free (0.00 € trial/introductory period).
+ * - Paid period starts on the 1st of the next month and runs until August 31st.
+ */
+export interface SchoolYearCalculation {
+  freeMonthName: string;
+  paidStartMonthName: string;
+  paidStartYear: number;
+  paidEndMonthName: string;
+  paidEndYear: number;
+  remainingPaidMonths: number;
+  monthlyRate: number; // 0.49
+  totalAmount: number; // e.g. 5.39 for 11 months, 4.90 for 10 months
+  totalAmountStr: string; // "5,39"
+  periodDescription: string; // "01.10.2026 – 31.08.2027"
+}
+
+export function calculateSchoolYearDirectBilling(nowDate?: Date): SchoolYearCalculation {
+  const date = nowDate || new Date();
+  const currentMonth = date.getMonth() + 1; // 1 = Jan, 9 = Sept, 12 = Dec
+  const currentYear = date.getFullYear();
+
+  const monthNames = [
+    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+  ];
+
+  const freeMonthName = monthNames[currentMonth - 1];
+
+  let nextMonth = currentMonth + 1;
+  let nextMonthYear = currentYear;
+  if (nextMonth > 12) {
+    nextMonth = 1;
+    nextMonthYear = currentYear + 1;
+  }
+  const paidStartMonthName = monthNames[nextMonth - 1];
+
+  let endYear = currentYear;
+  if (currentMonth >= 9) {
+    endYear = currentYear + 1;
+  }
+
+  // Calculate remaining paid months until August 31st
+  let remainingPaidMonths = 0;
+  if (currentMonth >= 9) {
+    // Sept(9) -> Oct-Aug = (12 - 9) + 8 = 11 months
+    remainingPaidMonths = (12 - currentMonth) + 8;
+  } else if (currentMonth < 8) {
+    // Jan(1) -> Feb-Aug = 8 - 1 = 7 months
+    remainingPaidMonths = 8 - currentMonth;
+  } else if (currentMonth === 8) {
+    // August registration (ahead of new school year): 12 months for upcoming school year
+    remainingPaidMonths = 12;
+    endYear = currentYear + 1;
+  }
+
+  if (remainingPaidMonths <= 0) {
+    remainingPaidMonths = 12;
+  }
+
+  const monthlyRate = 0.49;
+  const totalAmount = Math.round(remainingPaidMonths * monthlyRate * 100) / 100;
+  const totalAmountStr = totalAmount.toFixed(2).replace('.', ',');
+
+  const startFormatted = `01.${String(nextMonth).padStart(2, '0')}.${nextMonthYear}`;
+  const endFormatted = `31.08.${endYear}`;
+  const periodDescription = `${startFormatted} – ${endFormatted}`;
+
+  return {
+    freeMonthName,
+    paidStartMonthName,
+    paidStartYear: nextMonthYear,
+    paidEndMonthName: 'August',
+    paidEndYear: endYear,
+    remainingPaidMonths,
+    monthlyRate,
+    totalAmount,
+    totalAmountStr,
+    periodDescription
+  };
+}

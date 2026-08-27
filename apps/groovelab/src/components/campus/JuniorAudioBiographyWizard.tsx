@@ -41,11 +41,11 @@ interface JuniorAudioBiographyWizardProps {
 }
 
 export const JUNIOR_STICKER_REWARDS = [
-  { id: 'stk_rocket', emoji: '🚀', label: 'Raketen-Power', gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: '#3b82f6' },
+  { id: 'stk_note', emoji: '🎵', label: 'Zauber-Klang', gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: '#3b82f6' },
   { id: 'stk_star', emoji: '🌟', label: 'Goldstern', gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#f59e0b' },
   { id: 'stk_lion', emoji: '🦁', label: 'Löwen-Groove', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#10b981' },
   { id: 'stk_crown', emoji: '👑', label: 'Meister-Krone', gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', color: '#eab308' },
-  { id: 'stk_game', emoji: '🎮', label: 'Gaming-XP', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: '#8b5cf6' },
+  { id: 'stk_applause', emoji: '👏', label: 'Bühnen-Applaus', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: '#8b5cf6' },
   { id: 'stk_flame', emoji: '🔥', label: 'Feuer-Solo', gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#f97316' },
 ];
 
@@ -53,16 +53,16 @@ export const JUNIOR_GIFT_RECIPIENTS = [
   { id: 'mama', label: 'Für Mama', name: 'Mama', emoji: '🌸', color: '#f97316' },
   { id: 'papa', label: 'Für Papa', name: 'Papa', emoji: '🧢', color: '#3b82f6' },
   { id: 'oma', label: 'Für Oma', name: 'Oma', emoji: '👵', color: '#8b5cf6' },
-  { id: 'opa', label: 'Für Opa', name: 'Opa', emoji: '👴', color: '#059669' },
+  { id: 'opa', label: 'Für Oma & Opa', name: 'Oma & Opa', emoji: '👴', color: '#059669' },
   { id: 'birthday', label: 'Geburtstagskind', name: 'das Geburtstagskind', emoji: '🎂', color: '#f59e0b' },
   { id: 'family', label: 'Familie & Freunde', name: 'meine Familie', emoji: '✨', color: '#0d9488' },
 ];
 
 export const PRO_COVER_PRESETS = [
-  { id: 'cov_first_songs', label: 'Kids & Einsteiger', emoji: '🎈', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
-  { id: 'cov_chart_hits', label: 'Pop & Urban Beats', emoji: '🎧', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' },
-  { id: 'cov_rock_garage', label: 'Rock & Band', emoji: '🎸', gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' },
-  { id: 'cov_classical_gold', label: 'Klassik & Akustik', emoji: '🎻', gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' },
+  { id: 'cov_first_songs', label: 'Erste Lieblingsstücke', emoji: '🌱', gradient: 'linear-gradient(135deg, #047857 0%, #10b981 100%)' },
+  { id: 'cov_spring_summer_concert', label: 'Konzert & Vorspiel', emoji: '🌸', gradient: 'linear-gradient(135deg, #b45309 0%, #f59e0b 100%)' },
+  { id: 'cov_gift_parents', label: 'Musik-Geschenk', emoji: '💝', gradient: 'linear-gradient(135deg, #be123c 0%, #fb7185 100%)' },
+  { id: 'cov_current_repertoire', label: 'Mein Repertoire', emoji: '🎼', gradient: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)' },
 ];
 
 export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProps> = ({

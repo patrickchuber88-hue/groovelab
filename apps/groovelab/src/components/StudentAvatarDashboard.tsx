@@ -36,6 +36,7 @@ import { PushNotificationSoftPromptModal } from './ui/PushNotificationSoftPrompt
 import { generateGdprDataReportPDF } from '../utils/pdfGenerator';
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
 import { fetchHolidaysCached } from '../utils/holidayHelper';
+import { ParentCampusActivationModal } from './ParentCampusActivationModal';
 
 const showMissionsFeature = false;
 
@@ -3234,8 +3235,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
 
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
-  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal' | 'overview'>('parent_controls');
-  const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal' | null>(null);
+  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'parent_controls' | 'security' | 'modules' | 'billing' | 'legal' | 'overview'>('parent_controls');
+  const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'parent_controls' | 'security' | 'modules' | 'billing' | 'legal' | null>(null);
+  const [showParentActivationModal, setShowParentActivationModal] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [pinFormNew, setPinFormNew] = useState('');
   const [pinFormConfirm, setPinFormConfirm] = useState('');
@@ -24662,6 +24664,92 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 </p>
               </div>
 
+              {/* 🌟 PASSIVE ACCOUNT HERO STATUS STAGE */}
+              {!studentUser?.is_campus_active && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
+                  border: '1.5px solid #86efac',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  boxShadow: '0 8px 24px -4px rgba(34, 197, 94, 0.12)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  textAlign: 'left'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: '14px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)'
+                      }}>
+                        <Sparkles size={24} />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Status: Basis-Zugang (Passiv)
+                        </span>
+                        <h3 style={{ margin: '2px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                          Interaktives Campus-Studio für {studentUser?.first_name || 'dein Kind'} freischalten
+                        </h3>
+                      </div>
+                    </div>
+
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      padding: '4px 12px',
+                      borderRadius: '100px',
+                      background: '#dcfce7',
+                      color: '#15803d',
+                      border: '1px solid #86efac'
+                    }}>
+                      🎁 1 Monat gratis schnuppern
+                    </span>
+                  </div>
+
+                  <p style={{ margin: 0, fontSize: '0.84rem', color: '#475569', lineHeight: 1.5 }}>
+                    Stundenplan und Hausaufgabenheft sind bereits aktiv. Schalte jetzt die interaktive <strong>Audio-Loopstation</strong>, den <strong>Übe-Timer mit Streaks</strong> und die <strong>persönliche Audio-Biografie</strong> frei.
+                  </p>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', paddingTop: '4px' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: 700 }}>
+                      ✓ Laufender Monat 100% kostenlos • Danach nur 0,49 € / Mo. bis zum Schuljahresende (31.08.)
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowParentActivationModal(true)}
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '14px',
+                        padding: '12px 22px',
+                        fontSize: '0.88rem',
+                        fontWeight: 900,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        boxShadow: '0 6px 18px rgba(16, 185, 129, 0.35)',
+                        transition: 'all 0.15s'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Sparkles size={16} />
+                      <span>Kostenfreien Schnuppermonat starten ➔</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* MODULAR COVER CARDS GRID */}
             <div style={{
               display: 'grid',
@@ -24670,6 +24758,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               width: '100%'
             }}>
               {[
+                {
+                  id: 'modules',
+                  title: 'Module & Freischaltung',
+                  subtitle: studentUser?.is_campus_active ? 'Campus & GrooveLab aktiv' : '1 Monat gratis schnuppern',
+                  badge: studentUser?.is_campus_active ? 'Aktiv' : '1 Mo. gratis',
+                  gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  shadowColor: 'rgba(16, 185, 129, 0.40)',
+                  icon: Zap
+                },
                 {
                   id: 'parent_controls',
                   title: isAdultStudent ? 'App- & Design-Stufe' : 'Eltern-Kontrollzentrum',
@@ -25196,7 +25293,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         width: '42px',
                         height: '42px',
                         borderRadius: '12px',
-                        background: activeStudentSettingsModal === 'parent_controls'
+                        background: activeStudentSettingsModal === 'modules'
+                          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                          : activeStudentSettingsModal === 'parent_controls'
                           ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
                           : activeStudentSettingsModal === 'notifications'
                           ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
@@ -25210,6 +25309,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         justifyContent: 'center',
                         boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
                       }}>
+                        {activeStudentSettingsModal === 'modules' && <Zap size={20} color="#ffffff" />}
                         {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? <Compass size={20} color="#ffffff" /> : <ShieldCheck size={20} color="#ffffff" />)}
                         {activeStudentSettingsModal === 'notifications' && <Bell size={20} color="#ffffff" />}
                         {activeStudentSettingsModal === 'security' && <Lock size={20} color="#ffffff" />}
@@ -25218,6 +25318,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       </div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {activeStudentSettingsModal === 'modules' && 'Module & Freischaltung'}
                           {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? 'App- & Design-Einstellungen' : 'Eltern-Kontrollzentrum')}
                           {activeStudentSettingsModal === 'notifications' && 'Mitteilungen & Benachrichtigungen'}
                           {activeStudentSettingsModal === 'security' && (isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Sicherheit')}
@@ -25225,6 +25326,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           {activeStudentSettingsModal === 'legal' && 'Rechtliches & Datenschutz'}
                         </h3>
                         <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                          {activeStudentSettingsModal === 'modules' && 'Verwalte Campus- & GrooveLab-Module und schalte Zusatzfunktionen frei.'}
                           {activeStudentSettingsModal === 'parent_controls' && (isAdultStudent ? 'Passe Benutzeroberfläche und Funktionen nach deinen Wünschen an.' : 'Schutz-, Design- & Freigabefunktionen für dein Kind.')}
                           {activeStudentSettingsModal === 'notifications' && 'Passe an, worüber und wie wir dich informieren.'}
                           {activeStudentSettingsModal === 'security' && (isAdultStudent ? '4-stellige persönliche PIN für schnellen und sicheren Login.' : (securityPinTarget === 'parent' ? '6-stellige Eltern-PIN zum Schutz des Kontrollzentrums & der Ruhezeiten.' : '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & Profil).'))}
@@ -26729,6 +26831,185 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       );
                     })()}
 
+                    {activeStudentSettingsModal === 'modules' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* Modul 1: Campus */}
+                        <div style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #86efac',
+                          borderRadius: '20px',
+                          padding: '22px',
+                          boxShadow: '0 4px 16px rgba(16, 185, 129, 0.08)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '14px',
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                              }}>
+                                <BookOpen size={22} />
+                              </div>
+                              <div>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                  Schüler- &amp; Übestudio
+                                </span>
+                                <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
+                                  Modul Campus
+                                </h4>
+                              </div>
+                            </div>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              padding: '4px 10px',
+                              borderRadius: '100px',
+                              background: studentUser?.is_campus_active ? '#dcfce7' : '#fef3c7',
+                              color: studentUser?.is_campus_active ? '#15803d' : '#b45309',
+                              border: `1px solid ${studentUser?.is_campus_active ? '#86efac' : '#fde68a'}`
+                            }}>
+                              {studentUser?.is_campus_active ? '✓ Aktiv freigeschaltet' : 'Bereit zur Aktivierung'}
+                            </span>
+                          </div>
+
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
+                            Umfasst das digitale Hausaufgabenheft, den interaktiven Übe-Timer mit Streaks &amp; Level-Ups, die Audio-Loopstation und die persönliche Audio-Biografie.
+                          </p>
+
+                          {/* Feature Pills */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {['⏱️ Übe-Timer & Streaks', '🎙️ Audio-Loopstation', '📖 Hausaufgabenheft & Notizen', '🎵 Audio-Biografie'].map((feat) => (
+                              <span key={feat} style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                color: '#1e293b',
+                                background: '#f1f5f9',
+                                padding: '4px 10px',
+                                borderRadius: '8px'
+                              }}>
+                                {feat}
+                              </span>
+                            ))}
+                          </div>
+
+                          {/* Action Button */}
+                          <div style={{ paddingTop: '6px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9' }}>
+                            {studentUser?.is_campus_active ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '0.76rem', color: '#15803d', fontWeight: 700 }}>
+                                  ✓ Aktiv für das laufende Schuljahr
+                                </span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleCloseSettingsModal();
+                                  setShowParentActivationModal(true);
+                                }}
+                                style={{
+                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '12px',
+                                  padding: '10px 18px',
+                                  fontSize: '0.84rem',
+                                  fontWeight: 900,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                                }}
+                                className="hover-scale"
+                              >
+                                <Sparkles size={16} />
+                                <span>Gratis-Schnuppermonat starten &amp; freischalten ➔</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Modul 2: GrooveLab */}
+                        <div style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #fef08a',
+                          borderRadius: '20px',
+                          padding: '22px',
+                          boxShadow: '0 4px 16px rgba(234, 179, 8, 0.08)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '14px',
+                                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
+                              }}>
+                                <Music size={22} />
+                              </div>
+                              <div>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                  Band- &amp; Repertoire-Suite
+                                </span>
+                                <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
+                                  Modul GrooveLab
+                                </h4>
+                              </div>
+                            </div>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              padding: '4px 10px',
+                              borderRadius: '100px',
+                              background: '#fefce8',
+                              color: '#a16207',
+                              border: '1px solid #fef08a'
+                            }}>
+                              ✓ Inklusive (Musikschule übernimmt 100%)
+                            </span>
+                          </div>
+
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
+                            Umfasst die Band-Rooms, Song-Bibliotheken zum Mitspielen, Live Lab, den Skill-Radar und spielerische Musiker-Avatare.
+                          </p>
+
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {['🎸 Band-Rooms', '🎼 Song-Bibliotheken', '🎯 Skill-Radar', '👻 Musiker-Avatare'].map((feat) => (
+                              <span key={feat} style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                color: '#1e293b',
+                                background: '#fefce8',
+                                border: '1px solid #fef9c3',
+                                padding: '4px 10px',
+                                borderRadius: '8px'
+                              }}>
+                                {feat}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {activeStudentSettingsModal === 'billing' && (
                       <div>
                         {studentUser?.role?.toLowerCase() === 'student' && (
@@ -26804,11 +27085,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         {/* Impressum & Anbieterkennzeichnung */}
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            📄 Impressum &amp; Anbieterkennzeichnung
+                            📄 Impressum &amp; Anbieterkennzeichnung (§ 5 DDG)
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
-                            <strong>Campus-Groovelab</strong> ist ein Produkt und Service für Musikschulen.<br />
-                            Keine Lizenzkaufgebühren (Cloud- &amp; Hostingpauschale).<br />
+                            <strong>Campus-Groovelab</strong> • Plattformbetrieb Patrick Huber, Karl-Fürstenberg Str. 59, 79618 Rheinfelden.<br />
+                            E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#059669', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> (⚡ 60-Minuten Schnellkontakt-Garantie an Werktagen).<br />
+                            Keine Lizenzkaufgebühren (Cloud- &amp; Hostingpauschale gem. § 19 UStG).<br />
                             Server-Standort &amp; Datenspeicherung: Bundesrepublik Deutschland (EU).
                           </p>
                         </div>
@@ -30077,6 +30359,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         onClose={() => setShowStudentToolbox(false)}
         ageGroup={studentUiLevel || 'pro'}
       />
+
+      {/* Parent Campus Activation Modal with Dynamic School Year Trial & EPC-QR GiroCode */}
+      {showParentActivationModal && (
+        <ParentCampusActivationModal
+          student={studentUser || { id: studentId }}
+          schoolData={{
+            name: studentUser?.schools?.name || 'Campus-Groovelab Partner-Musikschule',
+            billing_company: 'Campus-Groovelab Plattformbetrieb'
+          }}
+          onClose={() => setShowParentActivationModal(false)}
+          onPaymentSubmitted={() => {
+            setShowParentActivationModal(false);
+            fetchStudentAndAvatar();
+          }}
+        />
+      )}
 
       <TourComponent />
     </div>

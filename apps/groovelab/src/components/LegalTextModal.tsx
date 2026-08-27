@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, FileText, Building, Undo2 } from 'lucide-react';
 import { useMasterPricing } from '../context/MasterPricingContext';
 
@@ -15,6 +15,12 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 }) => {
   const masterPricing = useMasterPricing();
   const [activeTab, setActiveTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation'>(initialTab);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   if (!isOpen) return null;
 
@@ -217,10 +223,14 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Kontakt & Schnelle elektronische Kontaktaufnahme (§ 5 Abs. 1 Nr. 2 DDG):</strong><br />
-                Telefon: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>Auf Anfrage via E-Mail</a><br />
-                E-Mail: <a href="mailto:patrick.huber@musaek.de" style={{ color: '#34a853', fontWeight: 700 }}>patrick.huber@musaek.de</a> / <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a><br />
-                Website: <a href="https://campus-groovelab.de" target="_blank" rel="noopener noreferrer" style={{ color: '#34a853', fontWeight: 700 }}>campus-groovelab.de</a>
+                <strong style={{ color: '#0f172a' }}>Kontakt &amp; Schnelle elektronische Kontaktaufnahme (§ 5 Abs. 1 Nr. 2 DDG):</strong><br />
+                E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> / <a href="mailto:patrick.huber@musaek.de" style={{ color: '#34a853', fontWeight: 700 }}>patrick.huber@musaek.de</a><br />
+                <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '3px' }}>
+                  <strong>⚡ Elektronische Schnellkontakt-Garantie (BGH I ZR 238/14 / EuGH C-298/07):</strong> Anfragen über unsere E-Mail- &amp; Support-Kanäle werden an Werktagen (Mo–Fr 08:00–18:00 Uhr) garantiert <strong>innerhalb von maximal 60 Minuten</strong> beantwortet. Ein digitales Support- &amp; Feedback-System steht allen registrierten Nutzern und Schulen direkt im App-Dashboard zur Verfügung.
+                </span>
+                <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '2px' }}>
+                  Website: <a href="https://campus-groovelab.de" target="_blank" rel="noopener noreferrer" style={{ color: '#34a853', fontWeight: 700 }}>campus-groovelab.de</a>
+                </span>
               </div>
 
               <div>
@@ -290,32 +300,65 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 Allgemeine Geschäftsbedingungen (AGB) – Campus-Groovelab
               </h4>
 
-              <div>
-                <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand &amp; Rechtsnatur (B2B SaaS)</strong><br />
-                Diese AGB regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB</strong> über die schlüsselfertige Bereitstellung der Softwarefunktionalitäten inklusive dedizierter Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Wartung.
+              {/* ── TEIL A: B2B FÜR MUSIKSCHULEN ── */}
+              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  TEIL A: Bestimmungen für Musikschulen &amp; Bildungsträger (B2B / § 14 BGB)
+                </span>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand &amp; Rechtsnatur (SaaS-Mietvertrag)</strong><br />
+                  Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB</strong> über die Bereitstellung der Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Wartung.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>2. Bereitstellungsmodell &amp; Hosting-Pauschalen (§ 19 UStG)</strong><br />
+                  - <strong>Software-Bereitstellung:</strong> Die Software wird im Rahmen des gebuchten Cloud-Infrastruktur-Pakets ohne gesonderte Lizenzkaufgebühren bereitgestellt (0,00 €).<br />
+                  - <strong>Campus-Modul Hosting:</strong> {masterPricing.priceCampus.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
+                  - <strong>GrooveLab-Modul Hosting:</strong> {masterPricing.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
+                  - <strong>Kombi-Vorteil Hosting:</strong> {masterPricing.priceKombi.toFixed(2).replace('.', ',')} € / Mo. (Infrastruktur-Bündel für beide Module, Ersparnis von {masterPricing.kombiSavings.toFixed(2).replace('.', ',')} € / Mo.).<br />
+                  - <strong>Infrastruktur-Service-Fee:</strong> {masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. je aktivem Lehrer-Profil. Verwaltungs- und Sekretariats-User (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>admin</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>secretary</code>) sind inklusive.<br />
+                  - <strong>Schüler-Infrastruktur-Fee:</strong> {masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. je aktiver Schülerin / aktivem Schüler.<br />
+                  - <strong>Sammelzahler vs. Direktabrechnung:</strong> GrooveLab-Aktivierungen werden immer zu 100 % von der Musikschule getragen. Für das Campus-Modul kann wahlweise Direktabrechnung mit Eltern vereinbart werden.<br />
+                  - <strong>Steuerlicher Hinweis (§ 19 UStG):</strong> <em>Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</em>
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>3. Urheberrecht &amp; Verbot geschützter Notenvervielfältigung (§ 60a UrhG, Art. 6 DSA)</strong><br />
+                  Die Musikschule und ihre Lehrkräfte verpflichten sich, keine urheberrechtlich geschützten Notensätze, Leadsheets oder Play-Along-Aufnahmen Dritter ohne Lizenz hochzuladen (§ 60a Abs. 3 Nr. 2 UrhG Notenvervielfältigungsverbot). Der Betreiber haftet als technischer Host-Provider nach Art. 6 DSA erst ab Kenntnis (Notice-and-Takedown).
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>4. Raum-Engine &amp; Namensdarstellung</strong><br />
+                  Lehrkraft-Raumbuchungen werden im System initial im Status unbestätigt (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>pending</code>) geführt und bedürfen der Freigabe durch das Sekretariat. Schülernamen werden auf Lehrer-Dashboards datenschutzkonform gekürzt (Vorname + Anfangsbuchstabe); Lehrkräfte werden zur eindeutigen Wiedererkennung mit vollständigem Namen geführt.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>5. B2B-Gewährleistung &amp; Haftungsausschluss (§ 536a BGB)</strong><br />
+                  Gegenüber Unternehmern (§ 14 BGB) wird die verschuldensunabhängige Schadensersatzhaftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB) ausdrücklich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden.
+                </div>
               </div>
 
-              <div>
-                <strong style={{ color: '#0f172a' }}>2. Bereitstellungsmodell &amp; Hosting-Gebühren (§ 19 UStG Kleinunternehmer)</strong><br />
-                - <strong>Software-Nutzungsrechte:</strong> Die Einräumung der einfachen Nutzungsrechte an der Software erfolgt im Rahmen des gebuchten Cloud-Pakets ohne zusätzliche Lizenzkaufgebühren.<br />
-                - <strong>Campus-Modul Hosting:</strong> {masterPricing.priceCampus.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
-                - <strong>GrooveLab-Modul Hosting:</strong> {masterPricing.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
-                - <strong>Kombi-Vorteil Hosting:</strong> {masterPricing.priceKombi.toFixed(2).replace('.', ',')} € / Mo. (Infrastruktur-Bündel für beide Module, Ersparnis von {masterPricing.kombiSavings.toFixed(2).replace('.', ',')} € / Mo.).<br />
-                - <strong>Infrastruktur-Service-Fee:</strong> {masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. je aktivem Lehrer-Profil. Verwaltungs- und Sekretariats-User (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>admin</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>secretary</code>) sind kostenfrei inklusive.<br />
-                - <strong>Schüler-Infrastruktur-Fee:</strong> {masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. je aktiver Schülerin / aktivem Schüler. Bei mehr als 2 Monaten Inaktivität wird das Profil automatisch passiviert, um unnötige Kosten zu vermeiden.<br />
-                - <strong>Steuerlicher Hinweis (§ 19 UStG):</strong> <em>Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</em>
-              </div>
+              {/* ── TEIL B: B2C FÜR ELTERN & SCHÜLER ── */}
+              <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '16px', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  TEIL B: Bestimmungen für Eltern &amp; Schüler (B2C / § 13 BGB)
+                </span>
 
-              <div>
-                <strong style={{ color: '#0f172a' }}>3. Host-Provider-Privileg &amp; Urheberrecht an Daten (§ 535 BGB, Art. 6 DSA)</strong><br />
-                Der Betreiber stellt die technische Infrastruktur und den Speicherplatz bereit. Der Kunde bzw. die Endnutzer sind allein verantwortlich für die Rechtmäßigkeit der von ihnen erstellten Audioaufnahmen und Unterrichtsnotizen. Der Betreiber haftet als Host-Provider gemäß Art. 6 DSA (§ 10 TDDDG) erst ab Kenntniserlangung von konkreten Rechtsverletzungen (Notice-and-Takedown). Sämtliche Urheber- und Leistungsschutzrechte an in der Audio-Loopstation und im Übe-Studio erstellten Aufnahmen verbleiben zu 100 % beim jeweiligen Ersteller/Schüler.
-              </div>
+                <div>
+                  <strong style={{ color: '#0f172a' }}>6. Kostenfreier Schnuppermonat &amp; Schuljahres-Bereitstellung</strong><br />
+                  Eltern, die das interaktive Campus-Modul für ihr Kind aktivieren, erhalten den laufenden Anmeldemonat zu 100% kostenfrei zum Kennenlernen. Für die verbleibenden Monate bis zum Schuljahresende (31. August) fällt der dynamisch errechnete Betrag von 0,49 € / Monat an.
+                </div>
 
-              <div>
-                <strong style={{ color: '#0f172a' }}>4. Gewährleistung &amp; Haftungsbeschränkung (§ 535 BGB)</strong><br />
-                - <strong>Unbeschränkte Haftung:</strong> Der Betreiber haftet unbeschränkt bei Vorsatz, grober Fahrlässigkeit, bei arglistigem Verschweigen von Mängeln sowie für Schäden aus der Verletzung des Lebens, des Körpers oder der Gesundheit.<br />
-                - <strong>Kardinalpflichten:</strong> Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten, d. h. Pflichten, deren Erfüllung die ordnungsgemäße Durchführung des Vertrags überhaupt erst ermöglicht und auf deren Einhaltung der Vertragspartner regelmäßig vertraut). In diesem Fall ist die Haftung der Höhe nach auf den vertragstypischen, bei Vertragsschluss vorhersehbaren Schaden begrenzt.<br />
-                - <strong>Haftungsausschluss im Übrigen:</strong> Eine weitergehende Haftung für leichte Fahrlässigkeit, mittelbare Schäden oder entgangenen Gewinn ist ausgeschlossen. Die zwingenden Vorschriften des Produkthaftungsgesetzes und der DSGVO (Art. 82) bleiben unberührt.
+                <div>
+                  <strong style={{ color: '#0f172a' }}>7. Gesetzliche Verbraucherrechte &amp; Keine Abofalle</strong><br />
+                  Die gesetzlichen Mängelgewährleistungsrechte für Verbraucher bleiben uneingeschränkt bestehen. Es findet <strong>keine automatische Vertragsverlängerung</strong> über das Schuljahresende hinaus statt (Zero-Abofalle).
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>8. Elektronischer Kündigungsbutton &amp; Sofort-Widerruf (§ 312k BGB)</strong><br />
+                  Während des kostenfreien Schnuppermonats können Eltern den Zugang mit 1 Klick im Elternbereich sofort und ohne Kosten widerrufen. Nach Durchführung der Kündigung wird unverzüglich eine elektronische Kündigungsbestätigung mit Datum und Zeitstempel bereitgestellt.
+                </div>
               </div>
             </div>
           )}
@@ -333,14 +376,14 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 
               <div>
                 <strong style={{ color: '#0f172a' }}>Ausübung des Widerrufs:</strong><br />
-                Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (Patrick Huber, Karl-Fürstenberg Str. 59, 79618 Rheinfelden, E-Mail: patrick.huber@musaek.de) mittels einer eindeutigen Erklärung (z. B. ein mit der Post versandter Brief oder E-Mail) über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren.
+                Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (Patrick Huber, Karl-Fürstenberg Str. 59, 79618 Rheinfelden, E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#2563eb', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> / <a href="mailto:patrick.huber@musaek.de" style={{ color: '#2563eb', fontWeight: 700 }}>patrick.huber@musaek.de</a>) mittels einer eindeutigen Erklärung (z. B. ein mit der Post versandter Brief oder E-Mail) über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren.
               </div>
 
               <div>
                 <strong style={{ color: '#0f172a' }}>Muster-Widerrufsformular:</strong><br />
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '12px', fontFamily: 'monospace', fontSize: '0.78rem', marginTop: '6px' }}>
-                  An: Patrick Huber, Karl-Fürstenberg Str. 59, 79618 Rheinfelden, E-Mail: patrick.huber@musaek.de<br /><br />
-                  Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über die Buchung des Zugangs Campus-Groovelab.<br />
+                  An: Patrick Huber, Karl-Fürstenberg Str. 59, 79618 Rheinfelden, E-Mail: kontakt@campus-groovelab.de / patrick.huber@musaek.de<br /><br />
+                  Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über die Bereitstellung des Zugangs Campus-Groovelab.<br />
                   - Bestellt am (*)/erhalten am (*)<br />
                   - Name des/der Verbraucher(s)<br />
                   - Anschrift des/der Verbraucher(s)<br />

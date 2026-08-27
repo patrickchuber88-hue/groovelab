@@ -3,7 +3,7 @@ import QRCode from 'react-qr-code';
 import { supabase } from '../lib/supabase';
 import { 
   School, User, Mail, Lock, Phone, MapPin, CheckCircle, 
-  ArrowRight, ArrowLeft, RefreshCw, Key, ShieldCheck, ShieldAlert, Check, Sparkles, Download, Fingerprint, Copy
+  ArrowRight, ArrowLeft, RefreshCw, Key, ShieldCheck, ShieldAlert, Check, Sparkles, Download, Fingerprint, Copy, Eye, EyeOff
 } from 'lucide-react';
 import { isWebAuthnSupported, registerUserBiometrics } from '../utils/webauthn';
 import { inlineAllImagesInElement } from './IDBadgeCard';
@@ -95,8 +95,30 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const [city, setCity] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [schoolEmail, setSchoolEmail] = useState('');
-  const [isAccessGranted, setIsAccessGranted] = useState(true);
+  const [isAccessGranted, setIsAccessGranted] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('cg_beta_dev_access') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
   const [accessCodeInput, setAccessCodeInput] = useState('');
+  const [accessCodeError, setAccessCodeError] = useState<string | null>(null);
+  const [showAccessPassword, setShowAccessPassword] = useState(false);
+
+  const handleVerifyAccessCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = accessCodeInput.trim().toLowerCase();
+    if (clean === 'campus-test' || clean === 'campustest') {
+      try {
+        sessionStorage.setItem('cg_beta_dev_access', 'true');
+      } catch (err) {}
+      setIsAccessGranted(true);
+      setAccessCodeError(null);
+    } else {
+      setAccessCodeError('Ungültiges Entwickler-Passwort. Bitte wende dich an das Campus-Groovelab Team.');
+    }
+  };
 
   // Step 2: Owner Info
   const [adminFirstName, setAdminFirstName] = useState('');
@@ -553,29 +575,171 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         overflowY: 'auto',
         color: '#1e293b'
       }}>
-        {/* Header (except for provisioning step) */}
-        {step < 3 && (
-          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '20px', marginBottom: '24px', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(52, 168, 83, 0.1)', display: 'flex', alignItems: 'center', color: '#34a853', justifyContent: 'center' }}>
-                <School size={22} />
-              </div>
-              <div style={{ textAlign: 'left' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Campus-Groovelab</span>
-                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', display: 'block', letterSpacing: '-0.02em' }}>Musikschule registrieren</span>
-              </div>
+        {!isAccessGranted ? (
+          <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+            <div style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '16px',
+              background: 'rgba(52, 168, 83, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+              color: '#34a853'
+            }}>
+              <Lock size={26} />
             </div>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, background: 'rgba(0, 0, 0, 0.05)', color: '#334155', padding: '6px 14px', borderRadius: '100px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
-              Schritt {step} von 2
-            </span>
-          </div>
-        )}
 
-        {error && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '14px', borderRadius: '16px', color: '#b91c1c', fontSize: '13px', fontWeight: 700, marginBottom: '20px', textAlign: 'left' }}>
-            {error}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              color: '#34a853',
+              background: 'rgba(52, 168, 83, 0.08)',
+              border: '1px solid rgba(52, 168, 83, 0.25)',
+              padding: '4px 12px',
+              borderRadius: '100px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: '12px'
+            }}>
+              <ShieldCheck size={13} />
+              Geschlossene Entwickler-Beta
+            </div>
+
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+              Entwickler-Schutz aktiv
+            </h2>
+
+            <p style={{ fontSize: '0.84rem', color: '#64748b', margin: '0 0 22px 0', lineHeight: 1.55 }}>
+              Die Neuregistrierung von Musikschulen ist während der aktuellen Beta-Phase passwortgeschützt.
+            </p>
+
+            {accessCodeError && (
+              <div style={{
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                color: '#b91c1c',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                marginBottom: '16px',
+                textAlign: 'left'
+              }}>
+                {accessCodeError}
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyAccessCode} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>
+                  Entwickler-Passwort
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={showAccessPassword ? 'text' : 'password'}
+                    required
+                    value={accessCodeInput}
+                    onChange={(e) => {
+                      setAccessCodeInput(e.target.value);
+                      if (accessCodeError) setAccessCodeError(null);
+                    }}
+                    placeholder="Passwort eingeben..."
+                    style={{ ...inputStyle, paddingRight: '44px' }}
+                    className="signup-input"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAccessPassword(!showAccessPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '4px'
+                    }}
+                  >
+                    {showAccessPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                style={{
+                  background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '14px',
+                  padding: '14px 20px',
+                  fontSize: '0.92rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+                  marginTop: '4px'
+                }}
+              >
+                <span>Freischalten &amp; Weiter</span>
+                <ArrowRight size={18} />
+              </button>
+
+              <button
+                type="button"
+                onClick={onBackToLogin}
+                style={{
+                  background: 'transparent',
+                  color: '#64748b',
+                  border: 'none',
+                  padding: '8px',
+                  fontSize: '0.80rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  marginTop: '2px'
+                }}
+              >
+                ← Zurück zur Startseite
+              </button>
+            </form>
           </div>
-        )}
+        ) : (
+          <>
+            {/* Header (except for provisioning step) */}
+            {step < 3 && (
+              <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '20px', marginBottom: '24px', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(52, 168, 83, 0.1)', display: 'flex', alignItems: 'center', color: '#34a853', justifyContent: 'center' }}>
+                    <School size={22} />
+                  </div>
+                  <div style={{ textAlign: 'left' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Campus-Groovelab</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', display: 'block', letterSpacing: '-0.02em' }}>Musikschule registrieren</span>
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, background: 'rgba(0, 0, 0, 0.05)', color: '#334155', padding: '6px 14px', borderRadius: '100px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
+                  Schritt {step} von 2
+                </span>
+              </div>
+            )}
+
+            {error && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '14px', borderRadius: '16px', color: '#b91c1c', fontSize: '13px', fontWeight: 700, marginBottom: '20px', textAlign: 'left' }}>
+                {error}
+              </div>
+            )}
 
         {/* STEP 1: SCHOOL INFO */}
         {step === 1 && (
@@ -1035,6 +1199,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               </button>
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

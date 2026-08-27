@@ -2233,10 +2233,13 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     </p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Kontakt</h4>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Kontakt &amp; Schnelle elektronische Kommunikation (§ 5 Abs. 1 Nr. 2 DDG)</h4>
                     <p style={{ margin: 0 }}>
                       E-Mail: patrick.huber@musaek.de / kontakt@campus-groovelab.de<br />
-                      Website: campus-groovelab.de
+                      Website: campus-groovelab.de<br />
+                      <span style={{ fontSize: '0.78rem', color: '#475569', display: 'block', marginTop: '4px' }}>
+                        <strong>⚡ Elektronische Schnellkontakt-Garantie (BGH I ZR 238/14):</strong> Anfragen werden an Werktagen (Mo–Fr 08:00–18:00 Uhr) garantiert innerhalb von max. 60 Minuten beantwortet. Ein Support- &amp; Feedback-System steht direkt im Dashboard zur Verfügung.
+                      </span>
                     </p>
                   </div>
                   <div>

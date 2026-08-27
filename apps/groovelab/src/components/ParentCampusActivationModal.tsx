@@ -4,7 +4,12 @@ import {
   X, Check, Copy, Download, ShieldCheck, QrCode, Building2, 
   HelpCircle, ArrowRight, Sparkles, HeartHandshake, CheckCircle2 
 } from 'lucide-react';
-import { generateEpcGiroCodePayload, formatIbanWithSpaces, generateStudentGoBdCode } from '../utils/epcGiroCode';
+import { 
+  generateEpcGiroCodePayload, 
+  formatIbanWithSpaces, 
+  generateStudentGoBdCode,
+  calculateSchoolYearDirectBilling
+} from '../utils/epcGiroCode';
 import { supabase } from '../lib/supabase';
 
 export interface ParentCampusActivationModalProps {
@@ -45,21 +50,28 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [showHardshipConfirm, setShowHardshipConfirm] = useState(false);
+  const [agreeWithdrawalWaiver, setAgreeWithdrawalWaiver] = useState(true);
+
+  // Dynamic School Year Calculation (Registration month = 0.00 € free, remaining months until August 31st)
+  const schoolYearCalc = calculateSchoolYearDirectBilling();
+  const effectiveAnnualFee = annualFee !== 5.88 ? annualFee : schoolYearCalc.totalAmount;
+  const totalAmountStr = schoolYearCalc.totalAmountStr;
+  const monthlyRate = schoolYearCalc.monthlyRate.toFixed(2).replace('.', ',');
+  const remainingMonths = schoolYearCalc.remainingPaidMonths;
+  const periodDescription = schoolYearCalc.periodDescription;
 
   // Generate stable GoBD Reference Code: CG-[HASH8]-[YYMM]
   const referenceCode = generateStudentGoBdCode(student.id || 'TEMP-ID');
   const recipientName = masterBillingCompany;
   const effectiveIban = masterBillingIban;
   const effectiveBic = masterBillingBic;
-  const monthlyRate = (annualFee / 12).toFixed(2).replace('.', ',');
-  const totalAmountStr = annualFee.toFixed(2).replace('.', ',');
 
   // EPC GiroCode payload
   const epcPayload = generateEpcGiroCodePayload({
     iban: effectiveIban,
     bic: effectiveBic,
     recipientName: recipientName,
-    amount: annualFee,
+    amount: effectiveAnnualFee,
     referenceCode: referenceCode
   });
 
@@ -178,11 +190,11 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.setTextColor(71, 85, 105);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.text('GESAMTBETRAG (12 MONATE INKLUSIVE)', 28, 138);
-      doc.setFontSize(12);
+      doc.text(`GESAMTBETRAG (${remainingMonths} MONATE, ${periodDescription})`, 28, 138);
+      doc.setFontSize(11);
       doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${totalAmountStr} EUR (${monthlyRate} EUR / Monat)`, 28, 146);
+      doc.text(`${totalAmountStr} EUR (0,49 EUR/Mo. • ${schoolYearCalc.freeMonthName} gratis • Endpreis gem. § 19 UStG)`, 28, 146);
 
       // Instructions
       doc.setFont('helvetica', 'bold');
@@ -194,7 +206,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.setFontSize(9);
       doc.setTextColor(71, 85, 105);
       doc.text('1. Öffnen Sie Ihre gewohnte Banking-App (z. B. Sparkasse, VR-Banking, ING, DKB, N26).', 22, 178);
-      doc.text('2. Überweisen Sie den Betrag von 5,88 EUR auf die oben genannte IBAN.', 22, 185);
+      doc.text(`2. Überweisen Sie den Betrag von ${totalAmountStr} EUR auf die oben genannte IBAN.`, 22, 185);
       doc.text(`3. Geben Sie als Verwendungszweck exakt ${referenceCode} an.`, 22, 192);
       doc.text('4. Sobald der Zahlungseingang verbucht ist, wird der Campus-Zugang vollautomatisch freigeschaltet.', 22, 199);
 
@@ -297,33 +309,51 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
         {/* Modal Body */}
         <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* Price Summary Banner */}
+          {/* Price Summary Banner with Dynamic School Year Trial */}
           <div style={{
             background: '#f8fafc',
             border: '1px solid #e2e8f0',
             borderRadius: '16px',
-            padding: '16px 20px',
+            padding: '18px 20px 16px 20px',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            position: 'relative'
           }}>
-            <div>
+            <div style={{
+              position: 'absolute',
+              top: '-10px',
+              left: '18px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              fontSize: '0.68rem',
+              fontWeight: 900,
+              padding: '2px 10px',
+              borderRadius: '100px',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+            }}>
+              🎁 {schoolYearCalc.freeMonthName.toUpperCase()} KOSTENFREI ZUM SCHNUPPERN
+            </div>
+            <div style={{ marginTop: '4px' }}>
               <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
-                Bereitstellungsinfrastruktur
+                Schuljahres-Bereitstellung ({periodDescription})
               </span>
               <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
-                Modul Campus (12 Monate)
+                Modul Campus ({remainingMonths} Monate bis Schuljahresende)
               </div>
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
                 Hausaufgabenheft, Übe-Timer, Loopstation &amp; Audio-Tresor
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#059669', letterSpacing: '-0.03em' }}>
-                {totalAmountStr} €
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#059669', letterSpacing: '-0.03em' }}>
+                0,00 € <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>({schoolYearCalc.freeMonthName})</span>
               </div>
-              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                {monthlyRate} € / Monat
+              <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600, display: 'block' }}>
+                ab 01.{schoolYearCalc.paidStartMonthName.slice(0,3)}: {totalAmountStr} € ({remainingMonths} × 0,49 €)
+              </span>
+              <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginTop: '1px' }}>
+                Endpreis gem. § 19 UStG (steuerbefreit)
               </span>
             </div>
           </div>
@@ -480,31 +510,55 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           {/* Action CTAs */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
             
-            {/* Primary confirmation CTA */}
+            {/* Legal Consent Checkbox for B2C (§§ 312j, 356 Abs. 5 BGB) */}
+            <label style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              fontSize: '0.74rem',
+              color: '#475569',
+              cursor: 'pointer',
+              lineHeight: '1.4',
+              padding: '2px 4px'
+            }}>
+              <input
+                type="checkbox"
+                checked={agreeWithdrawalWaiver}
+                onChange={(e) => setAgreeWithdrawalWaiver(e.target.checked)}
+                style={{ accentColor: '#10b981', marginTop: '2px', cursor: 'pointer' }}
+              />
+              <span>
+                Ich stimme den <strong>AGB</strong> zu und wünsche den sofortigen Beginn des kostenfreien Schnuppermonats ({schoolYearCalc.freeMonthName}) vor Ablauf der 14-tägigen Widerrufsfrist.
+              </span>
+            </label>
+
+            {/* Primary confirmation CTA with strict § 312j BGB Compliance */}
             <button
               type="button"
-              disabled={isSubmitting || submittedSuccess}
+              disabled={isSubmitting || submittedSuccess || !agreeWithdrawalWaiver}
               onClick={handleConfirmTransferInitiated}
               style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: (!agreeWithdrawalWaiver || isSubmitting || submittedSuccess) 
+                  ? '#94a3b8' 
+                  : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '14px',
                 padding: '14px',
                 fontSize: '0.92rem',
                 fontWeight: 900,
-                cursor: isSubmitting || submittedSuccess ? 'default' : 'pointer',
+                cursor: (isSubmitting || submittedSuccess || !agreeWithdrawalWaiver) ? 'default' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
+                boxShadow: agreeWithdrawalWaiver ? '0 6px 20px rgba(16, 185, 129, 0.35)' : 'none',
                 transition: 'all 0.15s'
               }}
-              onMouseOver={(e) => { if (!submittedSuccess) e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseOver={(e) => { if (!submittedSuccess && agreeWithdrawalWaiver) e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
             >
-              {isSubmitting ? 'Wird gespeichert...' : submittedSuccess ? '✓ Überweisung gemeldet' : 'Ich habe die Überweisung ausgeführt ➔'}
+              {isSubmitting ? 'Wird freigeschaltet...' : submittedSuccess ? '✓ Überweisung gemeldet' : `${schoolYearCalc.freeMonthName} gratis testen & zahlungspflichtig bestellen ➔`}
             </button>
 
             {/* 2-Column secondary tools */}

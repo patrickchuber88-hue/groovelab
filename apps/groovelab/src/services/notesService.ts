@@ -96,13 +96,18 @@ export const parseSmartTags = (text: string) => {
     });
   }
 
-  // Extract !Rooms (e.g. !Raum 4, !Raum4, !Konzertsaal, !Groovelab Nebenraum)
+  // Extract !Rooms (e.g. !Raum 4, !Raum4, !Konzertsaal, !Groovelab Nebenraum) or generic room patterns
   const roomMatches = text.match(/!([A-Za-z0-9äöüÄÖÜß_-]+(?:\s+(?:\d+|Nebenraum|Studio|Saal))?)/gi);
   if (roomMatches) {
     roomMatches.forEach(r => {
       const room = r.substring(1).trim();
       if (room) rooms.push(room);
     });
+  } else {
+    const genericRoomMatch = text.match(/\b(Raum\s*\d+|Saal\s*\d*|Studio\s*\d*|Konzertsaal|Bandraum|Keller|EG|OG\s*\d*)\b/i);
+    if (genericRoomMatch) {
+      rooms.push(genericRoomMatch[1].trim());
+    }
   }
 
   return { studentMentions, tags, rooms, isTodo };
@@ -258,8 +263,14 @@ export const notesService = {
   }): Promise<UserNote> {
     const { studentMentions, tags, rooms, isTodo } = parseSmartTags(params.content);
 
+    const lower = params.content.toLowerCase();
+    const isDefectKeyword = lower.includes('mangel') || lower.includes('defekt') || lower.includes('kaputt') || lower.includes('reparatur') || lower.includes('stimmen') || lower.includes('saite');
+    const isRoomRelated = rooms.length > 0 || !!params.roomId || lower.includes('raum');
+
     const detectedType = params.noteType || 
-      (params.audioUrl ? 'audio_memo' : isTodo ? 'todo' : params.studentId ? 'student_note' : (rooms.length > 0 && params.visibility === 'school_admin') ? 'room_issue' : 'scratchpad');
+      (params.audioUrl ? 'audio_memo' : isTodo ? 'todo' : (isRoomRelated && isDefectKeyword) ? 'room_issue' : params.studentId ? 'student_note' : (rooms.length > 0 && params.visibility === 'school_admin') ? 'room_issue' : 'scratchpad');
+
+    const detectedVisibility = (detectedType === 'room_issue') ? 'school_admin' : (params.visibility || 'private');
 
     const combinedTags = Array.from(new Set([
       ...tags,
@@ -287,7 +298,7 @@ export const notesService = {
       is_pinned: params.isPinned || false,
       is_archived: false,
       is_completed: false,
-      visibility: params.visibility || 'private',
+      visibility: detectedVisibility,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -308,6 +319,20 @@ export const notesService = {
   // Fetch all room issues for the school (for Secretariat & Admin dashboards)
   async fetchSchoolRoomIssues(schoolId: number | string): Promise<UserNote[]> {
     if (!schoolId) return [];
+    
+    // 1. Get list of persistently resolved note IDs
+    let persistentResolvedIds = new Set<string>();
+    try {
+      const raw = localStorage.getItem('campus_resolved_room_issues');
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          persistentResolvedIds = new Set(arr);
+        }
+      }
+    } catch (e) {}
+
+    let dbIssues: UserNote[] = [];
     try {
       const { data, error } = await supabase
         .from('user_notes')
@@ -317,28 +342,119 @@ export const notesService = {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        return data as UserNote[];
+        dbIssues = data as UserNote[];
       }
     } catch (err) {
-      console.warn('Could not fetch school room issues:', err);
+      console.warn('Could not fetch school room issues from DB:', err);
     }
-    return [];
+
+    // Also check local storage notes as zero-latency cache fallback
+    let localIssues: UserNote[] = [];
+    try {
+      const db = await openNotesDB();
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const allLocal = await new Promise<UserNote[]>((resolve) => {
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      });
+      localIssues = allLocal.filter(n => 
+        String(n.school_id) === String(schoolId) && 
+        (n.note_type === 'room_issue' || n.visibility === 'school_admin' || n.content.toLowerCase().includes('mangel'))
+      );
+    } catch (e) {
+      // ignore
+    }
+
+    const issueMap = new Map<string, UserNote>();
+    for (const item of localIssues) {
+      if (persistentResolvedIds.has(item.id)) {
+        item.is_completed = true;
+        item.is_acknowledged = true;
+      }
+      issueMap.set(item.id, item);
+    }
+    for (const item of dbIssues) {
+      if (persistentResolvedIds.has(item.id)) {
+        item.is_completed = true;
+        item.is_acknowledged = true;
+      }
+      issueMap.set(item.id, item);
+    }
+
+    return Array.from(issueMap.values()).sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   },
 
-  // Resolve / Mark room issue as completed (by Secretariat)
+  // Resolve / Mark room issue as completed permanently across Supabase, IndexedDB & LocalStorage
   async resolveRoomIssue(noteId: string): Promise<void> {
+    const nowIso = new Date().toISOString();
     const patch = {
       is_completed: true,
       is_acknowledged: true,
-      acknowledged_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      acknowledged_at: nowIso,
+      updated_at: nowIso
     };
+
+    // 1. Permanent Registry in LocalStorage
+    try {
+      const raw = localStorage.getItem('campus_resolved_room_issues');
+      const resolved: string[] = raw ? JSON.parse(raw) : [];
+      if (!resolved.includes(noteId)) {
+        resolved.push(noteId);
+        localStorage.setItem('campus_resolved_room_issues', JSON.stringify(resolved));
+      }
+    } catch (e) {}
+
+    // 2. Update Supabase Database
     try {
       await supabase
         .from('user_notes')
         .update(patch)
         .eq('id', noteId);
+    } catch (e) {
+      console.warn('Supabase resolve update notice:', e);
+    }
+
+    // 3. Update IndexedDB
+    try {
+      const db = await openNotesDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(noteId);
+      req.onsuccess = () => {
+        if (req.result) {
+          store.put({ ...req.result, ...patch });
+        }
+      };
     } catch (e) {}
+
+    // 4. Update all local note caches in LocalStorage
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('campus_groovelab_notes_')) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const notes: UserNote[] = JSON.parse(raw);
+            let changed = false;
+            const updated = notes.map(n => {
+              if (n.id === noteId) {
+                changed = true;
+                return { ...n, ...patch };
+              }
+              return n;
+            });
+            if (changed) {
+              localStorage.setItem(key, JSON.stringify(updated));
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
     this.notifySync('NOTE_RESOLVED', noteId);
   },
 

@@ -11605,6 +11605,34 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                             </button>
                           )}
 
+                          {/* Single Track Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              requestDeleteTrack(selectedJuniorPlaylistForModal.id, t.id, t.title);
+                              setSelectedJuniorPlaylistForModal(prev => prev ? {
+                                ...prev,
+                                tracks: prev.tracks.filter(item => item.id !== t.id)
+                              } : null);
+                            }}
+                            title="Stück aus Album entfernen"
+                            style={{
+                              width: '34px',
+                              height: '34px',
+                              borderRadius: '50%',
+                              border: 'none',
+                              background: isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.12)',
+                              color: '#ef4444',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer'
+                            }}
+                            className="hover-scale"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => handlePlayToggle(t.audioUrl, t.masteredAudioUrl, t.id)}
@@ -11794,12 +11822,12 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               </div>
             </div>
 
-            {/* Pedagogical Cover Cards (2x2 Clean Grid) */}
+            {/* Pedagogical Cover Cards (Responsive Auto-Fit Grid) */}
             <div>
               <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
                 2. Album-Vorlage wählen (Cover & Thema)
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
                 {UNIVERSAL_PLAYLIST_COVERS
                   .filter((cov: UniversalPlaylistCoverConfig) => {
                     const activeCat = juniorCoverCategoryFilter === 'all' ? 'concert_stage' : juniorCoverCategoryFilter;
@@ -11895,6 +11923,29 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 type="text"
                 value={newJuniorPlaylistTitle}
                 onChange={(e) => setNewJuniorPlaylistTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newJuniorPlaylistTitle.trim()) {
+                    e.preventDefault();
+                    const chosenCover = UNIVERSAL_PLAYLIST_COVERS.find((c: UniversalPlaylistCoverConfig) => c.id === newJuniorPlaylistCover) || UNIVERSAL_PLAYLIST_COVERS[0];
+                    const newPl: CustomPlaylist = {
+                      id: `pl_${Date.now()}`,
+                      title: newJuniorPlaylistTitle.trim(),
+                      description: chosenCover.subTitle || `Erstellt von ${student?.first_name || 'Schüler'}`,
+                      vibeTheme: chosenCover.vibeTheme || 'sunset_gold',
+                      iconName: chosenCover.iconName || 'disc',
+                      coverPresetId: chosenCover.id,
+                      schoolYear: '2026/2027',
+                      tracks: [],
+                      createdAt: new Date().toISOString()
+                    };
+                    savePlaylists([newPl, ...customPlaylists]);
+                    setShowJuniorCreatePlaylistModal(false);
+                    setNewJuniorPlaylistTitle('');
+                    try {
+                      window.dispatchEvent(new CustomEvent('groovelab_playlists_changed', { detail: [newPl, ...customPlaylists] }));
+                    } catch (err) {}
+                  }
+                }}
                 placeholder="z. B. Mein Sommerkonzert 2026, Geschenk für Oma..."
                 style={{
                   width: '100%',

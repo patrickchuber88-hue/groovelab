@@ -4,13 +4,14 @@ import {
   Send, ShieldCheck, Tag, Info, Layers, Loader2, Calendar, BookOpen, 
   Music, Users, CreditCard, Settings, Building2, Award, ShieldOff,
   ChevronDown, ChevronUp, MessageCircle, Clock, Search, Archive, CheckCircle2,
-  Inbox, RefreshCw
+  Inbox, RefreshCw, Zap
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { 
   FeedbackType, HeroOptInType, FEEDBACK_CATEGORIES, 
   getAvailableCategoriesForRole, formatLegalHeroCredit,
-  FEEDBACK_STATUSES, PlatformFeedbackItem
+  FEEDBACK_STATUSES, PlatformFeedbackItem, computeSlaTarget,
+  formatSlaCountdown
 } from '../../config/feedbackConfig';
 
 const renderCategoryIcon = (iconName: string, size = 14, color = 'currentColor') => {
@@ -89,7 +90,21 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
   // Submission states
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [submittedTicket, setSubmittedTicket] = useState<PlatformFeedbackItem | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(3600);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Live SLA Countdown Interval for Active Submission
+  useEffect(() => {
+    if (!isSubmitted || !submittedTicket) return;
+    const updateTimer = () => {
+      const target = computeSlaTarget(submittedTicket.created_at);
+      setCountdownSeconds(Math.max(0, target.secondsRemaining));
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [isSubmitted, submittedTicket]);
 
   const availableCategories = getAvailableCategoriesForRole(userRole);
   const currentCategory = availableCategories.find(c => c.id === selectedBoardId) || availableCategories[0];
@@ -310,8 +325,11 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
     const localId = 'fb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     const nowIso = new Date().toISOString();
 
+    const ticketNumber = 'CG-SUP-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
     const newFeedbackItem: PlatformFeedbackItem = {
       id: localId,
+      ticket_number: ticketNumber,
       school_id: schoolId || null,
       user_id: userId || null,
       user_name: sanitizedName,
@@ -379,15 +397,9 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
       console.warn('Supabase platform_feedback table note:', cloudErr);
     }
 
-    // Always succeed cleanly for the user
+    // Retain ticket in state for Mission Control Stage
+    setSubmittedTicket(newFeedbackItem);
     setIsSubmitted(true);
-    setTimeout(() => {
-      setIsSubmitted(false);
-      setContent('');
-      setSelectedTags([]);
-      onClose();
-    }, 2200);
-
     setIsSubmitting(false);
   };
 
@@ -673,33 +685,56 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                               gap: '4px',
                               padding: '3px 8px',
                               borderRadius: '8px',
-                              background: item.type === 'bug' ? '#fee2e2' : '#fef3c7',
-                              color: item.type === 'bug' ? '#b91c1c' : '#b45309',
+                              background: item.type === 'bug' ? '#fee2e2' : (item.type === 'support_request' ? '#ecfeff' : '#fef3c7'),
+                              color: item.type === 'bug' ? '#b91c1c' : (item.type === 'support_request' ? '#0891b2' : '#b45309'),
                               fontSize: '0.72rem',
                               fontWeight: 800
                             }}>
-                              {item.type === 'bug' ? <Bug size={12} /> : <Lightbulb size={12} />}
-                              {item.type === 'bug' ? 'Fehlerbericht' : 'Feature-Idee'}
+                              {item.type === 'bug' ? <Bug size={12} /> : (item.type === 'support_request' ? <ShieldCheck size={12} /> : <Lightbulb size={12} />)}
+                              {item.type === 'bug' ? 'Fehlerbericht' : (item.type === 'support_request' ? 'Express-Support' : 'Feature-Idee')}
                             </span>
                             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                              • {item.board_name} • {new Date(item.created_at).toLocaleDateString('de-DE')}
+                              • {item.ticket_number ? `#${item.ticket_number}` : ''} • {item.board_name} • {new Date(item.created_at).toLocaleDateString('de-DE')}
                             </span>
                           </div>
 
-                          {/* Status Pill */}
-                          <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '4px 10px',
-                            borderRadius: '100px',
-                            background: statusMeta.badgeBg,
-                            color: statusMeta.badgeColor,
-                            fontSize: '0.72rem',
-                            fontWeight: 800
-                          }}>
-                            {renderStatusIcon(item.status, 12, statusMeta.badgeColor)}
-                            <span>{statusMeta.label}</span>
+                          {/* Status Pill & Dynamic SLA Badge */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {(() => {
+                              const slaTarget = computeSlaTarget(item.created_at, item.admin_responded_at);
+                              return (
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '3px 8px',
+                                  borderRadius: '100px',
+                                  background: slaTarget.badgeBg,
+                                  color: slaTarget.badgeColor,
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  border: `1px solid ${slaTarget.badgeColor}25`
+                                }}>
+                                  <Zap size={10} />
+                                  <span>{slaTarget.label}</span>
+                                </span>
+                              );
+                            })()}
+
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '4px 10px',
+                              borderRadius: '100px',
+                              background: statusMeta.badgeBg,
+                              color: statusMeta.badgeColor,
+                              fontSize: '0.72rem',
+                              fontWeight: 800
+                            }}>
+                              {renderStatusIcon(item.status, 12, statusMeta.badgeColor)}
+                              <span>{statusMeta.label}</span>
+                            </div>
                           </div>
                         </div>
 
@@ -759,37 +794,176 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
             </div>
           ) : isSubmitted ? (
             <div style={{
-              padding: '48px 24px',
+              padding: '32px 20px',
               textAlign: 'center',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '16px'
+              gap: '18px',
+              background: '#ffffff'
             }}>
+              {/* Ticket Pill */}
               <div style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '50%',
-                backgroundColor: '#dcfce7',
-                color: '#16a34a',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 10px 15px -3px rgba(22, 163, 74, 0.2)'
+                gap: '6px',
+                background: '#f0fdf4',
+                border: '1.5px solid #86efac',
+                padding: '6px 14px',
+                borderRadius: '100px',
+                color: '#15803d',
+                fontSize: '0.76rem',
+                fontWeight: 900,
+                letterSpacing: '0.04em'
               }}>
-                <Check size={36} />
+                <Zap size={13} />
+                <span>EXPRESS-TICKET #{submittedTicket?.ticket_number || 'CG-SUP-ACTIVE'}</span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: '#0f172a' }}>
-                Vielen herzlichen Dank!
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b', maxWidth: '380px', lineHeight: 1.5 }}>
-                Dein Beitrag ist direkt in unserer Entwickler-Schmiede eingegangen. Wir prüfen jede Idee sorgfältig!
-              </p>
+
+              {/* Radial / Big Digital Countdown Clock */}
+              <div style={{
+                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                borderRadius: '24px',
+                padding: '24px 28px',
+                color: '#ffffff',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                boxShadow: '0 12px 30px -4px rgba(15, 23, 42, 0.25)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                width: '100%',
+                maxWidth: '420px',
+                boxSizing: 'border-box'
+              }}>
+                {(() => {
+                  const target = submittedTicket ? computeSlaTarget(submittedTicket.created_at) : null;
+                  const formatted = formatSlaCountdown(countdownSeconds);
+                  const isNight = !target?.isWithinBusinessHours;
+
+                  return (
+                    <>
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        color: isNight ? '#94a3b8' : '#86efac',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}>
+                        {isNight ? '🌙 Nacht- & Ruhezeit-Modus' : '⚡ Live-Kernzeit • 60 Min. SLA'}
+                      </span>
+
+                      <div style={{
+                        fontSize: '2.5rem',
+                        fontWeight: 950,
+                        fontFamily: 'monospace',
+                        color: isNight ? '#38bdf8' : '#4ade80',
+                        letterSpacing: '-0.02em',
+                        marginTop: '6px',
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: '6px'
+                      }}>
+                        <span>{formatted.timeString}</span>
+                        <span style={{ fontSize: '1rem', fontWeight: 700, color: '#94a3b8' }}>
+                          {formatted.unit}
+                        </span>
+                      </div>
+
+                      <span style={{ fontSize: '0.74rem', color: '#cbd5e1', marginTop: '6px', fontWeight: 600 }}>
+                        {isNight 
+                          ? `Garantierte Antwort: ${target?.displayTarget || 'Nächster Werktag 10:00 Uhr'} (Kernzeit Mo–Fr 09:00–17:00)`
+                          : 'Garantierte qualifizierte Rückmeldung innerhalb von 60 Minuten'}
+                      </span>
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Status Flow Bar */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '14px 18px',
+                width: '100%',
+                maxWidth: '420px',
+                boxSizing: 'border-box',
+                textAlign: 'left',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', boxShadow: '0 0 8px #16a34a' }} />
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                    Ticket erfasst &amp; Plattformbetrieb zugewiesen
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.4 }}>
+                  ⚖️ <strong>Rechtskonform nach § 5 Abs. 1 Nr. 2 DDG (BGH I ZR 238/14):</strong> Deine Anfrage wird direkt im Master-Admin Cockpit priorisiert. Du erhältst die Rückmeldung hier im App-Dashboard sowie per In-App Mitteilung.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '420px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveModalTab('my_feedback');
+                    setIsSubmitted(false);
+                    setContent('');
+                    setSelectedTags([]);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: '#ffffff',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Inbox size={15} />
+                  <span>Zu meinen Einreichungen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSubmitted(false);
+                    setContent('');
+                    setSelectedTags([]);
+                    onClose();
+                  }}
+                  style={{
+                    padding: '12px 18px',
+                    borderRadius: '12px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Schließen
+                </button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               
-              {/* Step 1: Linear-Style Segmented Control (Feature Idea vs Bug) */}
+              {/* Step 1: Linear-Style Segmented Control (Feature Idea vs Bug vs Express Support) */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
                   Anliegen-Typ
@@ -827,7 +1001,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                     }}
                   >
                     <Lightbulb size={14} color={feedbackType === 'feature_idea' ? accentColor : '#94a3b8'} strokeWidth={2.2} />
-                    <span>Idee & Wunsch</span>
+                    <span>Idee &amp; Wunsch</span>
                   </button>
 
                   <button
@@ -880,10 +1054,34 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <ShieldCheck size={14} color={feedbackType === 'support_request' ? '#0891b2' : '#94a3b8'} strokeWidth={2.2} />
-                    <span>Ghost-Support</span>
+                    <Zap size={14} color={feedbackType === 'support_request' ? '#0891b2' : '#94a3b8'} strokeWidth={2.2} />
+                    <span>Express-Support (60m)</span>
                   </button>
                 </div>
+
+                {/* 60-Minute SLA Pledge Banner */}
+                {(feedbackType === 'support_request' || feedbackType === 'bug') && (
+                  <div style={{
+                    background: '#f0fdf4',
+                    border: '1.5px solid #86efac',
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginTop: '8px'
+                  }}>
+                    <span style={{ fontSize: '1.1rem' }}>⚡</span>
+                    <div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 850, color: '#15803d' }}>
+                        60-Minuten Express-SLA (BGH § 5 DDG konform)
+                      </div>
+                      <div style={{ fontSize: '0.70rem', color: '#166534', marginTop: '1px' }}>
+                        Garantierte qualifizierte Erst-Rückmeldung an Werktagen (Mo–Fr 09:00–17:00 Uhr) innerhalb von 60 Min.
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Enterprise Ghost Mode Consent Box */}
                 {(feedbackType === 'support_request' || feedbackType === 'bug') && (

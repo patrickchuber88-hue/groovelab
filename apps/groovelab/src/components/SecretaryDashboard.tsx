@@ -1659,6 +1659,20 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [qrModalUser, setQrModalUser] = useState<any | null>(null);
   const [copiedQrLink, setCopiedQrLink] = useState<boolean>(false);
 
+  // Live Real-Time Sync for Room Issues & Facility Defects across tabs
+  useEffect(() => {
+    if (!schoolId) return;
+    const unsubscribe = notesService.onSync(async () => {
+      try {
+        const fetchedIssues = await notesService.fetchSchoolRoomIssues(schoolId);
+        setRoomIssues(fetchedIssues);
+      } catch (err) {
+        console.warn('Real-time room issues sync notice:', err);
+      }
+    });
+    return () => unsubscribe();
+  }, [schoolId]);
+
 
   // Visual Live Lab states & refs
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
@@ -6282,6 +6296,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     e.preventDefault();
     if (!newTeacherFirstName.trim() || !newTeacherLastName.trim()) return;
 
+    if (!isAvvSigned) {
+      alert('DSGVO-Compliance: Vor dem Anlegen von Lehrkräften muss der gesetzliche Auftragsverarbeitungsvertrag (AVV gem. Art. 28 DSGVO) einmalig durch die Schulleitung digital gezeichnet werden.');
+      setShowAvvModal(true);
+      return;
+    }
+
     try {
       const pin = generateStarterPin('teacher', false, false);
       const qrToken = generateSecureQrToken();
@@ -6325,6 +6345,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     e.preventDefault();
     if (!newTeacherFirstName.trim() || !newTeacherLastName.trim()) return;
 
+    if (!isAvvSigned) {
+      alert('DSGVO-Compliance: Vor dem Anlegen von Lehrkräften muss der gesetzliche Auftragsverarbeitungsvertrag (AVV gem. Art. 28 DSGVO) einmalig durch die Schulleitung digital gezeichnet werden.');
+      setShowAvvModal(true);
+      return;
+    }
+
     try {
       const pin = generateStarterPin('teacher', false, false);
       const qrToken = generateSecureQrToken();
@@ -6367,6 +6393,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const handleCreateCoach = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!coachFirstName || !coachLastName || !coachEmail) return;
+
+    if (!isAvvSigned) {
+      alert('DSGVO-Compliance: Vor dem Anlegen von Lehrkräften muss der gesetzliche Auftragsverarbeitungsvertrag (AVV gem. Art. 28 DSGVO) einmalig durch die Schulleitung digital gezeichnet werden.');
+      setShowAvvModal(true);
+      return;
+    }
 
     try {
       const pin = generateStarterPin(coachRole, false, true);
@@ -17283,21 +17315,34 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   flexWrap: 'wrap'
                                 }}>
                                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: '240px' }}>
-                                    <div style={{
-                                      background: '#fee2e2',
-                                      color: '#dc2626',
-                                      borderRadius: '10px',
-                                      padding: '6px 10px',
-                                      fontWeight: 800,
-                                      fontSize: '0.75rem',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      flexShrink: 0
-                                    }}>
-                                      <DoorOpen size={12} />
-                                      <span>{issue.room_id || 'Raum'}</span>
-                                    </div>
+                                    {(() => {
+                                      const isEquip = (issue.tags && issue.tags.includes('#Ausstattung')) || 
+                                                      issue.content.toLowerCase().includes('klavier') || 
+                                                      issue.content.toLowerCase().includes('piano') || 
+                                                      issue.content.toLowerCase().includes('drum') || 
+                                                      issue.content.toLowerCase().includes('gitarre') || 
+                                                      issue.content.toLowerCase().includes('saite') || 
+                                                      issue.content.toLowerCase().includes('kabel') || 
+                                                      issue.content.toLowerCase().includes('pedal') || 
+                                                      issue.content.toLowerCase().includes('netzteil');
+                                      return (
+                                        <div style={{
+                                          background: '#fee2e2',
+                                          color: '#dc2626',
+                                          borderRadius: '10px',
+                                          padding: '6px 10px',
+                                          fontWeight: 800,
+                                          fontSize: '0.75rem',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          flexShrink: 0
+                                        }}>
+                                          {isEquip ? <Music size={12} /> : <DoorOpen size={12} />}
+                                          <span>{issue.room_id || (isEquip ? 'Ausstattung' : 'Raum')}</span>
+                                        </div>
+                                      );
+                                    })()}
                                     <div>
                                       <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
                                         {cleanContent || issue.content}
@@ -32335,6 +32380,39 @@ status: status,
                                           <>
                                             <DoorOpen size={12} style={{ color: '#64748b' }} />
                                             <span>{inst.roomName}</span>
+                                            {(() => {
+                                              const openDefect = roomIssues.find(issue => 
+                                                !issue.is_completed && !issue.is_acknowledged && (
+                                                  issue.content.toLowerCase().includes(inst.fullName.toLowerCase()) ||
+                                                  (inst.roomName && issue.room_id === inst.roomName && (
+                                                    issue.content.toLowerCase().includes(group.baseName.toLowerCase()) ||
+                                                    issue.content.toLowerCase().includes('klavier') ||
+                                                    issue.content.toLowerCase().includes('piano') ||
+                                                    issue.content.toLowerCase().includes('drum') ||
+                                                    issue.content.toLowerCase().includes('gitarre') ||
+                                                    issue.content.toLowerCase().includes('amp')
+                                                  ))
+                                                )
+                                              );
+                                              if (!openDefect) return null;
+                                              return (
+                                                <span style={{
+                                                  background: '#fee2e2',
+                                                  color: '#dc2626',
+                                                  borderRadius: '6px',
+                                                  padding: '2px 6px',
+                                                  fontSize: '0.62rem',
+                                                  fontWeight: 800,
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '3px',
+                                                  marginLeft: '3px'
+                                                }} title={`Mangel gemeldet: ${openDefect.content}`}>
+                                                  <AlertCircle size={10} />
+                                                  <span>Mangel</span>
+                                                </span>
+                                              );
+                                            })()}
                                             <button
                                               onClick={async (e) => {
                                                 e.stopPropagation();
@@ -32362,7 +32440,33 @@ status: status,
                                             </button>
                                           </>
                                         ) : (
-                                          <span>📦 Pool / Frei</span>
+                                          <>
+                                            <span>📦 Pool / Frei</span>
+                                            {(() => {
+                                              const openDefect = roomIssues.find(issue => 
+                                                !issue.is_completed && !issue.is_acknowledged && 
+                                                issue.content.toLowerCase().includes(inst.fullName.toLowerCase())
+                                              );
+                                              if (!openDefect) return null;
+                                              return (
+                                                <span style={{
+                                                  background: '#fee2e2',
+                                                  color: '#dc2626',
+                                                  borderRadius: '6px',
+                                                  padding: '2px 6px',
+                                                  fontSize: '0.62rem',
+                                                  fontWeight: 800,
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '3px',
+                                                  marginLeft: '3px'
+                                                }} title={`Mangel gemeldet: ${openDefect.content}`}>
+                                                  <AlertCircle size={10} />
+                                                  <span>Mangel</span>
+                                                </span>
+                                              );
+                                            })()}
+                                          </>
                                         )}
                                       </div>
                                     );

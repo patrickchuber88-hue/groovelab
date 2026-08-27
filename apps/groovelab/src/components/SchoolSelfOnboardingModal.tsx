@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase';
 import { 
   Building, User, Check, Shield, GraduationCap, 
   Music, Zap, ArrowRight, ArrowLeft, Lock, Mail, MapPin, Key,
-  CheckCircle, Fingerprint, Download, Copy, Sparkles, Smartphone, Link, X
+  CheckCircle, Fingerprint, Download, Copy, Sparkles, Smartphone, Link, X,
+  ShieldCheck, Eye, EyeOff
 } from 'lucide-react';
 import { isWebAuthnSupported, registerUserBiometrics } from '../utils/webauthn';
 import { inlineAllImagesInElement } from './IDBadgeCard';
@@ -25,6 +26,32 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [showLegalModal, setShowLegalModal] = useState<boolean>(false);
   const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy' | 'impressum' | 'cancellation'>('terms');
+
+  // Beta Entwickler-Schutz (Passwort: campus-test)
+  const [isAccessGranted, setIsAccessGranted] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('cg_beta_dev_access') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [accessCodeInput, setAccessCodeInput] = useState<string>('');
+  const [accessCodeError, setAccessCodeError] = useState<string | null>(null);
+  const [showAccessPassword, setShowAccessPassword] = useState<boolean>(false);
+
+  const handleVerifyAccessCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = accessCodeInput.trim().toLowerCase();
+    if (clean === 'campus-test' || clean === 'campustest') {
+      try {
+        sessionStorage.setItem('cg_beta_dev_access', 'true');
+      } catch (err) {}
+      setIsAccessGranted(true);
+      setAccessCodeError(null);
+    } else {
+      setAccessCodeError('Ungültiges Entwickler-Passwort. Bitte wende dich an das Campus-Groovelab Team.');
+    }
+  };
 
   // Step 1: Ultra-Lean Core Fields
   const [schoolName, setSchoolName] = useState<string>('');
@@ -470,6 +497,139 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
             </div>
           )}
 
+          {!isAccessGranted ? (
+            <div style={{ textAlign: 'center', padding: '12px 4px 6px' }}>
+              <div style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '16px',
+                background: 'rgba(52, 168, 83, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                color: '#34a853'
+              }}>
+                <Lock size={26} />
+              </div>
+
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                color: '#34a853',
+                background: 'rgba(52, 168, 83, 0.08)',
+                border: '1px solid rgba(52, 168, 83, 0.25)',
+                padding: '4px 12px',
+                borderRadius: '100px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                marginBottom: '12px'
+              }}>
+                <ShieldCheck size={13} />
+                Geschlossene Entwickler-Beta
+              </div>
+
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+                Entwickler-Schutz aktiv
+              </h2>
+
+              <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0 0 20px 0', lineHeight: 1.55 }}>
+                Die Neuregistrierung von Musikschulen ist während der aktuellen Beta-Phase passwortgeschützt.
+              </p>
+
+              {accessCodeError && (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  color: '#b91c1c',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  marginBottom: '16px',
+                  textAlign: 'left'
+                }}>
+                  {accessCodeError}
+                </div>
+              )}
+
+              <form onSubmit={handleVerifyAccessCode} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>
+                    Entwickler-Passwort
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input
+                      type={showAccessPassword ? 'text' : 'password'}
+                      required
+                      value={accessCodeInput}
+                      onChange={(e) => {
+                        setAccessCodeInput(e.target.value);
+                        if (accessCodeError) setAccessCodeError(null);
+                      }}
+                      placeholder="Passwort eingeben..."
+                      className="lean-input"
+                      style={{ paddingRight: '44px' }}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAccessPassword(!showAccessPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '4px'
+                      }}
+                    >
+                      {showAccessPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="lean-btn-primary"
+                  style={{
+                    width: '100%',
+                    marginTop: '4px',
+                    fontSize: '0.92rem',
+                    padding: '13px 18px'
+                  }}
+                >
+                  <span>Freischalten &amp; Weiter</span>
+                  <ArrowRight size={17} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{
+                    background: 'transparent',
+                    color: '#64748b',
+                    border: 'none',
+                    padding: '8px',
+                    fontSize: '0.80rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    marginTop: '2px'
+                  }}
+                >
+                  ✕ Abbrechen &amp; Schließen
+                </button>
+              </form>
+            </div>
+          ) : (
+            <>
           {/* ═══════════════════════════════════════════════════════════════════════════
               STAGE 1: ULTRA-LEAN INPUT (5 ESSENZIELLE FELDER INKL. § 14 UStG ANSCHRIFT)
               ═══════════════════════════════════════════════════════════════════════════ */}
@@ -886,6 +1046,8 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 <ArrowRight size={17} />
               </button>
             </div>
+          )}
+          </>
           )}
         </div>
       </div>

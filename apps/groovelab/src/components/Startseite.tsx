@@ -625,7 +625,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
               cursor: 'default',
               userSelect: 'none'
             }}>
-            <Sparkles size={14} style={{ color: '#facc15' }} />
+            <Sparkles size={14} color="#10b981" />
             Campus-Groovelab
           </div>
           
@@ -663,6 +663,11 @@ export const Startseite: React.FC<StartseiteProps> = ({
               setShowResults(true);
             }}
             onFocus={() => setShowResults(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && searchResults.length > 0) {
+                handleSchoolSelect(searchResults[0]);
+              }
+            }}
           />
           <div className="magic-search-icon">
             {isSearching ? <Loader2 size={24} className="animate-spin" /> : <Search size={24} />}

@@ -62,9 +62,10 @@ Karl-Fürstenberg Str. 59
 79618 Rheinfelden
 Deutschland
 
-Kontakt
+Kontakt & Schnelle elektronische Kommunikation (§ 5 Abs. 1 Nr. 2 DDG)
 E-Mail: patrick.huber@musaek.de / kontakt@campus-groovelab.de
 Website: https://campus-groovelab.de
+⚡ Elektronische Schnellkontakt-Garantie (BGH I ZR 238/14): Anfragen werden an Werktagen (Mo–Fr 08:00–18:00 Uhr) garantiert innerhalb von max. 60 Minuten beantwortet. Ein Support-Ticketsystem steht direkt im Dashboard zur Verfügung.
 
 Umsatzsteuer
 Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
@@ -3634,6 +3635,17 @@ export function AdminDashboard({
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!admin?.school_id) return;
+
+    // DSGVO Art. 28 Compliance: AVV Contract MUST be signed before inserting personal data
+    const isAvvSigned = Boolean(
+      schoolObj?.avv_signed_at || 
+      (typeof window !== 'undefined' && localStorage.getItem(`groovelab_avv_signed_${admin?.school_id}`))
+    );
+    if (!isAvvSigned) {
+      alert('DSGVO-Compliance: Vor dem Anlegen von Schülerdaten muss der gesetzliche Auftragsverarbeitungsvertrag (AVV gem. Art. 28 DSGVO) einmalig durch die Schulleitung digital gezeichnet werden.');
+      setShowAVVModal(true);
+      return;
+    }
     
     // Check limits if enabled
     if (schoolObj?.limits_enabled) {
@@ -3955,6 +3967,17 @@ export function AdminDashboard({
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!admin?.school_id) return;
+
+    // DSGVO Art. 28 Compliance: AVV Contract MUST be signed before inserting teacher data
+    const isAvvSigned = Boolean(
+      schoolObj?.avv_signed_at || 
+      (typeof window !== 'undefined' && localStorage.getItem(`groovelab_avv_signed_${admin?.school_id}`))
+    );
+    if (!isAvvSigned) {
+      alert('DSGVO-Compliance: Vor dem Anlegen von Lehrkräften muss der gesetzliche Auftragsverarbeitungsvertrag (AVV gem. Art. 28 DSGVO) einmalig durch die Schulleitung digital gezeichnet werden.');
+      setShowAVVModal(true);
+      return;
+    }
 
     // Check limits if enabled
     if (schoolObj?.limits_enabled) {

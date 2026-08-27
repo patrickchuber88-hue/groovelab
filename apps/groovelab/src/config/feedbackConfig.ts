@@ -13,6 +13,7 @@ export interface FeedbackCategory {
 
 export interface PlatformFeedbackItem {
   id: string;
+  ticket_number?: string | null;
   school_id?: string | null;
   user_id?: string | null;
   user_name?: string | null;
@@ -39,6 +40,8 @@ export interface PlatformFeedbackItem {
   admin_notes?: string;
   admin_response?: string | null;
   admin_responded_at?: string | null;
+  first_response_seconds?: number | null;
+  sla_fulfilled?: boolean | null;
   is_user_read?: boolean;
   is_announcement_created?: boolean;
   created_at: string;
@@ -108,62 +111,279 @@ export const FEEDBACK_STATUSES: FeedbackStatusMeta[] = [
 export interface QuickResponseTemplate {
   id: string;
   label: string;
-  category: 'positive' | 'info' | 'legal' | 'scope';
+  shortTag: string;
+  category: 'sla_first_touch' | 'positive' | 'info' | 'legal' | 'scope';
   status: FeedbackStatus;
   text: string;
 }
 
 export const QUICK_RESPONSE_TEMPLATES: QuickResponseTemplate[] = [
+  // ── ⚡ 60-MINUTEN FIRST TOUCH & SLA SCHNELLBAUSTEINE ──
+  {
+    id: 'first_touch_tech_fix',
+    label: '🛠️ SLA: In technischer Prüfung',
+    shortTag: 'Tech-Fix',
+    category: 'sla_first_touch',
+    status: 'in_review',
+    text: 'Hallo! Vielen Dank für Ihren Hinweis. Unser technischer Plattformbetrieb hat Ihr Ticket erfasst und analysiert das Fehlerbild auf Ihrem Gerätetyp. Wir melden uns schnellstmöglich mit einer Lösung.'
+  },
+  {
+    id: 'first_touch_quick_guide',
+    label: '💡 SLA: Sofort-Hilfe / FAQ',
+    shortTag: 'Sofort-Hilfe',
+    category: 'sla_first_touch',
+    status: 'done',
+    text: 'Hallo! Vielen Dank für Ihre Nachricht. Diese Funktion steht Ihnen direkt in der App zur Verfügung: Bitte öffnen Sie das Menü und wählen Sie den entsprechenden Bereich aus. Bei weiteren Fragen helfen wir jederzeit gerne!'
+  },
+  {
+    id: 'first_touch_legal_dsgvo',
+    label: '🔒 SLA: DSGVO / Vertragsauskunft',
+    shortTag: 'DSGVO / Recht',
+    category: 'sla_first_touch',
+    status: 'in_progress',
+    text: 'Sehr geehrte Schulleitung, vielen Dank für Ihre Anfrage. Wir haben Ihr Anliegen aufgenommen und stellen Ihnen die gewünschten Unterlagen bzw. die DSGVO-Auskunft fristgerecht zur Verfügung.'
+  },
   {
     id: 'roadmap_accept',
-    label: 'Roadmap-Zusage',
+    label: '🚀 Roadmap-Zusage',
+    shortTag: 'Roadmap',
     category: 'positive',
     status: 'planned',
     text: 'Vielen Dank für diese hervorragende Idee! Wir haben deinen Vorschlag in unsere Entwicklungs-Roadmap aufgenommen und planen die Umsetzung für eines der nächsten Updates.'
   },
   {
     id: 'in_progress',
-    label: 'In Umsetzung',
+    label: '⚡ In Umsetzung',
+    shortTag: 'In Arbeit',
     category: 'positive',
     status: 'in_progress',
     text: 'Großartiger Vorschlag! Unsere Entwickler arbeiten aktuell bereits an der Umsetzung dieses Features.'
   },
   {
     id: 'bug_fixed',
-    label: 'Bug behoben',
+    label: '✅ Bug behoben',
+    shortTag: 'Behoben',
     category: 'positive',
     status: 'done',
     text: 'Danke für deinen aufmerksamen Hinweis! Wir konnten das Problem analysieren und haben den Fehler mit dem neuesten Update behoben.'
   },
   {
-    id: 'tip_available',
-    label: 'Bereits möglich',
-    category: 'info',
-    status: 'done',
-    text: 'Vielen Dank für deine Nachricht! Diese Funktion ist bereits im System verfügbar oder lässt sich über die entsprechenden Einstellungen anpassen.'
-  },
-  {
     id: 'declined_legal',
-    label: 'Rechtlich nicht machbar',
+    label: '⚖️ Rechtlich nicht machbar',
+    shortTag: 'UrhG / Recht',
     category: 'legal',
     status: 'declined',
-    text: 'Vielen Dank für deinen Vorschlag! Nach eingehender juristischer und regulatorischer Prüfung (u. a. Urheberrecht/GEMA, B2B-Schulvertragsrecht und Compliance) können wir diese Funktion leider nicht rechtssicher im Plattform-Standard abbilden. Wir danken dir dennoch herzlich für deinen engagierten Beitrag zur Plattform!'
-  },
-  {
-    id: 'declined_gdpr',
-    label: 'Datenschutz-Absage',
-    category: 'legal',
-    status: 'declined',
-    text: 'Herzlichen Dank für deinen Input. Zum Schutz der strengen DSGVO- und Datenschutzstandards für Schulen und Minderjährige (Datenminimierung & Kinderschutz) können wir dieses Feature in dieser Form leider nicht anbieten.'
+    text: 'Vielen Dank für deinen Vorschlag! Nach eingehender juristischer und regulatorischer Prüfung (u. a. Urheberrecht/Notenvervielfältigung und B2B-Compliance) können wir diese Funktion leider nicht im Plattform-Standard abbilden.'
   },
   {
     id: 'declined_scope',
-    label: 'Scope & Minimalismus',
+    label: '🎯 Scope & Minimalismus',
+    shortTag: 'Scope',
     category: 'scope',
     status: 'declined',
-    text: 'Vielen Dank für deine Idee! Um die kompromisslose Einfachheit, Geschwindigkeit und intuitive Bedienung von Campus-Groovelab für alle Lehrkräfte und Schüler zu gewährleisten, halten wir den Plattform-Kern schlank und können dieses Spezial-Feature aktuell nicht aufnehmen.'
+    text: 'Vielen Dank für deine Idee! Um die kompromisslose Einfachheit, Geschwindigkeit und intuitive Bedienung von Campus-Groovelab für alle Nutzer zu gewährleisten, halten wir den Plattform-Kern schlank und können dieses Spezial-Feature aktuell nicht aufnehmen.'
   }
 ];
+
+/**
+ * Enterprise+ SLA Calculation Engine:
+ * Business Hours: Monday – Friday, 09:00 – 17:00 (German Business Time).
+ * Guaranteed response time: 60 minutes during business hours, or next working day by 10:00.
+ */
+export interface SlaCalculationResult {
+  dueAt: Date;
+  isWithinBusinessHours: boolean;
+  displayTarget: string;
+  secondsRemaining: number;
+  minutesRemaining: number;
+  isExpired: boolean;
+  urgencyLevel: 'critical' | 'warning' | 'normal' | 'after_hours' | 'fulfilled';
+  badgeColor: string;
+  badgeBg: string;
+  label: string;
+}
+
+export const computeSlaTarget = (
+  createdAtString: string,
+  respondedAtString?: string | null
+): SlaCalculationResult => {
+  const createdDate = new Date(createdAtString);
+  const now = new Date();
+
+  // Helper: check if day is weekend (0 = Sun, 6 = Sat)
+  const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
+
+  // Determine SLA Due Date
+  const startHour = createdDate.getHours();
+  const startMinute = createdDate.getMinutes();
+  const isWeekday = !isWeekend(createdDate);
+  const inHours = isWeekday && startHour >= 9 && (startHour < 17 || (startHour === 17 && startMinute === 0));
+
+  let dueDate = new Date(createdDate.getTime());
+
+  if (inHours) {
+    // If created before 16:00 -> due +60 mins
+    if (startHour < 16 || (startHour === 16 && startMinute === 0)) {
+      dueDate = new Date(createdDate.getTime() + 60 * 60 * 1000);
+    } else {
+      // Created between 16:00 and 17:00 -> remaining minutes roll over to next business day 09:00
+      const minutesLeftToday = (17 * 60) - (startHour * 60 + startMinute);
+      const rolloverMinutes = 60 - minutesLeftToday;
+      
+      // Advance to next business day 09:00
+      dueDate.setDate(dueDate.getDate() + 1);
+      while (isWeekend(dueDate)) {
+        dueDate.setDate(dueDate.getDate() + 1);
+      }
+      dueDate.setHours(9, rolloverMinutes, 0, 0);
+    }
+  } else {
+    // Created after hours or on weekend -> SLA starts next business day 09:00, due by 10:00
+    if (startHour >= 17) {
+      dueDate.setDate(dueDate.getDate() + 1);
+    }
+    while (isWeekend(dueDate)) {
+      dueDate.setDate(dueDate.getDate() + 1);
+    }
+    dueDate.setHours(10, 0, 0, 0);
+  }
+
+  // Check if already responded
+  if (respondedAtString) {
+    const respDate = new Date(respondedAtString);
+    const diffSec = Math.max(0, Math.floor((respDate.getTime() - createdDate.getTime()) / 1000));
+    const fulfilled = respDate.getTime() <= dueDate.getTime();
+    return {
+      dueAt: dueDate,
+      isWithinBusinessHours: inHours,
+      displayTarget: `Beantwortet in ${Math.round(diffSec / 60)} Min.`,
+      secondsRemaining: 0,
+      minutesRemaining: 0,
+      isExpired: false,
+      urgencyLevel: 'fulfilled',
+      badgeColor: fulfilled ? '#16a34a' : '#d97706',
+      badgeBg: fulfilled ? '#dcfce7' : '#fef3c7',
+      label: fulfilled ? `✓ SLA erfüllt (${Math.round(diffSec / 60)} Min.)` : `✓ Beantwortet`
+    };
+  }
+
+  const secondsRemaining = Math.floor((dueDate.getTime() - now.getTime()) / 1000);
+  const minutesRemaining = Math.floor(secondsRemaining / 60);
+  const isExpired = secondsRemaining <= 0;
+
+  if (isExpired) {
+    return {
+      dueAt: dueDate,
+      isWithinBusinessHours: inHours,
+      displayTarget: `SLA fällig seit ${Math.abs(minutesRemaining)} Min.`,
+      secondsRemaining: 0,
+      minutesRemaining: 0,
+      isExpired: true,
+      urgencyLevel: 'critical',
+      badgeColor: '#dc2626',
+      badgeBg: '#fee2e2',
+      label: `🚨 SLA Überschritten (${Math.abs(minutesRemaining)}m)`
+    };
+  }
+
+  if (!inHours) {
+    const dayNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+    const dueDay = dayNames[dueDate.getDay()];
+    const dueTime = `${String(dueDate.getHours()).padStart(2, '0')}:${String(dueDate.getMinutes()).padStart(2, '0')}`;
+    return {
+      dueAt: dueDate,
+      isWithinBusinessHours: false,
+      displayTarget: `Fällig ${dueDay}, ${dueTime} Uhr`,
+      secondsRemaining,
+      minutesRemaining,
+      isExpired: false,
+      urgencyLevel: 'after_hours',
+      badgeColor: '#64748b',
+      badgeBg: '#f1f5f9',
+      label: `🌙 Ruhezeit • Fällig ${dueDay} ${dueTime}`
+    };
+  }
+
+  if (minutesRemaining < 15) {
+    return {
+      dueAt: dueDate,
+      isWithinBusinessHours: true,
+      displayTarget: `Noch ${minutesRemaining} Min.`,
+      secondsRemaining,
+      minutesRemaining,
+      isExpired: false,
+      urgencyLevel: 'critical',
+      badgeColor: '#dc2626',
+      badgeBg: '#fee2e2',
+      label: `⏱️ Noch ${minutesRemaining} Min. (Kritisch)`
+    };
+  }
+
+  if (minutesRemaining < 30) {
+    return {
+      dueAt: dueDate,
+      isWithinBusinessHours: true,
+      displayTarget: `Noch ${minutesRemaining} Min.`,
+      secondsRemaining,
+      minutesRemaining,
+      isExpired: false,
+      urgencyLevel: 'warning',
+      badgeColor: '#d97706',
+      badgeBg: '#fef3c7',
+      label: `⏳ Noch ${minutesRemaining} Min.`
+    };
+  }
+
+  return {
+    dueAt: dueDate,
+    isWithinBusinessHours: true,
+    displayTarget: `Noch ${minutesRemaining} Min.`,
+    secondsRemaining,
+    minutesRemaining,
+    isExpired: false,
+    urgencyLevel: 'normal',
+    badgeColor: '#16a34a',
+    badgeBg: '#dcfce7',
+    label: `🟢 SLA aktiv: Noch ${minutesRemaining} Min.`
+  };
+};
+
+/**
+ * Format SLA Seconds cleanly into HH:MM:SS or MM:SS with clear units
+ */
+export const formatSlaCountdown = (seconds: number): {
+  timeString: string;
+  unit: string;
+  isHours: boolean;
+  hours: number;
+  minutes: number;
+  secs: number;
+} => {
+  const totalSeconds = Math.max(0, seconds);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  if (hours > 0) {
+    return {
+      timeString: `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`,
+      unit: 'Std.',
+      isHours: true,
+      hours,
+      minutes,
+      secs
+    };
+  }
+
+  return {
+    timeString: `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`,
+    unit: 'Min.',
+    isHours: false,
+    hours,
+    minutes,
+    secs
+  };
+};
 
 export interface PlatformAnnouncement {
   id: string;
