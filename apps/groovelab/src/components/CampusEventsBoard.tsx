@@ -3346,7 +3346,65 @@ export function CampusEventsBoard({
 
         const { data: allStudentsList } = await studentQuery;
 
-        teacherPlannedBoards.forEach(board => {
+        const recalculateBoardTimesForEvents = (board: any): any => {
+          if (!board || !Array.isArray(board.students)) return board;
+          const parseTimeH = (t: string): [number, number] => {
+            if (!t || !t.includes(':')) return [14, 0];
+            const [h, m] = t.split(':').map(Number);
+            return [isNaN(h) ? 14 : h, isNaN(m) ? 0 : m];
+          };
+          const snapTimeH = (timeStr: string, snap = 15): string => {
+            if (!timeStr) return timeStr;
+            const [h, m] = parseTimeH(timeStr);
+            const total = h * 60 + m;
+            const snapped = Math.round(total / snap) * snap;
+            return `${String(Math.floor(snapped / 60) % 24).padStart(2, '0')}:${String(snapped % 60).padStart(2, '0')}`;
+          };
+          const addMinsH = (time: string, mins: number): string => {
+            const [h, m] = parseTimeH(time);
+            const total = h * 60 + m + mins;
+            return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+          };
+
+          const startAnchor = board.startTime || board.startAnchor || '14:00';
+          const sorted = [...board.students].sort((a, b) => {
+            const aTime = a.customStartTime || a.assignedTime || a.startTime || startAnchor;
+            const bTime = b.customStartTime || b.assignedTime || b.startTime || startAnchor;
+            const [ah, am] = parseTimeH(aTime);
+            const [bh, bm] = parseTimeH(bTime);
+            return (ah * 60 + am) - (bh * 60 + bm);
+          });
+
+          let curTime = snapTimeH(startAnchor, 15);
+          const updated = sorted.map((s: any) => {
+            let assignedStart = curTime;
+            if (s.isPinned && (s.customStartTime || s.assignedTime)) {
+              const targetTime = s.customStartTime || s.assignedTime || startAnchor;
+              const snapped = snapTimeH(targetTime, 15);
+              const [csh, csm] = parseTimeH(snapped);
+              const [curh, curm] = parseTimeH(curTime);
+              if (csh * 60 + csm >= curh * 60 + curm) assignedStart = snapped;
+            } else if (s.customStartTime) {
+              const snapped = snapTimeH(s.customStartTime, 15);
+              const [csh, csm] = parseTimeH(snapped);
+              const [curh, curm] = parseTimeH(curTime);
+              if (csh * 60 + csm >= curh * 60 + curm) assignedStart = snapped;
+            } else if (s.assignedTime) {
+              const snapped = snapTimeH(s.assignedTime, 15);
+              const [csh, csm] = parseTimeH(snapped);
+              const [curh, curm] = parseTimeH(curTime);
+              if (csh * 60 + csm >= curh * 60 + curm) assignedStart = snapped;
+            }
+            const assignedTime = snapTimeH(assignedStart, 15);
+            const dur = s.duration || 30;
+            curTime = snapTimeH(addMinsH(assignedTime, dur), 15);
+            return { ...s, assignedTime };
+          });
+          return { ...board, students: updated };
+        };
+
+        teacherPlannedBoards.forEach(rawBoard => {
+          const board = recalculateBoardTimesForEvents(rawBoard);
           if (board.students && Array.isArray(board.students)) {
             board.students.forEach((s: any) => {
               if (s.isBreak) return;

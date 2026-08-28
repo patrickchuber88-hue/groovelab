@@ -30,45 +30,57 @@ const inMemoryRooms = new Map<string, { timestamp: number; data: RoomRecord[] }>
 const inMemoryStations = new Map<string, { timestamp: number; data: StationRecord[] }>();
 const CACHE_TTL_MS = 60 * 1000; // 60 seconds TTL
 
-export async function fetchRoomsBySchool(schoolId: string, force = false): Promise<RoomRecord[]> {
+export async function fetchRoomsBySchool(schoolId: string, force = false, activePlatform?: string): Promise<RoomRecord[]> {
   if (!schoolId) return [];
 
-  if (!force && inMemoryRooms.has(schoolId)) {
-    const cached = inMemoryRooms.get(schoolId)!;
+  const persistentKey = activePlatform 
+    ? `campus_all_rooms_${schoolId}_${activePlatform}`
+    : `campus_all_rooms_${schoolId}`;
+
+  const memoryKey = `${schoolId}_${activePlatform || 'all'}`;
+
+  if (!force && inMemoryRooms.has(memoryKey)) {
+    const cached = inMemoryRooms.get(memoryKey)!;
     if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
       return cached.data;
     }
   }
 
-  const persistentKey = `campus_all_rooms_${schoolId}`;
   if (!force) {
     const cached = getItemWithTTL<RoomRecord[]>(persistentKey);
     if (cached && cached.length > 0) {
-      inMemoryRooms.set(schoolId, { timestamp: Date.now(), data: cached });
+      inMemoryRooms.set(memoryKey, { timestamp: Date.now(), data: cached });
       return cached;
     }
   }
 
-  return dedupeQuery(`rooms_${schoolId}`, async () => {
+  return dedupeQuery(`rooms_${schoolId}_${activePlatform || 'all'}`, async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('rooms')
         .select('*')
-        .eq('school_id', schoolId)
-        .order('sort_order', { ascending: true });
+        .eq('school_id', schoolId);
+
+      if (activePlatform === 'groovelab') {
+        query = query.eq('is_groovelab_active', true);
+      } else if (activePlatform === 'campus') {
+        query = query.eq('is_campus_active', true);
+      }
+
+      const { data, error } = await query.order('sort_order', { ascending: true });
 
       if (error) {
         console.warn('[RoomRepository] Error fetching rooms:', error);
-        return inMemoryRooms.get(schoolId)?.data || [];
+        return inMemoryRooms.get(memoryKey)?.data || [];
       }
 
       const result = data || [];
-      inMemoryRooms.set(schoolId, { timestamp: Date.now(), data: result });
+      inMemoryRooms.set(memoryKey, { timestamp: Date.now(), data: result });
       setItemWithTTL(persistentKey, result, CACHE_TTL_MS);
       return result;
     } catch (err) {
       console.error('[RoomRepository] Unexpected error in fetchRoomsBySchool:', err);
-      return inMemoryRooms.get(schoolId)?.data || [];
+      return inMemoryRooms.get(memoryKey)?.data || [];
     }
   });
 }

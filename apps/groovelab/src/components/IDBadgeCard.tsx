@@ -1,6 +1,7 @@
 import React from 'react';
 import QRCode from 'react-qr-code';
 import { Check } from 'lucide-react';
+import { formatTeacherFullName } from '../utils/nameHelper';
 
 export const urlToDataUrl = async (url: string): Promise<string> => {
   if (!url) return '';
@@ -85,24 +86,28 @@ export interface IDBadgeCardProps {
   };
   activePlatform?: string;
   qrValue?: string;
+  qrSize?: number;
   cardRef?: React.RefObject<HTMLDivElement>;
   onClick?: (e: React.MouseEvent) => void;
   style?: React.CSSProperties;
   showSubtext?: boolean;
   selectedPrint?: boolean;
   onToggleSelectPrint?: (e: React.MouseEvent) => void;
+  isPrintVersion?: boolean;
 }
 
 export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
   user,
   activePlatform,
   qrValue,
+  qrSize,
   cardRef,
   onClick,
   style,
   showSubtext = false,
   selectedPrint,
-  onToggleSelectPrint
+  onToggleSelectPrint,
+  isPrintVersion = false
 }) => {
   const currentPlatform = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab') || 'groovelab';
 
@@ -132,29 +137,50 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
   }
 
   const effectiveQrValue = qrValue || (typeof window !== 'undefined' ? `${window.location.origin}/qr/${user.qr_token || user.id || ''}` : '');
-  const formattedLastName = user.last_name || user.instrument || 'Member';
+  
+  const isTeacherRole = user.role === 'teacher' || userRolesList.includes('teacher') || user.role === 'admin' || userRolesList.includes('admin') || user.role === 'secretary' || userRolesList.includes('secretary');
+  const isStudentRole = (user.role === 'student' || userRolesList.includes('student')) && !isTeacherRole;
 
-  const isTeacherRole = user.role === 'teacher' || userRolesList.includes('teacher');
-  const isStudentRole = user.role === 'student' || userRolesList.includes('student');
+  let displayFirstName = user.first_name || 'Member';
+  let displayLastName = user.last_name || user.instrument || 'Member';
+
+  if (isStudentRole && user.last_name) {
+    const raw = user.last_name.trim();
+    if (raw.length > 0) {
+      if (raw.length === 2 && raw.endsWith('.')) {
+        displayLastName = raw;
+      } else {
+        displayLastName = raw.charAt(0).toUpperCase() + '.';
+      }
+    }
+  } else if (isTeacherRole || !isStudentRole) {
+    const fullTeacher = formatTeacherFullName(user.first_name, user.last_name);
+    const parts = fullTeacher.split(' ');
+    displayFirstName = parts[0] || user.first_name || 'Lehrkraft';
+    displayLastName = parts.slice(1).join(' ') || (user.last_name && user.last_name !== 'L.' ? user.last_name : 'Landenberger');
+  }
+
+  const finalQrSize = qrSize || (isPrintVersion ? 74 : 135);
 
   return (
     <div 
       ref={cardRef}
       onClick={onClick}
       style={{
-        width: '300px',
+        width: isPrintVersion ? '54mm' : '300px',
+        height: isPrintVersion ? '86mm' : 'auto',
         maxWidth: '100%',
         margin: '0 auto',
         background: '#ffffff',
-        borderRadius: '24px',
+        borderRadius: isPrintVersion ? '12px' : '24px',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35), 0 10px 25px -5px rgba(0,0,0,0.08)',
+        boxShadow: isPrintVersion ? 'none' : '0 25px 50px -12px rgba(0,0,0,0.35), 0 10px 25px -5px rgba(0,0,0,0.08)',
         overflow: 'hidden',
-        border: '1px solid rgba(0,0,0,0.06)',
+        border: '1px solid rgba(0,0,0,0.08)',
         boxSizing: 'border-box',
         position: 'relative',
-        aspectRatio: '0.62',
+        aspectRatio: isPrintVersion ? '54 / 86' : '0.62',
         flexShrink: 0,
         ...style
       }}
@@ -187,33 +213,33 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
       )}
 
       {/* Lanyard Hole Mockup (Centered for straight hanging) */}
-      <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b', position: 'relative', flexShrink: 0 }}>
+      <div style={{ height: isPrintVersion ? '20px' : '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b', position: 'relative', flexShrink: 0 }}>
         {/* Centered Lanyard Slot with Metallic Ring */}
         <div style={{ 
-          width: '42px', 
-          height: '10px', 
-          borderRadius: '5px', 
+          width: isPrintVersion ? '24px' : '42px', 
+          height: isPrintVersion ? '6px' : '10px', 
+          borderRadius: isPrintVersion ? '3px' : '5px', 
           background: '#0f172a',
-          border: '2px solid rgba(255,255,255,0.3)',
+          border: '1.5px solid rgba(255,255,255,0.3)',
           boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.6)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
         }}>
-          <div style={{ width: '28px', height: '3px', borderRadius: '1.5px', background: '#020617' }}></div>
+          <div style={{ width: isPrintVersion ? '16px' : '28px', height: '2px', borderRadius: '1px', background: '#020617' }}></div>
         </div>
       </div>
 
       {/* Real-time Dynamic Spectrum Header Line */}
-      <div style={{ height: '8px', width: '100%', background: spectrumGradient, flexShrink: 0 }} />
+      <div style={{ height: isPrintVersion ? '4px' : '8px', width: '100%', background: spectrumGradient, flexShrink: 0 }} />
 
       {/* Role Pill Badges Header */}
       <div style={{ 
-        padding: '10px 14px 4px 14px', 
+        padding: isPrintVersion ? '4px 6px 2px 6px' : '10px 14px 4px 14px', 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '6px',
+        gap: isPrintVersion ? '4px' : '6px',
         flexWrap: 'wrap'
       }}>
         {hasVerwaltung && (
@@ -221,11 +247,11 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
             background: '#fce8e6', 
             color: '#ea4335', 
             border: '1px solid #fad2cf',
-            padding: '3px 8px', 
-            borderRadius: '6px', 
-            fontSize: '0.58rem', 
+            padding: isPrintVersion ? '1.5px 5px' : '3px 8px', 
+            borderRadius: '5px', 
+            fontSize: isPrintVersion ? '0.45rem' : '0.58rem', 
             fontWeight: 1000, 
-            letterSpacing: '0.12em',
+            letterSpacing: '0.1em',
             textTransform: 'uppercase'
           }}>
             VERWALTUNG
@@ -236,11 +262,11 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
             background: '#e6f4ea', 
             color: '#34a853', 
             border: '1px solid #ceebd6',
-            padding: '3px 8px', 
-            borderRadius: '6px', 
-            fontSize: '0.58rem', 
+            padding: isPrintVersion ? '1.5px 5px' : '3px 8px', 
+            borderRadius: '5px', 
+            fontSize: isPrintVersion ? '0.45rem' : '0.58rem', 
             fontWeight: 1000, 
-            letterSpacing: '0.12em',
+            letterSpacing: '0.1em',
             textTransform: 'uppercase'
           }}>
             CAMPUS
@@ -251,11 +277,11 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
             background: '#fefce8', 
             color: '#ca8a04', 
             border: '1px solid #fef08a',
-            padding: '3px 8px', 
-            borderRadius: '6px', 
-            fontSize: '0.58rem', 
+            padding: isPrintVersion ? '1.5px 5px' : '3px 8px', 
+            borderRadius: '5px', 
+            fontSize: isPrintVersion ? '0.45rem' : '0.58rem', 
             fontWeight: 1000, 
-            letterSpacing: '0.12em',
+            letterSpacing: '0.1em',
             textTransform: 'uppercase'
           }}>
             GROOVELAB
@@ -265,53 +291,52 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
           <span style={{ 
             background: '#f1f5f9', 
             color: '#64748b', 
-            border: '1.5px dashed #cbd5e1',
-            padding: '3px 8px', 
-            borderRadius: '6px', 
-            fontSize: '0.58rem', 
+            border: '1px dashed #cbd5e1',
+            padding: isPrintVersion ? '1.5px 5px' : '3px 8px', 
+            borderRadius: '5px', 
+            fontSize: isPrintVersion ? '0.45rem' : '0.58rem', 
             fontWeight: 1000, 
-            letterSpacing: '0.12em',
+            letterSpacing: '0.1em',
             textTransform: 'uppercase'
           }}>
-            INAKTIV (0 MODULE)
+            INAKTIV
           </span>
         )}
       </div>
 
       {/* Main Content Area — Minimalist & Spacious */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 20px 20px 20px', gap: '14px', boxSizing: 'border-box' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isPrintVersion ? '6px 8px 8px 8px' : '16px 20px 20px 20px', gap: isPrintVersion ? '6px' : '14px', boxSizing: 'border-box', justifyContent: 'space-between' }}>
         {/* Large Identity Typography */}
-        <div style={{ textAlign: 'center', marginTop: '6px' }}>
-          <div style={{ fontSize: '2.1rem', fontWeight: 1000, color: '#0f172a', lineHeight: 1.05, fontFamily: "'Urbanist', 'Outfit', sans-serif", letterSpacing: '-0.03em' }}>
-            {user.first_name || 'Member'}
+        <div style={{ textAlign: 'center', marginTop: isPrintVersion ? '2px' : '6px' }}>
+          <div style={{ fontSize: isPrintVersion ? '1.15rem' : '2.1rem', fontWeight: 1000, color: '#0f172a', lineHeight: 1.05, fontFamily: "'Urbanist', 'Outfit', sans-serif", letterSpacing: '-0.03em' }}>
+            {displayFirstName}
           </div>
-          <div style={{ fontSize: '1.05rem', color: '#64748b', marginTop: '4px', fontWeight: 800 }}>
-            {formattedLastName}
+          <div style={{ fontSize: isPrintVersion ? '0.75rem' : '1.05rem', color: '#64748b', marginTop: isPrintVersion ? '2px' : '4px', fontWeight: 800 }}>
+            {displayLastName}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '6px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <div style={{ fontSize: isPrintVersion ? '0.52rem' : '0.72rem', color: '#94a3b8', marginTop: isPrintVersion ? '3px' : '6px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             {isTeacherRole ? 'Lehrkraft' : (isStudentRole ? 'Schüler' : 'Mitglied')}
           </div>
         </div>
 
         {/* QR Code Container */}
         <div className="onboarding-qr-container" style={{ 
-          marginTop: 'auto',
           background: '#f8fafc', 
-          padding: '14px', 
-          borderRadius: '22px',
+          padding: isPrintVersion ? '6px' : '14px', 
+          borderRadius: isPrintVersion ? '12px' : '22px',
           border: '1px solid #f1f5f9',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           boxSizing: 'border-box',
-          boxShadow: '0 4px 14px rgba(0,0,0,0.03)'
+          boxShadow: isPrintVersion ? 'none' : '0 4px 14px rgba(0,0,0,0.03)'
         }}>
-          <QRCode value={effectiveQrValue} size={135} style={{ width: '135px', height: '135px' }} />
+          <QRCode value={effectiveQrValue} size={finalQrSize} style={{ width: `${finalQrSize}px`, height: `${finalQrSize}px` }} />
         </div>
       </div>
 
       {/* Bottom Spectrum Stripe */}
-      <div style={{ height: '8px', width: '100%', background: spectrumGradient, flexShrink: 0 }} />
+      <div style={{ height: isPrintVersion ? '4px' : '8px', width: '100%', background: spectrumGradient, flexShrink: 0 }} />
     </div>
   );
 };

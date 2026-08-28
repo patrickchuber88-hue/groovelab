@@ -43,6 +43,31 @@ export const DEFAULT_FOKUS_LEVELS = {
   level3: { kleine: 10, mittlere: 15, helden: 20 }
 };
 
+/**
+ * Computes the effective evolution level for a student.
+ * 
+ * CORE RULE (Age-Agnostic Streak Progression):
+ * - ALL students start in Level 1 (evolution_level = 1).
+ * - Progression into Level 2 (5/10/15m) requires consistent streak habit (streak >= 14 days OR practiceMinutes >= 250 OR trimesterPracticedDays >= 20).
+ * - Progression into Level 3 (10/15/20m) requires long-term mastery (streak >= 45 days OR practiceMinutes >= 1000 OR trimesterPracticedDays >= 45).
+ * - dbLevel acts as a permanent threshold floor (no de-leveling).
+ */
+export const getEngineEffectiveLevel = (
+  dbLevel: number = 1,
+  totalPracticeMinutes: number = 0,
+  currentStreak: number = 0,
+  trimesterPracticedDays: number = 0
+): number => {
+  const baseLevel = Math.max(1, Math.min(3, Number(dbLevel) || 1));
+  let earnedLevel = 1;
+  if (totalPracticeMinutes >= 1000 || currentStreak >= 45 || trimesterPracticedDays >= 45) {
+    earnedLevel = 3;
+  } else if (totalPracticeMinutes >= 250 || currentStreak >= 14 || trimesterPracticedDays >= 20) {
+    earnedLevel = 2;
+  }
+  return Math.max(baseLevel, earnedLevel);
+};
+
 export const getEngineFlameCategory = (streak: number): 'kleine' | 'mittlere' | 'helden' => {
   if (streak >= 9) return 'helden';
   if (streak >= 4) return 'mittlere';

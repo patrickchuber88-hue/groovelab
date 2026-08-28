@@ -17,6 +17,7 @@ import Confetti from 'react-confetti';
 import { QRCodeModal } from './QRCodeModal';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive, ALL_STICKERS, getUnifiedStickersMap, getUnifiedStickerStatus } from './MeisterwerkDocumentationModal';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
+import { HelpCenterModal } from './help/HelpCenterModal';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
@@ -29,9 +30,10 @@ import { CampusLevelSelectModal } from './campus/CampusLevelSelectModal';
 import { AudioTrackCarousel, AudioTrackItem } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 import { StudentToolboxModal } from './campus/StudentToolboxModal';
+import { getAvatarLevelFrameStyle } from './StudioAvatar';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../utils/audioMasteringEngine';
 import { downloadStudentAudioBackup } from '../utils/audioBackupHelper';
-import { computeGroundTruthMetrics, broadcastPracticeUpdate } from '../utils/studentProgressEngine';
+import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel } from '../utils/studentProgressEngine';
 import { PushNotificationSoftPromptModal } from './ui/PushNotificationSoftPromptModal';
 import { generateGdprDataReportPDF } from '../utils/pdfGenerator';
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
@@ -47,6 +49,7 @@ interface Avatar {
   xp: number;
   asset_path: string;
   streak_flame?: number;
+  current_streak?: number;
 }
 
 const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
@@ -3239,6 +3242,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'parent_controls' | 'security' | 'modules' | 'billing' | 'legal' | null>(null);
   const [showParentActivationModal, setShowParentActivationModal] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [isHelpCenterOpen, setIsHelpCenterOpen] = useState(false);
   const [pinFormNew, setPinFormNew] = useState('');
   const [pinFormConfirm, setPinFormConfirm] = useState('');
   const [pinFormError, setPinFormError] = useState('');
@@ -6776,27 +6780,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return secondsToDisplayMinutes(totalSecs);
   }, [fokusLogs, getExactLogSeconds, secondsToDisplayMinutes]);
 
-  const effectiveLevel = useMemo(() => {
-    const dbLevel = avatar?.evolution_level || 1;
-    let computedLevel = 1;
-    if (totalPracticeMinutes >= 1000) {
-      computedLevel = 3;
-    } else if (totalPracticeMinutes >= 250) {
-      computedLevel = 2;
-    }
-    return Math.max(dbLevel, computedLevel);
-  }, [avatar?.evolution_level, totalPracticeMinutes]);
-
-  const getTargetMinutes = (streak: number = 0) => {
-    const level = effectiveLevel;
-    const cat = getFlameCategory(streak);
-    const config = schoolFokusLevels || DEFAULT_FOKUS_LEVELS;
-    const levelKey = `level${level}` as 'level1' | 'level2' | 'level3';
-    const levelConfig = config[levelKey] || DEFAULT_FOKUS_LEVELS[levelKey];
-    return levelConfig[cat] || DEFAULT_FOKUS_LEVELS[levelKey][cat];
-  };
-
-  const getTrimesterPracticeDays = () => {
+  const getTrimesterPracticeDays = useCallback(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
 
@@ -6818,7 +6802,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const endDate = new Date(endYear, endMonth, 31, 23, 59, 59);
 
     // Filter logs
-    const trimesterLogs = fokusLogs.filter(log => {
+    const trimesterLogs = (fokusLogs || []).filter(log => {
       const logDate = new Date(log.created_at);
       return logDate >= startDate && logDate <= endDate && (log.duration_minutes > 0 || log.duration_seconds > 0);
     });
@@ -6829,10 +6813,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }));
 
     return uniqueDays.size;
+  }, [fokusLogs]);
+
+  const practicedDays = useMemo(() => getTrimesterPracticeDays(), [getTrimesterPracticeDays]);
+
+  const effectiveLevel = useMemo(() => {
+    const dbLevel = avatar?.evolution_level || 1;
+    const currentStreak = avatar?.streak_flame || (avatar as any)?.current_streak || 0;
+    return getEngineEffectiveLevel(dbLevel, totalPracticeMinutes, currentStreak, practicedDays);
+  }, [avatar?.evolution_level, avatar?.streak_flame, totalPracticeMinutes, practicedDays]);
+
+  const getTargetMinutes = (streak: number = 0) => {
+    const level = effectiveLevel;
+    const cat = getFlameCategory(streak);
+    const config = schoolFokusLevels || DEFAULT_FOKUS_LEVELS;
+    const levelKey = `level${level}` as 'level1' | 'level2' | 'level3';
+    const levelConfig = config[levelKey] || DEFAULT_FOKUS_LEVELS[levelKey];
+    return levelConfig[cat] || DEFAULT_FOKUS_LEVELS[levelKey][cat];
   };
 
   const getTrimesterProgressDetails = () => {
-    const practicedDays = getTrimesterPracticeDays();
     const level = effectiveLevel;
     let targetDays = 30;
     let nextLevel = 2;
@@ -23195,53 +23195,60 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           <div style={{ textAlign: 'center', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ position: 'relative', display: 'inline-block', margin: '0 auto' }}>
               {/* Avatar frame */}
-              <div style={{
-                width: '160px',
-                height: '160px',
-                borderRadius: '50%',
-                background: '#f8fafc',
-                border: '3px solid #e2e8f0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.02)',
-                transition: 'all 0.3s'
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <span style={{ fontSize: '5rem' }}>
-                    {avatar.instrument_type === 'guitarist' ? '🎸' : avatar.instrument_type === 'drummer' ? '🥁' : avatar.instrument_type === 'keyboardist' ? '🎹' : '🎤'}
-                  </span>
-                </div>
-              </div>
-              
-              {xpActive && (
-                <div style={{
-                  position: 'absolute',
-                  bottom: '-8px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  background: '#0b57d0',
-                  color: '#ffffff',
-                  fontWeight: 900,
-                  fontSize: '0.68rem',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                  padding: '4px 14px',
-                  borderRadius: '100px',
-                  boxShadow: '0 4px 12px rgba(11, 87, 208, 0.25)',
-                  border: '2px solid #ffffff',
-                  whiteSpace: 'nowrap'
-                }}>
-                  Evolution {currentLevel}
-                </div>
-              )}
+              {(() => {
+                const frameStyle = getAvatarLevelFrameStyle(effectiveLevel);
+                return (
+                  <>
+                    <div style={{
+                      width: '160px',
+                      height: '160px',
+                      borderRadius: '50%',
+                      background: '#f8fafc',
+                      border: frameStyle.border,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      boxShadow: frameStyle.boxShadow,
+                      transition: 'all 0.4s ease'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span style={{ fontSize: '5rem' }}>
+                          {avatar.instrument_type === 'guitarist' ? '🎸' : avatar.instrument_type === 'drummer' ? '🥁' : avatar.instrument_type === 'keyboardist' ? '🎹' : '🎤'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {xpActive && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '-8px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: frameStyle.borderColor,
+                        color: '#ffffff',
+                        fontWeight: 900,
+                        fontSize: '0.68rem',
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                        padding: '4px 14px',
+                        borderRadius: '100px',
+                        boxShadow: frameStyle.boxShadow,
+                        border: '2px solid #ffffff',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        Stufe {effectiveLevel}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* Info Block */}
             <div style={{ marginTop: '8px' }}>
               <h3 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0 }}>
-                Mein Held
+                Mein Avatar
               </h3>
               {xpActive && (
                 <span style={{ color: '#0b57d0', fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
@@ -23271,7 +23278,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     <span>Glückwunsch! Höchste Stufe erreicht!</span>
                   ) : (
                     <>
-                      <span>Noch {nextThreshold - currentXp} XP bis Evolution {currentLevel + 1}</span>
+                      <span>Noch {nextThreshold - currentXp} XP bis Stufe {currentLevel + 1}</span>
                       <span>{Math.round(xpPercentage)}%</span>
                     </>
                   )}
@@ -24652,20 +24659,23 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               ) : (
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div>
-                <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
-                  {isAdultStudent ? '⚙️ Mein Account & Einstellungen' : (isJuniorOrTeen ? '🛡️ Elternbereich' : '⚙️ Einstellungen & Eltern-Zone')}
+                <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: currentPlatform === 'groovelab' ? '#fefce8' : '#e6f4ea', border: currentPlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #ceebd6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: currentPlatform === 'groovelab' ? '#ca8a04' : '#34a853' }}>
+                    <Sliders size={22} strokeWidth={2.4} />
+                  </div>
+                  <span>{isAdultStudent ? 'Mein Account & Einstellungen' : (isJuniorOrTeen ? 'Elternbereich & Schutz' : 'Einstellungen & Eltern-Zone')}</span>
                 </h2>
                 <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
                   {isAdultStudent 
-                    ? 'Verwalte deine App-Designs, Push-Benachrichtigungen, persönliche PIN, Abrechnungsbelege und Datenschutz-Einstellungen eigenständig.' 
+                    ? 'Verwalte deine App-Designs, Push-Benachrichtigungen, persönliche PIN, Belege und Datenschutz-Einstellungen eigenständig.' 
                     : (isJuniorOrTeen 
                       ? 'Schutz- & Freigabefunktionen, Benachrichtigungen und Sicherheit für Eltern.' 
-                      : 'Verwalte deine Push-Benachrichtigungen, persönliche PIN, Abrechnungsbelege und Erziehungsberechtigten-Freigaben.')}
+                      : 'Verwalte deine Push-Benachrichtigungen, persönliche PIN, Belege und Erziehungsberechtigten-Freigaben.')}
                 </p>
               </div>
 
-              {/* 🌟 PASSIVE ACCOUNT HERO STATUS STAGE */}
-              {!studentUser?.is_campus_active && (
+              {/* 🌟 PASSIVE ACCOUNT HERO STATUS STAGE (CAMPUS ONLY) */}
+              {currentPlatform === 'campus' && !studentUser?.is_campus_active && (
                 <div style={{
                   background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
                   border: '1.5px solid #86efac',
@@ -24761,10 +24771,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 {
                   id: 'modules',
                   title: 'Module & Freischaltung',
-                  subtitle: studentUser?.is_campus_active ? 'Campus & GrooveLab aktiv' : '1 Monat gratis schnuppern',
-                  badge: studentUser?.is_campus_active ? 'Aktiv' : '1 Mo. gratis',
-                  gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  shadowColor: 'rgba(16, 185, 129, 0.40)',
+                  subtitle: studentUser?.is_campus_active ? 'Campus & GrooveLab aktiv' : (currentPlatform === 'groovelab' ? 'GrooveLab aktiv' : '1 Monat gratis schnuppern'),
+                  badge: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? 'Aktiv' : '1 Mo. gratis',
+                  gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  shadowColor: currentPlatform === 'groovelab' ? 'rgba(234, 179, 8, 0.35)' : 'rgba(16, 185, 129, 0.40)',
                   icon: Zap
                 },
                 {
@@ -24772,8 +24782,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   title: isAdultStudent ? 'App- & Design-Stufe' : 'Eltern-Kontrollzentrum',
                   subtitle: isAdultStudent ? 'Benutzeroberfläche & Boards' : 'Altersstufe & Freigaben',
                   badge: isAdultStudent ? 'Self-Management' : 'Master-PIN Schutz',
-                  gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                  shadowColor: 'rgba(2, 132, 199, 0.40)',
+                  gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #facc15 0%, #d97706 100%)' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  shadowColor: currentPlatform === 'groovelab' ? 'rgba(250, 204, 21, 0.40)' : 'rgba(2, 132, 199, 0.40)',
                   icon: isAdultStudent ? Compass : ShieldCheck
                 },
                 {
@@ -24781,8 +24791,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   title: 'Mitteilungen & Alerts',
                   subtitle: pushEnabled ? 'Push-Mitteilungen aktiv' : 'Mitteilungen & Push-Kanäle',
                   badge: pushEnabled ? 'Aktiv' : 'Konfigurieren',
-                  gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                  shadowColor: 'rgba(59, 130, 246, 0.40)',
+                  gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #eab308 0%, #a16207 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  shadowColor: currentPlatform === 'groovelab' ? 'rgba(234, 179, 8, 0.35)' : 'rgba(59, 130, 246, 0.40)',
                   icon: Bell
                 },
                 {
@@ -24790,8 +24800,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   title: isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Sicherheit',
                   subtitle: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : '4-stellige PIN festlegen',
                   badge: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? 'Geschützt' : 'Empfohlen',
-                  gradient: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
-                  shadowColor: 'rgba(52, 168, 83, 0.40)',
+                  gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)' : 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+                  shadowColor: currentPlatform === 'groovelab' ? 'rgba(202, 138, 4, 0.40)' : 'rgba(52, 168, 83, 0.40)',
                   icon: Lock
                 },
                 {
@@ -24799,8 +24809,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   title: isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung',
                   subtitle: '100% freie App & Belege',
                   badge: '100% Kostenlos',
-                  gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                  shadowColor: 'rgba(139, 92, 246, 0.40)',
+                  gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)' : 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                  shadowColor: currentPlatform === 'groovelab' ? 'rgba(245, 158, 11, 0.35)' : 'rgba(139, 92, 246, 0.40)',
                   icon: FileText
                 },
                 {
@@ -24817,8 +24827,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   title: 'Ideenschmiede',
                   subtitle: 'Wünsche & Fehler melden',
                   badge: 'Mitgestalten',
-                  gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
-                  shadowColor: 'rgba(236, 72, 153, 0.40)',
+                  gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #facc15 0%, #ca8a04 100%)' : 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                  shadowColor: currentPlatform === 'groovelab' ? 'rgba(250, 204, 21, 0.35)' : 'rgba(236, 72, 153, 0.40)',
                   icon: Lightbulb
                 }
               ].map((module) => {
@@ -24864,8 +24874,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       fontWeight: 800,
                       padding: '3px 9px',
                       borderRadius: '100px',
-                      background: '#e6f4ea',
-                      color: '#15803d',
+                      background: currentPlatform === 'groovelab' ? '#fefce8' : '#e6f4ea',
+                      color: currentPlatform === 'groovelab' ? '#ca8a04' : '#15803d',
+                      border: currentPlatform === 'groovelab' ? '1px solid #fef08a' : 'none',
                       marginBottom: '10px',
                       letterSpacing: '0.02em',
                       textTransform: 'uppercase'
@@ -24909,12 +24920,70 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               borderRadius: '20px',
               marginTop: '8px'
             }}>
-              <span style={{ fontSize: '0.82rem', color: '#34a853', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: currentPlatform === 'groovelab' ? '#ca8a04' : '#34a853', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 ✓ Alle Einstellungen synchronisiert.
               </span>
               <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                 Änderungen werden sofort wirksam und gesichert.
               </span>
+            </div>
+
+            {/* QUICK LINK: HANDBUCH & AKADEMIE */}
+            <div style={{ 
+              background: currentPlatform === 'groovelab' ? '#fefce8' : '#f0fdf4', 
+              borderRadius: '20px', 
+              padding: '18px 24px', 
+              border: `1.5px solid ${currentPlatform === 'groovelab' ? '#fef08a' : '#bbf7d0'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ 
+                  width: '38px', 
+                  height: '38px', 
+                  borderRadius: '12px', 
+                  background: currentPlatform === 'groovelab' ? '#eab308' : '#34a853', 
+                  color: currentPlatform === 'groovelab' ? '#0f172a' : '#ffffff', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center' 
+                }}>
+                  <BookOpen size={20} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: currentPlatform === 'groovelab' ? '#713f12' : '#14532d' }}>
+                    Campus-Hilfe &amp; Akademie für Schüler &amp; Eltern
+                  </h4>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: currentPlatform === 'groovelab' ? '#854d0e' : '#166534' }}>
+                    So nutzt du dein digitales Aufgabenheft, den Übe-Timer, Streaks und die Loopstation.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHelpCenterOpen(true)}
+                style={{
+                  background: currentPlatform === 'groovelab' ? '#eab308' : '#34a853',
+                  color: currentPlatform === 'groovelab' ? '#0f172a' : '#ffffff',
+                  border: 'none',
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: currentPlatform === 'groovelab' ? '0 4px 12px rgba(234, 179, 8, 0.25)' : '0 4px 12px rgba(52, 168, 83, 0.25)',
+                  transition: 'all 0.15s'
+                }}
+                className="hover-scale"
+              >
+                <BookOpen size={14} /> Leitfäden öffnen
+              </button>
             </div>
 
             {/* PARENT GATEKEEPER MODAL (6-Digit Parent Master PIN) */}
@@ -27505,6 +27574,19 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         schoolName={(studentUser as any)?.school_name}
         activePlatform={currentPlatform}
       />
+
+      {/* Leitfäden & Akademie Modal */}
+      <HelpCenterModal
+        isOpen={isHelpCenterOpen}
+        onClose={() => setIsHelpCenterOpen(false)}
+        userRole="student"
+        activePlatform={currentPlatform as any}
+        schoolName={(studentUser as any)?.school_name || 'Meine Musikschule'}
+        onOpenFeedbackHub={() => {
+          setIsHelpCenterOpen(false);
+          setIsFeedbackModalOpen(true);
+        }}
+      />
     </div>
 
       {/* Junior-Optimized Song Detail Modal */}
@@ -28319,7 +28401,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               {storySlide === 2 && (
                 <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px', alignItems: 'center' }}>
                   <div>
-                    <span style={{ background: '#34a853', color: 'white', fontSize: '0.7rem', fontWeight: 900, padding: '4px 12px', borderRadius: '100px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Charakter Evolution</span>
+                    <span style={{ background: '#34a853', color: 'white', fontSize: '0.7rem', fontWeight: 900, padding: '4px 12px', borderRadius: '100px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Übe-Stufe &amp; Status</span>
                     <h2 style={{ fontSize: '2rem', fontWeight: 900, marginTop: '12px' }}>Dein Avatar-Status</h2>
                   </div>
 
@@ -28339,8 +28421,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     </h3>
                     <p style={{ color: '#a1a1aa', fontSize: '0.85rem', marginTop: '6px' }}>
                       {wrappedData.isPremium 
-                        ? `Evolution Level ${currentLevel} erreicht!`
-                        : 'Kostenlose Avatare bleiben grau und leblos. Upgrade, um deinen 3D-Helden zu erwecken!'
+                        ? `Übe-Stufe ${currentLevel} erreicht!`
+                        : 'Kostenlose Profile bleiben eingeschränkt. Aktiviere dein Profil für den vollen Funktionsumfang!'
                       }
                     </p>
                   </div>

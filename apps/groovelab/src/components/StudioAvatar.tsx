@@ -115,7 +115,69 @@ export const resolveStudentInstrumentAsync = async (user: any): Promise<string> 
   return 'Gitarre';
 };
 
-export const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick, activePlatform }: { src: string | null | undefined, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void, activePlatform?: string }) => {
+// ─── Dynamic Level Border & Halo Frame System ─────────────────────────────────
+export interface AvatarFrameStyle {
+  border: string;
+  boxShadow: string;
+  badgeLabel: string;
+  badgeBg: string;
+  badgeColor: string;
+  borderColor: string;
+  glowColor: string;
+  level: number;
+}
+
+export const getAvatarLevelFrameStyle = (level: number = 1): AvatarFrameStyle => {
+  const safeLevel = Math.max(1, Math.min(3, Number(level) || 1));
+  if (safeLevel === 3) {
+    return {
+      border: '3.5px solid #f59e0b',
+      boxShadow: '0 0 18px rgba(245, 158, 11, 0.48), inset 0 0 6px rgba(251, 191, 36, 0.25)',
+      badgeLabel: 'Stufe 3 • Gold',
+      badgeBg: '#fef3c7',
+      badgeColor: '#92400e',
+      borderColor: '#f59e0b',
+      glowColor: 'rgba(245, 158, 11, 0.48)',
+      level: 3
+    };
+  }
+  if (safeLevel === 2) {
+    return {
+      border: '3px solid #34a853',
+      boxShadow: '0 0 14px rgba(52, 168, 83, 0.38)',
+      badgeLabel: 'Stufe 2 • Smaragd',
+      badgeBg: '#dcfce7',
+      badgeColor: '#166534',
+      borderColor: '#34a853',
+      glowColor: 'rgba(52, 168, 83, 0.38)',
+      level: 2
+    };
+  }
+  return {
+    border: '2.5px solid #cbd5e1',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+    badgeLabel: 'Stufe 1 • Silber',
+    badgeBg: '#f1f5f9',
+    badgeColor: '#475569',
+    borderColor: '#cbd5e1',
+    glowColor: 'rgba(0, 0, 0, 0.04)',
+    level: 1
+  };
+};
+
+export interface StudioAvatarProps {
+  src?: string | null;
+  style?: React.CSSProperties;
+  className?: string;
+  user?: any;
+  userId?: string;
+  onClick?: () => void;
+  activePlatform?: string;
+  level?: number;
+  showLevelRing?: boolean;
+}
+
+export const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick, activePlatform, level, showLevelRing }: StudioAvatarProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [resolvedInstrument, setResolvedInstrument] = useState<string | null>(() => user ? getEffectiveInstrument(user) : null);
   
@@ -211,6 +273,10 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
     displaySrc.includes('avatar_girl')
   );
 
+  const effectiveUserLevel = level || targetUser?.evolution_level || (Array.isArray(targetUser?.avatars) ? targetUser.avatars[0]?.evolution_level : targetUser?.avatars?.evolution_level) || targetUser?.avatar?.evolution_level;
+  const shouldApplyRing = showLevelRing || (!!level && role === 'student');
+  const levelFrame = shouldApplyRing ? getAvatarLevelFrameStyle(effectiveUserLevel) : null;
+
   return (
     <div 
       onClick={hasAction ? handleClick : undefined}
@@ -221,6 +287,8 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
         position: 'relative', 
         overflow: 'hidden', 
         cursor: hasAction ? 'pointer' : 'default', 
+        border: levelFrame ? levelFrame.border : (style?.border || 'none'),
+        boxShadow: levelFrame ? (style?.boxShadow ? `${style.boxShadow}, ${levelFrame.boxShadow}` : levelFrame.boxShadow) : (style?.boxShadow || 'none'),
         ...style 
       }} 
       className={`studio-avatar-wrapper ${hasAction ? 'hover-scale-mini' : ''} ${className || ''}`}
@@ -254,7 +322,9 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   prev.user?.instrument === next.user?.instrument && 
   prev.user?.resolved_instrument === next.user?.resolved_instrument && 
   prev.user?.teacher_id === next.user?.teacher_id && 
-  prev.activePlatform === next.activePlatform
+  prev.activePlatform === next.activePlatform &&
+  prev.level === next.level &&
+  prev.showLevelRing === next.showLevelRing
 ));
 
 export const renderBandAvatar = (name: string, photoUrl?: string | null, size: string = '64px', borderRadius: string = '18px') => {

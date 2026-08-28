@@ -13,10 +13,12 @@ import {
   Link2,
   X,
   ShieldCheck,
-  Lightbulb
+  Lightbulb,
+  BookOpen
 } from 'lucide-react';
 import { generateConsentPDF, generateDSBCompliancePDF } from '../utils/pdfGenerator';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
+import { HelpCenterModal } from './help/HelpCenterModal';
 
 interface CampusSetupScreenProps {
   school: any;
@@ -40,6 +42,7 @@ export function CampusSetupScreen({
   const [settingsTab, setSettingsTab] = useState<'calendar' | 'communication' | 'gamification' | 'datenschutz'>('calendar');
   const [activeCampusSettingsModal, setActiveCampusSettingsModal] = useState<'calendar' | 'communication' | 'gamification' | 'datenschutz' | null>(null);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
+  const [isHelpCenterOpen, setIsHelpCenterOpen] = useState<boolean>(false);
   const [initialConfig, setInitialConfig] = useState<any>(null);
 
   // Responsive Mobile Viewport Detection (<= 1024px or Device Simulator)
@@ -422,6 +425,55 @@ export function CampusSetupScreen({
           className={isSettingsDirty ? "hover-scale" : ""}
         >
           {isSaving ? 'Speichern...' : 'Speichern'}
+        </button>
+      </div>
+
+      {/* QUICK LINK: HANDBUCH & AKADEMIE */}
+      <div style={{ 
+        background: '#f0fdf4', 
+        borderRadius: '20px', 
+        padding: '18px 24px', 
+        border: '1.5px solid #bbf7d0',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: brandColor, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BookOpen size={20} />
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: '#14532d' }}>
+              Leitfäden &amp; Akademie (Offizielles Handbuch)
+            </h4>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#166534' }}>
+              Schritt-für-Schritt-Anleitungen für Schulleitung, Kollegium und Eltern sowie FAQ und DSGVO-Standards.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsHelpCenterOpen(true)}
+          style={{
+            background: brandColor,
+            color: '#ffffff',
+            border: 'none',
+            padding: '9px 18px',
+            borderRadius: '10px',
+            fontWeight: 800,
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
+            transition: 'all 0.15s'
+          }}
+          className="hover-scale"
+        >
+          <BookOpen size={14} /> Leitfäden öffnen
         </button>
       </div>
 
@@ -887,6 +939,19 @@ export function CampusSetupScreen({
         schoolId={effectiveSchool?.id || admin?.school_id}
         schoolName={effectiveSchool?.name || ''}
         activePlatform="campus"
+      />
+
+      {/* Leitfäden & Akademie Modal */}
+      <HelpCenterModal
+        isOpen={isHelpCenterOpen}
+        onClose={() => setIsHelpCenterOpen(false)}
+        userRole="admin"
+        activePlatform="campus"
+        schoolName={effectiveSchool?.name || schoolName || ''}
+        onOpenFeedbackHub={() => {
+          setIsHelpCenterOpen(false);
+          setIsFeedbackModalOpen(true);
+        }}
       />
     </div>
   );

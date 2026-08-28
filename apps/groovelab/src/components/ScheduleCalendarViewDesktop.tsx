@@ -142,18 +142,16 @@ export function ScheduleCalendarViewDesktop({
   };
 
   const [currentDate, setCurrentDate] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const targetDateStr = localStorage.getItem('campus_calendar_target_date') || localStorage.getItem('groovelab_selected_schedule_date');
-      if (targetDateStr) {
-        const clean = targetDateStr.split('T')[0];
-        const parts = clean.split('-').map(Number);
-        if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
-          return new Date(parts[0], parts[1] - 1, parts[2]);
-        }
-      }
-    }
     return getSimulatedNow();
   });
+
+  useEffect(() => {
+    // When mounting or opening the Stundenplan board, always ensure the current week is shown and clean stale dates
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('campus_calendar_target_date');
+      localStorage.removeItem('groovelab_selected_schedule_date');
+    }
+  }, []);
 
   useEffect(() => {
     const handleNavDate = (e: Event) => {
@@ -165,6 +163,8 @@ export function ScheduleCalendarViewDesktop({
         if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
           setCurrentDate(new Date(parts[0], parts[1] - 1, parts[2]));
         }
+        localStorage.removeItem('campus_calendar_target_date');
+        localStorage.removeItem('groovelab_selected_schedule_date');
       }
     };
     window.addEventListener('groovelab_navigate_schedule_date', handleNavDate);

@@ -16,6 +16,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { StudioAvatar } from './StudioAvatar';
+import { formatSingleStudentAnonymized, formatTeacherFullName } from '../utils/nameHelper';
 
 interface GrooveLabMessagesBoardProps {
   user: any;
@@ -60,6 +61,7 @@ export default function GrooveLabMessagesBoard({
   const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
   const [recipientSearchText, setRecipientSearchText] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [toastNotification, setToastNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -107,14 +109,23 @@ export default function GrooveLabMessagesBoard({
       if (targetType === 'specific') isForUser = targetUserIds.includes(user?.id) || isTeacherOrAdmin;
 
       if (isForUser) {
+        let senderDisplayName = 'Musikschule';
+        if (ann.sender_name) {
+          senderDisplayName = ann.sender_name;
+        } else if (ann.sender || ann.users) {
+          const senderObj = ann.sender || ann.users;
+          const isStaff = (senderObj.role || '').toLowerCase() === 'teacher' || (senderObj.role || '').toLowerCase() === 'admin';
+          senderDisplayName = isStaff ? formatTeacherFullName(senderObj) : formatSingleStudentAnonymized(senderObj.first_name, senderObj.last_name, senderObj.id);
+        }
+
         combined.push({
           id: ann.id,
           rawObject: ann,
           type: ann.type || (targetType === 'band' ? 'band' : 'school'),
           title: parsedTitle,
           content: parsedBody,
-          senderName: ann.sender_name || (ann.sender ? `${ann.sender.first_name} ${ann.sender.last_name || ''}`.trim() : 'Musikschule'),
-          senderAvatar: ann.sender?.photo_url || '/avatar_ghost.jpg',
+          senderName: senderDisplayName,
+          senderAvatar: ann.sender?.photo_url || ann.users?.photo_url || '/avatar_ghost.jpg',
           createdAt: ann.created_at || new Date().toISOString(),
           readBy: ann.read_by || [],
           targetType,
@@ -129,14 +140,23 @@ export default function GrooveLabMessagesBoard({
       if (deletedIds.includes(msg.id)) return;
       if (combined.some(c => c.id === msg.id)) return;
 
+      let senderDisplayName = 'Coach';
+      if (msg.sender_name) {
+        senderDisplayName = msg.sender_name;
+      } else if (msg.sender || msg.users) {
+        const senderObj = msg.sender || msg.users;
+        const isStaff = (senderObj.role || '').toLowerCase() === 'teacher' || (senderObj.role || '').toLowerCase() === 'admin';
+        senderDisplayName = isStaff ? formatTeacherFullName(senderObj) : formatSingleStudentAnonymized(senderObj.first_name, senderObj.last_name, senderObj.id);
+      }
+
       combined.push({
         id: msg.id,
         rawObject: msg,
         type: msg.type || 'school',
         title: msg.title || 'Nachricht',
         content: msg.content || '',
-        senderName: msg.sender_name || (msg.sender ? `${msg.sender.first_name} ${msg.sender.last_name || ''}`.trim() : 'Coach'),
-        senderAvatar: msg.sender?.photo_url || '/avatar_ghost.jpg',
+        senderName: senderDisplayName,
+        senderAvatar: msg.sender?.photo_url || msg.users?.photo_url || '/avatar_ghost.jpg',
         createdAt: msg.created_at || new Date().toISOString(),
         readBy: msg.read_by || [],
         isAnnouncement: false
@@ -207,8 +227,12 @@ export default function GrooveLabMessagesBoard({
       setComposerTarget('all');
       setSelectedTargetIds([]);
       setIsComposing(false);
-    } catch (err) {
+      setToastNotification({ message: 'Mitteilung wurde erfolgreich veröffentlicht!', type: 'success' });
+      setTimeout(() => setToastNotification(null), 3500);
+    } catch (err: any) {
       console.error('[GrooveLabMessagesBoard] Post error:', err);
+      setToastNotification({ message: err?.message || 'Fehler beim Senden der Mitteilung', type: 'error' });
+      setTimeout(() => setToastNotification(null), 4000);
     } finally {
       setIsSubmitting(false);
     }
@@ -675,6 +699,7 @@ export default function GrooveLabMessagesBoard({
 
                       return activeGrooveLabStudents.map(u => {
                         const isSel = selectedTargetIds.includes(u.id);
+                        const displayName = formatSingleStudentAnonymized(u.first_name, u.last_name, u.id);
                         return (
                           <button
                             key={u.id}
@@ -695,7 +720,7 @@ export default function GrooveLabMessagesBoard({
                               boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                             }}
                           >
-                            {u.first_name} {u.last_name || ''} {isSel ? '✓' : '+'}
+                            {displayName} {isSel ? '✓' : '+'}
                           </button>
                         );
                       });
@@ -899,6 +924,31 @@ export default function GrooveLabMessagesBoard({
           </div>
         )}
       </div>
+
+      {/* Floating Apple-Style Toast Notification */}
+      {toastNotification && (
+        <div style={{
+          position: 'fixed',
+          top: isMobile ? '20px' : '32px',
+          right: isMobile ? '20px' : '32px',
+          zIndex: 99999,
+          background: toastNotification.type === 'success' ? '#15803d' : '#b91c1c',
+          color: '#ffffff',
+          padding: '12px 22px',
+          borderRadius: '16px',
+          boxShadow: '0 12px 30px rgba(0,0,0,0.22)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontSize: '0.88rem',
+          fontWeight: 800,
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          {toastNotification.type === 'success' ? <CheckCircle size={18} strokeWidth={2.5} /> : <X size={18} strokeWidth={2.5} />}
+          <span>{toastNotification.message}</span>
+        </div>
+      )}
     </div>
   );
 }

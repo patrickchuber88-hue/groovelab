@@ -248,22 +248,34 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen && userId) {
-      fetchMyFeedback();
+    if (isOpen) {
+      if (userId) {
+        fetchMyFeedback();
+      }
+      setIsSubmitted(false);
+      setErrorMessage(null);
+      setContent('');
+      setSelectedTags([]);
+      setActiveModalTab('submit');
+      
+      // Smart category selection based on active platform
+      if (activePlatform === 'groovelab' && availableCategories.some(c => c.id === 'bands')) {
+        setSelectedBoardId('bands');
+      } else if (availableCategories.length > 0 && !availableCategories.some(c => c.id === selectedBoardId)) {
+        setSelectedBoardId(availableCategories[0].id);
+      }
+    } else {
+      // Stop speech dictation if modal is closed
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch {}
+      }
+      setIsRecording(false);
     }
-  }, [isOpen, userId, activeModalTab]);
+  }, [isOpen, userId, activePlatform]);
 
   const unreadResponseCount = React.useMemo(() => {
     return myFeedbackItems.filter(it => it.admin_response && it.is_user_read === false).length;
   }, [myFeedbackItems]);
-
-  // Set default board if current is not in available
-  useEffect(() => {
-    if (availableCategories.length > 0 && !availableCategories.some(c => c.id === selectedBoardId)) {
-      setSelectedBoardId(availableCategories[0].id);
-      setSelectedTags([]);
-    }
-  }, [userRole]);
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => 

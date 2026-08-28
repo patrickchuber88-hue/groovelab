@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb, Disc, XCircle, Volume2 } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, ShieldCheck, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb, Disc, XCircle, Volume2 } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -1734,6 +1734,9 @@ export function AdminDashboard({
   const [editingStationInstrument, setEditingStationInstrument] = useState<string>('');
   const [editingStationColor, setEditingStationColor] = useState<string>('#e5e7eb');
   const [snapToGrid, setSnapToGrid] = useState(true);
+  const [copiedStationKioskId, setCopiedStationKioskId] = useState<string | null>(null);
+  const [copiedRoomKiosk, setCopiedRoomKiosk] = useState(false);
+  const [gridAppliedFeedback, setGridAppliedFeedback] = useState(false);
   const canvasRef = React.useRef<HTMLDivElement>(null);
   const calendarScrollRef = React.useRef<HTMLDivElement>(null);
   const loadedWeekRangeRef = React.useRef<{ start: string; end: string } | null>(null);
@@ -3377,6 +3380,8 @@ export function AdminDashboard({
         first_name: student.first_name,
         last_name: student.last_name,
         photo_url: student.photo_url,
+        avatar_url: student.avatar_url,
+        instrument: student.instrument,
         xp
       };
     })
@@ -3662,7 +3667,6 @@ export function AdminDashboard({
 
     const hasCampus = schoolObj?.has_campus_subscription !== false;
     const finalLastName = hasCampus ? newStudent.lastName : (newStudent.lastName?.trim() ? newStudent.lastName.trim().charAt(0).toUpperCase() + '.' : '');
-    const finalBirthDate = hasCampus ? (newStudent.birthDate ? newStudent.birthDate : null) : null;
 
     const isSchoolAutoActivateAll = schoolObj?.student_billing_option === 'option3_3' || schoolObj?.student_billing_option === 'all_inclusive';
 
@@ -3672,7 +3676,7 @@ export function AdminDashboard({
       roles: ['student'],
       first_name: newStudent.firstName, 
       last_name: finalLastName, 
-      birth_date: finalBirthDate,
+      birth_date: null,
       photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
       avatar_url: studentAvatarUrl,
       qr_token: qrToken,
@@ -3806,12 +3810,11 @@ export function AdminDashboard({
 
     const hasCampus = schoolObj?.has_campus_subscription !== false;
     const finalLastName = hasCampus ? editingStudent.last_name : (editingStudent.last_name?.trim() ? editingStudent.last_name.trim().charAt(0).toUpperCase() + '.' : '');
-    const finalBirthDate = hasCampus ? (editingStudent.birth_date || null) : null;
 
     const { error } = await supabase.from('users').update({
       first_name: editingStudent.first_name,
       last_name: finalLastName,
-      birth_date: finalBirthDate,
+      birth_date: null,
       status: editingStudent.status || 'active',
       is_trial: editingStudent.is_trial || false,
       trial_ends_at: editingStudent.trial_ends_at || null,
@@ -5519,10 +5522,10 @@ export function AdminDashboard({
                       width: windowWidth < 768 ? '100%' : 'auto',
                       boxSizing: 'border-box'
                     }}
-                    title={showRealNames ? "Nachnamen maskieren" : "Nachnamen für 10 Sekunden einblenden"}
+                    title={showRealNames ? "Nachnamen anonymisieren / maskieren" : "Nachnamen für 10 Sekunden einblenden"}
                   >
                     {showRealNames ? <EyeOff size={14} /> : <Eye size={14} />}
-                    <span>{showRealNames ? "Sperren" : "Anzeigen"}</span>
+                    <span>{showRealNames ? "Namen maskieren" : "Namen anzeigen"}</span>
                   </button>
                   {!showAddStudent && (
                     <button
@@ -5619,13 +5622,6 @@ export function AdminDashboard({
                   <input required placeholder="Nachname" value={newStudent.lastName} onChange={e => setNewStudent({...newStudent, lastName: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
                 </div>
               </div>
-
-              {schoolObj?.has_campus_subscription !== false && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Geburtsdatum *</label>
-                  <input type="date" required value={newStudent.birthDate || ''} onChange={e => setNewStudent({...newStudent, birthDate: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Instrument</label>
@@ -5799,19 +5795,6 @@ export function AdminDashboard({
               <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : '1fr 1fr', gap: '16px' }}>
                 <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
                 <input required placeholder={schoolObj?.has_campus_subscription !== false ? "Nachname" : "Nachname (Initial)"} value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
-
-                {schoolObj?.has_campus_subscription !== false && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Geburtsdatum *</label>
-                    <input 
-                      type="date" 
-                      required 
-                      value={editingStudent.birth_date ? (editingStudent.birth_date.includes('.') ? editingStudent.birth_date.split('.').reverse().join('-') : editingStudent.birth_date.substring(0, 10)) : ''} 
-                      onChange={e => setEditingStudent({...editingStudent, birth_date: e.target.value})} 
-                      style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} 
-                    />
-                  </div>
-                )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Instrument</label>
@@ -13715,11 +13698,31 @@ export function AdminDashboard({
                     <div style={{ fontSize: '0.9rem', fontWeight: 900, color: idx === 0 ? '#f59e0b' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : '#64748b', width: '20px' }}>
                       #{idx + 1}
                     </div>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
-                      <img src={user.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    <div style={{ 
+                      width: '40px', 
+                      height: '40px', 
+                      borderRadius: '12px', 
+                      overflow: 'hidden', 
+                      border: '2px solid white', 
+                      boxShadow: '0 4px 8px rgba(0,0,0,0.05)',
+                      background: `${brandColor}15`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative'
+                    }}>
+                      <span style={{ fontSize: '1rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>
+                        {user.first_name?.[0] || 'S'}
+                      </span>
+                      <img 
+                        src={resolveUserAvatar(user, activePlatform)} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }} 
+                        alt="" 
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
                     </div>
                     <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.9rem' }}>
-                      {user.first_name} {user.last_name}
+                      {user.first_name} {maskLastName(user.last_name, showRealNames)}
                     </div>
                   </div>
                   <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.2)' }}>
@@ -15164,7 +15167,8 @@ export function AdminDashboard({
       await supabase.from('stations').update({ pos_x: us.pos_x, pos_y: us.pos_y }).eq('id', us.id);
     }
     
-    alert('Symmetrisches Standard-Raster wurde erfolgreich auf die iPads angewendet!');
+    setGridAppliedFeedback(true);
+    setTimeout(() => setGridAppliedFeedback(false), 2500);
   };
 
   const renderRoomLayoutModal = () => {
@@ -15202,8 +15206,6 @@ export function AdminDashboard({
             <button 
               onClick={() => setCustomizingRoom(null)} 
               style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }}
-              
-              
             >
               <X size={20} />
             </button>
@@ -15355,7 +15357,7 @@ export function AdminDashboard({
             </div>
 
             {/* Right: Customization & QR Tools */}
-            <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto' }}>
+            <div style={{ padding: '24px 32px 48px 32px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto' }}>
               
               {/* Section 1: Room Dimensions */}
               <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
@@ -15418,11 +15420,30 @@ export function AdminDashboard({
 
                 <button 
                   onClick={handleApplyDefaultGrid}
-                  style={{ width: '100%', background: '#ffffff', color: '#1e293b', border: '1.5px solid #cbd5e1', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s' }}
-                  
-                  
+                  style={{ 
+                    width: '100%', 
+                    background: gridAppliedFeedback ? '#f0fdf4' : '#ffffff', 
+                    color: gridAppliedFeedback ? '#16a34a' : '#1e293b', 
+                    border: gridAppliedFeedback ? '1.5px solid #86efac' : '1.5px solid #cbd5e1', 
+                    padding: '12px', 
+                    borderRadius: '12px', 
+                    fontWeight: 800, 
+                    fontSize: '0.8rem', 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '6px', 
+                    transition: 'all 0.2s' 
+                  }}
                 >
-                  ✨ Symmetrisches Standard-Raster anwenden
+                  {gridAppliedFeedback ? (
+                    <>
+                      <Check size={14} color="#16a34a" /> Symmetrisches Raster angewendet!
+                    </>
+                  ) : (
+                    '✨ Symmetrisches Standard-Raster anwenden'
+                  )}
                 </button>
               </div>
 
@@ -15534,11 +15555,35 @@ export function AdminDashboard({
                     <button 
                       onClick={() => {
                         navigator.clipboard.writeText(getStationKioskUrl(activeStation.id));
-                        alert('Kiosk-Setup-Link für diesen Platz kopiert!');
+                        setCopiedStationKioskId(activeStation.id);
+                        setTimeout(() => setCopiedStationKioskId(null), 2500);
                       }}
-                      style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                      style={{ 
+                        width: '100%', 
+                        padding: '10px', 
+                        borderRadius: '10px', 
+                        border: copiedStationKioskId === activeStation.id ? '1px solid #86efac' : '1px solid #e2e8f0', 
+                        background: copiedStationKioskId === activeStation.id ? '#f0fdf4' : '#f8fafc', 
+                        color: copiedStationKioskId === activeStation.id ? '#16a34a' : '#475569', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 800, 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '6px',
+                        transition: 'all 0.2s'
+                      }}
                     >
-                      <ExternalLink size={12} /> Setup-Link kopieren
+                      {copiedStationKioskId === activeStation.id ? (
+                        <>
+                          <Check size={14} color="#16a34a" /> Setup-Link kopiert!
+                        </>
+                      ) : (
+                        <>
+                          <ExternalLink size={12} /> Setup-Link kopieren
+                        </>
+                      )}
                     </button>
                   </div>
 
@@ -15560,11 +15605,32 @@ export function AdminDashboard({
                 <button 
                   onClick={() => {
                     navigator.clipboard.writeText(getRoomKioskUrl(customizingRoom.id));
-                    alert('Allgemeiner Raum-Kiosk Link kopiert!');
+                    setCopiedRoomKiosk(true);
+                    setTimeout(() => setCopiedRoomKiosk(false), 2500);
                   }}
-                  style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', color: '#475569' }}
+                  style={{ 
+                    background: copiedRoomKiosk ? '#f0fdf4' : '#ffffff', 
+                    border: copiedRoomKiosk ? '1px solid #86efac' : '1px solid #e2e8f0', 
+                    padding: '10px', 
+                    borderRadius: '10px', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 800, 
+                    cursor: 'pointer', 
+                    color: copiedRoomKiosk ? '#16a34a' : '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
                 >
-                  Raum-Kiosk Link kopieren
+                  {copiedRoomKiosk ? (
+                    <>
+                      <Check size={14} color="#16a34a" /> Raum-Kiosk Link kopiert!
+                    </>
+                  ) : (
+                    'Raum-Kiosk Link kopieren'
+                  )}
                 </button>
               </div>
 
@@ -15577,7 +15643,7 @@ export function AdminDashboard({
               onClick={() => setCustomizingRoom(null)}
               style={{ 
                 background: brandColor, 
-                color: 'white', 
+                color: activePlatform === 'groovelab' ? '#1e293b' : 'white', 
                 border: 'none', 
                 padding: '12px 32px', 
                 borderRadius: '16px', 
@@ -15587,8 +15653,6 @@ export function AdminDashboard({
                 boxShadow: '0 8px 20px rgba(0,0,0,0.1)', 
                 transition: 'all 0.2s' 
               }}
-              
-              
             >
               Speichern & Schließen
             </button>
@@ -18837,89 +18901,6 @@ function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any
   const selectedCount = selectedUsers.length;
   const pageCount = Math.ceil(selectedCount / 9);
 
-  const getPrintAvatarSrc = (u: any): string => {
-    const role = (u.role || '').toLowerCase();
-    const plat = activePlatform || 'groovelab';
-    
-    if (plat === 'secretary') {
-      return '/campus_login_hero.png';
-    }
-    
-    if (plat === 'campus') {
-      const src = u.photo_url;
-      const isMusicianOrInstrumentAvatar = src && (
-        src.includes('student_') ||
-        src.includes('bandstyle_') ||
-        src.includes('teen_') ||
-        src.includes('avatar_boy') ||
-        src.includes('avatar_girl') ||
-        src.includes('avatar.png') || 
-        src.includes('avatar_new') ||
-        src.includes('_avatar') ||
-        src.includes('guitar_avatar') || 
-        src.includes('gitarre_avatar') || 
-        src.includes('ebass_avatar') || 
-        src.includes('egitarre_avatar') || 
-        src.includes('kontrabass_avatar') || 
-        src.includes('bass_avatar') || 
-        src.includes('drums_avatar') || 
-        src.includes('schlagzeug_avatar') || 
-        src.includes('piano_avatar') || 
-        src.includes('klavier_avatar') || 
-        src.includes('vocals_avatar') || 
-        src.includes('gesang_avatar') || 
-        src.includes('trumpet_avatar') || 
-        src.includes('trompete_avatar') || 
-        src.includes('trombone_avatar') || 
-        src.includes('posaune_avatar') || 
-        src.includes('horn_avatar') || 
-        src.includes('cello_avatar') || 
-        src.includes('violin_avatar') || 
-        src.includes('violine_avatar') || 
-        src.includes('clarinet_avatar') || 
-        src.includes('klarinette_avatar') || 
-        src.includes('flute_avatar') || 
-        src.includes('querfloete_avatar') || 
-        src.includes('saxophone_avatar') || 
-        src.includes('saxophon_avatar') || 
-        src.includes('blockfloete_avatar') || 
-        src.includes('bariton_avatar') || 
-        src.includes('oboe_avatar') ||
-        src.includes('teacher_') ||
-        src.includes('avatar_teacher') ||
-        src === '/campus_login_hero.png'
-      );
-      if (!src || isMusicianOrInstrumentAvatar) {
-        return getInstrumentAvatarUrl(u.instrument);
-      }
-      return src;
-    } else {
-      const src = u.photo_url;
-      const isStudentAvatar = src && (
-        src.includes('student_') ||
-        src.includes('bandstyle_') ||
-        src.includes('teen_') ||
-        src.includes('avatar_boy') ||
-        src.includes('avatar_girl')
-      );
-      const isTeacherAvatar = src && (
-        src.includes('teacher_') ||
-        src.includes('avatar_teacher')
-      );
-      
-      if (role === 'teacher') {
-        return isTeacherAvatar ? src : '/avatar_ghost.jpg';
-      } else if (role === 'student') {
-        if (!src || src === '/avatar_ghost.jpg') {
-          return '/avatar_ghost.jpg';
-        }
-        return src;
-      } else {
-        return '/campus_login_hero.png';
-      }
-    }
-  };
-
   return (
     <div style={{ marginTop: '0px' }}>
       <style>{`
@@ -19213,96 +19194,11 @@ function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any
                   const cardBadgeLabel = isQRAdminOrSec ? 'Admin / Control' : (u.role === 'student' ? 'Member Access' : 'Staff / Coach');
                   return (
                     <div key={u.id} className="print-card-wrapper">
-                      <div style={{
-                        width: '54mm',
-                        height: '86mm',
-                        background: 'white',
-                        borderRadius: '12px',
-                        border: '1px solid #cbd5e1',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        position: 'relative',
-                        boxSizing: 'border-box'
-                      }}>
-                        {/* Card Lanyard Slot */}
-                        <div style={{ height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-                          <div style={{ width: '15px', height: '3px', borderRadius: '1.5px', background: '#0f172a' }}></div>
-                        </div>
-                        
-                        {/* Card Status Header */}
-                        <div style={{ 
-                          background: cardHeaderColor, 
-                          padding: '3px', 
-                          textAlign: 'center',
-                          textTransform: 'uppercase'
-                        }}>
-                          <div style={{ color: 'white', fontSize: '0.45rem', fontWeight: 1000, letterSpacing: '0.15em' }}>
-                            {cardBadgeLabel}
-                          </div>
-                        </div>
-
-                        {/* Card Body */}
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 8px 12px 8px', gap: '8px', justifyContent: 'space-between', boxSizing: 'border-box' }}>
-                          {/* Card Portrait */}
-                          <div style={{ 
-                            width: '64px', 
-                            height: '64px', 
-                            borderRadius: '50%', 
-                            border: `2px solid ${u.role === 'student' ? '#eab308' : (u.role === 'admin' || u.role === 'secretary') ? '#ea4335' : '#34a853'}`,
-                            padding: '3px',
-                            background: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden'
-                          }}>
-                            <div style={{ 
-                              width: '100%', 
-                              height: '100%', 
-                              borderRadius: '50%', 
-                              overflow: 'hidden'
-                            }}>
-                              <img 
-                                src={getPrintAvatarSrc(u)} 
-                                style={{ 
-                                  width: '100%', 
-                                  height: '100%', 
-                                  objectFit: 'cover',
-                                  display: 'block'
-                                }}
-                                alt=""
-                                onError={(e) => { (e.target as HTMLImageElement).src = '/avatar_ghost.jpg'; }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Card Name */}
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1 }}>{u.first_name}</div>
-                            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#64748b', marginTop: '1px' }}>{u.last_name || 'Member'}</div>
-                          </div>
-
-                          {/* Card QR Code */}
-                          <div style={{ 
-                            background: '#f8fafc', 
-                            padding: '6px', 
-                            borderRadius: '8px',
-                            border: '1px solid #f1f5f9',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <QRCode value={`${window.location.origin}/qr/${u.qr_token || u.id || ''}`} size={56} />
-                          </div>
-                        </div>
-
-                        {/* Card Bottom Stripe */}
-                        <div style={{ 
-                          height: '5px', 
-                          background: `linear-gradient(90deg, ${u.role === 'student' ? '#eab308' : '#34a853'}, #1e293b, ${u.role === 'student' ? '#eab308' : '#34a853'})` 
-                        }}></div>
-                      </div>
+                      <IDBadgeCard 
+                        user={u} 
+                        activePlatform={activePlatform} 
+                        isPrintVersion={true}
+                      />
                     </div>
                   );
                 })}
@@ -19319,7 +19215,7 @@ function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any
 function DeviceSetupScreen({ 
   rooms, 
   stations, 
-  brandColor, 
+  brandColor = '#eab308', 
   activeSessions, 
   students, 
   school,
@@ -19332,7 +19228,7 @@ function DeviceSetupScreen({
 }: { 
   rooms: any[], 
   stations: any[], 
-  brandColor: string, 
+  brandColor?: string, 
   activeSessions: any[], 
   students: any[], 
   school: any,
@@ -19343,7 +19239,7 @@ function DeviceSetupScreen({
   onResetPlanning: () => void,
   activePlatform?: 'campus' | 'groovelab'
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('academy');
+  const [activeGrooveSettingsModal, setActiveGrooveSettingsModal] = useState<'hours' | 'security' | 'devices' | 'analytics' | 'maintenance' | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
   const effectiveSchool = Array.isArray(school) ? school[0] : school;
   const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 1024 || Boolean(typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]')));
@@ -19362,6 +19258,7 @@ function DeviceSetupScreen({
     saturday: { start: '10:00', end: '16:00', active: false },
     sunday: { start: '10:00', end: '16:00', active: false }
   });
+  const [initialConfig, setInitialConfig] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [copiedKioskLink, setCopiedKioskLink] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -19376,10 +19273,10 @@ function DeviceSetupScreen({
   useEffect(() => {
     if (effectiveSchool) {
       setName(effectiveSchool.name || '');
-      setLat(effectiveSchool.latitude?.toString() || '');
-      setLng(effectiveSchool.longitude?.toString() || '');
-      setRadius(effectiveSchool.geofence_radius_meters?.toString() || '100');
-      setHours(effectiveSchool.opening_hours || {
+      const sLat = effectiveSchool.latitude?.toString() || '';
+      const sLng = effectiveSchool.longitude?.toString() || '';
+      const sRadius = effectiveSchool.geofence_radius_meters?.toString() || '100';
+      const sHours = effectiveSchool.opening_hours || {
         monday: { start: '08:00', end: '20:00', active: true },
         tuesday: { start: '08:00', end: '20:00', active: true },
         wednesday: { start: '08:00', end: '20:00', active: true },
@@ -19387,9 +19284,30 @@ function DeviceSetupScreen({
         friday: { start: '08:00', end: '20:00', active: true },
         saturday: { start: '10:00', end: '16:00', active: false },
         sunday: { start: '10:00', end: '16:00', active: false }
+      };
+
+      setLat(sLat);
+      setLng(sLng);
+      setRadius(sRadius);
+      setHours(sHours);
+      setInitialConfig({
+        hours: JSON.parse(JSON.stringify(sHours)),
+        lat: sLat,
+        lng: sLng,
+        radius: sRadius
       });
     }
   }, [effectiveSchool]);
+
+  const isSettingsDirty = React.useMemo(() => {
+    if (!initialConfig) return false;
+    return (
+      JSON.stringify(hours) !== JSON.stringify(initialConfig.hours) ||
+      lat !== initialConfig.lat ||
+      lng !== initialConfig.lng ||
+      radius !== initialConfig.radius
+    );
+  }, [initialConfig, hours, lat, lng, radius]);
 
   const days = [
     { id: 'monday', label: 'Montag' },
@@ -19419,8 +19337,18 @@ function DeviceSetupScreen({
       .eq('id', effectiveSchool.id);
     
     setIsSaving(false);
-    if (error) alert('Fehler: ' + error.message);
-    else onUpdate();
+    if (error) {
+      alert('Fehler: ' + error.message);
+    } else {
+      setInitialConfig({
+        hours: JSON.parse(JSON.stringify(hours)),
+        lat,
+        lng,
+        radius
+      });
+      alert('GrooveLab-Einstellungen erfolgreich gespeichert! 🌟');
+      onUpdate();
+    }
   };
 
   const handleExportAllPresenceCSV = async () => {
@@ -19696,8 +19624,6 @@ function DeviceSetupScreen({
                 justifyContent: 'center',
                 gap: '4px'
               }}
-              
-              
             >
               <span>🔌</span> Kopplung aufheben
             </button>
@@ -19722,735 +19648,966 @@ function DeviceSetupScreen({
     );
   };
 
+  const modules = [
+    {
+      id: 'hours',
+      title: 'Betriebszeiten & Studio-Zeiten',
+      subtitle: hours.enforce_hours !== false ? 'Strikte Öffnungszeiten aktiv' : 'Flexible Öffnungszeiten',
+      badge: hours.enforce_hours !== false ? 'Strikte Zeiten' : 'Flexibel',
+      gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+      shadowColor: 'rgba(234, 179, 8, 0.35)',
+      icon: Clock
+    },
+    {
+      id: 'security',
+      title: 'Geofencing & Login-Schutz',
+      subtitle: hours.geofence_bypass !== true ? `${radius || 100}m Geofence aktiv` : 'Bypass Aktiv',
+      badge: hours.geofence_bypass !== true ? `${radius || 100}m Radius` : 'Bypass',
+      gradient: 'linear-gradient(135deg, #facc15 0%, #d97706 100%)',
+      shadowColor: 'rgba(250, 204, 21, 0.40)',
+      icon: ShieldCheck
+    },
+    {
+      id: 'devices',
+      title: 'Kiosk-Geräte & Stations-Setup',
+      subtitle: `${rooms.length} ${rooms.length === 1 ? 'Raum' : 'Räume'} • ${stations.length} Stationen`,
+      badge: `${stations.length} iPads konfiguriert`,
+      gradient: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)',
+      shadowColor: 'rgba(202, 138, 4, 0.40)',
+      icon: Monitor
+    },
+    {
+      id: 'analytics',
+      title: 'Anwesenheit & Protokolle',
+      subtitle: 'Check-Ins & Probenhistorie (CSV)',
+      badge: 'Export',
+      gradient: 'linear-gradient(135deg, #eab308 0%, #a16207 100%)',
+      shadowColor: 'rgba(234, 179, 8, 0.35)',
+      icon: Activity
+    },
+    {
+      id: 'maintenance',
+      title: 'Systemwartung & Bereinigung',
+      subtitle: 'Wochenplan bereinigen & Reset',
+      badge: 'Wartung',
+      gradient: 'linear-gradient(135deg, #eab308 0%, #854d0e 100%)',
+      shadowColor: 'rgba(234, 179, 8, 0.35)',
+      icon: AlertCircle
+    },
+    {
+      id: 'feedback',
+      title: 'Ideenschmiede',
+      subtitle: 'Song-Wünsche & Feedback melden',
+      badge: 'Mitgestalten',
+      gradient: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
+      shadowColor: 'rgba(245, 158, 11, 0.35)',
+      icon: Lightbulb
+    }
+  ];
+
   return (
-    <div style={{ marginTop: '0px' }}>
-      {/* Premium sub-tab navigation */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', width: 'fit-content' }}>
+    <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', boxSizing: 'border-box' }}>
+      <div>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#fefce8', border: '1px solid #fef08a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ca8a04' }}>
+            <Sliders size={22} strokeWidth={2.4} />
+          </div>
+          <span>GrooveLab-Einstellungen</span>
+        </h2>
+        <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
+          Konfiguriere Betriebszeiten, Geofencing &amp; Standort-Sicherheit, Kiosk-Proberäume und Systemwartung für dein Studio.
+        </p>
+      </div>
+
+      {/* MODULAR COVER CARDS GRID */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+        gap: '18px',
+        width: '100%'
+      }}>
+        {modules.map((module) => {
+          const IconComp = module.icon;
+          return (
+            <div
+              key={module.id}
+              onClick={() => {
+                if (module.id === 'feedback') {
+                  setIsFeedbackModalOpen(true);
+                } else {
+                  setActiveGrooveSettingsModal(module.id as any);
+                }
+              }}
+              style={{
+                background: '#ffffff',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '20px',
+                padding: '24px 16px 20px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              className="hover-scale"
+            >
+              {/* Square Cover Icon Box */}
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '16px',
+                background: module.gradient,
+                boxShadow: `0 8px 18px -3px ${module.shadowColor}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                overflow: 'hidden',
+                border: '1px solid rgba(255, 255, 255, 0.25)'
+              }}>
+                <IconComp size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+              </div>
+
+              {/* Title & Subtitle */}
+              <div style={{ marginTop: '14px', padding: '0 4px', width: '100%' }}>
+                <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                  {module.title}
+                </div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', marginTop: '3px', lineHeight: '1.3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {module.subtitle}
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              {module.badge && (
+                <span style={{
+                  marginTop: '10px',
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                  color: '#ca8a04',
+                  background: '#fefce8',
+                  border: '1px solid #fef08a',
+                  padding: '2px 8px',
+                  borderRadius: '100px'
+                }}>
+                  {module.badge}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* PERSISTENT BOTTOM SAVE BAR (IF DIRTY) */}
+      {isSettingsDirty && (
+        <div style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'stretch' : 'center',
+          justifyContent: 'space-between',
+          gap: isMobile ? '10px' : '0',
+          padding: isMobile ? '12px 16px' : '16px 32px',
+          border: '1px solid #fef08a',
+          background: '#fefce8',
+          borderRadius: isMobile ? '16px' : '20px',
+          boxSizing: 'border-box',
+          width: '100%',
+          boxShadow: '0 4px 16px rgba(234, 179, 8, 0.15)'
+        }}>
+          <span style={{ fontSize: '0.82rem', color: '#854d0e', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            ⚠️ Ungespeicherte Änderungen an den GrooveLab-Einstellungen vorhanden.
+          </span>
+          <button
+            onClick={handleSaveAcademy}
+            disabled={isSaving}
+            style={{
+              padding: '10px 24px',
+              width: isMobile ? '100%' : 'auto',
+              background: '#eab308',
+              color: '#0f172a',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: 900,
+              fontSize: '0.84rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(234, 179, 8, 0.35)',
+              transition: 'all 0.2s',
+              opacity: isSaving ? 0.7 : 1
+            }}
+            className="hover-scale"
+          >
+            {isSaving ? 'Wird gespeichert...' : 'Einstellungen speichern'}
+          </button>
+        </div>
+      )}
+
+      {/* QUICK LINK: HANDBUCH & AKADEMIE */}
+      <div style={{ 
+        background: '#fefce8', 
+        borderRadius: '20px', 
+        padding: '18px 24px', 
+        border: '1.5px solid #fef08a',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#eab308', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BookOpen size={20} />
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: '#713f12' }}>
+              Leitfäden &amp; Akademie (Offizielles Handbuch)
+            </h4>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#854d0e' }}>
+              Schritt-für-Schritt-Anleitungen für Schulleitung, Kollegium und Band-Coaches sowie FAQ.
+            </p>
+          </div>
+        </div>
         <button
-          onClick={() => setActiveSubTab('academy')}
+          type="button"
+          onClick={() => setIsHelpCenterOpen(true)}
           style={{
-            padding: '10px 20px',
-            borderRadius: '12px',
+            background: '#eab308',
+            color: '#0f172a',
             border: 'none',
-            background: activeSubTab === 'academy' ? 'white' : 'transparent',
-            color: activeSubTab === 'academy' ? '#1e293b' : '#64748b',
+            padding: '9px 18px',
+            borderRadius: '10px',
             fontWeight: 800,
-            fontSize: '0.85rem',
+            fontSize: '0.8rem',
             cursor: 'pointer',
-            boxShadow: activeSubTab === 'academy' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
-            transition: 'all 0.2s',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '8px',
+            boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)',
+            transition: 'all 0.15s'
           }}
+          className="hover-scale"
         >
-          <Shield size={16} /> Einstellungen
-        </button>
-        <button
-          onClick={() => setActiveSubTab('device')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '12px',
-            border: 'none',
-            background: activeSubTab === 'device' ? 'white' : 'transparent',
-            color: activeSubTab === 'device' ? '#1e293b' : '#64748b',
-            fontWeight: 800,
-            fontSize: '0.85rem',
-            cursor: 'pointer',
-            boxShadow: activeSubTab === 'device' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <Monitor size={16} /> Geräte-Setup
-        </button>
-        <button
-          onClick={() => setActiveSubTab('maintenance')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '12px',
-            border: 'none',
-            background: activeSubTab === 'maintenance' ? 'white' : 'transparent',
-            color: activeSubTab === 'maintenance' ? '#1e293b' : '#64748b',
-            fontWeight: 800,
-            fontSize: '0.85rem',
-            cursor: 'pointer',
-            boxShadow: activeSubTab === 'maintenance' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none',
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <AlertCircle size={16} /> Systemwartung
+          <BookOpen size={14} /> Leitfäden öffnen
         </button>
       </div>
 
-      {/* Subtab 1: Geräte-Setup (Classroom grid kiosk view) */}
-      {activeSubTab === 'device' && (
-        <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-          
-          {/* GrooveLab Kiosk Device Onboarding Link section */}
-          {effectiveSchool?.groovelab_kiosk_token && (
-            <div style={{ 
-              background: '#fefce8', 
-              border: '1.5px solid #fef08a', 
-              borderRadius: '20px', 
-              padding: '20px', 
-              marginBottom: '28px',
+      {/* FOCUS MODALS FOR GROOVELAB SETTINGS */}
+      {activeGrooveSettingsModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            boxSizing: 'border-box'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveGrooveSettingsModal(null);
+          }}
+        >
+          <div 
+            style={{
+              width: '100%',
+              maxWidth: activeGrooveSettingsModal === 'devices' ? '920px' : activeGrooveSettingsModal === 'hours' ? '760px' : '620px',
+              maxHeight: '90vh',
+              background: '#ffffff',
+              borderRadius: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.8)',
+              boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.35)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px'
-            }}>
-              <div>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#854d0e', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Monitor size={18} /> GrooveLab Kiosk-Geräte Onboarding
-                </h3>
-                <p style={{ fontSize: '0.78rem', color: '#a16207', margin: '4px 0 0 0', fontWeight: 550, lineHeight: 1.4 }}>
-                  Kopiere diesen Link und sende ihn an neue Kiosk-Geräte (z.B. iPads), um diese mit den GrooveLab-Stationen zu verknüpfen. Wird der Link geöffnet, kann die GrooveLab-App direkt installiert und eingerichtet werden (keine PIN erforderlich, Anmeldung erfolgt komplett über Schüler-QR-Codes).
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <input 
-                  type="text" 
-                  readOnly 
-                  value={`${window.location.origin}/device-onboarding/${effectiveSchool.groovelab_kiosk_token}`}
-                  style={{ 
-                    flex: 1, 
-                    padding: '12px 16px', 
-                    borderRadius: '12px', 
-                    border: '1px solid #fef08a', 
-                    background: '#ffffff',
-                    color: '#854d0e',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    outline: 'none'
-                  }} 
-                />
-                <button
-                  onClick={() => {
-                    const link = `${window.location.origin}/device-onboarding/${effectiveSchool.groovelab_kiosk_token}`;
-                    navigator.clipboard.writeText(link);
-                    setCopiedKioskLink(true);
-                    setTimeout(() => setCopiedKioskLink(false), 2000);
-                  }}
-                  style={{
-                    background: '#eab308',
-                    color: '#0f172a',
-                    border: 'none',
-                    borderRadius: '12px',
-                    padding: '12px 20px',
-                    fontSize: '0.8rem',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 4px 10px rgba(234,179,8,0.2)',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  {copiedKioskLink ? <Check size={16} /> : <Copy size={16} />}
-                  {copiedKioskLink ? 'Link kopiert!' : 'Link kopieren'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Räumliche Kiosk-Übersicht</h2>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Manuelle Umbuchungen & Echtzeit-iPad-Platzierungen vornehmen.</p>
-            </div>
-            
-            {/* iPad local configuration reset */}
-            {localStorage.getItem('groovelab_station_id') && (
-              <button 
-                onClick={() => {
-                  if (window.confirm("Dieses Gerät wirklich entkoppeln und in den Mobil-Modus versetzen?")) {
-                    localStorage.removeItem('groovelab_station_id'); 
-                    window.location.reload(); 
-                  }
-                }}
-                style={{ 
-                  background: '#fee2e2', 
-                  border: 'none', 
-                  padding: '10px 18px', 
-                  borderRadius: '12px', 
-                  color: '#ef4444', 
-                  fontWeight: 800, 
-                  fontSize: '0.8rem',
-                  cursor: 'pointer' 
-                }}
-              >
-                Geräte-Kopplung aufheben
-              </button>
-            )}
-          </div>
-
-          {/* Room Selector Tab Bar */}
-          {rooms.length > 1 && (
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-              {rooms.map(r => (
-                <button
-                  key={r.id}
-                  onClick={() => setSelectedRoomId(r.id)}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: selectedRoomId === r.id ? brandColor : '#f1f5f9',
-                    color: selectedRoomId === r.id ? 'white' : '#64748b',
-                    fontWeight: 700,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {r.name}
-                </button>
-              ))}
-            </div>
-          )}
-
-
-
-          {/* Seating Layout Grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '12px',
-            background: '#f8fafc',
-            padding: '16px',
-            borderRadius: '20px',
-            border: '1px solid #f1f5f9',
-            maxWidth: '900px',
-            margin: '0 auto'
-          }}>
-            {/* Row 1: iPads 3, 4, 5, 6 */}
-            {renderStationCell(getStationByNumber(3), 'iPad 3')}
-            {renderStationCell(getStationByNumber(4), 'iPad 4')}
-            {renderStationCell(getStationByNumber(5), 'iPad 5')}
-            {renderStationCell(getStationByNumber(6), 'iPad 6')}
-
-            {/* Row 2: iPad 2, Lehrer-iPad (spans 2 columns), iPad 7 */}
-            {renderStationCell(getStationByNumber(2), 'iPad 2')}
-            <div style={{ gridColumn: 'span 2' }}>
-              {renderStationCell(lehrerStation, 'Lehrer-iPad', true)}
-            </div>
-            {renderStationCell(getStationByNumber(7), 'iPad 7')}
-
-            {/* Mittelgang Divider */}
+              overflow: 'hidden',
+              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}
+            className="animate-scale-in"
+          >
+            {/* Modal Header */}
             <div style={{
-              gridColumn: 'span 4',
+              padding: '20px 24px',
+              borderBottom: '1px solid #f1f5f9',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              padding: '4px 0',
-              color: '#94a3b8',
-              fontSize: '0.7rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '0.25em',
-              borderTop: '1px dashed #e2e8f0',
-              borderBottom: '1px dashed #e2e8f0',
-              margin: '2px 0',
-              userSelect: 'none'
+              justifyContent: 'space-between',
+              background: '#f8fafc'
             }}>
-              ↕ Mittelgang ↕
-            </div>
-
-            {/* Row 3: iPad 1, empty space (entrance), iPad 8 */}
-            {renderStationCell(getStationByNumber(1), 'iPad 1')}
-            <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 600 }}>
-              Eingang
-            </div>
-            {renderStationCell(getStationByNumber(8), 'iPad 8')}
-          </div>
-        </div>
-      )}
-
-      {/* Subtab 2: Einstellungen */}
-      {activeSubTab === 'academy' && (
-        <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: `${brandColor}10`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Shield size={20} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Einstellungen</h2>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Betriebszeiten und Sicherheitseinstellungen für dein Groovelab.</p>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr', gap: '32px', alignItems: 'stretch' }}>
-              {/* Left Column: Öffnungszeiten */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px' }}>Öffnungszeiten</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  {days.map((day, idx) => {
-                    const isActive = hours[day.id]?.active !== false; // default open
-                    return (
-                      <div
-                        key={day.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0',
-                          padding: '13px 16px',
-                          background: idx % 2 === 0 ? '#f8fafc' : 'white',
-                          borderRadius: idx === 0 ? '14px 14px 0 0' : idx === days.length - 1 ? '0 0 14px 14px' : '0',
-                          borderBottom: idx < days.length - 1 ? '1px solid #f1f5f9' : 'none',
-                          opacity: isActive ? 1 : 0.55,
-                          transition: 'opacity 0.2s'
-                        }}
-                      >
-                        {/* Day label */}
-                        <div style={{ width: '110px', fontWeight: 700, color: '#1e293b', fontSize: '0.88rem', flexShrink: 0 }}>{day.label}</div>
-
-                        {/* Time inputs */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                          <input
-                            type="time"
-                            value={hours[day.id]?.start || '08:00'}
-                            disabled={!isActive}
-                            onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: isActive, start: e.target.value}})}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '8px',
-                              border: '1px solid #e2e8f0',
-                              background: isActive ? 'white' : '#f8fafc',
-                              fontWeight: 600,
-                              fontSize: '0.85rem',
-                              color: isActive ? '#1e293b' : '#94a3b8',
-                              cursor: isActive ? 'text' : 'not-allowed',
-                              outline: 'none',
-                              width: '100px'
-                            }}
-                          />
-                          <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: '0.8rem' }}>–</span>
-                          <input
-                            type="time"
-                            value={hours[day.id]?.end || '20:00'}
-                            disabled={!isActive}
-                            onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: isActive, end: e.target.value}})}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '8px',
-                              border: '1px solid #e2e8f0',
-                              background: isActive ? 'white' : '#f8fafc',
-                              fontWeight: 600,
-                              fontSize: '0.85rem',
-                              color: isActive ? '#1e293b' : '#94a3b8',
-                              cursor: isActive ? 'text' : 'not-allowed',
-                              outline: 'none',
-                              width: '100px'
-                            }}
-                          />
-                        </div>
-
-                        {/* Apple-style pill toggle */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                          <span style={{
-                            fontSize: '0.7rem',
-                            fontWeight: 800,
-                            letterSpacing: '0.05em',
-                            color: isActive ? '#34a853' : '#ef4444',
-                            minWidth: '42px',
-                            textAlign: 'right'
-                          }}>
-                            {isActive ? 'OFFEN' : 'ZU'}
-                          </span>
-                          <button
-                            onClick={() => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: !isActive, start: hours[day.id]?.start || '08:00', end: hours[day.id]?.end || '20:00'}})}
-                            style={{
-                              position: 'relative',
-                              width: '44px',
-                              height: '26px',
-                              borderRadius: '13px',
-                              border: 'none',
-                              background: isActive ? '#34a853' : '#e2e8f0',
-                              cursor: 'pointer',
-                              transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                              flexShrink: 0,
-                              padding: 0,
-                              outline: 'none',
-                              boxShadow: isActive ? '0 0 0 2px #e6f4ea' : 'none'
-                            }}
-                            aria-label={isActive ? 'Tag schließen' : 'Tag öffnen'}
-                          >
-                            <div style={{
-                              position: 'absolute',
-                              top: '3px',
-                              left: isActive ? '21px' : '3px',
-                              width: '20px',
-                              height: '20px',
-                              borderRadius: '50%',
-                              background: 'white',
-                              boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
-                              transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-                            }} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Right Column: Sicherheit & Geofencing */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' }}>
-                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '24px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0px' }}>Login-Sicherheit & Geofencing</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <button 
-                      onClick={() => setHours({ ...hours, enforce_hours: true })}
-                      style={{ 
-                        width: '100%',
-                        padding: '12px',
-                        borderRadius: '12px',
-                        border: `2px solid ${hours.enforce_hours !== false ? brandColor : '#e2e8f0'}`,
-                        background: hours.enforce_hours !== false ? `${brandColor}05` : 'white',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: hours.enforce_hours !== false ? brandColor : '#1e293b', marginBottom: '2px' }}>Strikte Öffnungszeiten</div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: 1.3 }}>Labor-Login mit Geotracking NUR innerhalb der Öffnungszeiten erlaubt.</div>
-                    </button>
-                    <button 
-                      onClick={() => setHours({ ...hours, enforce_hours: false })}
-                      style={{ 
-                        width: '100%',
-                        padding: '12px',
-                        borderRadius: '12px',
-                        border: `2px solid ${hours.enforce_hours === false ? brandColor : '#e2e8f0'}`,
-                        background: hours.enforce_hours === false ? `${brandColor}05` : 'white',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: hours.enforce_hours === false ? brandColor : '#1e293b', marginBottom: '2px' }}>Flexible Öffnungszeiten</div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: 1.3 }}>Labor-Login mit Geotracking AUCH außerhalb der Öffnungszeiten erlaubt.</div>
-                    </button>
-                  </div>
-
-                  <div style={{ height: '1px', background: '#e2e8f0', margin: '8px 0' }} />
-
-                  <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0px' }}>Geofencing (Standort-Prüfung)</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <button 
-                      onClick={() => setHours({ ...hours, geofence_bypass: false })}
-                      style={{ 
-                        width: '100%',
-                        padding: '12px',
-                        borderRadius: '12px',
-                        border: `2px solid ${hours.geofence_bypass !== true ? brandColor : '#e2e8f0'}`,
-                        background: hours.geofence_bypass !== true ? `${brandColor}05` : 'white',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: hours.geofence_bypass !== true ? brandColor : '#1e293b', marginBottom: '2px' }}>Geofencing Aktivieren (Standard)</div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: 1.3 }}>Beim Login wird der Standort des Geräts abgefragt. Nur wenn der Standort des Geräts und der des Groove Lab Raums übereinstimmen, wird er im Live Lab eingeloggt und sichtbar.</div>
-                    </button>
-                    <button 
-                      onClick={() => setHours({ ...hours, geofence_bypass: true })}
-                      style={{ 
-                        width: '100%',
-                        padding: '12px',
-                        borderRadius: '12px',
-                        border: `2px solid ${hours.geofence_bypass === true ? brandColor : '#e2e8f0'}`,
-                        background: hours.geofence_bypass === true ? `${brandColor}05` : 'white',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: hours.geofence_bypass === true ? brandColor : '#1e293b', marginBottom: '2px' }}>Geofencing Ausschalten (Bypass)</div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: 1.3 }}>Jeder Login führt direkt ins Live Lab. Die Standortabfrage wird komplett übersprungen.</div>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <button 
-                onClick={handleSaveAcademy}
-                disabled={isSaving}
-                style={{ 
-                  width: 'fit-content',
-                  background: brandColor, 
-                  color: 'white', 
-                  border: 'none', 
-                  padding: '12px 28px', 
-                  borderRadius: '10px', 
-                  fontWeight: 800, 
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  opacity: isSaving ? 0.7 : 1
-                }}
-              >
-                {isSaving ? 'Speichere...' : 'Einstellungen speichern'}
-              </button>
-            </div>
-
-            {/* Sektion: Daten-Export (Anwesenheiten) */}
-            <div style={{ 
-              background: '#f8fafc', 
-              borderRadius: '24px', 
-              padding: '20px 24px', 
-              border: '1.5px solid #e2e8f0',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              marginTop: '16px'
-            }}>
-              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Activity size={18} color={brandColor} /> Anwesenheitsdaten exportieren
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>
-                Lade alle Anwesenheits- und Check-In-Protokolle von allen Lehrern, Coaches und Schülern dieser Musikschule als CSV-Datei herunter.
-              </p>
-              <button
-                type="button"
-                onClick={handleExportAllPresenceCSV}
-                style={{
-                  width: 'fit-content',
-                  background: brandColor,
-                  color: 'white',
-                  border: 'none',
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  fontWeight: 800,
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: `0 4px 12px ${brandColor}20`,
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
+                }}>
+                  {activeGrooveSettingsModal === 'hours' && <Clock size={22} color="#ffffff" />}
+                  {activeGrooveSettingsModal === 'security' && <ShieldCheck size={22} color="#ffffff" />}
+                  {activeGrooveSettingsModal === 'devices' && <Monitor size={22} color="#ffffff" />}
+                  {activeGrooveSettingsModal === 'analytics' && <Activity size={22} color="#ffffff" />}
+                  {activeGrooveSettingsModal === 'maintenance' && <AlertCircle size={22} color="#ffffff" />}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                    {activeGrooveSettingsModal === 'hours' && 'Betriebszeiten & Studio-Zeiten'}
+                    {activeGrooveSettingsModal === 'security' && 'Geofencing & Login-Schutz'}
+                    {activeGrooveSettingsModal === 'devices' && 'Kiosk-Geräte & Stations-Setup'}
+                    {activeGrooveSettingsModal === 'analytics' && 'Anwesenheit & Check-In Protokolle'}
+                    {activeGrooveSettingsModal === 'maintenance' && 'Systemwartung & Bereinigung'}
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
+                    {activeGrooveSettingsModal === 'hours' && 'Öffnungszeiten und Login-Regeln für das GrooveLab Studio.'}
+                    {activeGrooveSettingsModal === 'security' && 'Standort-Validierung (Geofence) und Sicherheitsregeln konfigurieren.'}
+                    {activeGrooveSettingsModal === 'devices' && 'Kiosk-iPads den GrooveLab-Stationen zuweisen und verwalten.'}
+                    {activeGrooveSettingsModal === 'analytics' && 'Anwesenheits- und Probenprotokolle aller Band-Mitglieder herunterladen.'}
+                    {activeGrooveSettingsModal === 'maintenance' && 'Scheduler-Datenleichen bereinigen und Semester-Resets vornehmen.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveGrooveSettingsModal(null)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  color: '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}
-                onMouseOver={e => e.currentTarget.style.background = activePlatform === 'campus' ? '#0f5b28' : '#ca8a04'}
-                onMouseLeave={e => e.currentTarget.style.background = brandColor}
+                className="hover-scale"
               >
-                <Download size={14} /> Alle Anwesenheiten exportieren (CSV)
+                <X size={16} />
               </button>
             </div>
 
-            {/* Sektion: Leitfäden & Akademie (Offizielles Handbuch) */}
-            <div style={{ 
-              background: activePlatform === 'campus' ? '#f0fdf4' : '#fefce8', 
-              borderRadius: '24px', 
-              padding: '20px 24px', 
-              border: `1.5px solid ${activePlatform === 'campus' ? '#bbf7d0' : '#fef08a'}`,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              marginTop: '8px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: brandColor, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <BookOpen size={20} />
+            {/* Modal Body */}
+            <div style={{ padding: '24px', overflowY: 'auto', maxHeight: 'calc(85vh - 140px)', textAlign: 'left' }}>
+              
+              {/* TAB 1: BETRIEBSZEITEN */}
+              {activeGrooveSettingsModal === 'hours' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Mode Selector */}
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                    <button 
+                      type="button"
+                      onClick={() => setHours({ ...hours, enforce_hours: true })}
+                      style={{ 
+                        padding: '14px',
+                        borderRadius: '14px',
+                        border: `2px solid ${hours.enforce_hours !== false ? '#eab308' : '#e2e8f0'}`,
+                        background: hours.enforce_hours !== false ? '#fefce8' : '#ffffff',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s'
+                      }}
+                      className="hover-scale"
+                    >
+                      <div style={{ fontWeight: 850, fontSize: '0.88rem', color: hours.enforce_hours !== false ? '#ca8a04' : '#1e293b', marginBottom: '3px' }}>Strikte Öffnungszeiten</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.35 }}>Login mit Geotracking NUR innerhalb der Öffnungszeiten erlaubt.</div>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setHours({ ...hours, enforce_hours: false })}
+                      style={{ 
+                        padding: '14px',
+                        borderRadius: '14px',
+                        border: `2px solid ${hours.enforce_hours === false ? '#eab308' : '#e2e8f0'}`,
+                        background: hours.enforce_hours === false ? '#fefce8' : '#ffffff',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s'
+                      }}
+                      className="hover-scale"
+                    >
+                      <div style={{ fontWeight: 850, fontSize: '0.88rem', color: hours.enforce_hours === false ? '#ca8a04' : '#1e293b', marginBottom: '3px' }}>Flexible Öffnungszeiten</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.35 }}>Login mit Geotracking AUCH außerhalb der Zeiten erlaubt.</div>
+                    </button>
                   </div>
-                  <div>
-                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: activePlatform === 'campus' ? '#14532d' : '#713f12' }}>
-                      Leitfäden & Akademie (Offizielles Handbuch)
-                    </h4>
-                    <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: activePlatform === 'campus' ? '#166534' : '#854d0e' }}>
-                      Schritt-für-Schritt-Anleitungen für Schulleitung, Kollegium und Schüler sowie Feature-Guides und FAQ.
-                    </p>
+
+                  {/* 7 Days Table */}
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '18px', overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                      Wochenübersicht (Mo – So)
+                    </div>
+                    {days.map((day, idx) => {
+                      const isActive = hours[day.id]?.active !== false;
+                      return (
+                        <div
+                          key={day.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            background: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                            borderBottom: idx < days.length - 1 ? '1px solid #f1f5f9' : 'none',
+                            opacity: isActive ? 1 : 0.6,
+                            transition: 'opacity 0.2s',
+                            gap: '12px'
+                          }}
+                        >
+                          <div style={{ width: '110px', fontWeight: 800, color: '#1e293b', fontSize: '0.86rem', flexShrink: 0 }}>
+                            {day.label}
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                            <input
+                              type="time"
+                              value={hours[day.id]?.start || '08:00'}
+                              disabled={!isActive}
+                              onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: isActive, start: e.target.value}})}
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                background: isActive ? '#ffffff' : '#f1f5f9',
+                                fontWeight: 700,
+                                fontSize: '0.84rem',
+                                color: isActive ? '#1e293b' : '#94a3b8',
+                                outline: 'none',
+                                width: '90px'
+                              }}
+                            />
+                            <span style={{ color: '#94a3b8', fontWeight: 600 }}>–</span>
+                            <input
+                              type="time"
+                              value={hours[day.id]?.end || '20:00'}
+                              disabled={!isActive}
+                              onChange={e => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: isActive, end: e.target.value}})}
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                background: isActive ? '#ffffff' : '#f1f5f9',
+                                fontWeight: 700,
+                                fontSize: '0.84rem',
+                                color: isActive ? '#1e293b' : '#94a3b8',
+                                outline: 'none',
+                                width: '90px'
+                              }}
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 850, color: isActive ? '#15803d' : '#ef4444', minWidth: '38px', textAlign: 'right' }}>
+                              {isActive ? 'OFFEN' : 'ZU'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: !isActive, start: hours[day.id]?.start || '08:00', end: hours[day.id]?.end || '20:00'}})}
+                              className={`app-binary-switch ${isActive ? 'active' : ''}`}
+                              style={{ backgroundColor: isActive ? '#eab308' : undefined, flexShrink: 0 }}
+                            >
+                              <div className="app-binary-switch-knob" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsHelpCenterOpen(true)}
-                  style={{
-                    background: brandColor,
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '9px 18px',
-                    borderRadius: '10px',
-                    fontWeight: 800,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: `0 4px 12px ${brandColor}25`,
-                    transition: 'all 0.15s'
-                  }}
-                  className="hover-scale"
-                >
-                  <BookOpen size={14} /> Leitfäden öffnen
-                </button>
-              </div>
-            </div>
+              )}
 
-            {/* Sektion: Ideenschmiede & Feedback */}
-            <div style={{ 
-              background: '#fdf2f8', 
-              borderRadius: '24px', 
-              padding: '20px 24px', 
-              border: '1.5px solid #fbcfe8',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              marginTop: '8px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ec4899', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Lightbulb size={20} />
+              {/* TAB 2: GEOFENCING & SICHERHEIT */}
+              {activeGrooveSettingsModal === 'security' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  {/* Mode Selector */}
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                    <button 
+                      type="button"
+                      onClick={() => setHours({ ...hours, geofence_bypass: false })}
+                      style={{ 
+                        padding: '14px',
+                        borderRadius: '14px',
+                        border: `2px solid ${hours.geofence_bypass !== true ? '#eab308' : '#e2e8f0'}`,
+                        background: hours.geofence_bypass !== true ? '#fefce8' : '#ffffff',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                      className="hover-scale"
+                    >
+                      <div style={{ fontWeight: 850, fontSize: '0.88rem', color: hours.geofence_bypass !== true ? '#ca8a04' : '#1e293b', marginBottom: '3px' }}>Geofencing Aktivieren (Standard)</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.35 }}>Login wird mit den Koordinaten des Raums abgeglichen.</div>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setHours({ ...hours, geofence_bypass: true })}
+                      style={{ 
+                        padding: '14px',
+                        borderRadius: '14px',
+                        border: `2px solid ${hours.geofence_bypass === true ? '#eab308' : '#e2e8f0'}`,
+                        background: hours.geofence_bypass === true ? '#fefce8' : '#ffffff',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                      }}
+                      className="hover-scale"
+                    >
+                      <div style={{ fontWeight: 850, fontSize: '0.88rem', color: hours.geofence_bypass === true ? '#ca8a04' : '#1e293b', marginBottom: '3px' }}>Geofencing Ausschalten (Bypass)</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.35 }}>Jeder Login führt direkt ins Live Lab ohne GPS-Abfrage.</div>
+                    </button>
                   </div>
-                  <div>
-                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: '#831843' }}>
-                      Ideenschmiede & Feature-Wünsche
-                    </h4>
-                    <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#9d174d' }}>
-                      Reiche Wünsche, Feature-Ideen oder Fehlerberichte ein und stimme über Community-Vorschläge ab.
-                    </p>
+
+                  {/* Geofence Radius */}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Erlaubter Geofence-Radius</label>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      {['50', '100', '200', '500'].map((rVal) => {
+                        const isSelected = (radius || '100') === rVal;
+                        return (
+                          <button
+                            key={rVal}
+                            type="button"
+                            onClick={() => setRadius(rVal)}
+                            style={{
+                              flex: 1,
+                              padding: '10px',
+                              borderRadius: '10px',
+                              border: isSelected ? '2px solid #eab308' : '1px solid #cbd5e1',
+                              background: isSelected ? '#fefce8' : '#ffffff',
+                              color: isSelected ? '#ca8a04' : '#475569',
+                              fontWeight: 850,
+                              fontSize: '0.84rem',
+                              cursor: 'pointer'
+                            }}
+                            className="hover-scale"
+                          >
+                            {rVal} Meter
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Coordinates GPS */}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Schul-Koordinaten (GPS)</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (navigator.geolocation) {
+                            navigator.geolocation.getCurrentPosition(
+                              (pos) => {
+                                setLat(pos.coords.latitude.toFixed(6));
+                                setLng(pos.coords.longitude.toFixed(6));
+                                alert('GPS-Koordinaten erfolgreich ermittelt! 📍');
+                              },
+                              (err) => alert('Standort konnte nicht ermittelt werden: ' + err.message)
+                            );
+                          } else {
+                            alert('Geolocation wird von diesem Browser nicht unterstützt.');
+                          }
+                        }}
+                        style={{
+                          background: '#fefce8',
+                          border: '1px solid #fef08a',
+                          color: '#ca8a04',
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        className="hover-scale"
+                      >
+                        <MapPin size={12} /> Standort ermitteln
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <input 
+                        type="text" 
+                        placeholder="Breitengrad (z.B. 47.5584)" 
+                        value={lat} 
+                        onChange={e => setLat(e.target.value)}
+                        style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, outline: 'none' }}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Längengrad (z.B. 7.9472)" 
+                        value={lng} 
+                        onChange={e => setLng(e.target.value)}
+                        style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, outline: 'none' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* GDPR Status */}
+                  <div style={{ background: '#fefce8', border: '1px solid #fef08a', borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <ShieldCheck size={24} color="#ca8a04" />
+                    <div>
+                      <strong style={{ fontSize: '0.84rem', color: '#713f12', display: 'block' }}>Art. 32 DSGVO Konforme Speicherung</strong>
+                      <span style={{ fontSize: '0.72rem', color: '#a16207' }}>
+                        Standortdaten werden ausschließlich temporär zur Check-in-Validierung verarbeitet und niemals in Bewegungsprofilen gespeichert.
+                      </span>
+                    </div>
                   </div>
                 </div>
+              )}
+
+              {/* TAB 3: KIOSK GERÄTE & STATIONS SETUP */}
+              {activeGrooveSettingsModal === 'devices' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* GrooveLab Kiosk Device Onboarding Link section */}
+                  {effectiveSchool?.groovelab_kiosk_token && (
+                    <div style={{ 
+                      background: '#fefce8', 
+                      border: '1.5px solid #fef08a', 
+                      borderRadius: '18px', 
+                      padding: '18px', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '10px'
+                    }}>
+                      <div>
+                        <h4 style={{ fontSize: '0.92rem', fontWeight: 900, color: '#854d0e', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Monitor size={18} /> GrooveLab Kiosk-Geräte Onboarding Link
+                        </h4>
+                        <p style={{ fontSize: '0.76rem', color: '#a16207', margin: '3px 0 0 0', fontWeight: 550, lineHeight: 1.4 }}>
+                          Kopiere diesen Link und öffne ihn auf neuen Kiosk-iPads im Proberaum, um diese direkt als GrooveLab-Kiosk einzurichten.
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <input 
+                          type="text" 
+                          readOnly 
+                          value={`${window.location.origin}/device-onboarding/${effectiveSchool.groovelab_kiosk_token}`}
+                          style={{ 
+                            flex: 1, 
+                            padding: '10px 14px', 
+                            borderRadius: '10px', 
+                            border: '1px solid #fef08a', 
+                            background: '#ffffff',
+                            color: '#854d0e',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }} 
+                        />
+                        <button
+                          onClick={() => {
+                            const link = `${window.location.origin}/device-onboarding/${effectiveSchool.groovelab_kiosk_token}`;
+                            navigator.clipboard.writeText(link);
+                            setCopiedKioskLink(true);
+                            setTimeout(() => setCopiedKioskLink(false), 2000);
+                          }}
+                          style={{
+                            background: '#eab308',
+                            color: '#0f172a',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '10px 16px',
+                            fontSize: '0.78rem',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 10px rgba(234,179,8,0.2)',
+                            transition: 'all 0.15s'
+                          }}
+                          className="hover-scale"
+                        >
+                          {copiedKioskLink ? <Check size={14} /> : <Copy size={14} />}
+                          {copiedKioskLink ? 'Kopiert!' : 'Kopieren'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Room Selector Tab Bar */}
+                  {rooms.length > 1 && (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {rooms.map(r => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => setSelectedRoomId(r.id)}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: '10px',
+                            border: 'none',
+                            background: selectedRoomId === r.id ? '#eab308' : '#f1f5f9',
+                            color: selectedRoomId === r.id ? '#0f172a' : '#64748b',
+                            fontWeight: 800,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          className="hover-scale"
+                        >
+                          {r.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Seating Layout Grid */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    gap: '12px',
+                    background: '#f8fafc',
+                    padding: '16px',
+                    borderRadius: '20px',
+                    border: '1px solid #e2e8f0',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    {/* Row 1: iPads 3, 4, 5, 6 */}
+                    {renderStationCell(getStationByNumber(3), 'iPad 3')}
+                    {renderStationCell(getStationByNumber(4), 'iPad 4')}
+                    {renderStationCell(getStationByNumber(5), 'iPad 5')}
+                    {renderStationCell(getStationByNumber(6), 'iPad 6')}
+
+                    {/* Row 2: iPad 2, Lehrer-iPad (spans 2 columns), iPad 7 */}
+                    {renderStationCell(getStationByNumber(2), 'iPad 2')}
+                    <div style={{ gridColumn: 'span 2' }}>
+                      {renderStationCell(lehrerStation, 'Lehrer-iPad', true)}
+                    </div>
+                    {renderStationCell(getStationByNumber(7), 'iPad 7')}
+
+                    {/* Mittelgang Divider */}
+                    <div style={{
+                      gridColumn: 'span 4',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '4px 0',
+                      color: '#94a3b8',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.25em',
+                      borderTop: '1px dashed #e2e8f0',
+                      borderBottom: '1px dashed #e2e8f0',
+                      margin: '2px 0',
+                      userSelect: 'none'
+                    }}>
+                      ↕ Mittelgang ↕
+                    </div>
+
+                    {/* Row 3: iPad 1, empty space (entrance), iPad 8 */}
+                    {renderStationCell(getStationByNumber(1), 'iPad 1')}
+                    <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 600 }}>
+                      Eingang
+                    </div>
+                    {renderStationCell(getStationByNumber(8), 'iPad 8')}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: ANWESENHEIT & PROTOKOLLE */}
+              {activeGrooveSettingsModal === 'analytics' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Activity size={22} color="#ca8a04" />
+                      <div>
+                        <strong style={{ fontSize: '0.92rem', color: '#0f172a', display: 'block' }}>Anwesenheitsdaten &amp; Check-In Export</strong>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                          Lade alle Anwesenheits- und Check-In-Protokolle von allen Coaches und Schülern dieser Musikschule als CSV-Datei herunter.
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleExportAllPresenceCSV}
+                      style={{
+                        width: 'fit-content',
+                        background: '#eab308',
+                        color: '#0f172a',
+                        border: 'none',
+                        padding: '12px 22px',
+                        borderRadius: '12px',
+                        fontWeight: 900,
+                        fontSize: '0.84rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        boxShadow: '0 4px 12px rgba(234,179,8,0.25)',
+                        marginTop: '6px'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Download size={16} /> Alle Anwesenheiten exportieren (CSV)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: SYSTEMWARTUNG */}
+              {activeGrooveSettingsModal === 'maintenance' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 850, fontSize: '0.86rem', color: '#1e293b' }}>Wochenplan bereinigen</div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Entfernt inaktive Daten und synchronisiert Rosteinträge, um Dateileichen aus der Scheduler-Tabelle zu entfernen.</div>
+                    <button 
+                      type="button"
+                      onClick={onCleanupPlanning}
+                      style={{ 
+                        width: 'fit-content',
+                        background: '#ffffff', 
+                        border: '1.5px solid #fef08a', 
+                        color: '#ca8a04', 
+                        padding: '9px 16px', 
+                        borderRadius: '10px', 
+                        fontWeight: 800, 
+                        fontSize: '0.8rem', 
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                      className="hover-scale"
+                    >
+                      Wochenplan bereinigen (Datenleichen entfernen)
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 850, fontSize: '0.86rem', color: '#1e293b' }}>Wochenplan komplett leeren</div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Versetzt den Scheduler für alle Schüler in den Ausgangszustand und löscht alle eingetragenen Zeitslots. Dieser Schritt kann nicht rückgängig gemacht werden!</div>
+                    <button 
+                      type="button"
+                      onClick={onResetPlanning}
+                      style={{ 
+                        width: 'fit-content',
+                        background: '#ffffff', 
+                        border: '1.5px solid #fecaca', 
+                        color: '#ef4444', 
+                        padding: '9px 16px', 
+                        borderRadius: '10px', 
+                        fontWeight: 800, 
+                        fontSize: '0.8rem', 
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                      className="hover-scale"
+                    >
+                      Wochenplan komplett leeren
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 850, fontSize: '0.86rem', color: '#1e293b' }}>Übe-Statistiken zurücksetzen</div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Setzt die aufgezeichneten Minuten und Übezeiten für alle Schülerprofile auf 0 zurück. Nützlich zum Beginn eines neuen Semesters.</div>
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm("Möchtest du die Übe-Statistik (eingeloggte Minuten) wirklich für alle Schüler zurücksetzen?")) {
+                          setIsSaving(true);
+                          const updatedHours = {
+                            ...hours,
+                            [activePlatform === 'campus' ? 'campus_stats_reset_at' : 'groovelab_stats_reset_at']: new Date().toISOString()
+                          };
+                          const { error } = await supabase
+                            .from('schools')
+                            .update({ opening_hours: updatedHours })
+                            .eq('id', school.id);
+                          setIsSaving(false);
+                          if (error) alert("Fehler: " + error.message);
+                          else {
+                            setHours(updatedHours);
+                            alert("Statistiken erfolgreich zurückgesetzt!");
+                            onUpdate();
+                          }
+                        }
+                      }}
+                      style={{ 
+                        width: 'fit-content',
+                        background: '#ffffff', 
+                        border: '1.5px solid #fef08a', 
+                        color: '#ca8a04', 
+                        padding: '9px 16px', 
+                        borderRadius: '10px', 
+                        fontWeight: 800, 
+                        fontSize: '0.8rem', 
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                      className="hover-scale"
+                    >
+                      Übe-Statistiken zurücksetzen
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #f1f5f9',
+              background: '#f8fafc',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '10px'
+            }}>
+              <button
+                type="button"
+                onClick={() => setActiveGrooveSettingsModal(null)}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+                className="hover-scale"
+              >
+                Schließen
+              </button>
+
+              {(activeGrooveSettingsModal === 'hours' || activeGrooveSettingsModal === 'security') && (
                 <button
                   type="button"
-                  onClick={() => setIsFeedbackModalOpen(true)}
-                  style={{
-                    background: '#ec4899',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '9px 18px',
-                    borderRadius: '10px',
-                    fontWeight: 800,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 12px rgba(236,72,153,0.25)',
-                    transition: 'all 0.15s'
+                  onClick={async () => {
+                    await handleSaveAcademy();
+                    setActiveGrooveSettingsModal(null);
                   }}
-                  className="hover-scale"
+                  disabled={!isSettingsDirty || isSaving}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: isSettingsDirty ? '#eab308' : '#cbd5e1',
+                    color: isSettingsDirty ? '#0f172a' : '#94a3b8',
+                    fontSize: '0.82rem',
+                    fontWeight: 900,
+                    cursor: isSettingsDirty ? 'pointer' : 'default',
+                    boxShadow: isSettingsDirty ? '0 4px 12px rgba(234,179,8,0.3)' : 'none'
+                  }}
+                  className={isSettingsDirty ? "hover-scale" : ""}
                 >
-                  <Lightbulb size={14} /> Ideenschmiede öffnen
+                  {isSaving ? 'Speichern...' : 'Speichern'}
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Subtab 3: Systemwartung */}
-      {activeSubTab === 'maintenance' && (
-        <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-            <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              borderRadius: '10px', 
-              background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', 
-              color: brandColor, 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <AlertCircle size={20} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: brandColor, margin: 0 }}>Systemwartung & Bereinigung</h2>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Hier kannst du Datenleichen entfernen und die Datenbank konsistent halten.</p>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '8px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>Wochenplan bereinigen</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Entfernt inaktive Daten und synchronisiert Rosteinträge, um Dateileichen aus der Scheduler-Tabelle zu entfernen.</div>
-              <button 
-                onClick={onCleanupPlanning}
-                style={{ 
-                  width: 'fit-content',
-                  background: 'white', 
-                  border: `1px solid ${activePlatform === 'campus' ? '#d1fae5' : '#fef08a'}`, 
-                  color: brandColor, 
-                  padding: '10px 18px', 
-                  borderRadius: '10px', 
-                  fontWeight: 700, 
-                  fontSize: '0.8rem', 
-                  cursor: 'pointer',
-                  transition: 'all 0.15s'
-                }}
-              >
-                Wochenplan bereinigen (Datenleichen entfernen)
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>Wochenplan komplett leeren</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Versetzt den Scheduler für alle Schüler in den Ausgangszustand und löscht alle eingetragenen Zeitslots. Dieser Schritt kann nicht rückgängig gemacht werden!</div>
-              <button 
-                onClick={onResetPlanning}
-                style={{ 
-                  width: 'fit-content',
-                  background: 'white', 
-                  border: `1px solid ${activePlatform === 'campus' ? '#d1fae5' : '#fef08a'}`, 
-                  color: brandColor, 
-                  padding: '10px 18px', 
-                  borderRadius: '10px', 
-                  fontWeight: 700, 
-                  fontSize: '0.8rem', 
-                  cursor: 'pointer',
-                  transition: 'all 0.15s'
-                }}
-              >
-                Wochenplan komplett leeren
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>Übe-Statistiken zurücksetzen</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Setzt die aufgezeichneten Minuten und Übezeiten für alle Schülerprofile auf 0 zurück. Nützlich zum Beginn eines neuen Semesters.</div>
-              <button 
-                onClick={async () => {
-                  if (window.confirm("Möchtest du die Übe-Statistik (eingeloggte Minuten) wirklich für alle Schüler zurücksetzen?")) {
-                    setIsSaving(true);
-                    const updatedHours = {
-                      ...hours,
-                      [activePlatform === 'campus' ? 'campus_stats_reset_at' : 'groovelab_stats_reset_at']: new Date().toISOString()
-                    };
-                    const { error } = await supabase
-                      .from('schools')
-                      .update({ opening_hours: updatedHours })
-                      .eq('id', school.id);
-                    setIsSaving(true);
-                    if (error) alert("Fehler: " + error.message);
-                    else {
-                      setHours(updatedHours);
-                      alert("Statistiken erfolgreich zurückgesetzt!");
-                      onUpdate();
-                    }
-                  }
-                }}
-                style={{ 
-                  width: 'fit-content',
-                  background: 'white', 
-                  border: `1px solid ${activePlatform === 'campus' ? '#d1fae5' : '#fef08a'}`, 
-                  color: brandColor, 
-                  padding: '10px 18px', 
-                  borderRadius: '10px', 
-                  fontWeight: 700, 
-                  fontSize: '0.8rem', 
-                  cursor: 'pointer',
-                  transition: 'all 0.15s'
-                }}
-              >
-                Übe-Statistiken zurücksetzen
-              </button>
+              )}
             </div>
           </div>
         </div>

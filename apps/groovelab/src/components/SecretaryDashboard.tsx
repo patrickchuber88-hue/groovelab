@@ -11,7 +11,8 @@ import {
   Trash2, Shield, Calendar, CalendarX, CalendarCheck, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon, Edit2,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
   School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake,
-  HardDrive, Cloud, Crown, Rocket, Cpu, Fingerprint, Smartphone, KeyRound, RotateCw, LayoutGrid, Mic, Smile, Radio, Archive
+  HardDrive, Cloud, Crown, Rocket, Cpu, Fingerprint, Smartphone, KeyRound, RotateCw, LayoutGrid, Mic, Smile, Radio, Archive,
+  Disc3
 } from 'lucide-react';
 import { isWebAuthnSupported, registerUserBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
 import { TeacherDashboard } from './TeacherDashboard';
@@ -48,6 +49,7 @@ import {
 } from '../services/studentRosterService';
 import { notesService, UserNote } from '../services/notesService';
 import { formatCleanNoteContent } from './notes/notesConstants';
+import { DEFAULT_FOKUS_LEVELS } from '../utils/studentProgressEngine';
 function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
   let prefix = 'C';
   if (role === 'admin' || role === 'secretary') {
@@ -2001,6 +2003,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   // Students and Link States
   const [students, setStudents] = useState<any[]>([]);
+  const [bands, setBands] = useState<any[]>([]);
   const [showTrialLogModal, setShowTrialLogModal] = useState(false);
   const [trialLogs, setTrialLogs] = useState<any[]>([]);
   const [trialLogsLoading, setTrialLogsLoading] = useState(false);
@@ -4642,6 +4645,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         .eq('rooms.school_id', schoolId);
       setStations(stationsData || []);
 
+      // Fetch bands for GrooveLab module
+      try {
+        const { data: bandsData } = await supabase
+          .from('bands')
+          .select('*')
+          .eq('school_id', schoolId);
+        setBands(bandsData || []);
+      } catch (err) {
+        console.warn('Error fetching bands in SecretaryDashboard:', err);
+      }
+
       // Fetch system alerts
       const { data: alertsData, error: alertsErr } = await supabase
         .from('system_alerts')
@@ -6690,15 +6704,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const handleCreateStudentCampus = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStudentFirstName || !newStudentLastName || (hasCampusSub && !newStudentBirthDate)) {
-      alert(hasCampusSub ? 'Bitte Vorname, Nachname und Geburtsdatum ausfüllen.' : 'Bitte Vorname und Nachname ausfüllen.');
+    if (!newStudentFirstName || !newStudentLastName) {
+      alert('Bitte Vorname und Nachname ausfüllen.');
       return;
     }
 
     try {
       const teacherId = newStudentTeacherId || null;
       const finalLastName = hasCampusSub ? newStudentLastName : (newStudentLastName?.trim() ? newStudentLastName.trim().charAt(0).toUpperCase() + '.' : '');
-      const finalBirthDate = hasCampusSub ? sanitizeBirthDateToDayOnly(newStudentBirthDate) : null;
+      const finalBirthDate = null;
 
       // 1. Call import_student RPC (5-Tabellen anonymisiertes Onboarding)
       const { data: newStudentId, error: insertError } = await supabase.rpc('import_student', {
@@ -12208,18 +12222,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
                     />
                   </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Geburtsdatum * (Format: DD.MM.YYYY)</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={newStudentBirthDate}
-                    onChange={(e) => setNewStudentBirthDate(e.target.value)}
-                    placeholder="z.B. 15.08.2012"
-                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
-                  />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -22512,90 +22514,179 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           )}
 
                           {/* 3. TIMER & LOOPSTATION */}
-                          {activeCampusSettingsModal === 'timer' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                              <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Standard Fokus-Timer Dauer</div>
-                                <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Voreingestellte Dauer für selbstständige Übe-Sessions von Schülern.</div>
-                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                                  {[15, 25, 45, 60].map((min) => (
-                                    <button
-                                      key={min}
-                                      onClick={() => handleSaveSettingValue('gl_campus_focus_timer_min', min, setCampusFocusTimerDefaultMin)}
-                                      style={{
-                                        flex: 1,
-                                        padding: '8px',
-                                        borderRadius: '10px',
-                                        border: '1.5px solid',
-                                        borderColor: campusFocusTimerDefaultMin === min ? '#34a853' : '#e2e8f0',
-                                        background: campusFocusTimerDefaultMin === min ? '#e6f4ea' : '#ffffff',
-                                        color: campusFocusTimerDefaultMin === min ? '#166534' : '#64748b',
-                                        fontWeight: 800,
-                                        fontSize: '0.8rem',
-                                        cursor: 'pointer'
-                                      }}
-                                    >
-                                      {min} Min
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
+                          {activeCampusSettingsModal === 'timer' && (() => {
+                            const currentFokusLevels = openingHours?.fokus_levels || DEFAULT_FOKUS_LEVELS;
 
-                              <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Zwingende Loopstation-Pause (Sample-Genauigkeit)</div>
-                                <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Verhindert verschluckte Anschläge (Swallowed Attack) bei Mehrspur-Aufnahmen im Solo-Übestudio.</div>
-                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                                  {[2, 4, 8].map((bars) => (
-                                    <button
-                                      key={bars}
-                                      onClick={() => handleSaveSettingValue('gl_campus_loopstation_bars_pause', bars, setCampusLoopstationBarsPause)}
-                                      style={{
-                                        flex: 1,
-                                        padding: '8px',
-                                        borderRadius: '10px',
-                                        border: '1.5px solid',
-                                        borderColor: campusLoopstationBarsPause === bars ? '#34a853' : '#e2e8f0',
-                                        background: campusLoopstationBarsPause === bars ? '#e6f4ea' : '#ffffff',
-                                        color: campusLoopstationBarsPause === bars ? '#166534' : '#64748b',
-                                        fontWeight: 800,
-                                        fontSize: '0.8rem',
-                                        cursor: 'pointer'
-                                      }}
-                                    >
-                                      {bars} Takte {bars === 4 && '(Standard)'}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
+                            const handleUpdateFokusMinutes = (levelKey: 'level1' | 'level2' | 'level3', flameKey: 'kleine' | 'mittlere' | 'helden', val: number) => {
+                              const safeVal = Math.max(1, Math.min(60, val));
+                              const updated = JSON.parse(JSON.stringify(currentFokusLevels));
+                              if (!updated[levelKey]) updated[levelKey] = { ...(DEFAULT_FOKUS_LEVELS as any)[levelKey] };
+                              updated[levelKey][flameKey] = safeVal;
+                              handleSaveSettingValue('fokus_levels', updated);
+                            };
 
-                              <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Maximale Audio-Aufnahmedauer pro Take</div>
-                                <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Schützt den Cloud-Speicher vor überlangen unkomprimierten Sprach- und Audiomitschnitten.</div>
-                                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                                  {[5, 10, 15].map((min) => (
+                            const handleResetFokusLevels = () => {
+                              handleSaveSettingValue('fokus_levels', DEFAULT_FOKUS_LEVELS);
+                            };
+
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                {/* 3-LEVEL STREAK PROGRESSION MATRIX */}
+                                <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                                    <div>
+                                      <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <Clock size={16} style={{ color: '#34a853' }} />
+                                        <span>Pädagogische Fokus-Timer Vorgaben</span>
+                                      </div>
+                                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>
+                                        Jedes Alter startet in Stufe 1. Mit zunehmender Streak-Ausdauer steigen Schüler in Stufe 2 und 3 auf.
+                                      </div>
+                                    </div>
                                     <button
-                                      key={min}
-                                      onClick={() => handleSaveSettingValue('gl_campus_audio_max_min', min, setCampusAudioMaxSessionMinutes)}
+                                      type="button"
+                                      onClick={handleResetFokusLevels}
                                       style={{
-                                        flex: 1,
-                                        padding: '8px',
-                                        borderRadius: '10px',
-                                        border: '1.5px solid',
-                                        borderColor: campusAudioMaxSessionMinutes === min ? '#34a853' : '#e2e8f0',
-                                        background: campusAudioMaxSessionMinutes === min ? '#e6f4ea' : '#ffffff',
-                                        color: campusAudioMaxSessionMinutes === min ? '#166534' : '#64748b',
-                                        fontWeight: 800,
-                                        fontSize: '0.8rem',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 700,
+                                        padding: '4px 10px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #cbd5e1',
+                                        background: '#ffffff',
+                                        color: '#475569',
                                         cursor: 'pointer'
                                       }}
+                                      title="Auf didaktische Standardwerte zurücksetzen"
                                     >
-                                      {min} Min
+                                      Standard-Werte
                                     </button>
-                                  ))}
+                                  </div>
+
+                                  {/* 3 Stufen Kacheln */}
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '10px' }}>
+                                    {[
+                                      {
+                                        key: 'level1' as const,
+                                        title: '🥚 Stufe 1: Habit-Starter',
+                                        subtitle: 'Start für ALLE Schüler',
+                                        defaults: DEFAULT_FOKUS_LEVELS.level1
+                                      },
+                                      {
+                                        key: 'level2' as const,
+                                        title: '🐥 Stufe 2: Streak-Routinier',
+                                        subtitle: '14+ Tage Streak / 250m',
+                                        defaults: DEFAULT_FOKUS_LEVELS.level2
+                                      },
+                                      {
+                                        key: 'level3' as const,
+                                        title: '🦅 Stufe 3: Fokus-Virtuose',
+                                        subtitle: '45+ Tage Streak / 1.000m',
+                                        defaults: DEFAULT_FOKUS_LEVELS.level3
+                                      }
+                                    ].map((lvl) => {
+                                      const conf = currentFokusLevels[lvl.key] || lvl.defaults;
+                                      return (
+                                        <div key={lvl.key} style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '14px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          <div>
+                                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>{lvl.title}</div>
+                                            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>{lvl.subtitle}</div>
+                                          </div>
+
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+                                            {[
+                                              { k: 'kleine' as const, label: '🔥 Klein (1–3 T.)' },
+                                              { k: 'mittlere' as const, label: '🔥🔥 Standard (4–8 T.)' },
+                                              { k: 'helden' as const, label: '👑 Helden (9+ T.)' }
+                                            ].map((flame) => (
+                                              <div key={flame.k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 650 }}>{flame.label}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                  <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="60"
+                                                    value={conf[flame.k] ?? lvl.defaults[flame.k]}
+                                                    onChange={(e) => handleUpdateFokusMinutes(lvl.key, flame.k, parseInt(e.target.value) || 1)}
+                                                    style={{
+                                                      width: '44px',
+                                                      padding: '3px 6px',
+                                                      textAlign: 'center',
+                                                      fontSize: '0.78rem',
+                                                      fontWeight: 800,
+                                                      border: '1px solid #cbd5e1',
+                                                      borderRadius: '6px',
+                                                      background: '#f8fafc',
+                                                      color: '#0f172a',
+                                                      outline: 'none'
+                                                    }}
+                                                  />
+                                                  <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>Min</span>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Zwingende Loopstation-Pause (Sample-Genauigkeit)</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Verhindert verschluckte Anschläge (Swallowed Attack) bei Mehrspur-Aufnahmen im Solo-Übestudio.</div>
+                                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                    {[2, 4, 8].map((bars) => (
+                                      <button
+                                        key={bars}
+                                        onClick={() => handleSaveSettingValue('gl_campus_loopstation_bars_pause', bars, setCampusLoopstationBarsPause)}
+                                        style={{
+                                          flex: 1,
+                                          padding: '8px',
+                                          borderRadius: '10px',
+                                          border: '1.5px solid',
+                                          borderColor: campusLoopstationBarsPause === bars ? '#34a853' : '#e2e8f0',
+                                          background: campusLoopstationBarsPause === bars ? '#e6f4ea' : '#ffffff',
+                                          color: campusLoopstationBarsPause === bars ? '#166534' : '#64748b',
+                                          fontWeight: 800,
+                                          fontSize: '0.8rem',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        {bars} Takte {bars === 4 && '(Standard)'}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Maximale Audio-Aufnahmedauer pro Take</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Schützt den Cloud-Speicher vor überlangen unkomprimierten Sprach- und Audiomitschnitten.</div>
+                                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                    {[5, 10, 15].map((min) => (
+                                      <button
+                                        key={min}
+                                        onClick={() => handleSaveSettingValue('gl_campus_audio_max_min', min, setCampusAudioMaxSessionMinutes)}
+                                        style={{
+                                          flex: 1,
+                                          padding: '8px',
+                                          borderRadius: '10px',
+                                          border: '1.5px solid',
+                                          borderColor: campusAudioMaxSessionMinutes === min ? '#34a853' : '#e2e8f0',
+                                          background: campusAudioMaxSessionMinutes === min ? '#e6f4ea' : '#ffffff',
+                                          color: campusAudioMaxSessionMinutes === min ? '#166534' : '#64748b',
+                                          fontWeight: 800,
+                                          fontSize: '0.8rem',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        {min} Min
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
                           {/* 4. SCHEDULE */}
                           {activeCampusSettingsModal === 'schedule' && (
@@ -26136,11 +26227,21 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               )}
                             </div>
 
-                            {/* Pupil Count */}
-                            <div style={{ flex: '1', minWidth: '100px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: '#3a3a3c' }}>
-                              <Users size={16} style={{ color: '#86868b' }} />
-                              <span>{(students.filter((s: any) => s.teacher_id === t.id).length) || t.studentCount || 0} Schüler</span>
-                            </div>
+                            {/* Coached Bands Count */}
+                            {(() => {
+                              const coachBandsCount = bands.filter((b: any) => 
+                                b.coach_id === t.id && 
+                                b.name !== '__SYSTEM_ANNOUNCEMENTS__' && 
+                                b.genre !== 'System'
+                              ).length;
+                              const isZero = coachBandsCount === 0;
+                              return (
+                                <div style={{ flex: '1', minWidth: '100px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: isZero ? '#94a3b8' : '#3a3a3c' }}>
+                                  <Disc3 size={16} style={{ color: isZero ? '#94a3b8' : '#b45309' }} />
+                                  <span>{coachBandsCount === 1 ? '1 Band' : `${coachBandsCount} Bands`}</span>
+                                </div>
+                              );
+                            })()}
 
                             {/* Action Buttons */}
                             <div style={{ flex: '1.2', minWidth: '120px', display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -34525,17 +34626,6 @@ status: status,
               </div>
             )}
 
-            {/* Feedback & Ideenschmiede Modal */}
-            <FeedbackHubModal
-              isOpen={isFeedbackModalOpen}
-              onClose={() => setIsFeedbackModalOpen(false)}
-              userRole="secretary"
-              userId={userId}
-              userName={schoolName ? `${schoolName} Sekretariat` : 'Sekretariat'}
-              schoolId={currentSchoolProfile?.id || schoolId}
-              schoolName={schoolName}
-              activePlatform="admin_desk"
-            />
           </div>
         )}
         {activeTab === 'secretary' && secretarySubTab === 'duties' && renderDutiesBoard()}
@@ -35108,22 +35198,46 @@ status: status,
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
                   <h4 style={{ margin: '0 0 4px 0', fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Stammdaten &amp; Ausstattung</h4>
 
-                  {/* Schüleranzahl KPI Card inside left column */}
-                  <div style={{
-                    background: '#f4fbf7',
-                    border: '1px solid #e6f4ea',
-                    padding: '16px',
-                    borderRadius: '16px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <div>
-                      <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüleranzahl</span>
-                      <strong style={{ display: 'block', fontSize: '1.45rem', color: '#34a853', marginTop: '2px', fontWeight: 900 }}>{(students.filter((s: any) => s.teacher_id === manageTeacher.id).length) || manageTeacher.studentCount || 0}</strong>
+                  {/* Schüleranzahl / Gecoachte Bands KPI Card inside left column */}
+                  {activeTab === 'groovelab' ? (
+                    <div style={{
+                      background: '#fefce8',
+                      border: '1px solid #fef08a',
+                      padding: '16px',
+                      borderRadius: '16px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div>
+                        <span style={{ fontSize: '0.68rem', color: '#b45309', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gecoachte Bands</span>
+                        <strong style={{ display: 'block', fontSize: '1.45rem', color: '#b45309', marginTop: '2px', fontWeight: 900 }}>
+                          {bands.filter((b: any) => 
+                            b.coach_id === manageTeacher.id && 
+                            b.name !== '__SYSTEM_ANNOUNCEMENTS__' && 
+                            b.genre !== 'System'
+                          ).length}
+                        </strong>
+                      </div>
+                      <Disc3 size={24} style={{ color: '#b45309', opacity: 0.8 }} />
                     </div>
-                    <GraduationCap size={24} style={{ color: '#34a853', opacity: 0.8 }} />
-                  </div>
+                  ) : (
+                    <div style={{
+                      background: '#f4fbf7',
+                      border: '1px solid #e6f4ea',
+                      padding: '16px',
+                      borderRadius: '16px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div>
+                        <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüleranzahl</span>
+                        <strong style={{ display: 'block', fontSize: '1.45rem', color: '#34a853', marginTop: '2px', fontWeight: 900 }}>{(students.filter((s: any) => s.teacher_id === manageTeacher.id).length) || manageTeacher.studentCount || 0}</strong>
+                      </div>
+                      <GraduationCap size={24} style={{ color: '#34a853', opacity: 0.8 }} />
+                    </div>
+                  )}
 
                   {/* Vorname & Nachname fields */}
                   <div style={{ display: 'flex', gap: '12px' }}>
@@ -37467,6 +37581,18 @@ status: status,
         schoolSubdomain={currentSchoolProfile?.subdomain}
         activePlatform={activePlatform as any}
         initialTab={guidanceInitialTab}
+      />
+
+      {/* Platform-wide Feedback & Ideenschmiede Modal */}
+      <FeedbackHubModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        userRole="secretary"
+        userId={userId}
+        userName={schoolName ? `${schoolName} Verwaltung` : 'Verwaltung'}
+        schoolId={currentSchoolProfile?.id || schoolId}
+        schoolName={schoolName || currentSchoolProfile?.name}
+        activePlatform={activeTab === 'secretary' ? 'admin_desk' : activeTab}
       />
     </div>
   </div>

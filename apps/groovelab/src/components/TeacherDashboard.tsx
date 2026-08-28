@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
+import { HelpCenterModal } from './help/HelpCenterModal';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
@@ -38,6 +39,7 @@ import {
   fetchUserBandIds, 
   fetchUnreadShouts 
 } from '../repositories';
+import { DEFAULT_FOKUS_LEVELS } from '../utils/studentProgressEngine';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -1310,6 +1312,12 @@ export function TeacherDashboard({
     if (onTabChange) onTabChange(tab);
   };
 
+  useEffect(() => {
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTabRaw(initialTab);
+    }
+  }, [initialTab]);
+
   // --- Guided Tour ---
   const tourSteps = useMemo<TourStep[]>(() => {
     switch(activeTab) {
@@ -1338,9 +1346,10 @@ export function TeacherDashboard({
     steps: tourSteps,
     platformTheme: activePlatform === 'campus' ? 'campus' : 'groovelab'
   });
-  const [teacherSettingsTab, setTeacherSettingsTab] = useState<'fokus' | 'profile'>('fokus');
-  const [activeTeacherSettingsModal, setActiveTeacherSettingsModal] = useState<'fokus' | 'profile' | 'avatar' | 'security' | null>(null);
+  const [teacherSettingsTab, setTeacherSettingsTab] = useState<'fokus' | 'profile' | 'livelab' | 'repertoire'>('livelab');
+  const [activeTeacherSettingsModal, setActiveTeacherSettingsModal] = useState<'livelab' | 'repertoire' | 'profile' | 'avatar' | 'security' | 'fokus' | null>(null);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [isHelpCenterOpen, setIsHelpCenterOpen] = useState(false);
   const [initialSchoolData, setInitialSchoolData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [allBands, setAllBands] = useState<any[]>([]);
@@ -2832,6 +2841,7 @@ export function TeacherDashboard({
       const rawName = item.studentName || item.student_name || item.name || item.purpose || '';
       const cleanName = rawName.replace(/^Unterricht:\s*/i, '').trim();
       const itemStudentFirstName = cleanName.split(' ')[0].toLowerCase();
+      const itemStudentLastName = cleanName.split(' ').slice(1).join(' ').toLowerCase();
       const itemStudentId = item.student_id || item.studentId || item.student?.id;
 
       const findIdx = () => {
@@ -2839,9 +2849,14 @@ export function TeacherDashboard({
           if (item.scheduleId && String(t.scheduleId) === String(item.scheduleId)) return true;
           if (item.id && (String(t.id) === String(item.id) || String(t.scheduleId) === String(item.id))) return true;
           if (itemStudentId && t.student?.id && String(t.student.id) === String(itemStudentId)) return true;
-          if (itemStudentFirstName && itemStudentFirstName !== 'schüler' && itemStudentFirstName !== 'unterricht') {
+          if (itemStudentFirstName && itemStudentFirstName.length >= 3 && itemStudentFirstName !== 'schüler' && itemStudentFirstName !== 'unterricht') {
             const tFn = (t.student?.first_name || t.student?.name?.split(' ')[0] || '').toLowerCase().trim();
-            if (tFn && tFn === itemStudentFirstName) return true;
+            const tLn = (t.student?.last_name || t.student?.name?.split(' ').slice(1).join(' ') || '').toLowerCase().trim();
+            if (tFn && tFn === itemStudentFirstName) {
+              if (!itemStudentLastName || !tLn || tLn.startsWith(itemStudentLastName[0])) {
+                return true;
+              }
+            }
           }
           return false;
         });
@@ -2853,6 +2868,7 @@ export function TeacherDashboard({
           updatedTimeline[existingIdx].status = 'rescheduled_away';
         }
       } else if (normDate === todayStr && formattedItemTime) {
+        const isUnconfirmed = item.status === 'unconfirmed' || item.status === 'unconfirmed_group';
         const existingIdx = findIdx();
         const isFromMyBookings = myBookings.some((b: any) => String(b.id) === String(item.id) || (itemStudentId && String(b.studentId) === String(itemStudentId)));
         const isPendingResched = item.status === 'rescheduled_pending' || item.status === 'pending_reschedule';
@@ -2867,7 +2883,7 @@ export function TeacherDashboard({
             is_room_booking: Boolean(item.is_room_booking || item.isRoomBooking || item.room_override_id || item.roomOverrideId || item.is_room_changed || item.isRoomChanged || isFromMyBookings),
             isRescheduledPending: isPendingResched
           };
-        } else if (itemStudentFirstName && itemStudentFirstName !== 'schüler' && itemStudentFirstName !== 'unterricht') {
+        } else if (!isUnconfirmed && itemStudentFirstName && itemStudentFirstName !== 'schüler' && itemStudentFirstName !== 'unterricht') {
           updatedTimeline.push({
             id: item.id || `changed-${Math.random()}`,
             scheduleId: item.scheduleId || item.id,
@@ -4395,19 +4411,113 @@ export function TeacherDashboard({
             return dStr === String(todayWeekday);
           });
 
+          // Helper to recalculate board lesson times identically to ScheduleBoardDesktop
+          const recalculateBoardTimesForBriefing = (board: any): any => {
+            if (!board || !Array.isArray(board.students)) return board;
+
+            const parseTimeHelper = (t: string): [number, number] => {
+              if (!t || !t.includes(':')) return [14, 0];
+              const [h, m] = t.split(':').map(Number);
+              return [isNaN(h) ? 14 : h, isNaN(m) ? 0 : m];
+            };
+
+            const snapTimeToGridHelper = (timeStr: string, snapMinutes = 15): string => {
+              if (!timeStr) return timeStr;
+              const [hours, minutes] = parseTimeHelper(timeStr);
+              const totalMinutes = hours * 60 + minutes;
+              const snappedMinutes = Math.round(totalMinutes / snapMinutes) * snapMinutes;
+              const snappedHours = Math.floor(snappedMinutes / 60) % 24;
+              const snappedMins = snappedMinutes % 60;
+              return `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+            };
+
+            const addMinutesToTimeHelper = (time: string, mins: number): string => {
+              const [h, m] = parseTimeHelper(time);
+              let total = h * 60 + m + mins;
+              let newH = Math.floor(total / 60) % 24;
+              let newM = total % 60;
+              return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+            };
+
+            const startAnchor = board.startTime || board.startAnchor || '14:00';
+
+            const sortedStudents = [...board.students].sort((a, b) => {
+              const aTime = a.customStartTime || a.assignedTime || a.startTime || startAnchor;
+              const bTime = b.customStartTime || b.assignedTime || b.startTime || startAnchor;
+              const [ah, am] = parseTimeHelper(aTime);
+              const [bh, bm] = parseTimeHelper(bTime);
+              return (ah * 60 + am) - (bh * 60 + bm);
+            });
+
+            let currentTime = snapTimeToGridHelper(startAnchor, 15);
+            const updatedStudents = sortedStudents.map((s: any) => {
+              let assignedStart = currentTime;
+              let effectiveCustomTime = s.customStartTime;
+              let isPinned = s.isPinned;
+
+              if (s.isPinned && (s.customStartTime || s.assignedTime)) {
+                const targetTime = s.customStartTime || s.assignedTime || startAnchor;
+                const snappedTarget = snapTimeToGridHelper(targetTime, 15);
+                const [csh, csm] = parseTimeHelper(snappedTarget);
+                const [curh, curm] = parseTimeHelper(currentTime);
+                if (csh * 60 + csm >= curh * 60 + curm) {
+                  assignedStart = snappedTarget;
+                } else {
+                  assignedStart = currentTime;
+                  isPinned = false;
+                }
+              } else if (s.customStartTime) {
+                const snappedTarget = snapTimeToGridHelper(s.customStartTime, 15);
+                const [csh, csm] = parseTimeHelper(snappedTarget);
+                const [curh, curm] = parseTimeHelper(currentTime);
+                if (csh * 60 + csm >= curh * 60 + curm) {
+                  assignedStart = snappedTarget;
+                  effectiveCustomTime = snappedTarget;
+                } else {
+                  assignedStart = currentTime;
+                }
+              } else if (s.assignedTime) {
+                const snappedTarget = snapTimeToGridHelper(s.assignedTime, 15);
+                const [csh, csm] = parseTimeHelper(snappedTarget);
+                const [curh, curm] = parseTimeHelper(currentTime);
+                if (csh * 60 + csm >= curh * 60 + curm) {
+                  assignedStart = snappedTarget;
+                } else {
+                  assignedStart = currentTime;
+                }
+              } else {
+                assignedStart = currentTime;
+              }
+
+              const assignedTime = snapTimeToGridHelper(assignedStart, 15);
+              const dur = s.duration || 30;
+              currentTime = snapTimeToGridHelper(addMinutesToTimeHelper(assignedTime, dur), 15);
+
+              return {
+                ...s,
+                assignedDay: board.dayOfWeek,
+                assignedTime,
+                customStartTime: effectiveCustomTime,
+                isPinned
+              };
+            });
+
+            return {
+              ...board,
+              students: updatedStudents,
+              endAnchor: currentTime
+            };
+          };
+
           if (todayBoards.length > 0) {
-            for (const todayBoard of todayBoards) {
-              if (todayBoard && Array.isArray(todayBoard.students)) {
+            for (const rawTodayBoard of todayBoards) {
+              if (rawTodayBoard && Array.isArray(rawTodayBoard.students)) {
+                // Ensure times are 100% recalculated with student duration & grid snap matching ScheduleBoardDesktop
+                const todayBoard = recalculateBoardTimesForBriefing(rawTodayBoard);
                 const boardRoomName = allRooms.find((r: any) => String(r.id) === String(todayBoard.roomId))?.name || todayBoard.roomName || 'Raum 4';
-                const boardStartStr = todayBoard.startTime || '14:00';
-                const [bSh, bSm] = boardStartStr.split(':').map(Number);
-                let currentCumulativeMin = (bSh || 14) * 60 + (bSm || 0);
 
                 todayBoard.students.forEach((s: any) => {
                   if (s.isBreak || (!s.first_name && !s.name && !s.isGroup && (!s.groupStudents || s.groupStudents.length === 0))) {
-                    if (s.isBreak) {
-                      currentCumulativeMin += (s.duration || 15);
-                    }
                     return;
                   }
 
@@ -4435,14 +4545,8 @@ export function TeacherDashboard({
                     (st.first_name?.trim().toLowerCase() === sFn && (!sLn || (st.last_name || '').trim().toLowerCase().startsWith(sLn[0])))
                   );
 
-                  let studentTime = s.customStartTime || s.assignedTime || s.startTime;
-                  if (!studentTime) {
-                    const h = Math.floor(currentCumulativeMin / 60) % 24;
-                    const m = currentCumulativeMin % 60;
-                    studentTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                  }
+                  const studentTime = s.assignedTime || s.customStartTime || s.startTime || todayBoard.startTime || '14:00';
                   const studentDuration = s.duration || (matchedStudent as any)?.duration || 30;
-                  currentCumulativeMin += studentDuration;
 
                   const resolvedInstrument = resolveStudentInstrument(s.instrument, matchedStudent?.instrument || subStudents[0]?.instrument, teacherProfile?.instrument);
 
@@ -4480,7 +4584,7 @@ export function TeacherDashboard({
                     scheduleId: s.id || `board-${todayBoard.id}-${studentTime}`,
                     time_slot: studentTime,
                     duration: studentDuration,
-                    status: 'approved',
+                    status: s.status || (s.unconfirmed ? 'unconfirmed' : 'approved'),
                     day_of_week: todayWeekday,
                     instrument: resolvedInstrument,
                     isGroup,
@@ -4624,12 +4728,17 @@ export function TeacherDashboard({
                const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : (occ.startTime ? occ.startTime.substring(0, 5) : '00:00');
                const occStudentId = occ.student?.id || occ.student_id || occ.studentId;
                const occStudentFirstName = (occ.student?.first_name || occ.studentName || occ.student_name || '').split(' ')[0].toLowerCase();
+               const occStudentLastName = (occ.student?.last_name || occ.student_last_name || '').split(' ').slice(1).join(' ').toLowerCase();
 
                const findMatchingTimelineIdx = () => {
                  return timeline.findIndex((t: any) => {
                    if (occ.schedule_id && String(t.scheduleId) === String(occ.schedule_id)) return true;
                    if (occStudentId && t.student?.id && String(t.student.id) === String(occStudentId)) return true;
-                   if (occStudentFirstName && t.student?.first_name && t.student.first_name.toLowerCase() === occStudentFirstName) return true;
+                   if (occStudentFirstName && occStudentFirstName.length >= 3 && t.student?.first_name && t.student.first_name.toLowerCase() === occStudentFirstName) {
+                     if (!occStudentLastName || !t.student?.last_name || t.student.last_name.toLowerCase().startsWith(occStudentLastName[0])) {
+                       return true;
+                     }
+                   }
                    return false;
                  });
                };
@@ -4640,7 +4749,14 @@ export function TeacherDashboard({
                    timeline[existingIdx].status = 'rescheduled_away';
                  }
                } else if (occ.date === todayStr) {
+                 const isUnconfirmedPhantom = occ.status === 'unconfirmed' || occ.status === 'unconfirmed_group';
                  const existingIdx = findMatchingTimelineIdx();
+
+                 // Suppress unconfirmed occurrences from other days from creating extraneous phantom cards in today's timeline
+                 if (isUnconfirmedPhantom && existingIdx === -1) {
+                   return;
+                 }
+
                  const existingItem = existingIdx !== -1 ? timeline[existingIdx] : null;
                  const resolvedRoom = allRooms.find((r: any) => r.id === (occ.room_id || occ.schedules?.room_id || existingItem?.roomId))?.name || 
                                      occ.schedules?.rooms?.name || occ.roomName || occ.room_name || existingItem?.room || 'Raum 4';
@@ -5268,7 +5384,7 @@ export function TeacherDashboard({
         ] = await Promise.all([
           // rooms (via RoomRepository with in-memory TTL caching)
           (activeTab === 'live' || activeTab === 'briefing')
-            ? fetchRoomsBySchool(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
+            ? fetchRoomsBySchool(tData.school_id, false, activePlatform).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // user_availability
           (activeTab === 'settings')
@@ -5336,15 +5452,26 @@ export function TeacherDashboard({
 
         setCrisisNotifications(prev => JSON.stringify(prev) === JSON.stringify(crisisData || []) ? prev : (crisisData || []));
 
-        setRooms(prev => JSON.stringify(prev) === JSON.stringify(rData || []) ? prev : (rData || []));
+        const effectivePlatform = activePlatform || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_active_platform') || 'campus') : 'campus');
+        const effectiveRooms = (rData || []).filter((r: any) => {
+          if (effectivePlatform === 'groovelab') {
+            return r.is_groovelab_active === true;
+          }
+          if (effectivePlatform === 'campus') {
+            return r.is_campus_active !== false;
+          }
+          return true;
+        });
+
+        setRooms(prev => JSON.stringify(prev) === JSON.stringify(effectiveRooms) ? prev : effectiveRooms);
         setAvailabilities(prev => JSON.stringify(prev) === JSON.stringify(avData || []) ? prev : (avData || []));
         
-        if (rData && rData.length > 0 && !selectedRoomId) {
-          const savedRoomId = localStorage.getItem('groovelab_teacher_selected_room_id');
-          if (savedRoomId && rData.some(r => r.id === savedRoomId)) {
+        if (effectiveRooms && effectiveRooms.length > 0 && (!selectedRoomId || !effectiveRooms.some(r => r.id === selectedRoomId))) {
+          const savedRoomId = localStorage.getItem(`groovelab_teacher_selected_room_id_${effectivePlatform}`) || localStorage.getItem('groovelab_teacher_selected_room_id');
+          if (savedRoomId && effectiveRooms.some(r => r.id === savedRoomId)) {
             setSelectedRoomId(savedRoomId);
           } else {
-            setSelectedRoomId(rData[0].id);
+            setSelectedRoomId(effectiveRooms[0].id);
           }
         }
         setStations(prev => JSON.stringify(prev) === JSON.stringify(sData || []) ? prev : (sData || []));
@@ -6627,12 +6754,10 @@ useEffect(() => {
     const activeSchool = schoolData || (Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools);
     const hasCampus = activePlatform === 'campus' && activeSchool?.has_campus_subscription !== false;
     const finalLastName = hasCampus ? (editingStudent.last_name || '') : (editingStudent.last_name?.trim() ? editingStudent.last_name.trim().charAt(0).toUpperCase() + '.' : '');
-    const finalBirthDate = hasCampus ? sanitizeBirthDateToDayOnly(editingStudent.birth_date) : null;
-
     const { error } = await supabase.from('users').update({
       first_name: editingStudent.first_name,
       last_name: finalLastName,
-      birth_date: finalBirthDate,
+      birth_date: null,
       status: editingStudent.status || 'active',
       is_trial: editingStudent.is_trial || false,
       trial_ends_at: editingStudent.is_trial && editingStudent.trial_ends_at ? editingStudent.trial_ends_at : null,
@@ -7502,71 +7627,8 @@ useEffect(() => {
                     </div>
                   </div>
 
-                  {/* Stage Toolbox & Profil Action Buttons */}
+                  {/* Profil Action Button */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                    {/* Stimmgerät (Tuner) Button */}
-                    <button
-                      type="button"
-                      onClick={() => setShowStageToolbox('tuner')}
-                      style={{
-                        background: '#f8fafc',
-                        color: '#334155',
-                        border: '1px solid #e2e8f0',
-                        padding: '7px 10px',
-                        borderRadius: '10px',
-                        fontSize: '0.76rem',
-                        fontWeight: 750,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '5px',
-                        minWidth: '36px',
-                        minHeight: '36px',
-                        transition: 'all 0.2s'
-                      }}
-                      className="hover-scale"
-                      title="Stimmgerät (Tuner) öffnen"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 12v10" />
-                        <path d="M18 2v7a6 6 0 0 1-12 0V2" />
-                      </svg>
-                      <span>Stimmgerät</span>
-                    </button>
-
-                    {/* Metronom Button */}
-                    <button
-                      type="button"
-                      onClick={() => setShowStageToolbox('metronome')}
-                      style={{
-                        background: '#f8fafc',
-                        color: '#334155',
-                        border: '1px solid #e2e8f0',
-                        padding: '7px 10px',
-                        borderRadius: '10px',
-                        fontSize: '0.76rem',
-                        fontWeight: 750,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '5px',
-                        minWidth: '36px',
-                        minHeight: '36px',
-                        transition: 'all 0.2s'
-                      }}
-                      className="hover-scale"
-                      title="Metronom öffnen"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 2L4 20h16L12 2z" />
-                        <path d="M12 10l5-3" />
-                        <circle cx="17" cy="7" r="1.5" fill="currentColor" />
-                      </svg>
-                      <span>Metronom</span>
-                    </button>
-
                     {/* Profil Button */}
                     <button
                       type="button"
@@ -8335,9 +8397,49 @@ useEffect(() => {
                     }
                   });
 
+                  // Insert automatic break/gap items between consecutive slots if there is an empty window >= 15 min
+                  const timelineWithGaps: any[] = [];
+                  const sortedTimeline = [...groupedTimeline].sort((a, b) => {
+                    const [ah, am] = (a.timeSlot || '00:00').split(':').map(Number);
+                    const [bh, bm] = (b.timeSlot || '00:00').split(':').map(Number);
+                    return (ah * 60 + am) - (bh * 60 + bm);
+                  });
+
+                  sortedTimeline.forEach((currentSlot, i) => {
+                    if (i > 0) {
+                      const prevSlot = sortedTimeline[i - 1];
+                      const [ph, pm] = (prevSlot.timeSlot || '00:00').split(':').map(Number);
+                      const prevDuration = prevSlot.duration || 30;
+                      const prevEndMinutes = ph * 60 + pm + prevDuration;
+                      
+                      const [ch, cm] = (currentSlot.timeSlot || '00:00').split(':').map(Number);
+                      const currentStartMinutes = ch * 60 + cm;
+                      
+                      const gapMinutes = currentStartMinutes - prevEndMinutes;
+                      if (gapMinutes >= 15 && !prevSlot.isBreak && !currentSlot.isBreak) {
+                        const gapStartH = Math.floor(prevEndMinutes / 60);
+                        const gapStartM = prevEndMinutes % 60;
+                        const gapStartTimeStr = `${String(gapStartH).padStart(2, '0')}:${String(gapStartM).padStart(2, '0')}`;
+                        
+                        timelineWithGaps.push({
+                          id: `auto-gap-${gapStartTimeStr}-${gapMinutes}`,
+                          timeSlot: gapStartTimeStr,
+                          duration: gapMinutes,
+                          isBreak: true,
+                          isGroup: false,
+                          students: [],
+                          slots: [],
+                          room: prevSlot.room || 'Freiraum',
+                          status: 'scheduled'
+                        });
+                      }
+                    }
+                    timelineWithGaps.push(currentSlot);
+                  });
+
                   let prepIndex = -1;
-                  for (let i = 0; i < groupedTimeline.length; i++) {
-                    const slot = groupedTimeline[i];
+                  for (let i = 0; i < timelineWithGaps.length; i++) {
+                    const slot = timelineWithGaps[i];
                     const activeSlots = (slot.isGroup && Array.isArray(slot.slots)) ? slot.slots : (slot.slots || [slot]);
                     const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick');
                     if (!isCanceled) {
@@ -8355,7 +8457,7 @@ useEffect(() => {
                     }
                   }
 
-                  return groupedTimeline.map((slot: any, idx: number) => {
+                  return timelineWithGaps.map((slot: any, idx: number) => {
                     const slotStart = slot.timeSlot;
                     const slotEnd = (() => {
                       const [sh, sm] = slotStart.split(':').map(Number);
@@ -10629,7 +10731,7 @@ useEffect(() => {
             </div>
           </header>
         )}
-        {activeTab === 'briefing' && !hideHeader ? (
+        {activeTab === 'briefing' ? (
           <div style={{ 
             display: 'flex', 
             flexDirection: 'row', 
@@ -11860,9 +11962,49 @@ useEffect(() => {
                             }
                           });
 
+                          // Insert automatic break/gap items between consecutive slots if there is an empty window >= 15 min
+                          const timelineWithGaps: any[] = [];
+                          const sortedTimeline = [...groupedTimeline].sort((a, b) => {
+                            const [ah, am] = (a.timeSlot || '00:00').split(':').map(Number);
+                            const [bh, bm] = (b.timeSlot || '00:00').split(':').map(Number);
+                            return (ah * 60 + am) - (bh * 60 + bm);
+                          });
+
+                          sortedTimeline.forEach((currentSlot, i) => {
+                            if (i > 0) {
+                              const prevSlot = sortedTimeline[i - 1];
+                              const [ph, pm] = (prevSlot.timeSlot || '00:00').split(':').map(Number);
+                              const prevDuration = prevSlot.duration || 30;
+                              const prevEndMinutes = ph * 60 + pm + prevDuration;
+                              
+                              const [ch, cm] = (currentSlot.timeSlot || '00:00').split(':').map(Number);
+                              const currentStartMinutes = ch * 60 + cm;
+                              
+                              const gapMinutes = currentStartMinutes - prevEndMinutes;
+                              if (gapMinutes >= 15 && !prevSlot.isBreak && !currentSlot.isBreak) {
+                                const gapStartH = Math.floor(prevEndMinutes / 60);
+                                const gapStartM = prevEndMinutes % 60;
+                                const gapStartTimeStr = `${String(gapStartH).padStart(2, '0')}:${String(gapStartM).padStart(2, '0')}`;
+                                
+                                timelineWithGaps.push({
+                                  id: `auto-gap-${gapStartTimeStr}-${gapMinutes}`,
+                                  timeSlot: gapStartTimeStr,
+                                  duration: gapMinutes,
+                                  isBreak: true,
+                                  isGroup: false,
+                                  students: [],
+                                  slots: [],
+                                  room: prevSlot.room || 'Freiraum',
+                                  status: 'scheduled'
+                                });
+                              }
+                            }
+                            timelineWithGaps.push(currentSlot);
+                          });
+
                           let prepIndex = -1;
-                          for (let i = 0; i < groupedTimeline.length; i++) {
-                            const slot = groupedTimeline[i];
+                          for (let i = 0; i < timelineWithGaps.length; i++) {
+                            const slot = timelineWithGaps[i];
                             const activeSlots = (slot.isGroup && Array.isArray(slot.slots)) ? slot.slots : (slot.slots || [slot]);
                             const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick');
                             if (!isCanceled) {
@@ -11880,7 +12022,7 @@ useEffect(() => {
                             }
                           }
  
-                          return groupedTimeline.map((slot: any, idx: number) => {
+                          return timelineWithGaps.map((slot: any, idx: number) => {
                             const slotStart = slot.timeSlot;
                             const slotEnd = (() => {
                               const [sh, sm] = slotStart.split(':').map(Number);
@@ -15854,40 +15996,6 @@ useEffect(() => {
             </button>
           )}
 
-          {/* Floating Right-Edge Collapse Button when Expanded */}
-          {!isSidebarCollapsed && (
-            <button
-              onClick={() => setIsSidebarCollapsed(true)}
-              style={{
-                position: 'fixed',
-                right: '0px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                zIndex: 999,
-                background: '#ffffff',
-                border: '1.5px solid #cbd5e1',
-                borderRight: 'none',
-                borderRadius: '16px 0 0 16px',
-                padding: '12px 8px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.1)',
-                color: '#475569',
-                fontWeight: 900,
-                fontSize: '0.7rem',
-                transition: 'all 0.2s ease-in-out'
-              }}
-              className="hover-scale"
-              title="Slider einklappen"
-            >
-              <ChevronRight size={18} color="#475569" />
-              <span style={{ writingMode: 'vertical-rl', textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '0.65rem' }}>Einklappen</span>
-            </button>
-          )}
-
           <aside style={{ 
             display: 'flex', 
             flexDirection: 'column', 
@@ -16410,31 +16518,30 @@ useEffect(() => {
                 border: '1px solid #e2e8f0',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.03)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px', minWidth: 0 }}>
-                  <div style={{ background: '#f59e0b', color: 'white', padding: '6px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)', flexShrink: 0 }}>
-                    <TrendingUp size={18} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '20px', minWidth: 0, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                    <div style={{ background: '#f59e0b', color: 'white', padding: '6px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)', flexShrink: 0 }}>
+                      <TrendingUp size={16} />
+                    </div>
+                    <h3 style={{ 
+                      fontSize: '0.82rem', 
+                      fontWeight: 950, 
+                      color: '#1e293b', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.06em', 
+                      margin: 0,
+                      whiteSpace: 'nowrap'
+                    }}>
+                      Challenge Pipeline
+                    </h3>
                   </div>
-                  <h3 style={{ 
-                    fontSize: '0.8rem', 
-                    fontWeight: 950, 
-                    color: '#1e293b', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.1em', 
-                    margin: 0,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    flex: 1
-                  }}>
-                    Challenge Pipeline
-                  </h3>
                   <button 
                     onClick={() => setShowAllSubmissions(true)}
                     style={{ 
                       background: '#f8fafc', 
                       border: '1px solid #e2e8f0', 
                       color: '#64748b', 
-                      fontSize: '0.65rem', 
+                      fontSize: '0.68rem', 
                       fontWeight: 800, 
                       cursor: 'pointer',
                       padding: '4px 10px',
@@ -16444,6 +16551,7 @@ useEffect(() => {
                       gap: '6px',
                       whiteSpace: 'nowrap'
                     }}
+                    className="hover-scale-mini"
                   >
                     Alle anzeigen <span style={{ background: '#f59e0b', color: 'white', padding: '1px 5px', borderRadius: '4px', fontSize: '0.6rem' }}>{allSubmissions.length}</span>
                   </button>
@@ -16665,36 +16773,27 @@ useEffect(() => {
             {viewMode === 'admin' && (
               <button 
                 onClick={async () => {
-                  if (window.confirm('Alle Schüler ausloggen?')) {
+                  const studentSessions = activeSessions.filter(s => s?.users?.role !== 'teacher' && s?.users?.role !== 'admin');
+                  if (studentSessions.length === 0) {
+                    setToastMessage('Keine aktiven Schüler im aktuellen Raum eingeloggt.');
+                    return;
+                  }
+                  if (window.confirm(`Möchtest du alle ${studentSessions.length} Schüler im aktuellen Raum auschecken?`)) {
                     const now = new Date().toISOString();
+                    const sessionIds = studentSessions.map(s => s.id);
                     
-                    // Fetch all active student sessions in this school
-                    const { data: activeSess, error: fetchError } = await supabase
-                      .from('sessions')
-                      .select('user_id, users!inner(role, school_id)')
-                      .is('check_out_time', null)
-                      .eq('users.school_id', teacher.school_id)
-                      .eq('users.role', 'student');
-
-                    if (fetchError) {
-                      alert('Fehler beim Abrufen der aktiven Schüler: ' + fetchError.message);
-                      return;
-                    }
-
-                    if (!activeSess || activeSess.length === 0) {
-                      alert('Keine aktiven Schüler-Sessions gefunden.');
-                      return;
-                    }
-
-                    const studentUserIds = Array.from(new Set(activeSess.map(s => s.user_id)));
                     const { error } = await supabase
                       .from('sessions')
                       .update({ check_out_time: now })
-                      .is('check_out_time', null)
-                      .in('user_id', studentUserIds);
+                      .in('id', sessionIds);
                     
-                    if (error) alert('Fehler beim Ausloggen: ' + error.message);
-                    else fetchData();
+                    if (error) {
+                      setToastMessage('Fehler beim Ausloggen: ' + error.message);
+                    } else {
+                      setActiveSessions(prev => prev.filter(s => !sessionIds.includes(s.id)));
+                      setToastMessage(`${sessionIds.length} Schüler erfolgreich ausgecheckt.`);
+                      fetchData();
+                    }
                   }
                 }}
                 style={{ 
@@ -16711,8 +16810,7 @@ useEffect(() => {
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
-                
-                
+                className="hover-scale"
               >
                 <User size={20} color="#ef4444" />
                 <span style={{ color: '#ef4444', fontWeight: 900, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Alle Ausloggen</span>
@@ -18020,199 +18118,204 @@ useEffect(() => {
       ) : activeTab === 'settings' ? (
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
-              ⚙️ Einstellungen
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#fefce8', border: '1px solid #fef08a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ca8a04' }}>
+                <Sliders size={22} strokeWidth={2.4} />
+              </div>
+              <span>GrooveLab Einstellungen</span>
             </h2>
             <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
-              Wähle ein Modul aus, um deine persönlichen Einstellungen, Fokus-Stufen und dein Profil anzupassen.
+              Konfiguriere Proberaum-Standards, Band-Repertoire, Musiker-Avatare und Sicherheit für dein Studio.
             </p>
           </div>
 
           {/* MODULAR COVER CARDS GRID */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: windowWidth < 640 ? 'repeat(2, 1fr)' : windowWidth < 1024 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: '18px',
-            width: '100%'
-          }}>
-            {[
+          {(() => {
+            const groovelabSettings = schoolData?.opening_hours?.groovelab_settings || {
+              stage_ready_threshold: 85,
+              allow_student_song_proposals: true,
+              auto_add_mastered_songs: true,
+              kiosk_auto_timeout_minutes: 60
+            };
+
+            const currentPreferredRoom = rooms.find((r: any) => teacher?.preferred_room_ids?.includes(r.id)) || rooms[0];
+
+            const modules = [
               {
-                id: 'fokus',
-                title: 'Fokus-Stufen',
-                subtitle: 'Flammen & XP-Zeiten',
-                badge: '3 Level aktiv',
-                gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                shadowColor: 'rgba(245, 158, 11, 0.40)',
-                icon: Flame
+                id: 'livelab',
+                title: 'Live Lab & Proberaum',
+                subtitle: currentPreferredRoom ? `${currentPreferredRoom.name || 'Proberaum'} aktiv` : 'Raum-Kopplung & Timeout',
+                badge: currentPreferredRoom ? (currentPreferredRoom.name || 'Raum') : 'Standard',
+                gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                shadowColor: 'rgba(234, 179, 8, 0.35)',
+                icon: Radio
+              },
+              {
+                id: 'repertoire',
+                title: 'Repertoire & Songs',
+                subtitle: `Stage-Ready ab ${groovelabSettings.stage_ready_threshold || 85}% XP`,
+                badge: `${groovelabSettings.stage_ready_threshold || 85}% XP Schwelle`,
+                gradient: 'linear-gradient(135deg, #facc15 0%, #d97706 100%)',
+                shadowColor: 'rgba(250, 204, 21, 0.40)',
+                icon: Disc
               },
               {
                 id: 'profile',
-                title: 'Mein Profil',
-                subtitle: `${teacher?.first_name || ''} ${teacher?.last_name || ''}`.trim() || 'Stammdaten & Rolle',
-                badge: 'Lehrkraft',
-                gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                shadowColor: 'rgba(59, 130, 246, 0.40)',
-                icon: User
-              },
-              {
-                id: 'avatar',
-                title: 'Profil-Avatar',
-                subtitle: 'Live Lab & Sidebar',
-                badge: 'Auswählen',
-                gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                shadowColor: 'rgba(139, 92, 246, 0.40)',
+                title: 'Coach-Profil & Avatar',
+                subtitle: `${teacher?.first_name || ''} ${teacher?.last_name || ''}`.trim() || 'Musiker-Avatar & Rolle',
+                badge: teacher?.instrument || 'Band-Coach',
+                gradient: 'linear-gradient(135deg, #eab308 0%, #a16207 100%)',
+                shadowColor: 'rgba(234, 179, 8, 0.35)',
                 icon: Sparkles
               },
               {
                 id: 'security',
-                title: 'Sicherheit & PIN',
-                subtitle: 'Geräte-Pairing & Schutz',
-                badge: 'Aktiv',
-                gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                shadowColor: 'rgba(16, 185, 129, 0.40)',
+                title: 'Sicherheit & Kiosk-PIN',
+                subtitle: teacher?.personal_pin ? '4-stellige Coach-PIN aktiv' : 'Geräte-Pairing & PIN Schutz',
+                badge: teacher?.personal_pin ? 'PIN Aktiv' : 'Geschützt',
+                gradient: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)',
+                shadowColor: 'rgba(202, 138, 4, 0.40)',
                 icon: ShieldCheck
               },
               {
                 id: 'feedback',
                 title: 'Ideenschmiede',
-                subtitle: 'Wünsche & Fehler melden',
+                subtitle: 'Song-Wünsche & Feedback melden',
                 badge: 'Mitgestalten',
-                gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
-                shadowColor: 'rgba(236, 72, 153, 0.40)',
+                gradient: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
+                shadowColor: 'rgba(245, 158, 11, 0.35)',
                 icon: Lightbulb
               }
-            ].map((module) => {
-              const IconComp = module.icon;
-              return (
-                <div
-                  key={module.id}
-                  onClick={() => {
-                    if (module.id === 'feedback') {
-                      setIsFeedbackModalOpen(true);
-                    } else {
-                      setTeacherSettingsTab(module.id === 'avatar' ? 'profile' : (module.id as any));
-                      setActiveTeacherSettingsModal(module.id as any);
-                    }
-                  }}
-                  style={{
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    borderRadius: '20px',
-                    padding: '24px 16px 20px 16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}
-                  className="hover-scale"
-                >
-                  <div style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '16px',
-                    background: module.gradient,
-                    boxShadow: `0 8px 18px -3px ${module.shadowColor}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    border: '1px solid rgba(255, 255, 255, 0.25)'
-                  }}>
-                    <IconComp size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                  </div>
-                  <div style={{ marginTop: '14px', padding: '0 4px', width: '100%' }}>
-                    <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                      {module.title}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', marginTop: '3px', lineHeight: '1.3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {module.subtitle}
-                    </div>
-                  </div>
-                  {module.badge && (
-                    <span style={{
-                      marginTop: '10px',
-                      fontSize: '0.62rem',
-                      fontWeight: 800,
-                      color: '#34a853',
-                      background: '#e6f4ea',
-                      padding: '2px 8px',
-                      borderRadius: '100px'
-                    }}>
-                      {module.badge}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* PERSISTENT BOTTOM SAVE BAR (IF DIRTY) */}
-          {(() => {
-            const isSettingsDirty = initialSchoolData && schoolData && 
-              JSON.stringify(schoolData.opening_hours?.fokus_levels) !== JSON.stringify(initialSchoolData.opening_hours?.fokus_levels);
-            const brandColor = '#34a853';
-
-            if (!isSettingsDirty) return null;
+            ];
 
             return (
-              <div style={{
-                display: 'flex',
-                flexDirection: windowWidth < 768 ? 'column' : 'row',
-                alignItems: windowWidth < 768 ? 'stretch' : 'center',
-                justifyContent: 'space-between',
-                gap: windowWidth < 768 ? '10px' : '0',
-                padding: windowWidth < 768 ? '12px 16px' : '16px 32px',
-                border: '1px solid #fecaca',
-                background: '#fef2f2',
-                borderRadius: windowWidth < 768 ? '16px' : '20px',
-                boxSizing: 'border-box',
-                width: '100%',
-                boxShadow: '0 4px 16px rgba(234, 67, 53, 0.1)'
-              }}>
-                <span style={{ fontSize: '0.82rem', color: '#ea4335', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  ⚠️ Ungespeicherte Änderungen an den Fokus-Stufen vorhanden.
-                </span>
-                <button
-                  onClick={async () => {
-                    if (!teacher?.school_id || !schoolData) return;
-                    setIsSaving(true);
-                    const { error } = await supabase
-                      .from('schools')
-                      .update({ opening_hours: schoolData.opening_hours })
-                      .eq('id', teacher.school_id);
-                    setIsSaving(false);
-                    if (error) {
-                      alert("Fehler beim Speichern der Einstellungen: " + error.message);
-                    } else {
-                      setInitialSchoolData(JSON.parse(JSON.stringify(schoolData)));
-                      alert("Einstellungen erfolgreich gespeichert! 🎉");
-                    }
-                  }}
-                  disabled={isSaving}
-                  style={{
-                    padding: '10px 24px',
-                    width: windowWidth < 768 ? '100%' : 'auto',
-                    background: brandColor,
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontWeight: 800,
-                    fontSize: '0.84rem',
-                    cursor: 'pointer',
-                    boxShadow: `0 4px 12px ${brandColor}40`,
-                    transition: 'all 0.2s',
-                    opacity: isSaving ? 0.7 : 1
-                  }}
-                  className="hover-scale"
-                >
-                  {isSaving ? 'Wird gespeichert...' : 'Einstellungen speichern'}
-                </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: windowWidth < 640 ? 'repeat(2, 1fr)' : windowWidth < 1024 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: '18px',
+                  width: '100%'
+                }}>
+                  {modules.map((module) => {
+                    const IconComp = module.icon;
+                    return (
+                      <div
+                        key={module.id}
+                        onClick={() => {
+                          if (module.id === 'feedback') {
+                            setIsFeedbackModalOpen(true);
+                          } else {
+                            setActiveTeacherSettingsModal(module.id as any);
+                          }
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '20px',
+                          padding: '24px 16px 20px 16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{
+                          width: '64px',
+                          height: '64px',
+                          borderRadius: '16px',
+                          background: module.gradient,
+                          boxShadow: `0 8px 18px -3px ${module.shadowColor}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255, 255, 255, 0.25)'
+                        }}>
+                          <IconComp size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                        </div>
+                        <div style={{ marginTop: '14px', padding: '0 4px', width: '100%' }}>
+                          <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                            {module.title}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', marginTop: '3px', lineHeight: '1.3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {module.subtitle}
+                          </div>
+                        </div>
+                        {module.badge && (
+                          <span style={{
+                            marginTop: '10px',
+                            fontSize: '0.62rem',
+                            fontWeight: 800,
+                            color: '#ca8a04',
+                            background: '#fefce8',
+                            border: '1px solid #fef08a',
+                            padding: '2px 8px',
+                            borderRadius: '100px'
+                          }}>
+                            {module.badge}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* QUICK LINK: HANDBUCH & AKADEMIE */}
+                <div style={{ 
+                  background: '#fefce8', 
+                  borderRadius: '20px', 
+                  padding: '18px 24px', 
+                  border: '1.5px solid #fef08a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  marginTop: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#eab308', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <BookOpen size={20} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: '#713f12' }}>
+                        Coach-Akademie &amp; Unterrichts-Leitfäden
+                      </h4>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#854d0e' }}>
+                        Praxis-Tipps für Hausaufgaben-Protokoll, Play-Along Studio, Live Lab und Repertoire-Planer.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsHelpCenterOpen(true)}
+                    style={{
+                      background: '#eab308',
+                      color: '#0f172a',
+                      border: 'none',
+                      padding: '9px 18px',
+                      borderRadius: '10px',
+                      fontWeight: 800,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <BookOpen size={14} /> Leitfäden öffnen
+                  </button>
+                </div>
               </div>
             );
           })()}
@@ -18243,7 +18346,7 @@ useEffect(() => {
               <div 
                 style={{
                   width: '100%',
-                  maxWidth: activeTeacherSettingsModal === 'fokus' ? '720px' : '620px',
+                  maxWidth: '620px',
                   maxHeight: '90vh',
                   background: '#ffffff',
                   borderRadius: '24px',
@@ -18270,35 +18373,29 @@ useEffect(() => {
                       width: '42px',
                       height: '42px',
                       borderRadius: '12px',
-                      background: activeTeacherSettingsModal === 'fokus'
-                        ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                        : activeTeacherSettingsModal === 'profile'
-                        ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-                        : activeTeacherSettingsModal === 'avatar'
-                        ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
-                        : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
+                      boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
                     }}>
-                      {activeTeacherSettingsModal === 'fokus' && <Flame size={22} color="#ffffff" />}
-                      {activeTeacherSettingsModal === 'profile' && <User size={22} color="#ffffff" />}
-                      {activeTeacherSettingsModal === 'avatar' && <Sparkles size={22} color="#ffffff" />}
+                      {activeTeacherSettingsModal === 'livelab' && <Radio size={22} color="#ffffff" />}
+                      {activeTeacherSettingsModal === 'repertoire' && <Disc size={22} color="#ffffff" />}
+                      {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && <Sparkles size={22} color="#ffffff" />}
                       {activeTeacherSettingsModal === 'security' && <ShieldCheck size={22} color="#ffffff" />}
                     </div>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                        {activeTeacherSettingsModal === 'fokus' && 'Fokus-Stufen konfigurieren'}
-                        {activeTeacherSettingsModal === 'profile' && 'Mein Profil & Stammdaten'}
-                        {activeTeacherSettingsModal === 'avatar' && 'Profil-Avatar auswählen'}
-                        {activeTeacherSettingsModal === 'security' && 'Sicherheit & Status'}
+                        {activeTeacherSettingsModal === 'livelab' && 'Live Lab & Proberaum-Setup'}
+                        {activeTeacherSettingsModal === 'repertoire' && 'Repertoire & Song-Standards'}
+                        {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && 'Coach-Profil & Musiker-Avatar'}
+                        {activeTeacherSettingsModal === 'security' && 'Sicherheit & Kiosk-PIN'}
                       </h3>
                       <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
-                        {activeTeacherSettingsModal === 'fokus' && 'Definiere die benötigten Übe-Minuten für Flammen in den Stufen 1–3.'}
-                        {activeTeacherSettingsModal === 'profile' && 'Deine hinterlegten Stammdaten im Campus-Groovelab.'}
-                        {activeTeacherSettingsModal === 'avatar' && 'Wähle dein bevorzugtes Avatar-Bild für Live Lab & Sidebar.'}
-                        {activeTeacherSettingsModal === 'security' && 'Aktiver Sicherheitsstatus und Zugriffsrechte.'}
+                        {activeTeacherSettingsModal === 'livelab' && 'Wähle deinen Standard-Proberaum und automatische Kiosk-Abmeldezeiten im Bandraum.'}
+                        {activeTeacherSettingsModal === 'repertoire' && 'Definiere Schwellenwerte für bühnenreife Songs und Band-Vorschlagsrechte.'}
+                        {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && 'Deine hinterlegten Stammdaten und Musiker-Avatar im GrooveLab-Modul.'}
+                        {activeTeacherSettingsModal === 'security' && '4-stellige Coach-PIN und Sicherheitsstatus für den Proberaum.'}
                       </p>
                     </div>
                   </div>
@@ -18325,231 +18422,418 @@ useEffect(() => {
 
                 {/* Modal Body */}
                 <div style={{ padding: '24px', overflowY: 'auto', maxHeight: 'calc(80vh - 140px)', textAlign: 'left' }}>
-                  {activeTeacherSettingsModal === 'fokus' && (() => {
-                    const currentConfig = schoolData?.opening_hours?.fokus_levels || {
-                      level1: { kleine: 3, mittlere: 5, helden: 10 },
-                      level2: { kleine: 5, mittlere: 10, helden: 15 },
-                      level3: { kleine: 10, mittlere: 15, helden: 20 }
-                    };
-
-                    const levels = [
-                      { key: 'level1', label: '🥚 Level 1 (Stufe 1)', defaults: { kleine: 3, mittlere: 5, helden: 10 } },
-                      { key: 'level2', label: '🐥 Level 2 (Stufe 2)', defaults: { kleine: 5, mittlere: 10, helden: 15 } },
-                      { key: 'level3', label: '🦅 Level 3 (Stufe 3)', defaults: { kleine: 10, mittlere: 15, helden: 20 } }
-                    ];
+                  {/* TAB 1: LIVE LAB & PROBERAUM */}
+                  {activeTeacherSettingsModal === 'livelab' && (() => {
+                    const currentGrooveSettings = schoolData?.opening_hours?.groovelab_settings || {};
+                    const selectedRoomId = (teacher?.preferred_room_ids && teacher.preferred_room_ids[0]) || (rooms[0]?.id || '');
+                    const currentTimeout = currentGrooveSettings.kiosk_auto_timeout_minutes || 60;
 
                     return (
-                      <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? '1fr' : 'repeat(3, 1fr)', gap: '16px' }}>
-                        {levels.map((lvl) => {
-                          const conf = currentConfig[lvl.key] || lvl.defaults;
-                          return (
-                            <div key={lvl.key} style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 16px', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>{lvl.label}</strong>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {[
-                                  { k: 'kleine', label: 'Kleine Flamme' },
-                                  { k: 'mittlere', label: 'Mittlere Flamme' },
-                                  { k: 'helden', label: 'Helden-Flamme' }
-                                ].map((type) => (
-                                  <div key={type.k} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>{type.label} (Minuten)</label>
-                                    <input 
-                                      type="number"
-                                      min="1"
-                                      value={conf[type.k] || 1}
-                                      onChange={(e) => {
-                                        const val = Math.max(1, parseInt(e.target.value) || 1);
-                                        const updated = JSON.parse(JSON.stringify(currentConfig));
-                                        if (!updated[lvl.key]) updated[lvl.key] = {};
-                                        updated[lvl.key][type.k] = val;
-                                        setSchoolData((prev: any) => ({
-                                          ...prev,
-                                          opening_hours: { ...prev.opening_hours, fokus_levels: updated }
-                                        }));
-                                      }}
-                                      style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', fontWeight: 700, width: '100%', boxSizing: 'border-box', background: '#ffffff' }}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                        {/* Preferred Room Selector */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Radio size={18} color="#ca8a04" />
+                            <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Bevorzugter Proberaum (Live Lab)</strong>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>
+                            In diesem Raum startet dein Live Lab standardmäßig beim Login.
+                          </p>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px', marginTop: '6px' }}>
+                            {rooms.map((r: any) => {
+                              const isSelected = selectedRoomId === r.id;
+                              return (
+                                <button
+                                  key={r.id}
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!teacher?.id) return;
+                                    try {
+                                      const updatedRooms = [r.id];
+                                      await supabase.from('users').update({ preferred_room_ids: updatedRooms }).eq('id', teacher.id);
+                                      setTeacher((prev: any) => ({ ...prev, preferred_room_ids: updatedRooms }));
+                                    } catch (err: any) {
+                                      alert('Fehler beim Aktualisieren: ' + err.message);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '12px 14px',
+                                    borderRadius: '12px',
+                                    border: isSelected ? '2px solid #eab308' : '1px solid #e2e8f0',
+                                    background: isSelected ? '#fefce8' : '#ffffff',
+                                    color: isSelected ? '#ca8a04' : '#1e293b',
+                                    fontWeight: 800,
+                                    fontSize: '0.82rem',
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  {r.name || 'Proberaum'}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Auto Session Timeout */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Clock size={18} color="#ca8a04" />
+                            <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Kiosk Auto-Logout nach Inaktivität</strong>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>
+                            Schützt Kiosk-iPads im Proberaum vor unbefugter Weiternutzung nach Probenende.
+                          </p>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '6px' }}>
+                            {[45, 60, 90, 120].map((mins) => {
+                              const isSelected = currentTimeout === mins;
+                              return (
+                                <button
+                                  key={mins}
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!teacher?.school_id || !schoolData) return;
+                                    const updatedOpeningHours = {
+                                      ...schoolData.opening_hours,
+                                      groovelab_settings: {
+                                        ...currentGrooveSettings,
+                                        kiosk_auto_timeout_minutes: mins
+                                      }
+                                    };
+                                    try {
+                                      await supabase.from('schools').update({ opening_hours: updatedOpeningHours }).eq('id', teacher.school_id);
+                                      setSchoolData((prev: any) => ({ ...prev, opening_hours: updatedOpeningHours }));
+                                    } catch (err: any) {
+                                      alert('Fehler beim Speichern: ' + err.message);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '10px',
+                                    border: isSelected ? '2px solid #eab308' : '1px solid #cbd5e1',
+                                    background: isSelected ? '#fefce8' : '#ffffff',
+                                    color: isSelected ? '#ca8a04' : '#64748b',
+                                    fontWeight: 800,
+                                    fontSize: '0.8rem',
+                                    cursor: 'pointer'
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  {mins} Minuten
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Geofence Status */}
+                        <div style={{ background: '#fefce8', border: '1px solid #fef08a', borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <ShieldCheck size={24} color="#ca8a04" />
+                          <div>
+                            <strong style={{ fontSize: '0.84rem', color: '#713f12', display: 'block' }}>Ortsgebundener Geofence Aktiv</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#a16207' }}>
+                              Kiosk-Check-in und Stations-Sync sind sicher an die Koordinaten deiner Schule gebunden.
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     );
                   })()}
 
-                  {activeTeacherSettingsModal === 'profile' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? '1fr' : '1fr 1fr', gap: '14px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
-                        <input 
-                          type="text" 
-                          readOnly 
-                          value={teacher?.first_name || ''} 
-                          style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
-                        <input 
-                          type="text" 
-                          readOnly 
-                          value={teacher?.last_name || ''} 
-                          style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: windowWidth < 640 ? 'span 1' : 'span 2' }}>
-                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>E-Mail-Adresse</label>
-                        <input 
-                          type="text" 
-                          readOnly 
-                          value={teacher?.email || ''} 
-                          style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: windowWidth < 640 ? 'span 1' : 'span 2' }}>
-                        <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Rolle</label>
-                        <input 
-                          type="text" 
-                          readOnly 
-                          value="Campus-Lehrkraft" 
-                          style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
-                        />
-                      </div>
+                  {/* TAB 2: REPERTOIRE & SONG STANDARDS */}
+                  {activeTeacherSettingsModal === 'repertoire' && (() => {
+                    const currentGrooveSettings = schoolData?.opening_hours?.groovelab_settings || {
+                      stage_ready_threshold: 85,
+                      allow_student_song_proposals: true,
+                      auto_add_mastered_songs: true
+                    };
 
-                      {/* Ideenschmiede & Feature-Wünsche Callout */}
-                      <div style={{
-                        gridColumn: windowWidth < 640 ? 'span 1' : 'span 2',
-                        background: '#fdf2f8',
-                        border: '1px solid #fbcfe8',
-                        borderRadius: '12px',
-                        padding: '14px 16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        marginTop: '4px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <Lightbulb size={20} color="#ec4899" />
-                          <div>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#831843' }}>
-                              Ideenschmiede & Feature-Wünsche
-                            </div>
-                            <div style={{ fontSize: '0.72rem', color: '#9d174d' }}>
-                              Wünsche einreichen und für Community-Ideen abstimmen.
-                            </div>
+                    const updateGrooveSetting = async (key: string, value: any) => {
+                      if (!teacher?.school_id || !schoolData) return;
+                      const updatedOpeningHours = {
+                        ...schoolData.opening_hours,
+                        groovelab_settings: {
+                          ...currentGrooveSettings,
+                          [key]: value
+                        }
+                      };
+                      try {
+                        await supabase.from('schools').update({ opening_hours: updatedOpeningHours }).eq('id', teacher.school_id);
+                        setSchoolData((prev: any) => ({ ...prev, opening_hours: updatedOpeningHours }));
+                      } catch (err: any) {
+                        alert('Fehler beim Speichern: ' + err.message);
+                      }
+                    };
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                        {/* Stage-Ready Threshold */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Disc size={18} color="#ca8a04" />
+                            <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Stage-Ready Schwellenwert (Song-Meisterschaft)</strong>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>
+                            Ab welchem Fortschrittswert gilt ein Song im Live Lab und Repertoire als bühnenreif?
+                          </p>
+                          <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                            {[80, 85, 90, 95].map((thresh) => {
+                              const isSelected = (currentGrooveSettings.stage_ready_threshold || 85) === thresh;
+                              return (
+                                <button
+                                  key={thresh}
+                                  type="button"
+                                  onClick={() => updateGrooveSetting('stage_ready_threshold', thresh)}
+                                  style={{
+                                    flex: 1,
+                                    padding: '10px',
+                                    borderRadius: '12px',
+                                    border: isSelected ? '2px solid #eab308' : '1px solid #cbd5e1',
+                                    background: isSelected ? '#fefce8' : '#ffffff',
+                                    color: isSelected ? '#ca8a04' : '#64748b',
+                                    fontWeight: 900,
+                                    fontSize: '0.86rem',
+                                    cursor: 'pointer',
+                                    textAlign: 'center'
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  {thresh}% XP
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveTeacherSettingsModal(null);
-                            setIsFeedbackModalOpen(true);
-                          }}
-                          style={{
-                            background: '#ec4899',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '8px 14px',
-                            borderRadius: '8px',
-                            fontSize: '0.76rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            flexShrink: 0
-                          }}
-                          className="hover-scale"
-                        >
-                          Öffnen
-                        </button>
+
+                        {/* Toggle: Student Song Proposals */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '16px',
+                          borderRadius: '16px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          gap: '12px'
+                        }}>
+                          <div>
+                            <h4 style={{ margin: '0 0 2px 0', fontSize: '0.86rem', fontWeight: 800, color: '#1e293b' }}>
+                              Song-Vorschläge durch Schüler erlauben
+                            </h4>
+                            <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
+                              Schüler dürfen eigene Songwünsche für ihre Band vorschlagen.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateGrooveSetting('allow_student_song_proposals', currentGrooveSettings.allow_student_song_proposals === false ? true : false)}
+                            className={`app-binary-switch ${currentGrooveSettings.allow_student_song_proposals !== false ? 'active' : ''}`}
+                            style={{ backgroundColor: currentGrooveSettings.allow_student_song_proposals !== false ? '#eab308' : undefined, flexShrink: 0 }}
+                          >
+                            <div className="app-binary-switch-knob" />
+                          </button>
+                        </div>
+
+                        {/* Toggle: Auto-Add Mastered Songs */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '16px',
+                          borderRadius: '16px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          gap: '12px'
+                        }}>
+                          <div>
+                            <h4 style={{ margin: '0 0 2px 0', fontSize: '0.86rem', fontWeight: 800, color: '#1e293b' }}>
+                              Gemeisterte Songs automatisch ins Repertoire
+                            </h4>
+                            <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
+                              Sobald alle Band-Mitglieder einen Song gemeistert haben, wird er automatisch als Repertoire gelistet.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateGrooveSetting('auto_add_mastered_songs', currentGrooveSettings.auto_add_mastered_songs === false ? true : false)}
+                            className={`app-binary-switch ${currentGrooveSettings.auto_add_mastered_songs !== false ? 'active' : ''}`}
+                            style={{ backgroundColor: currentGrooveSettings.auto_add_mastered_songs !== false ? '#eab308' : undefined, flexShrink: 0 }}
+                          >
+                            <div className="app-binary-switch-knob" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* TAB 3: COACH PROFILE & AVATAR */}
+                  {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                      {/* Avatar Selection */}
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Sparkles size={18} color="#ca8a04" />
+                          <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Musiker-Avatar (Live Lab &amp; Sidebar)</strong>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(84px, 1fr))', gap: '12px', marginTop: '4px' }}>
+                          {[
+                            { url: '/avatars/gitarre_avatar_new.png', name: 'Gitarre' },
+                            { url: '/avatars/egitarre_avatar.png', name: 'E-Gitarre' },
+                            { url: '/avatars/ebass_avatar.png', name: 'E-Bass' },
+                            { url: '/avatars/schlagzeug_avatar.png', name: 'Drums' },
+                            { url: '/avatars/klavier_avatar_new.png', name: 'Klavier' },
+                            { url: '/avatars/gesang_avatar.png', name: 'Gesang' },
+                            { url: '/avatars/trompete_avatar_new.png', name: 'Trompete' },
+                            { url: '/avatars/saxophon_avatar_new.png', name: 'Saxophon' },
+                            { url: '/avatar_ghost.jpg', name: 'Geist' }
+                          ].map((av) => {
+                            const isSelected = teacher?.photo_url === av.url || teacher?.avatar_url === av.url;
+                            return (
+                              <div
+                                key={av.url}
+                                onClick={async () => {
+                                  if (!teacher?.id) return;
+                                  try {
+                                    const { error } = await supabase
+                                      .from('users')
+                                      .update({ photo_url: av.url, avatar_url: av.url })
+                                      .eq('id', teacher.id);
+                                    if (error) throw error;
+                                    setTeacher((prev: any) => ({ ...prev, photo_url: av.url, avatar_url: av.url }));
+                                  } catch (err: any) {
+                                    alert('Fehler beim Aktualisieren: ' + err.message);
+                                  }
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '10px 6px',
+                                  borderRadius: '14px',
+                                  background: isSelected ? '#fefce8' : '#ffffff',
+                                  border: isSelected ? '2px solid #eab308' : '1px solid #e2e8f0',
+                                  cursor: 'pointer',
+                                  boxShadow: isSelected ? '0 4px 14px rgba(234,179,8,0.25)' : 'none',
+                                  transition: 'all 0.15s'
+                                }}
+                                className="hover-scale"
+                              >
+                                <img
+                                  src={av.url}
+                                  alt={av.name}
+                                  style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
+                                />
+                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isSelected ? '#ca8a04' : '#64748b', textAlign: 'center' }}>
+                                  {av.name}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Coach Data */}
+                      <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? '1fr' : '1fr 1fr', gap: '14px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
+                          <input 
+                            type="text" 
+                            readOnly 
+                            value={teacher?.first_name || ''} 
+                            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+                          <input 
+                            type="text" 
+                            readOnly 
+                            value={teacher?.last_name || ''} 
+                            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: windowWidth < 640 ? 'span 1' : 'span 2' }}>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Rolle</label>
+                          <input 
+                            type="text" 
+                            readOnly 
+                            value="GrooveLab Band-Coach" 
+                            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
 
-                  {activeTeacherSettingsModal === 'avatar' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(84px, 1fr))', gap: '12px' }}>
-                        {[
-                          { url: '/avatars/gitarre_avatar_new.png', name: 'Gitarre' },
-                          { url: '/avatars/egitarre_avatar.png', name: 'E-Gitarre' },
-                          { url: '/avatars/ebass_avatar.png', name: 'E-Bass' },
-                          { url: '/avatars/schlagzeug_avatar.png', name: 'Drums' },
-                          { url: '/avatars/klavier_avatar_new.png', name: 'Klavier' },
-                          { url: '/avatars/gesang_avatar.png', name: 'Gesang' },
-                          { url: '/avatars/trompete_avatar_new.png', name: 'Trompete' },
-                          { url: '/avatars/saxophon_avatar_new.png', name: 'Saxophon' },
-                          { url: '/avatar_ghost.jpg', name: 'Geist' }
-                        ].map((av) => {
-                          const isSelected = teacher?.photo_url === av.url || teacher?.avatar_url === av.url;
-                          return (
-                            <div
-                              key={av.url}
+                  {/* TAB 4: SECURITY & KIOSK PIN */}
+                  {activeTeacherSettingsModal === 'security' && (() => {
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fefce8', border: '1px solid #fef08a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ca8a04' }}>
+                            <ShieldCheck size={24} />
+                          </div>
+                          <div>
+                            <strong style={{ fontSize: '0.86rem', color: '#0f172a', display: 'block' }}>DSGVO &amp; Datenschutz-Status</strong>
+                            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Dein Account ist mit TLS 1.3 Transport- und AES-256 Server-Verschlüsselung (Art. 32 DSGVO) geschützt.</span>
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>Persönliche Coach-PIN (für Kiosk-Freigaben)</strong>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45 }}>
+                            Mit dieser 4-stelligen PIN kannst du dich an Kiosk-iPads im Proberaum anmelden oder Schülersitzungen entsperren.
+                          </span>
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '4px' }}>
+                            <input 
+                              type="password"
+                              maxLength={4}
+                              placeholder="4-stellige PIN"
+                              defaultValue={teacher?.personal_pin || ''}
+                              id="groovelab_coach_pin_input"
+                              style={{ width: '160px', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '1rem', fontWeight: 800, textAlign: 'center', letterSpacing: '4px' }}
+                            />
+                            <button
+                              type="button"
                               onClick={async () => {
-                                if (!teacher?.id) return;
+                                const input = document.getElementById('groovelab_coach_pin_input') as HTMLInputElement;
+                                if (!input || !teacher?.id) return;
+                                const val = input.value.trim();
+                                if (val.length !== 4 || !/^\d{4}$/.test(val)) {
+                                  alert('Bitte gib eine gültige 4-stellige Zahlen-PIN ein.');
+                                  return;
+                                }
                                 try {
-                                  const { error } = await supabase
-                                    .from('users')
-                                    .update({ photo_url: av.url, avatar_url: av.url })
-                                    .eq('id', teacher.id);
+                                  const { error } = await supabase.from('users').update({ personal_pin: val }).eq('id', teacher.id);
                                   if (error) throw error;
-                                  setTeacher((prev: any) => ({ ...prev, photo_url: av.url, avatar_url: av.url }));
-                                } catch (err: any) {
-                                  alert('Fehler beim Aktualisieren: ' + err.message);
+                                  setTeacher((prev: any) => ({ ...prev, personal_pin: val }));
+                                  alert('Coach-PIN erfolgreich aktualisiert! 🛡️');
+                                } catch (e: any) {
+                                  alert('Fehler beim Speichern: ' + e.message);
                                 }
                               }}
-                              style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '10px 6px',
-                                borderRadius: '14px',
-                                background: isSelected ? '#e6f4ea' : '#f8fafc',
-                                border: isSelected ? '2px solid #34a853' : '1px solid #e2e8f0',
-                                cursor: 'pointer',
-                                boxShadow: isSelected ? '0 4px 14px rgba(52,168,83,0.2)' : 'none',
-                                transition: 'all 0.15s'
-                              }}
+                              style={{ padding: '10px 18px', borderRadius: '10px', background: '#eab308', color: '#1e293b', border: 'none', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}
                               className="hover-scale"
                             >
-                              <img
-                                src={av.url}
-                                alt={av.name}
-                                style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
-                              />
-                              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isSelected ? '#34a853' : '#64748b', textAlign: 'center' }}>
-                                {av.name}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTeacherSettingsModal === 'security' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
-                          <ShieldCheck size={24} />
+                              PIN speichern
+                            </button>
+                          </div>
                         </div>
-                        <div>
-                          <strong style={{ fontSize: '0.86rem', color: '#0f172a', display: 'block' }}>DSGVO &amp; Datenschutz-Status</strong>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Dein Account ist mit TLS 1.3 Transport- und AES-256 Server-Verschlüsselung (Art. 32 DSGVO) geschützt.</span>
+
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>Kopplung &amp; Proberaum-Status</strong>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45 }}>
+                            Schul-ID: <strong>{teacher?.school_id || 'Aktiv'}</strong><br />
+                            Rolle: <strong>GrooveLab Coach (Band-Lehrkraft)</strong><br />
+                            Zugriffsberechtigungen: <strong>Live Lab, Song-Bibliothek &amp; Repertoire-Planer</strong>
+                          </span>
                         </div>
                       </div>
-
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>Kopplung & Anmelde-Status</strong>
-                        <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45 }}>
-                          Schul-ID: <strong>{teacher?.school_id || 'Aktiv'}</strong><br />
-                          Rolle: <strong>Lehrkraft (Teacher Profile)</strong><br />
-                          Zugriffsberechtigungen: <strong>Campus & Meisterwerk-Dokumentation</strong>
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 {/* Modal Footer */}
@@ -18576,49 +18860,8 @@ useEffect(() => {
                     }}
                     className="hover-scale"
                   >
-                    Schließen
+                    Fertig
                   </button>
-
-                  {activeTeacherSettingsModal === 'fokus' && (() => {
-                    const isSettingsDirty = initialSchoolData && schoolData && 
-                      JSON.stringify(schoolData.opening_hours?.fokus_levels) !== JSON.stringify(initialSchoolData.opening_hours?.fokus_levels);
-
-                    return (
-                      <button
-                        onClick={async () => {
-                          if (!teacher?.school_id || !schoolData) return;
-                          setIsSaving(true);
-                          const { error } = await supabase
-                            .from('schools')
-                            .update({ opening_hours: schoolData.opening_hours })
-                            .eq('id', teacher.school_id);
-                          setIsSaving(false);
-                          if (error) {
-                            alert("Fehler beim Speichern der Einstellungen: " + error.message);
-                          } else {
-                            setInitialSchoolData(JSON.parse(JSON.stringify(schoolData)));
-                            alert("Einstellungen erfolgreich gespeichert! 🎉");
-                            setActiveTeacherSettingsModal(null);
-                          }
-                        }}
-                        disabled={!isSettingsDirty || isSaving}
-                        style={{
-                          padding: '8px 20px',
-                          borderRadius: '10px',
-                          border: 'none',
-                          background: isSettingsDirty ? '#34a853' : '#cbd5e1',
-                          color: isSettingsDirty ? '#ffffff' : '#94a3b8',
-                          fontSize: '0.82rem',
-                          fontWeight: 800,
-                          cursor: isSettingsDirty ? 'pointer' : 'default',
-                          boxShadow: isSettingsDirty ? '0 4px 12px rgba(52,168,83,0.3)' : 'none'
-                        }}
-                        className={isSettingsDirty ? "hover-scale" : ""}
-                      >
-                        {isSaving ? 'Speichern...' : 'Speichern'}
-                      </button>
-                    );
-                  })()}
                 </div>
               </div>
             </div>
@@ -19742,6 +19985,19 @@ useEffect(() => {
         schoolId={teacher?.school_id || (teacher as any)?.schoolId}
         schoolName={schoolData?.name || (teacher as any)?.school_name}
         activePlatform={activePlatform}
+      />
+
+      {/* Leitfäden & Akademie Modal */}
+      <HelpCenterModal
+        isOpen={isHelpCenterOpen}
+        onClose={() => setIsHelpCenterOpen(false)}
+        userRole="teacher"
+        activePlatform={activePlatform as any}
+        schoolName={schoolData?.name || (teacher as any)?.school_name}
+        onOpenFeedbackHub={() => {
+          setIsHelpCenterOpen(false);
+          setIsFeedbackModalOpen(true);
+        }}
       />
 
       {/* Global Notes Quick-Drawer (Cmd+J) */}

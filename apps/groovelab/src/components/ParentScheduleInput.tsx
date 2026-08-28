@@ -524,17 +524,6 @@ export function ParentScheduleInput({ onSuccess }: ParentScheduleInputProps) {
                         <option value="Bands & Ensembles">Bands & Ensembles</option>
                       </select>
                     </div>
-                    {hasCampusSub && (
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 mb-1">Geburtsdatum (optional)</label>
-                        <input
-                          type="date"
-                          value={sibBirthDate}
-                          onChange={e => setSibBirthDate(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                        />
-                      </div>
-                    )}
                   </div>
                   <div className="flex gap-3 justify-end pt-2">
                     <button

@@ -1396,6 +1396,147 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           uniqueSchedules.push(sched);
         }
       });
+
+      // Also check Stundenplan-Designer boards of teacher as primary master to guarantee exact lesson time
+      try {
+        const teacherId = student.teacher_id || student.teacherId;
+        if (teacherId) {
+          let teacherDrafts: any[] = [];
+          let targetDraftId = 'default';
+          let submittedDraftId = '';
+          
+          if (typeof window !== 'undefined') {
+            const localState = localStorage.getItem(`groovelab_teacher_draft_state_campus_${teacherId}`) || 
+                               localStorage.getItem(`groovelab_teacher_draft_state_groovelab_${teacherId}`) ||
+                               localStorage.getItem(`groovelab_teacher_draft_state_${teacherId}`);
+            if (localState) {
+              const parsed = JSON.parse(localState);
+              if (parsed && parsed.drafts) {
+                teacherDrafts = parsed.drafts;
+                targetDraftId = parsed.activeDraftId || 'default';
+                submittedDraftId = parsed.submittedDraftId || '';
+              }
+            }
+          }
+
+          if (teacherDrafts.length === 0) {
+            const { data: tUser } = await supabase
+              .from('users')
+              .select('planned_boards, first_name, last_name')
+              .eq('id', teacherId)
+              .maybeSingle();
+              
+            if (tUser?.planned_boards) {
+              const pb = typeof tUser.planned_boards === 'string' ? JSON.parse(tUser.planned_boards) : tUser.planned_boards;
+              if (pb && pb.drafts) {
+                teacherDrafts = pb.drafts;
+                targetDraftId = pb.activeDraftId || 'default';
+                submittedDraftId = pb.submittedDraftId || '';
+              } else if (Array.isArray(pb)) {
+                teacherDrafts = [{ id: 'default', name: 'Entwurf 1', boards: pb }];
+              }
+            }
+          }
+
+          const activeDraft = teacherDrafts.find(d => d.id === submittedDraftId) || teacherDrafts.find(d => d.id === targetDraftId) || teacherDrafts[0];
+          if (activeDraft && Array.isArray(activeDraft.boards)) {
+            const recalculateBoardTimesForModal = (board: any): any => {
+              if (!board || !Array.isArray(board.students)) return board;
+              const parseTimeH = (t: string): [number, number] => {
+                if (!t || !t.includes(':')) return [14, 0];
+                const [h, m] = t.split(':').map(Number);
+                return [isNaN(h) ? 14 : h, isNaN(m) ? 0 : m];
+              };
+              const snapTimeH = (timeStr: string, snap = 15): string => {
+                if (!timeStr) return timeStr;
+                const [h, m] = parseTimeH(timeStr);
+                const total = h * 60 + m;
+                const snapped = Math.round(total / snap) * snap;
+                return `${String(Math.floor(snapped / 60) % 24).padStart(2, '0')}:${String(snapped % 60).padStart(2, '0')}`;
+              };
+              const addMinsH = (time: string, mins: number): string => {
+                const [h, m] = parseTimeH(time);
+                const total = h * 60 + m + mins;
+                return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+              };
+
+              const startAnchor = board.startTime || board.startAnchor || '14:00';
+              const sorted = [...board.students].sort((a, b) => {
+                const aTime = a.customStartTime || a.assignedTime || a.startTime || startAnchor;
+                const bTime = b.customStartTime || b.assignedTime || b.startTime || startAnchor;
+                const [ah, am] = parseTimeH(aTime);
+                const [bh, bm] = parseTimeH(bTime);
+                return (ah * 60 + am) - (bh * 60 + bm);
+              });
+
+              let curTime = snapTimeH(startAnchor, 15);
+              const updated = sorted.map((s: any) => {
+                let assignedStart = curTime;
+                if (s.isPinned && (s.customStartTime || s.assignedTime)) {
+                  const targetTime = s.customStartTime || s.assignedTime || startAnchor;
+                  const snapped = snapTimeH(targetTime, 15);
+                  const [csh, csm] = parseTimeH(snapped);
+                  const [curh, curm] = parseTimeH(curTime);
+                  if (csh * 60 + csm >= curh * 60 + curm) assignedStart = snapped;
+                } else if (s.customStartTime) {
+                  const snapped = snapTimeH(s.customStartTime, 15);
+                  const [csh, csm] = parseTimeH(snapped);
+                  const [curh, curm] = parseTimeH(curTime);
+                  if (csh * 60 + csm >= curh * 60 + curm) assignedStart = snapped;
+                } else if (s.assignedTime) {
+                  const snapped = snapTimeH(s.assignedTime, 15);
+                  const [csh, csm] = parseTimeH(snapped);
+                  const [curh, curm] = parseTimeH(curTime);
+                  if (csh * 60 + csm >= curh * 60 + curm) assignedStart = snapped;
+                }
+                const assignedTime = snapTimeH(assignedStart, 15);
+                const dur = s.duration || 30;
+                curTime = snapTimeH(addMinsH(assignedTime, dur), 15);
+                return { ...s, assignedTime };
+              });
+              return { ...board, students: updated };
+            };
+
+            const sFn = (student.first_name || '').trim().toLowerCase();
+            const sLn = (student.last_name || '').trim().toLowerCase();
+
+            activeDraft.boards.forEach((b: any) => {
+              const recalculated = recalculateBoardTimesForModal(b);
+              (recalculated.students || []).forEach((st: any) => {
+                if (st.isBreak) return;
+                const stFn = (st.first_name || st.name?.split(' ')[0] || '').trim().toLowerCase();
+                const stLn = (st.last_name || st.name?.split(' ').slice(1).join(' ') || '').trim().toLowerCase();
+                const isMatch = (st.id && groupStudentIds.includes(st.id)) || 
+                                (stFn === sFn && (!sLn || !stLn || stLn.startsWith(sLn[0]) || sLn.startsWith(stLn[0])));
+                if (isMatch) {
+                  const boardSlotTime = st.assignedTime || st.customStartTime || '14:00';
+                  if (st.duration) {
+                    setLessonDuration(st.duration);
+                  }
+                  const existingIdx = uniqueSchedules.findIndex(s => s.day_of_week === b.dayOfWeek);
+                  const boardObj = {
+                    id: `designer-${b.id}-${st.id}`,
+                    time_slot: boardSlotTime,
+                    duration: st.duration || 30,
+                    day_of_week: b.dayOfWeek,
+                    status: 'approved',
+                    rooms: { name: b.roomName || 'Raum 4' },
+                    teacher: { first_name: student.teacher?.first_name || '', last_name: student.teacher?.last_name || '' }
+                  };
+                  if (existingIdx >= 0) {
+                    uniqueSchedules[existingIdx] = boardObj;
+                  } else {
+                    uniqueSchedules.push(boardObj);
+                  }
+                }
+              });
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to merge designer schedule in StudentDetailModal:', e);
+      }
+
       setSchedulesList(uniqueSchedules);
 
       // Fetch premium status
@@ -3983,9 +4124,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                               transition: 'all 0.15s',
                               boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
                             }}
-                            title={lvl === 1 ? '3/5/10 Min.' : lvl === 2 ? '5/10/15 Min.' : '10/15/20 Min.'}
+                            title={lvl === 1 ? 'Stufe 1 (Habit-Starter: 3/5/10 Min.)' : lvl === 2 ? 'Stufe 2 (Streak-Routinier: 5/10/15 Min.)' : 'Stufe 3 (Fokus-Virtuose: 10/15/20 Min.)'}
                           >
-                            Level {lvl}
+                            Stufe {lvl}
                           </button>
                         );
                       })}

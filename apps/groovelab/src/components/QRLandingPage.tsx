@@ -8,7 +8,7 @@ import { validateNewPin } from '../utils/pinValidation';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 
 import { useMasterPricing } from '../context/MasterPricingContext';
-import { computeGroundTruthMetrics, broadcastPracticeUpdate } from '../utils/studentProgressEngine';
+import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel, getEngineTargetMinutes, getEngineFlameCategory } from '../utils/studentProgressEngine';
 import { ParentCampusActivationModal } from './ParentCampusActivationModal';
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
@@ -378,27 +378,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [practiceLoggedToday, setPracticeLoggedToday] = useState(false);
   const [avatar, setAvatar] = useState<any | null>(null);
 
-  const DEFAULT_FOKUS_LEVELS = {
-    level1: { kleine: 3, mittlere: 5, helden: 10 },
-    level2: { kleine: 5, mittlere: 10, helden: 15 },
-    level3: { kleine: 10, mittlere: 15, helden: 20 }
-  };
-
   const [schoolFokusLevels, setSchoolFokusLevels] = useState<any>(null);
 
-  const getFlameCategory = (streak: number): 'kleine' | 'mittlere' | 'helden' => {
-    if (streak >= 9) return 'helden';
-    if (streak >= 4) return 'mittlere';
-    return 'kleine';
-  };
-
   const getDailyGoal = () => {
-    const level = avatar?.evolution_level || 1;
-    const cat = getFlameCategory(avatar?.streak_flame || 0);
-    const config = schoolFokusLevels || DEFAULT_FOKUS_LEVELS;
-    const levelKey = `level${level}` as 'level1' | 'level2' | 'level3';
-    const levelConfig = config[levelKey] || DEFAULT_FOKUS_LEVELS[levelKey];
-    return levelConfig[cat] || DEFAULT_FOKUS_LEVELS[levelKey][cat];
+    const dbLevel = avatar?.evolution_level || 1;
+    const totalMinutes = stats?.total_focus_minutes || 0;
+    const currentStreak = avatar?.streak_flame || 0;
+    const level = getEngineEffectiveLevel(dbLevel, totalMinutes, currentStreak);
+    return getEngineTargetMinutes(level, currentStreak, schoolFokusLevels);
   };
 
   // Daily goal based on evolution level and flame level config

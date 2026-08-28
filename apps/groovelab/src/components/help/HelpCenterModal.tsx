@@ -236,6 +236,30 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       )
     },
     {
+      id: 'feat-student-homework-flow',
+      title: 'Aufgabenheft, Play-Alongs & Notizen',
+      category: 'features',
+      roles: ['student', 'teacher', 'admin'],
+      badge: 'Hausaufgaben',
+      summary: 'So rufst du deine Hausaufgaben, Notizen und Hörbeispiele deiner Lehrkraft ab.',
+      tags: ['hausaufgaben', 'aufgaben', 'schüler', 'eltern', 'notizen', 'play along', 'audio'],
+      details: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
+          <p>
+            Im Aufgabenheft findest du alles, was du für deine wöchentlichen Übe-Sessions brauchst:
+          </p>
+          <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+            <h5 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>📖 Schnelle Orientierung:</h5>
+            <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <li><strong>Seitenzahlen & Lehrbuch:</strong> Grüne Markierungen (z. B. <em>S. 24</em>) zeigen dir genau, welche Stücke geübt werden.</li>
+              <li><strong>Aufnahmen deiner Lehrkraft:</strong> Findest du immer auf der <strong>linken Seite</strong> („Von deiner Lehrkraft“).</li>
+              <li><strong>Deine eigenen Aufnahmen:</strong> Landen sicher auf der <strong>rechten Seite</strong> in deinem persönlichen Übe-Studio.</li>
+            </ul>
+          </div>
+        </div>
+      )
+    },
+    {
       id: 'feat-groovelab-bands',
       title: 'GrooveLab-Modul: Bands, Songs & Skill-Radar',
       category: 'features',
@@ -257,6 +281,27 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
               <li><strong>Live Lab:</strong> Synchrones Proben-Dashboard auf Tablets im Band-Raum.</li>
             </ul>
           </div>
+        </div>
+      )
+    },
+    {
+      id: 'faq-netflix-siblings',
+      title: 'Geschwisterkinder auf einem gemeinsamen iPad (Netflix-Prinzip)',
+      category: 'faq',
+      roles: ['student', 'teacher', 'admin'],
+      badge: 'Familie',
+      summary: 'Schneller 1-Klick Profilwechsel für mehrere Kinder ohne ständige PIN-Eingabe.',
+      tags: ['geschwister', 'familie', 'ipad', 'profil', 'wechsel', 'kinder', 'eltern'],
+      details: (
+        <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
+          <p>
+            Wenn mehrere Geschwisterkinder dieselbe Musikschule besuchen und sich ein Familien-Tablet teilen, 
+            funktioniert der Profilwechsel nach dem <strong>Netflix-Prinzip</strong>:
+          </p>
+          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <li>Einmal gekoppelte Geschwisterprofile können direkt über das Profil-Icon am oberen Bildschirmrand per Fingertipp gewechselt werden.</li>
+            <li>Kein lästiges Neu-Einloggen oder wiederholte Passworteingabe – jedes Kind gelangt direkt in sein eigenes Aufgabenheft.</li>
+          </ul>
         </div>
       )
     },

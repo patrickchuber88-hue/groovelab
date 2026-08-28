@@ -7,6 +7,8 @@ import Confetti from 'react-confetti';
 import { ALL_STICKERS, getUnifiedStickersMap } from '../../domain/stickersAndTresor';
 import { SimpleVoiceRecorder } from './SimpleVoiceRecorder';
 import { cleanHomeworkNotesText } from '../../utils/nameHelper';
+import { DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel } from '../../utils/studentProgressEngine';
+import { getAvatarLevelFrameStyle } from '../StudioAvatar';
 
 interface CampusJuniorDashboardProps {
   studentUser: any;
@@ -24,12 +26,6 @@ interface CampusJuniorDashboardProps {
   fokusLogs?: any[];
   schoolFokusLevels?: any;
 }
-
-const DEFAULT_FOKUS_LEVELS = {
-  level1: { kleine: 3, mittlere: 5, helden: 10 },
-  level2: { kleine: 5, mittlere: 10, helden: 15 },
-  level3: { kleine: 10, mittlere: 15, helden: 20 }
-};
 
 const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
   if (!instrument) return '/avatars/gitarre_avatar_new.png';
@@ -72,14 +68,9 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
   const config = schoolFokusLevels || DEFAULT_FOKUS_LEVELS;
   const effectiveLevel = useMemo(() => {
     const dbLevel = avatar?.evolution_level || 1;
-    let computedLevel = 1;
-    if (totalPracticeMinutes >= 1000) {
-      computedLevel = 3;
-    } else if (totalPracticeMinutes >= 250) {
-      computedLevel = 2;
-    }
-    return Math.max(dbLevel, computedLevel);
-  }, [avatar?.evolution_level, totalPracticeMinutes]);
+    const currentStreak = avatar?.current_streak || avatar?.streak_flame || 0;
+    return getEngineEffectiveLevel(dbLevel, totalPracticeMinutes, currentStreak);
+  }, [avatar?.evolution_level, avatar?.current_streak, avatar?.streak_flame, totalPracticeMinutes]);
 
   const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
   const activeLevelConfig = config[levelKey] || DEFAULT_FOKUS_LEVELS[levelKey];
@@ -375,26 +366,32 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', zIndex: 1 }}>
           {/* Avatar Icon */}
-          <div style={{
-            width: '84px',
-            height: '84px',
-            borderRadius: '24px',
-            background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-            border: '2px solid rgba(255, 255, 255, 0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-            boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
-            flexShrink: 0
-          }}>
-            <img 
-              src={instrumentAvatarUrl} 
-              alt="Instrument Avatar"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              onError={(e: any) => { e.target.src = '/avatars/gitarre_avatar_new.png'; }}
-            />
-          </div>
+          {(() => {
+            const frameStyle = getAvatarLevelFrameStyle(effectiveLevel);
+            return (
+              <div style={{
+                width: '84px',
+                height: '84px',
+                borderRadius: '24px',
+                background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                border: frameStyle.border,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                boxShadow: frameStyle.boxShadow,
+                flexShrink: 0,
+                transition: 'all 0.3s ease'
+              }}>
+                <img 
+                  src={instrumentAvatarUrl} 
+                  alt="Instrument Avatar"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e: any) => { e.target.src = '/avatars/gitarre_avatar_new.png'; }}
+                />
+              </div>
+            );
+          })()}
 
           <div>
             <div style={{

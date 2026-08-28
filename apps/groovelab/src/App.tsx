@@ -5161,7 +5161,7 @@ function App() {
             name: '__SYSTEM_ANNOUNCEMENTS__',
             status: 'active',
             school_id: schoolId,
-            coach_id: user?.id,
+            coach_id: null,
             genre: 'System',
             photo_url: '/logo.png'
           })
@@ -5374,22 +5374,44 @@ function App() {
     }
   };
 
-  const handleAcknowledgeStudentMessage = async (msg: any) => {
+  const handleAcknowledgeStudentMessage = async (msgOrId: any) => {
     if (!user) return;
-    const currentReadBy = msg.read_by || [];
-    if (currentReadBy.includes(user.id)) return;
+    const msgId = typeof msgOrId === 'string' ? msgOrId : msgOrId?.id;
+    if (!msgId) return;
     
-    const newReadBy = [...currentReadBy, user.id];
+    // Optimistic update of local states in studentMessages and announcements
+    setStudentMessages(prev => prev.map(m => {
+      if (m.id !== msgId) return m;
+      const rBy = m.read_by || [];
+      return rBy.includes(user.id) ? m : { ...m, read_by: [...rBy, user.id] };
+    }));
     
-    // Optimistic update of local states
-    setStudentMessages(prev => prev.map(m => m.id === msg.id ? { ...m, read_by: newReadBy } : m));
-    setSelectedStudentMessage((prev: any) => prev && prev.id === msg.id ? { ...prev, read_by: newReadBy } : prev);
+    setAnnouncements(prev => prev.map(m => {
+      if (m.id !== msgId) return m;
+      const rBy = m.read_by || [];
+      return rBy.includes(user.id) ? m : { ...m, read_by: [...rBy, user.id] };
+    }));
+    
+    setSelectedStudentMessage((prev: any) => {
+      if (!prev || prev.id !== msgId) return prev;
+      const rBy = prev.read_by || [];
+      return rBy.includes(user.id) ? prev : { ...prev, read_by: [...rBy, user.id] };
+    });
     
     try {
-      await supabase
+      const { data: current } = await supabase
         .from('band_shoutbox')
-        .update({ read_by: newReadBy })
-        .eq('id', msg.id);
+        .select('read_by')
+        .eq('id', msgId)
+        .maybeSingle();
+
+      const existingReadBy = Array.isArray(current?.read_by) ? current.read_by : [];
+      if (!existingReadBy.includes(user.id)) {
+        await supabase
+          .from('band_shoutbox')
+          .update({ read_by: [...existingReadBy, user.id] })
+          .eq('id', msgId);
+      }
     } catch (err) {
       console.error('Error acknowledging student message:', err);
     }
@@ -5436,11 +5458,10 @@ function App() {
   };
 
   const handlePostAnnouncement = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (!user || !user.school_id) return;
     if (!announcementTitle.trim() || !announcementMessage.trim()) {
-      alert('Bitte Betreff und Nachricht ausfüllen.');
-      return;
+      throw new Error('Bitte Betreff und Nachricht ausfüllen.');
     }
     
     setLoading(true);
@@ -5460,7 +5481,7 @@ function App() {
               name: '__SYSTEM_ANNOUNCEMENTS__',
               status: 'active',
               school_id: user.school_id,
-              coach_id: user.id,
+              coach_id: null,
               genre: 'System',
               photo_url: '/logo.png'
             })
@@ -5474,14 +5495,12 @@ function App() {
           }
         } else {
           bandId = annBands[0].id;
-          setAnnBandId(bandId);
+          setAnnBandId(annBands[0].id);
         }
       }
       
       if (!bandId) {
-        alert('Fehler beim Erstellen der System-Band.');
-        setLoading(false);
-        return;
+        throw new Error('Fehler beim Erstellen der System-Band.');
       }
       
       const payload = {
@@ -5499,7 +5518,7 @@ function App() {
       });
       
       if (error) {
-        alert('Fehler beim Senden: ' + error.message);
+        throw new Error('Fehler beim Senden: ' + error.message);
       } else {
         setAnnouncementTitle('');
         setAnnouncementMessage('');
@@ -5508,11 +5527,10 @@ function App() {
         setRecipientSearchText('');
         
         await fetchAnnouncements(user.school_id);
-        alert('Nachricht wurde erfolgreich gesendet!');
       }
     } catch (err: any) {
       console.error('[Announcements] Error posting:', err);
-      alert('Unerwarteter Fehler: ' + err.message);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -8992,7 +9010,7 @@ function App() {
           ) : (
             activePlatform === 'campus' ? (
               <>
-                <button onClick={() => setActiveStudentTab('live')} className={`sidebar-item ${activeStudentTab === 'live' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
+                <button onClick={() => setActiveStudentTab('briefing')} className={`sidebar-item ${activeStudentTab === 'briefing' ? `active ${activePlatform}` : ''}`} style={{ position: 'relative' }}>
                   <Monitor size={20} /> Briefing
                 </button>
                 <button onClick={() => setActiveStudentTab('schedule')} className={`sidebar-item ${activeStudentTab === 'schedule' ? `active ${activePlatform}` : ''}`}>
@@ -9168,7 +9186,7 @@ function App() {
                 textOverflow: 'ellipsis',
                 marginBottom: '2px'
               }}>
-                {user.role === 'student' ? 'Mein Profil' : `${user.first_name} ${user.last_name || ''}`.trim()}
+                {user.role === 'student' ? 'Mein Profil' : formatTeacherFullName(user.first_name, user.last_name)}
               </div>
               <div style={{ 
                 fontSize: '0.68rem', 
@@ -10797,7 +10815,7 @@ function App() {
                   </div>
 
                   <h1 style={{ fontSize: '3.5rem', fontWeight: 900, color: '#1e293b', margin: '0 0 16px 0', letterSpacing: '-0.03em' }}>
-                    {user.role === 'student' ? (activePlatform === 'groovelab' ? user.first_name : 'Hausaufgabenheft') : `${user.first_name} ${user.last_name || ''}`.trim()}
+                    {user.role === 'student' ? (activePlatform === 'groovelab' ? user.first_name : 'Hausaufgabenheft') : formatTeacherFullName(user.first_name, user.last_name)}
                   </h1>
 
                   {/* GrooveLab Instrument Selection Buttons for Coach */}
@@ -14503,7 +14521,7 @@ function App() {
             ) : (
               activePlatform === 'campus' ? (
                 <>
-                  <button onClick={() => setActiveStudentTab('live')} style={getMobileButtonStyle('live', 'campus')} className="hover-scale" title="Briefing">
+                  <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
                     <Monitor size={18} /> <span>Briefing</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('schedule')} style={getMobileButtonStyle('schedule', 'campus')} className="hover-scale" title="Stundenplan">
