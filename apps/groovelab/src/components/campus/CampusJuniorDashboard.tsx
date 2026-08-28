@@ -610,15 +610,17 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        padding: '10px 18px',
+                        padding: '12px 20px',
+                        minHeight: '44px',
                         borderRadius: '14px',
                         border: 'none',
                         background: item.isDone ? '#f1f5f9' : 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
                         color: item.isDone ? '#64748b' : '#ffffff',
                         fontWeight: 900,
-                        fontSize: '0.9rem',
+                        fontSize: '0.92rem',
                         cursor: 'pointer',
-                        boxShadow: item.isDone ? 'none' : '0 4px 14px rgba(52, 168, 83, 0.3)'
+                        boxShadow: item.isDone ? 'none' : '0 4px 14px rgba(52, 168, 83, 0.3)',
+                        touchAction: 'manipulation'
                       }}
                       className="hover-scale"
                     >
@@ -718,8 +720,9 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
 
         {/* Big Countdown Timer Circle */}
         <div style={{
-          width: '180px',
-          height: '180px',
+          width: 'clamp(140px, 45vw, 180px)',
+          height: 'clamp(140px, 45vw, 180px)',
+          aspectRatio: '1 / 1',
           borderRadius: '50%',
           background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
           display: 'flex',
@@ -729,9 +732,10 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
           color: '#ffffff',
           boxShadow: isTimerRunning ? '0 0 30px rgba(52, 168, 83, 0.4)' : '0 10px 25px rgba(0,0,0,0.15)',
           border: '4px solid #34a853',
-          transition: 'all 0.3s ease'
+          transition: 'all 0.3s ease',
+          contain: 'layout style'
         }}>
-          <span style={{ fontSize: '2.8rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '0.02em' }}>
+          <span style={{ fontSize: 'clamp(2.2rem, 8vw, 2.8rem)', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '0.02em' }}>
             {formattedTimer}
           </span>
           <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

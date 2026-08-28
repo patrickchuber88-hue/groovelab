@@ -4689,7 +4689,7 @@ export function CampusEventsBoard({
                 <td class="tabular-time">${timeInfo.start} &ndash; ${timeInfo.end}</td>
                 <td>
                   <span class="vertical-accent"></span>
-                  <div class="program-title">${pp.is_pause ? 'Pause: ' : ''}${pp.name}</div>
+                  <div class="program-title">${pp.is_pause ? 'Pause: ' : ''}${formatCombinedStudentNames(pp.name, null, pp.id, true)}</div>
                   ${!pp.is_pause ? `<div class="program-sub">${pp.ensemble_band || 'Einzelbeitrag'}</div>` : ''}
                 </td>
                 <td>${songsHTML}</td>

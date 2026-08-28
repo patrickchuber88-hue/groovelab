@@ -1,10 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import fs from 'fs'
+
+function swCacheBusterPlugin() {
+  return {
+    name: 'sw-cache-buster',
+    closeBundle() {
+      const distSwPath = path.resolve(__dirname, './dist/sw.js');
+      if (fs.existsSync(distSwPath)) {
+        let content = fs.readFileSync(distSwPath, 'utf-8');
+        const newVersion = `groovelab-static-v${Date.now()}`;
+        content = content.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = '${newVersion}';`);
+        fs.writeFileSync(distSwPath, content, 'utf-8');
+        console.log(`\n[SW Cache Buster] Automatically injected dynamic cache version: ${newVersion} into dist/sw.js\n`);
+      }
+    }
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), swCacheBusterPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

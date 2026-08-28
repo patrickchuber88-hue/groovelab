@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { StudioAvatar } from './StudioAvatar';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
+import { isDevEnvironment } from '../utils/tenantUrlHelper';
 
 interface QRCodeModalProps {
   user: {
@@ -474,22 +475,24 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
           onClick={onClose}
           style={{
             position: 'absolute',
-            top: '-50px',
-            right: '0',
-            background: 'rgba(255,255,255,0.2)',
+            top: typeof window !== 'undefined' && window.innerWidth <= 640 ? '12px' : '-48px',
+            right: typeof window !== 'undefined' && window.innerWidth <= 640 ? '12px' : '0',
+            background: typeof window !== 'undefined' && window.innerWidth <= 640 ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.25)',
             border: 'none',
-            color: 'white',
-            width: '40px',
-            height: '40px',
+            color: typeof window !== 'undefined' && window.innerWidth <= 640 ? '#0f172a' : 'white',
+            width: '42px',
+            height: '42px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            zIndex: 10
+            zIndex: 10,
+            backdropFilter: 'blur(10px)',
+            touchAction: 'manipulation'
           }}
         >
-          <X size={22} />
+          <X size={20} />
         </button>
         {/* Unified Modern Standalone Card Design */}
         {(() => {
@@ -765,7 +768,7 @@ ${link}`;
                 </button>
 
                 {/* Entwickler Button: QR-Landingpage testen (Dev Mode Only) */}
-                {(import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || new URLSearchParams(window.location.search).has('dev_tools')))) && (
+                {isDevEnvironment() && (
                   <button
                     onClick={() => {
                       const qrUrl = `${window.location.origin}/qr/${effectiveToken}`;

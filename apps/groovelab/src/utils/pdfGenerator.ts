@@ -528,10 +528,51 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   doc.save(`DSB_Freigabepaket_TOM_AVV_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
 };
 
+// 5-minute In-Memory PDF Document Cache for instant 0ms repeat downloads
+interface CachedPdf {
+  blob: Blob;
+  filename: string;
+  timestamp: number;
+}
+const pdfMemoryCache = new Map<string, CachedPdf>();
+const PDF_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function getCachedPdf(key: string): CachedPdf | null {
+  const item = pdfMemoryCache.get(key);
+  if (!item) return null;
+  if (Date.now() - item.timestamp > PDF_CACHE_TTL_MS) {
+    pdfMemoryCache.delete(key);
+    return null;
+  }
+  return item;
+}
+
+function setCachedPdf(key: string, blob: Blob, filename: string): void {
+  pdfMemoryCache.set(key, { blob, filename, timestamp: Date.now() });
+}
+
+function triggerBlobDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
 /**
  * Generates a 1-page A4 Quickstart Cheat Sheet for Teachers
  */
 export const generateTeacherQuickstartPDF = async (schoolName: string, schoolSubdomain?: string) => {
+  const cacheKey = `teacher_quickstart_${schoolName}_${schoolSubdomain || ''}`;
+  const cached = getCachedPdf(cacheKey);
+  if (cached) {
+    triggerBlobDownload(cached.blob, cached.filename);
+    return;
+  }
+
   const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF();
 
@@ -652,7 +693,10 @@ export const generateTeacherQuickstartPDF = async (schoolName: string, schoolSub
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
   doc.text(`Bereitgestellt für: ${schoolName} • Campus-Groovelab Lehrkräfte-Onboarding`, 20, 282);
 
-  doc.save(`Lehrer_Schnellstart_Campus_Groovelab_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+  const filename = `Lehrer_Schnellstart_Campus_Groovelab_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+  const blob = doc.output('blob');
+  setCachedPdf(cacheKey, blob, filename);
+  doc.save(filename);
 };
 
 /**
@@ -663,6 +707,13 @@ export const generateParentQuickstartPDF = async (
   _activePlatform?: 'campus' | 'groovelab' | 'both',
   schoolSubdomain?: string
 ) => {
+  const cacheKey = `parent_quickstart_${schoolName}_${schoolSubdomain || ''}`;
+  const cached = getCachedPdf(cacheKey);
+  if (cached) {
+    triggerBlobDownload(cached.blob, cached.filename);
+    return;
+  }
+
   const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF();
 
@@ -773,7 +824,10 @@ export const generateParentQuickstartPDF = async (
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
   doc.text(`Information für Eltern • ${schoolName} • Campus-Groovelab`, 20, 282);
 
-  doc.save(`Eltern_Information_Campus_Groovelab_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+  const filename = `Eltern_Information_Campus_Groovelab_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+  const blob = doc.output('blob');
+  setCachedPdf(cacheKey, blob, filename);
+  doc.save(filename);
 };
 
 export interface ResiliencePDFData {

@@ -301,8 +301,24 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 </span>
               </div>
               <button 
+                type="button"
                 onClick={() => setDrawerOpen(false)}
-                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}
+                style={{ 
+                  background: '#f1f5f9', 
+                  border: 'none', 
+                  borderRadius: '50%', 
+                  width: '38px', 
+                  height: '38px', 
+                  minWidth: '38px',
+                  minHeight: '38px',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  color: '#64748b', 
+                  cursor: 'pointer',
+                  touchAction: 'manipulation'
+                }}
+                title="Menü schließen"
               >
                 <X size={18} />
               </button>

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GraduationCap, Music, Bell, Cloud, CloudOff, RefreshCw, User, BookOpen } from 'lucide-react';
 import { subscribePendingOfflineCount, flushOfflineSyncQueue } from '../../services/offlineSyncService';
-import { CampusLevelSwitcher, CampusUiLevel } from '../campus/CampusLevelSwitcher';
 
 interface MobileTopHeaderProps {
   user: any;
@@ -24,24 +23,13 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
     return sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
            (user?.id ? sessionStorage.getItem(`groovelab_parent_unlocked_${user.id}`) === 'true' : false);
   });
-  const [campusStudentUiLevel, setCampusStudentUiLevel] = useState<CampusUiLevel>(() => {
-    if (typeof window === 'undefined') return 'junior';
-    const saved = localStorage.getItem('campus_student_ui_level');
-    if (saved === 'junior' || saved === 'teen' || saved === 'pro') return saved as CampusUiLevel;
-    return 'junior';
-  });
 
   useEffect(() => {
-    const handleLevelChangeEvt = (e: any) => {
-      if (e?.detail) setCampusStudentUiLevel(e.detail);
-    };
     const handleParentModeChange = (e: any) => {
       if (typeof e?.detail === 'boolean') setParentUnlocked(e.detail);
     };
-    window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
     window.addEventListener('groovelab_parent_mode_changed', handleParentModeChange);
     return () => {
-      window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
       window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChange);
     };
   }, []);
@@ -273,39 +261,48 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
             window.dispatchEvent(new CustomEvent('campus_open_help_center'));
           }}
           style={{
-            width: '34px',
-            height: '34px',
+            width: '38px',
+            height: '38px',
+            minWidth: '38px',
+            minHeight: '38px',
             borderRadius: '50%',
-            background: 'rgba(241, 245, 249, 0.8)',
+            background: 'rgba(241, 245, 249, 0.9)',
             border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: '#475569',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            touchAction: 'manipulation'
           }}
           title="Leitfäden & Akademie"
         >
-          <BookOpen size={16} />
+          <BookOpen size={17} />
         </button>
 
         {/* Unread Notifications Bell */}
         <div style={{ position: 'relative' }}>
           <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('campus_open_messages_tab'))}
             style={{
-              width: '34px',
-              height: '34px',
+              width: '38px',
+              height: '38px',
+              minWidth: '38px',
+              minHeight: '38px',
               borderRadius: '50%',
-              background: 'rgba(241, 245, 249, 0.8)',
+              background: 'rgba(241, 245, 249, 0.9)',
               border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#475569',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              touchAction: 'manipulation'
             }}
+            title="Benachrichtigungen & Nachrichten"
           >
-            <Bell size={16} />
+            <Bell size={17} />
           </button>
           {unreadCount > 0 && (
             <span
@@ -328,28 +325,6 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
         </div>
       </div>
 
-      {/* Sub-Bar for Mobile Students: 1-Click Campus Level Switcher */}
-      {activePlatform === 'campus' && user?.role === 'student' && (
-        <div style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingTop: '6px',
-          marginTop: '4px',
-          borderTop: '1px solid rgba(226, 232, 240, 0.5)'
-        }}>
-          <CampusLevelSwitcher
-            currentLevel={campusStudentUiLevel}
-            compact={true}
-            onChange={(newLevel) => {
-              setCampusStudentUiLevel(newLevel);
-              localStorage.setItem('campus_student_ui_level', newLevel);
-              window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
-            }}
-          />
-        </div>
-      )}
     </header>
   );
 };

@@ -105,7 +105,9 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
         borderRadius: '32px',
         maxWidth: '820px',
         width: '100%',
-        padding: '36px 30px 32px 30px',
+        maxHeight: '92vh',
+        overflowY: 'auto',
+        padding: 'clamp(24px, 5vw, 36px) clamp(16px, 4vw, 30px)',
         boxShadow: '0 30px 70px -10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.9) inset',
         display: 'flex',
         flexDirection: 'column',
@@ -122,8 +124,8 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
             onClick={onClose}
             style={{
               position: 'absolute',
-              top: '20px',
-              right: '20px',
+              top: '16px',
+              right: '16px',
               width: '36px',
               height: '36px',
               borderRadius: '50%',
@@ -134,7 +136,8 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              touchAction: 'manipulation'
             }}
             className="hover-scale"
             title="Schließen"
@@ -166,7 +169,7 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
 
           <h2 style={{ 
             margin: 0, 
-            fontSize: '1.95rem', 
+            fontSize: 'clamp(1.4rem, 4vw, 1.95rem)', 
             fontWeight: 950, 
             color: '#0f172a', 
             fontFamily: "'Urbanist', 'Plus Jakarta Sans', sans-serif",
@@ -184,7 +187,7 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
         {/* 3 Colorful & Child-Friendly Cards */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
           gap: '16px',
           alignItems: 'stretch'
         }}>

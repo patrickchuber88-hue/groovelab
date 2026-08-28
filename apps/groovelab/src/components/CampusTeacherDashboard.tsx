@@ -394,34 +394,47 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   }, [userId]);
 
   const refreshAllData = async (schoolId: string, teacherId: string) => {
-    // 1. Fetch Students
-    const { data: sData } = await supabase
-      .from('users')
-      .select('*, premium_status(is_premium_active)')
-      .eq('school_id', schoolId)
-      .eq('role', 'student')
-      .eq('teacher_id', teacherId);
-    setStudents(sData || []);
+    // 1. Parallel Wave 1: Fetch Students, Rooms, Teacher Schedules and School Schedules simultaneously
+    const [studentsRes, roomsRes, schedRes, allSchedRes] = await Promise.all([
+      supabase
+        .from('users')
+        .select('*, premium_status(is_premium_active)')
+        .eq('school_id', schoolId)
+        .eq('role', 'student')
+        .eq('teacher_id', teacherId),
+      supabase
+        .from('rooms')
+        .select('*')
+        .eq('school_id', schoolId)
+        .eq('is_campus_active', true)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('schedules')
+        .select('*, student:users!schedules_student_id_fkey(*), rooms(*), schedule_exceptions(exception_date, status)')
+        .eq('teacher_id', teacherId),
+      supabase
+        .from('schedules')
+        .select('*, student:users!schedules_student_id_fkey(*), teacher:users!schedules_teacher_id_fkey(*), rooms(*), schedule_exceptions(exception_date, status)')
+        .eq('school_id', schoolId)
+    ]);
 
-    // 2. Fetch Rooms
-    const { data: rData } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('school_id', schoolId)
-      .eq('is_campus_active', true)
-      .order('sort_order', { ascending: true });
-    setRooms(rData || []);
+    const sData = studentsRes.data || [];
+    setStudents(sData);
+
+    const rData = roomsRes.data || [];
+    setRooms(rData);
+
     // By default, no room should be visible (selectedRoom starts as null)
     const favoriteRoomId = localStorage.getItem(`groovelab_favorite_room_id_${userId}`);
-    if (favoriteRoomId && rData) {
+    if (favoriteRoomId && rData.length > 0) {
       const favRoom = rData.find((r: any) => r.id === favoriteRoomId);
       if (favRoom) {
         setSelectedRoom(favRoom);
       }
     }
 
-    // 3. Fetch Availabilities (Scoped to assigned students for maximum query performance)
-    const studentIds = (sData || []).map((s: any) => s.id);
+    // 2. Fetch Availabilities (Scoped to assigned students for maximum query performance)
+    const studentIds = sData.map((s: any) => s.id);
     let aData = null;
     if (studentIds.length > 0) {
       const { data: resAvail } = await supabase
@@ -432,11 +445,8 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
     }
     setStudentAvailabilities(aData || []);
 
-    // 4. Fetch Schedules
-    const { data: schedData } = await supabase
-      .from('schedules')
-      .select('*, student:users!schedules_student_id_fkey(*), rooms(*), schedule_exceptions(exception_date, status)')
-      .eq('teacher_id', teacherId);
+    const schedData = schedRes.data || [];
+    const allSchedData = allSchedRes.data || [];
 
     const today = new Date();
     const currentDay = today.getDay() || 7;
@@ -460,12 +470,6 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
     const todayWeekday = currentDay;
     const todaySlots = mappedSchedData.filter(s => s.day_of_week === todayWeekday);
     setRawTodaySchedules(todaySlots);
-
-    // 5. Fetch all school schedules for Room Board
-    const { data: allSchedData } = await supabase
-      .from('schedules')
-      .select('*, student:users!schedules_student_id_fkey(*), teacher:users!schedules_teacher_id_fkey(*), rooms(*), schedule_exceptions(exception_date, status)')
-      .eq('school_id', schoolId);
 
     const mappedAllSchedData = (allSchedData || []).map(s => {
       const targetDate = new Date(monday);

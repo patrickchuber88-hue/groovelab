@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Smartphone, Tablet, Monitor, RotateCcw, X, TouchpadIcon, Move, Sliders, ChevronDown } from 'lucide-react';
+import { isDevEnvironment } from '../../utils/tenantUrlHelper';
 
 interface DevicePreset {
   id: string;
@@ -76,13 +77,7 @@ interface DeviceSimulatorProps {
 }
 
 export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) => {
-  const isDev = typeof window !== 'undefined' && (
-    import.meta.env.DEV || 
-    window.location.hostname === 'localhost' || 
-    window.location.hostname === '127.0.0.1' ||
-    window.location.hostname.endsWith('.local') ||
-    new URLSearchParams(window.location.search).has('dev_simulator')
-  );
+  const isDev = isDevEnvironment();
 
   const [isActive, setIsActive] = useState<boolean>(() => {
     if (typeof window === 'undefined' || !isDev) return false;

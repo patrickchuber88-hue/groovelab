@@ -3360,6 +3360,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           cursor: pointer;
           margin: 0;
           padding: 0;
+          touch-action: none;
+          user-select: none;
+          -webkit-user-select: none;
+          transform: translateZ(0);
         }
         .groovelab-fader::-webkit-slider-runnable-track {
           width: 100%;

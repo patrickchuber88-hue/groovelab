@@ -15,6 +15,7 @@ import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 import { AudioEditorModal } from './campus/AudioEditorModal';
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
+import { isDevEnvironment } from '../utils/tenantUrlHelper';
 
 
 const getSimulatedNow = (): Date => {
@@ -7129,7 +7130,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     );
   };
 
-  const isMobileOrSim = isFullscreen || isMobileView || isInsideSim || (typeof window !== 'undefined' && window.innerWidth <= 1024);
+  const isMobileOrSim = isFullscreen || isMobileView || isInsideSim || (typeof window !== 'undefined' && window.innerWidth < 1024);
 
   const content = (
     <div style={{
@@ -16811,7 +16812,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
 
           {/* SIMULATOR TOGGLE BAR (Dev Mode Only) */}
-          {!readOnly && (import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || new URLSearchParams(window.location.search).has('dev_tools')))) && (
+          {!readOnly && isDevEnvironment() && (
             <div style={{
               background: 'white',
               borderRadius: '16px',

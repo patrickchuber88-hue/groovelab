@@ -7,6 +7,7 @@ import { dbCircuitBreaker } from './utils/circuitBreaker';
 import { subscribeUserToPush } from './utils/webPush';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar, resolveStudentInstrumentAsync, getEffectiveInstrument } from './components/StudioAvatar';
 import { reportClientError, initGlobalErrorListeners } from './lib/errorTelemetry';
+import { isDevEnvironment } from './utils/tenantUrlHelper';
 
 // Initialize global error interception
 initGlobalErrorListeners();
@@ -7012,19 +7013,30 @@ function App() {
     updateHeartbeat(); // Immediate heartbeat on load/mount
     const heartbeat = setInterval(updateHeartbeat, 90000); // 90 seconds interval
 
-    // Immediate heartbeat, Realtime reconnection, layout reflow, and screen blurring protection when backgrounding tab
+    // Immediate heartbeat, Realtime reconnection, layout reflow, screen blurring protection, and audio suspension when backgrounding tab
     const handleVisibilityChange = () => {
       if (document.hidden) {
         document.body.style.filter = 'blur(16px)';
         document.body.style.transition = 'filter 0.15s ease-out';
+        try {
+          if ((window as any).__groovelabAudioCtx && (window as any).__groovelabAudioCtx.state === 'running') {
+            (window as any).__groovelabAudioCtx.suspend().catch(() => {});
+          }
+        } catch (e) {}
       } else {
         document.body.style.filter = 'none';
         lastActivityTime = Date.now();
         dbCircuitBreaker.recordSuccess();
+        try {
+          if ((window as any).__groovelabAudioCtx && (window as any).__groovelabAudioCtx.state === 'suspended') {
+            (window as any).__groovelabAudioCtx.resume().catch(() => {});
+          }
+        } catch (e) {}
         try { (supabase.realtime as any)?.connect?.(); } catch (e) {}
         updateHeartbeat();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('resize'));
+          window.dispatchEvent(new CustomEvent('groovelab_orientation_changed'));
         }
       }
     };
@@ -8729,7 +8741,7 @@ function App() {
         }
       `}</style>
       {/* Sidebar Navigation (iPad/Desktop) */}
-      <aside className="sidebar-nav" style={{ display: windowWidth > 1024 ? 'flex' : 'none' }}>
+      <aside className="sidebar-nav" style={{ display: windowWidth >= 1024 ? 'flex' : 'none' }}>
         <div className="sidebar-logo" style={{ padding: '8px 0px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           {activePlatform === 'campus' ? (
             <>
@@ -9556,20 +9568,6 @@ function App() {
                     </button>
                   )}
 
-                  {/* Campus Student UI Level Switcher (Placed directly to the left of School / Teacher / Student info) */}
-                  {activePlatform === 'campus' && user?.role === 'student' && (
-                    <div style={{ display: 'flex', alignItems: 'center', marginRight: '8px', flexShrink: 0 }}>
-                      <CampusLevelSwitcher
-                        currentLevel={campusStudentUiLevel}
-                        compact={windowWidth <= 1024}
-                        onChange={(newLevel) => {
-                          setCampusStudentUiLevel(newLevel);
-                          localStorage.setItem('campus_student_ui_level', newLevel);
-                          window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
-                        }}
-                      />
-                    </div>
-                  )}
 
                   {/* Unified School, Teacher, Student, Admin & Secretary Pill */}
                   {(() => {
@@ -10039,7 +10037,7 @@ function App() {
                 </div>
               )}
               {/* Datum Simulation Control (Dev Mode Only) */}
-              {(import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || new URLSearchParams(window.location.search).has('dev_tools')))) && (
+              {isDevEnvironment() && (
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -10215,8 +10213,8 @@ function App() {
         {parentUnlocked && user?.role?.toLowerCase() === 'student' && (
           <div style={{
             position: 'sticky',
-            top: 0,
-            zIndex: 999,
+            top: windowWidth <= 768 ? 'calc(54px + env(safe-area-inset-top, 0px))' : 0,
+            zIndex: 890,
             background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
             color: '#ffffff',
             padding: '8px 16px',
@@ -13627,8 +13625,8 @@ function App() {
         )}
       </main>
 
-      {/* Mobile Native Bottom Navigation Bar (< 768px Viewports) */}
-      {windowWidth <= 768 && (
+      {/* Mobile Native Bottom Navigation Bar (< 1024px Viewports) */}
+      {(windowWidth < 1024 || isMobile) && (
         <MobileBottomNav
           activeTab={activeStudentTab}
           setActiveTab={setActiveStudentTab}
@@ -15497,15 +15495,6 @@ function App() {
         />
       )}
 
-      {/* Fixed Mobile Bottom Navigation Bar */}
-      <MobileBottomNav
-        activeTab={activeStudentTab}
-        setActiveTab={(t) => setActiveStudentTab(t)}
-        activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
-        setActivePlatform={(p) => setActivePlatform(p)}
-        userRole={user?.role}
-        unreadCount={campusUnreadCount}
-      />
     </div>
   </div>
 </DeviceSimulator>

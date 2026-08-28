@@ -37,6 +37,7 @@ export interface EInvoicePayload {
   buyer: EInvoiceParty;
   lineItems: EInvoiceLineItem[];
   paymentReference?: string;
+  buyerReference?: string; // Leitweg-ID for municipal Kämmereien
   notes?: string;
 }
 
@@ -128,6 +129,7 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
 
     <!-- 3.2 Header Trade Agreement (Seller & Buyer) -->
     <ram:ApplicableHeaderTradeAgreement>
+      <ram:BuyerReference>${escapeXml(data.buyerReference || 'N/A')}</ram:BuyerReference>
       <!-- Seller (Campus-Groovelab) -->
       <ram:SellerTradeParty>
         <ram:Name>${escapeXml(data.seller.name)}</ram:Name>
@@ -185,8 +187,9 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
         <ram:CalculatedAmount>${vatTotal.toFixed(2)}</ram:CalculatedAmount>
         <ram:TypeCode>VAT</ram:TypeCode>
         <ram:BasisAmount>${netTotal.toFixed(2)}</ram:BasisAmount>
-        <ram:CategoryCode>O</ram:CategoryCode>
-        <ram:RateApplicablePercent>0.00</ram:RateApplicablePercent>
+        <ram:CategoryCode>${vatTotal > 0 ? 'S' : 'O'}</ram:CategoryCode>
+        <ram:RateApplicablePercent>${vatTotal > 0 ? ((vatTotal / (netTotal || 1)) * 100).toFixed(2) : '0.00'}</ram:RateApplicablePercent>
+        ${vatTotal === 0 ? '<ram:ExemptionReason>Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</ram:ExemptionReason>' : ''}
       </ram:ApplicableTradeTax>
 
       <!-- Payment Terms -->

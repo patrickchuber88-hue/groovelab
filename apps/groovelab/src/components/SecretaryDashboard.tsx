@@ -38,7 +38,7 @@ import { deleteStudentFully } from '../utils/studentDeletionService';
 import { BulkImportModal } from './common/BulkImportModal';
 import { GuidanceCenterModal } from './modals/GuidanceCenterModal';
 import { generateTeacherQuickstartPDF, generateParentQuickstartPDF } from '../utils/pdfGenerator';
-import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
+import { getParentOnboardingUrl, isDevEnvironment } from '../utils/tenantUrlHelper';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -1689,7 +1689,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       setWindowHeight(window.innerHeight);
     };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    window.addEventListener('groovelab_orientation_changed', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('groovelab_orientation_changed', handleResize);
+    };
   }, []);
 
   useEffect(() => {
@@ -16142,7 +16148,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             </button>
 
             {/* Datum Simulation Control (Dev Mode Only) */}
-            {(import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || new URLSearchParams(window.location.search).has('dev_tools')))) && (
+            {isDevEnvironment() && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -16572,7 +16578,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             })();
 
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth <= 1024 ? '1fr' : '1fr 360px', gap: '24px', alignItems: 'start' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 1024 ? '1fr' : '1fr 360px', gap: '24px', alignItems: 'start' }}>
                 
                 {/* LEFT COLUMN: MAIN CONTENT AREA */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -32115,7 +32121,7 @@ status: status,
           const selectedRoom = rooms.find(r => r.id === selectedEquipmentRoomId);
           
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth <= 1024 ? '1fr' : '1fr 300px', gap: '24px', fontFamily: 'Inter, sans-serif', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 1024 ? '1fr' : '1fr 300px', gap: '24px', fontFamily: 'Inter, sans-serif', alignItems: 'start' }}>
               
               {/* LEFT COLUMN: WIDGET */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -37206,7 +37212,7 @@ status: status,
       )}
 
       {/* Floating Developer Reset Button (Dev Mode Only) */}
-      {(import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || new URLSearchParams(window.location.search).has('dev_tools')))) && activeTab === 'secretary' && secretarySubTab === 'licenses' && (
+      {isDevEnvironment() && activeTab === 'secretary' && secretarySubTab === 'licenses' && (
         <button
           onClick={handleDeveloperReset}
           style={{

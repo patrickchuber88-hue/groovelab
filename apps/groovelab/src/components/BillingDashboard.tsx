@@ -481,8 +481,22 @@ Ihr Campus-Groovelab Abrechnungsteam`;
         if (inv.total <= 0 && inv.status !== 'active') return;
 
         const schoolInvs = getSchoolInvoices(inv.schoolId, inv.total, inv.status);
+        const deMonthsMap: Record<string, number> = {
+          'Januar': 1, 'Februar': 2, 'März': 3, 'April': 4,
+          'Mai': 5, 'Juni': 6, 'Juli': 7, 'August': 8,
+          'September': 9, 'Oktober': 10, 'November': 11, 'Dezember': 12
+        };
+
         schoolInvs.forEach(si => {
-          const docDate = new Date(si.date ? si.date.split('. ')[2] + '-' + (si.date.split('. ')[1] === 'Januar' ? '01' : '08') + '-01' : new Date());
+          let docDate = new Date();
+          if (si.date) {
+            const parts = si.date.split('. ');
+            if (parts.length >= 3) {
+              const year = parseInt(parts[2], 10) || new Date().getFullYear();
+              const month = deMonthsMap[parts[1]] || 1;
+              docDate = new Date(year, month - 1, 1);
+            }
+          }
           if (docDate.getFullYear() === datevPeriodYear && (docDate.getMonth() + 1) === datevPeriodMonth) {
             records.push({
               amount: si.amount,
@@ -629,7 +643,8 @@ Ihr Campus-Groovelab Abrechnungsteam`;
         if (tx.matchedId) {
           const invMatch = invoices.find(inv => {
             const numId = getSchoolNumericId(inv.schoolId);
-            return tx.matchedId?.includes(String(numId));
+            const regex = new RegExp(`^RE-${numId}-\\d{4}-\\d{2}$`);
+            return regex.test(tx.matchedId || '');
           });
           if (invMatch) {
             const currentPaid = getPaidInvoices(invMatch.schoolId);
@@ -645,12 +660,11 @@ Ihr Campus-Groovelab Abrechnungsteam`;
       for (const tx of camtParsedResult.b2cMatches) {
         if (tx.matchedId) {
           const rawHash = tx.matchedId.replace(/[^A-Z0-9]/gi, '').substring(2, 10).toUpperCase();
-          // Find matching pending user
+          // Find matching pending user across school roster
           const { data: matchedUsers } = await supabase
             .from('users')
             .select('id, ausweis_nummer')
-            .eq('is_active', false)
-            .limit(20);
+            .eq('is_active', false);
           
           const found = (matchedUsers || []).find(u => 
             (u.ausweis_nummer || u.id).replace(/[^A-Z0-9]/gi, '').toUpperCase().startsWith(rawHash)
@@ -1452,13 +1466,14 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
         flexWrap: 'wrap'
       }}>
         {[
-          { id: 'invoices', label: '📄 Rechnungsjournal & Mandanten', count: invoices.length },
-          { id: 'datev', label: '📊 DATEV & Erlöskonten (SKR03/04)' },
-          { id: 'banking', label: '🏦 Bankabgleich & SEPA pain.008' },
-          { id: 'prap', label: '📈 PRAP & Erlösabgrenzung (HGB/IFRS)' },
-          { id: 'dunning', label: '⚠️ OPOS & Mahnwesen (§ 288 BGB)', count: summary.totalUnpaid > 0 ? `Offen: ${summary.totalUnpaid.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}` : undefined }
+          { id: 'invoices', label: 'Rechnungsjournal & Mandanten', icon: FileText, count: invoices.length },
+          { id: 'datev', label: 'DATEV & Erlöskonten (SKR03/04)', icon: FileSpreadsheet },
+          { id: 'banking', label: 'Bankabgleich & SEPA pain.008', icon: Landmark },
+          { id: 'prap', label: 'PRAP & Erlösabgrenzung (HGB/IFRS)', icon: TrendingUp },
+          { id: 'dunning', label: 'OPOS & Mahnwesen (§ 288 BGB)', icon: AlertTriangle, count: summary.totalUnpaid > 0 ? `Offen: ${summary.totalUnpaid.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}` : undefined }
         ].map((tab) => {
           const isActive = activeFinanceSubTab === tab.id;
+          const IconComp = tab.icon;
           return (
             <button
               key={tab.id}
@@ -1473,12 +1488,14 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
                 fontSize: '0.82rem',
                 cursor: 'pointer',
                 boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.15s ease',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease'
+                gap: '8px'
               }}
+              className="hover-scale-mini"
             >
+              <IconComp size={15} color={isActive ? '#ea4335' : '#64748b'} />
               <span>{tab.label}</span>
               {tab.count && (
                 <span style={{

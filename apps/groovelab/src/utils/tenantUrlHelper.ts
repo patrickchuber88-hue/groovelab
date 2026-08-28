@@ -111,3 +111,20 @@ export function getTeacherLoginUrl(
 ): string {
   return getSchoolOrigin(schoolName, explicitSubdomain);
 }
+
+/**
+ * Checks if the current environment is a local development host.
+ */
+export function isLocalhostEnvironment(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host.endsWith('.local');
+}
+
+/**
+ * Strict check: Only true in Vite DEV mode on a local machine.
+ * Eliminates all URL parameter bypasses in production builds.
+ */
+export function isDevEnvironment(): boolean {
+  return Boolean(import.meta.env.DEV && isLocalhostEnvironment());
+}

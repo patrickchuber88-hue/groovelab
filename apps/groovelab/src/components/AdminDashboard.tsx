@@ -628,11 +628,13 @@ export function AdminDashboard({
     const checkMobile = () => {
       if (typeof window !== 'undefined') setWindowWidth(window.innerWidth);
       const isSimMobile = typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]'));
-      setIsMobile(window.innerWidth <= 1024 || isSimMobile);
+      setIsMobile(window.innerWidth < 1024 || isSimMobile);
     };
 
     checkMobile();
     window.addEventListener('resize', checkMobile);
+    window.addEventListener('orientationchange', checkMobile);
+    window.addEventListener('groovelab_orientation_changed', checkMobile);
 
     const observer = new MutationObserver(() => {
       checkMobile();
@@ -643,6 +645,8 @@ export function AdminDashboard({
 
     return () => {
       window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('orientationchange', checkMobile);
+      window.removeEventListener('groovelab_orientation_changed', checkMobile);
       observer.disconnect();
     };
   }, []);
@@ -19242,7 +19246,7 @@ function DeviceSetupScreen({
   const [activeGrooveSettingsModal, setActiveGrooveSettingsModal] = useState<'hours' | 'security' | 'devices' | 'analytics' | 'maintenance' | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
   const effectiveSchool = Array.isArray(school) ? school[0] : school;
-  const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 1024 || Boolean(typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]')));
+  const isMobile = typeof window !== 'undefined' && (window.innerWidth < 1024 || Boolean(typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]')));
 
   // Academy Setup state
   const [name, setName] = useState(effectiveSchool?.name || '');

@@ -11,6 +11,7 @@ import {
   calculateSchoolYearDirectBilling
 } from '../utils/epcGiroCode';
 import { supabase } from '../lib/supabase';
+import { formatSingleStudentAnonymized } from '../utils/nameHelper';
 
 export interface ParentCampusActivationModalProps {
   student: {
@@ -150,7 +151,8 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.setTextColor(15, 23, 42);
       doc.setFontSize(13);
       doc.setFont('helvetica', 'bold');
-      doc.text(`Aktivierung für: ${student.first_name || 'Schüler'} ${student.last_name || ''}`.trim(), 22, 65);
+      const studentDisplayName = formatSingleStudentAnonymized(student.first_name, student.last_name);
+      doc.text(`Aktivierung für: ${studentDisplayName}`, 22, 65);
       if (schoolData?.name) {
         doc.setFontSize(9);
         doc.setTextColor(100, 116, 139);

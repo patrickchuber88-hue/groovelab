@@ -694,7 +694,7 @@ div:hover > .photo-overlay {
   display: none; /* Chrome/Safari */
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   .sidebar-nav {
     display: none;
   }
@@ -758,7 +758,7 @@ div:hover > .photo-overlay {
 }
 
 /* Apple-style floating SOS adjust for mobile and tablet bottom nav */
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   .fab-container {
     bottom: 108px !important; /* Raised above the bottom nav bar */
     right: 16px !important;

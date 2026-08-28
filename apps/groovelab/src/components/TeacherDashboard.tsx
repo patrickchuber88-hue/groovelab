@@ -5068,7 +5068,7 @@ export function TeacherDashboard({
 
   const getIsMobileDevice = () => {
     if (typeof window === 'undefined') return false;
-    return window.innerWidth <= 1024 || Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
+    return window.innerWidth < 1024 || Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
   };
 
   const [containerWidth, setContainerWidth] = useState(1000);
@@ -5094,6 +5094,8 @@ export function TeacherDashboard({
     };
 
     window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    window.addEventListener('groovelab_orientation_changed', handleResize);
     document.addEventListener('visibilitychange', handleVisibility);
     const observer = new MutationObserver(handleResize);
     if (typeof document !== 'undefined' && document.body) {
@@ -5105,6 +5107,8 @@ export function TeacherDashboard({
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('groovelab_orientation_changed', handleResize);
       document.removeEventListener('visibilitychange', handleVisibility);
       observer.disconnect();
     };

@@ -83,7 +83,8 @@ export const CampusLevelSwitcher: React.FC<CampusLevelSwitcherProps> = ({
               transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               whiteSpace: 'nowrap',
               height: '100%',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              touchAction: 'manipulation'
             }}
             title={`Campus-Ansicht: ${lvl.label} (${lvl.ageHint})`}
           >

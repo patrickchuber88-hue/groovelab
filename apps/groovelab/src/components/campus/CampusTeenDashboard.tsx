@@ -445,7 +445,7 @@ export const CampusTeenDashboard: React.FC<CampusTeenDashboardProps> = ({
       {/* 3. 2-COLUMN COCKPIT GRID (Spotify / Modern Teen Look) */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
         gap: '24px',
         alignItems: 'start'
       }}>

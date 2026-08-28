@@ -93,8 +93,63 @@
   --glass-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.02), inset 0 1px 0 0 rgba(255, 255, 255, 0.80);
   --glass-shadow-lg: 0 12px 36px 0 rgba(0, 0, 0, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.90);
 
+  /* Canonical Z-Index Stacking Tokens */
+  --z-inline-badge: 5;
+  --z-sticky-header: 100;
+  --z-sidebar-nav: 150;
+  --z-mobile-top-header: 900;
+  --z-parent-safety-banner: 890;
+  --z-mobile-bottom-nav: 1000;
+  --z-fab: 1100;
+  --z-dropdown-popover: 2000;
+  --z-modal-backdrop: 5000;
+  --z-modal-content: 5001;
+  --z-submodal: 6000;
+  --z-toast-notification: 9000;
+  --z-privacy-shield: 99999;
+  --z-system-critical-alert: 999999;
+
   /* Legacy */
   --surface-glass: rgba(255, 255, 255, 0.85);
+}
+
+/* Ensure all interactive buttons satisfy WCAG 2.1/2.2 AA */
+.touch-target-44 {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  touch-action: manipulation !important;
+  position: relative !important;
+}
+
+/* Pseudo hit-box expander for visually compact icon buttons */
+.touch-hitbox-expand {
+  position: relative !important;
+  touch-action: manipulation !important;
+}
+.touch-hitbox-expand::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 44px;
+  min-height: 44px;
+  width: 100%;
+  height: 100%;
+}
+
+/* Scrubber & Fader Touch Ergonomics (prevents accidental iOS text selection during drag) */
+.groovelab-fader,
+.waveform-scrubber-container,
+.player-seek-slider,
+.custom-range-slider {
+  touch-action: none !important;
+  -webkit-touch-callout: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 .liquid-glass {
@@ -1072,7 +1127,7 @@ button, a, [role="button"], [onClick] {
   width: 100%;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1023px) {
   .campus-grid {
     grid-template-columns: 1fr;
     gap: 24px;
@@ -1538,6 +1593,24 @@ select option {
     padding-left: 0 !important;
     padding-right: 0 !important;
     padding-bottom: 110px !important;
+  }
+}
+
+/* Landscape Mode Compact Header (< 500px height) */
+@media (max-height: 500px) and (orientation: landscape) {
+  .cg-mobile-top-header {
+    min-height: 42px !important;
+    padding-top: max(4px, env(safe-area-inset-top, 4px)) !important;
+    padding-bottom: 4px !important;
+  }
+}
+
+/* 320px Ultra-Compact Viewport Padding */
+@media (max-width: 340px) {
+  .cg-mobile-top-header {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    gap: 4px !important;
   }
 }
 
