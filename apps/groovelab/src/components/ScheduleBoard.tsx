@@ -11,6 +11,7 @@ import {
   Clock, 
   Settings, 
   AlertCircle, 
+  AlertTriangle,
   GraduationCap,
   Sparkles,
   MapPin,
@@ -6604,7 +6605,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '4px', pointerEvents: 'auto' }}>
                                 {hasConflict && (
-                                  <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
+                                  <span style={{ color: '#ef4444', cursor: 'help', display: 'inline-flex', alignItems: 'center' }} title={conflictMsg}>
+                                    <AlertTriangle size={13} color="#ef4444" />
+                                  </span>
                                 )}
                                 {editingTimeStudent?.studentId === bs.id && editingTimeStudent?.boardId === board.id ? (
                                   <input

@@ -568,11 +568,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [scanSuccess, setScanSuccess] = useState(false);
   const qrFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Biometric Vault States
   const [biometricProfiles, setBiometricProfiles] = useState<BiometricVaultProfile[]>([]);
   const [selectedBiometricUser, setSelectedBiometricUser] = useState<BiometricVaultProfile | null>(null);
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [biometricError, setBiometricError] = useState<string | null>(null);
+
+  // Netflix-Family Local Profiles State
+  const [savedFamilyProfiles, setSavedFamilyProfiles] = useState<any[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('groovelab_local_profiles') || localStorage.getItem('campus_family_profiles') || '[]';
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter(p => p.role === 'student' || !p.role) : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     if (isWebAuthnSupported()) {
@@ -4341,6 +4352,125 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 {biometricError}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ─── NETFLIX-STYLE FAMILY PROFILES VAULT (1-TAP SIBLING LOGIN) ─── */}
+        {savedFamilyProfiles.length > 0 && !isGroovelabKiosk && (
+          <div style={{
+            width: '100%',
+            marginBottom: '20px',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '24px',
+            padding: '16px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '0.80rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={15} color="#4ade80" />
+                <span>Gespeicherte Profile auf diesem Gerät</span>
+              </div>
+              <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600 }}>
+                1-Tap Schnellstart
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {savedFamilyProfiles.map((p) => (
+                <div
+                  key={p.id}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '16px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <img 
+                      src={p.photo_url || getInstrumentAvatarUrl(p.instrument)} 
+                      alt={p.first_name}
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '10px',
+                        objectFit: 'cover',
+                        border: '1px solid rgba(255,255,255,0.2)'
+                      }}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {p.first_name} {p.last_name ? `${p.last_name[0]}.` : ''}
+                      </span>
+                      <span style={{ fontSize: '0.70rem', color: '#94a3b8', fontWeight: 600 }}>
+                        {p.instrument || 'Schüler'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sessionStorage.setItem('groovelab_user_id', p.id);
+                        sessionStorage.setItem('groovelab_location_mode', 'home');
+                        onLogin(p.id, true);
+                      }}
+                      style={{
+                        background: '#16a34a',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '7px 14px',
+                        fontSize: '0.76rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)'
+                      }}
+                    >
+                      <span>Starten</span>
+                      <ArrowRight size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const updated = savedFamilyProfiles.filter(item => item.id !== p.id);
+                        setSavedFamilyProfiles(updated);
+                        localStorage.setItem('groovelab_local_profiles', JSON.stringify(updated));
+                        localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
+                      }}
+                      title="Profil von diesem Gerät entfernen"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'rgba(255, 255, 255, 0.35)',
+                        cursor: 'pointer',
+                        padding: '6px',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

@@ -13,6 +13,7 @@ import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, fo
 import { IDBadgeCard } from './IDBadgeCard';
 import { StudentPinResetModal } from './StudentPinResetModal';
 import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
+import { invalidateBiometricProfile } from '../utils/webauthn';
 
 const brandColor = 'var(--primary-color)';
 
@@ -360,6 +361,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
         await supabase.from('students').update({ onboarding_pin: null, is_pin_activated: false, status: 'offen' }).eq('id', student.id);
         await supabase.from('pending_students').update({ is_pin_activated: false, status: 'offen' }).eq('id', student.id);
       }
+
+      // Invalidate any local biometric credentials for this student
+      invalidateBiometricProfile(student.id);
 
       // Open instant link share panel
       setShowPinResetShareModal(true);

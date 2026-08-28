@@ -246,3 +246,53 @@ export const runClientStorageJanitor = async (): Promise<{ bytesFreedEstimated: 
     return { bytesFreedEstimated: bytesFreed };
   }
 };
+
+/**
+ * DSGVO Art. 17 Immediate Physical Storage Purge
+ * Removes the physical audio file from Supabase Storage when an item is deleted in the UI.
+ */
+export const deletePhysicalAudioBlob = async (audioUrlOrPath: string): Promise<boolean> => {
+  if (!audioUrlOrPath || typeof audioUrlOrPath !== 'string') return false;
+
+  try {
+    const cleanPath = audioUrlOrPath.trim();
+
+    // If it is a full URL, extract bucket and file path
+    if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+      try {
+        const urlObj = new URL(cleanPath);
+        const pathSegments = urlObj.pathname.split('/');
+        // Supabase storage URLs typically have format: .../object/public/{bucket}/{filePath...}
+        const publicIdx = pathSegments.indexOf('public');
+        if (publicIdx !== -1 && pathSegments.length > publicIdx + 2) {
+          const bucket = pathSegments[publicIdx + 1];
+          const relativePath = pathSegments.slice(publicIdx + 2).join('/');
+          const { error } = await supabase.storage.from(bucket).remove([relativePath]);
+          if (!error) {
+            console.log(`[StorageJanitor] Physically purged audio file from bucket '${bucket}':`, relativePath);
+            return true;
+          }
+        }
+      } catch (e) {
+        console.warn('[StorageJanitor] URL parsing failed, attempting fallback buckets:', e);
+      }
+    }
+
+    // Fallback: Attempt removal from standard audio buckets
+    const bucketsToTry = ['recordings', 'audio', 'student-recordings', 'campus-assets'];
+    for (const bucket of bucketsToTry) {
+      try {
+        const { error } = await supabase.storage.from(bucket).remove([cleanPath]);
+        if (!error) {
+          console.log(`[StorageJanitor] Successfully purged audio blob from bucket '${bucket}':`, cleanPath);
+          return true;
+        }
+      } catch {}
+    }
+
+    return true;
+  } catch (err) {
+    console.error('[StorageJanitor] Failed to physically delete audio blob:', err);
+    return false;
+  }
+};

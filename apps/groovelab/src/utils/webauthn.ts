@@ -294,6 +294,14 @@ export const authenticateUserBiometrics = async (
   return selectedProfile;
 };
 
+/**
+ * Invalidates / cleans up a biometric profile when a PIN is reset or password is changed.
+ */
+export const invalidateBiometricProfile = (userId: string): void => {
+  removeBiometricProfile(userId);
+  console.log('[WebAuthn] Invalidated biometric credentials for user:', userId);
+};
+
 // ─── Master Admin Dedicated Passkey / FIDO2 Engine ───────────────────────────
 
 const MASTER_PASSKEY_STORAGE_KEY = 'gl_master_admin_passkey';

@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom';
 import Confetti from 'react-confetti';
 import { QRCodeModal } from './QRCodeModal';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive, ALL_STICKERS, getUnifiedStickersMap, getUnifiedStickerStatus } from './MeisterwerkDocumentationModal';
+import { MeisterwerkCertificateModal } from './ui/MeisterwerkCertificateModal';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
 import { HelpCenterModal } from './help/HelpCenterModal';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
@@ -631,6 +632,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return null;
   });
   const [showLevelModal, setShowLevelModal] = useState<boolean>(false);
+  const [certificateSong, setCertificateSong] = useState<any | null>(null);
+  const [resolvedSchoolName, setResolvedSchoolName] = useState<string>(() => {
+    return (initialUser as any)?.schools?.name || (initialUser as any)?.school_name || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_name') || localStorage.getItem('campus_school_name')) : '') || 'Campus-Groovelab Musikschule';
+  });
+
+  useEffect(() => {
+    const sId = studentUser?.school_id || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id')) : null);
+    if (sId) {
+      supabase
+        .from('schools')
+        .select('name')
+        .eq('id', sId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data && data.name) {
+            setResolvedSchoolName(data.name);
+          }
+        });
+    }
+  }, [studentUser?.school_id]);
 
   // Adult Student Resolver (18+ or explicit is_adult flag) for Adaptive Legal Governance
   const isAdultStudent = useMemo(() => {
@@ -12381,22 +12402,56 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', lineHeight: '1.2', wordBreak: 'break-word' }}>von {song.artist}</div>
                                     </div>
 
-                                    {statusText && (
-                                      <span style={{
-                                        background: statusBg,
-                                        color: statusColor,
-                                        padding: '3px 8px',
-                                        borderRadius: '6px',
-                                        fontSize: '0.68rem',
-                                        fontWeight: 850,
-                                        textTransform: 'uppercase',
-                                        whiteSpace: 'nowrap',
-                                        alignSelf: 'center',
-                                        flexShrink: 0
-                                      }}>
-                                        {statusText}
-                                      </span>
-                                    )}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                      {progressItem?.status === 'MASTERED' && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setCertificateSong({
+                                              ...song,
+                                              masteredDate: progressItem?.updated_at || progressItem?.created_at,
+                                              certificateId: `MW-${new Date().getFullYear()}-${song.id.substring(0, 6).toUpperCase()}-100`
+                                            });
+                                          }}
+                                          style={{
+                                            background: '#fef3c7',
+                                            color: '#92400e',
+                                            border: '1px solid #fde68a',
+                                            borderRadius: '8px',
+                                            padding: '4px 10px',
+                                            fontSize: '0.70rem',
+                                            fontWeight: 800,
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            boxShadow: '0 2px 6px rgba(202, 138, 4, 0.15)'
+                                          }}
+                                          title="Offizielle Meisterwerk-Goldurkunde öffnen"
+                                        >
+                                          <Award size={13} />
+                                          <span>Gold-Urkunde</span>
+                                        </button>
+                                      )}
+
+                                      {statusText && (
+                                        <span style={{
+                                          background: statusBg,
+                                          color: statusColor,
+                                          padding: '3px 8px',
+                                          borderRadius: '6px',
+                                          fontSize: '0.68rem',
+                                          fontWeight: 850,
+                                          textTransform: 'uppercase',
+                                          whiteSpace: 'nowrap',
+                                          alignSelf: 'center',
+                                          flexShrink: 0
+                                        }}>
+                                          {statusText}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -23489,6 +23544,80 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           )}
                         </div>
 
+                        {/* 📊 Eltern-Wochenreport & Übe-Insights */}
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px',
+                          padding: '22px 20px',
+                          borderRadius: '22px',
+                          background: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
+                          textAlign: 'left'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{
+                                width: '34px',
+                                height: '34px',
+                                borderRadius: '10px',
+                                background: '#e6f4ea',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                <Clock size={18} color="#16a34a" />
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                                  Wöchentlicher Übe-Report &amp; Fortschritt
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  100% datenschutzkonforme Zusammenfassung der Übe-Einheiten zu Hause.
+                                </div>
+                              </div>
+                            </div>
+                            <span style={{
+                              background: '#f1f5f9',
+                              color: '#475569',
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              fontSize: '0.70rem',
+                              fontWeight: 800
+                            }}>
+                              Aktuelle Woche
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginTop: '4px' }}>
+                            <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '14px', padding: '12px' }}>
+                              <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Übe-Minuten</div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#16a34a', marginTop: '2px' }}>
+                                {totalPracticeMinutes} Min.
+                              </div>
+                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>Ziel: {getTargetMinutes(avatar?.streak_flame || 0)} Min./Tag</div>
+                            </div>
+
+                            <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '14px', padding: '12px' }}>
+                              <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Aktiver Streak</div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0284c7', marginTop: '2px' }}>
+                                {avatar?.streak_flame || 0} Tage
+                              </div>
+                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>3 Schutzschilde aktiv</div>
+                            </div>
+
+                            <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '14px', padding: '12px' }}>
+                              <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Campus-XP</div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ca8a04', marginTop: '2px' }}>
+                                {(avatar as any)?.experience_points || (avatar as any)?.xp || 0} XP
+                              </div>
+                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>Level {avatar?.evolution_level || 1} erreicht</div>
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Must-Have 2: Geschwister-Schnellwechsel (Netflix Family Hub) */}
                         {familyProfiles.length > 0 && (
                           <div style={{
@@ -25213,18 +25342,19 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         activePlatform={currentPlatform}
       />
 
-      {/* Leitfäden & Akademie Modal */}
-      <HelpCenterModal
-        isOpen={isHelpCenterOpen}
-        onClose={() => setIsHelpCenterOpen(false)}
-        userRole="student"
-        activePlatform={currentPlatform as any}
-        schoolName={(studentUser as any)?.school_name || 'Meine Musikschule'}
-        onOpenFeedbackHub={() => {
-          setIsHelpCenterOpen(false);
-          setIsFeedbackModalOpen(true);
-        }}
-      />
+      {/* Meisterwerk Gold-Urkunde Modal */}
+      {certificateSong && (
+        <MeisterwerkCertificateModal
+          studentName={studentUser?.first_name ? `${studentUser.first_name} ${studentUser.last_name || ''}`.trim() : 'Musikschüler'}
+          songTitle={certificateSong.title || 'Meisterwerk'}
+          instrument={studentUser?.instrument || 'Instrument'}
+          schoolName={resolvedSchoolName}
+          teacherName={studentUser?.teacher_name ? formatTeacherFullName(studentUser.teacher_name) : 'Deine Lehrkraft'}
+          masteredDate={certificateSong.masteredDate}
+          certificateId={certificateSong.certificateId}
+          onClose={() => setCertificateSong(null)}
+        />
+      )}
     </div>
 
       {/* Junior-Optimized Song Detail Modal */}

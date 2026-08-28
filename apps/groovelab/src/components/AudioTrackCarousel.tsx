@@ -13,7 +13,7 @@ export interface AudioTrackItem {
 
 interface AudioTrackCarouselProps {
   tracks: AudioTrackItem[];
-  onDelete?: (originalIdx: number) => void;
+  onDelete?: (originalIdx: number, url?: string) => void;
   readOnly?: boolean;
   layoutMode?: 'carousel' | 'vertical-list';
 }
@@ -100,7 +100,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
               label={track.label || `Aufnahme #${idx + 1}`}
               duration={track.duration}
               trackIndex={idx}
-              onDelete={!readOnly && onDelete && targetIdx !== undefined ? () => onDelete(targetIdx) : undefined}
+              onDelete={!readOnly && onDelete ? () => onDelete(targetIdx ?? idx, track.url) : undefined}
             />
           );
         })}
@@ -153,9 +153,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
     e.stopPropagation();
     if (!onDelete) return;
     const targetIdx = currentTrack.originalIdx !== undefined ? currentTrack.originalIdx : currentTrack.idx;
-    if (targetIdx !== undefined) {
-      onDelete(targetIdx);
-    }
+    onDelete(targetIdx ?? activeIndex, currentTrack.url);
   };
 
   return (

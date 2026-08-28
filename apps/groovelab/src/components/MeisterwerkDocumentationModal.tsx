@@ -10,7 +10,7 @@ import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
 import { CampusTuner } from './campus/CampusTuner';
 import { AudioBiographyView, CustomPlaylist, CustomPlaylistTrack } from './campus/AudioBiographyView';
 import { processPureRawBlob, processStudioMastering, TARGET_PURE_RAW_LUFS, TARGET_STUDIO_LUFS, TARGET_PEAK_DBTP } from '../utils/audioMasteringEngine';
-import { storeBlob, getBlob } from '../utils/blobStorage';
+import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 import { AudioEditorModal } from './campus/AudioEditorModal';
@@ -18,6 +18,8 @@ import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuou
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
 import { generateStudentHomeworkPrintoutPDF } from '../utils/pdfGenerator';
 import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard } from '../utils/nameHelper';
+import { MeisterwerkCertificateModal } from './ui/MeisterwerkCertificateModal';
+import { AudioWaveformVisualizer } from './ui/AudioWaveformVisualizer';
 
 
 
@@ -542,6 +544,37 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [activeItem, setActiveItem] = useState<ProgressItem | null>(null);
   const [topicName, setTopicName] = useState('');
   const [status, setStatus] = useState<'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED'>('IN_PROGRESS');
+  const [certModalSong, setCertModalSong] = useState<any | null>(null);
+  const [resolvedSchoolName, setResolvedSchoolName] = useState<string>(() => {
+    if (propSchoolName) return propSchoolName;
+    if ((student as any)?.school_name) return (student as any).school_name;
+    if ((student as any)?.schools?.name) return (student as any).schools.name;
+    try {
+      const raw = localStorage.getItem('groovelab_school_info');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.school_name || parsed.name) return parsed.school_name || parsed.name;
+      }
+    } catch {}
+    return localStorage.getItem('groovelab_school_name') || localStorage.getItem('campus_school_name') || 'Campus-Groovelab Musikschule';
+  });
+
+  useEffect(() => {
+    const sId = student?.school_id || (student as any)?.schoolId || studentSchoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+    if (sId) {
+      supabase
+        .from('schools')
+        .select('name')
+        .eq('id', sId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data && data.name) {
+            setResolvedSchoolName(data.name);
+          }
+        });
+    }
+  }, [student?.school_id, (student as any)?.schoolId, studentSchoolId]);
+
   const [isCurrentHomework, setIsCurrentHomework] = useState(false);
   const [teacherNotes, setTeacherNotes] = useState<string>(() => {
     try {
@@ -1293,6 +1326,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [localJuniorRecordingsTrigger, setLocalJuniorRecordingsTrigger] = useState(0);
   const [mediaRecorderInstance, setMediaRecorderInstance] = useState<MediaRecorder | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingTargetRef = useRef<{ songId?: string; label?: string; isMasterwork?: boolean }>({});
+  const [activeRecordingSongId, setActiveRecordingSongId] = useState<string | null>(null);
+  const [playingAudioUrl, setPlayingAudioUrl] = useState<string | null>(null);
+  const activeAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const useNotebookLayout = false;
   const recordingTimerRef = React.useRef<any>(null);
   const accumulatedTranscriptRef = React.useRef<string>('');
@@ -1980,7 +2017,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   // Audio Recorder logic
-  const startRecordingAudio = async () => {
+  const startRecordingAudio = async (overrideSongId?: string | React.MouseEvent, overrideLabel?: string, isMasterworkSong = false) => {
+    const rawSongId = typeof overrideSongId === 'string' ? overrideSongId : null;
+    const targetSongId = rawSongId || selectedActiveSongId;
+    const targetLabel = (typeof overrideLabel === 'string' ? overrideLabel : null) || audioLabel || topicName || 'Meisterwerk-Aufnahme';
+    const isMasterwork = isMasterworkSong || Boolean(rawSongId);
+    recordingTargetRef.current = { songId: targetSongId || undefined, label: targetLabel, isMasterwork };
+    if (targetSongId) {
+      setSelectedActiveSongId(targetSongId);
+      setActiveRecordingSongId(targetSongId);
+    }
+    if (targetLabel) {
+      setAudioLabel(targetLabel);
+    }
+
     const userRoleInSession = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role')) : null;
     const isStudentActor = !isTeacherTools && userRoleInSession?.toLowerCase() === 'student';
     if (isStudentActor) {
@@ -2111,8 +2161,91 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               await storeBlob(audioUrlString, blob).catch(() => {});
             }
 
+            const targetInfo = recordingTargetRef.current;
+            const isMasterwork = targetInfo.isMasterwork || Boolean(targetInfo.songId);
+            const currentSongId = targetInfo.songId || selectedActiveSongId;
+            const currentAudioLabel = targetInfo.label || audioLabel || topicName || 'Meisterwerk-Aufnahme';
+            const normKey = currentAudioLabel.toLowerCase().trim();
+
+            if (isMasterwork) {
+              // 🏆 EXCLUSIVELY ATTACHED TO THE 100% MEISTERWERK SONG
+              // DO NOT SAVE TO JUNIOR RECORDINGS OR HOMEWORK NOTES!
+              if (currentSongId) {
+                localStorage.setItem(`campus_mastered_audio_${student.id}_${currentSongId}`, audioUrlString);
+              }
+              if (normKey) {
+                localStorage.setItem(`campus_mastered_audio_${student.id}_${normKey}`, audioUrlString);
+              }
+
+              // Clean up any test recordings from junior recordings
+              const juniorKey = `campus_junior_recordings_${student.id}`;
+              try {
+                const stored = localStorage.getItem(juniorKey);
+                if (stored) {
+                  const parsed = JSON.parse(stored);
+                  if (Array.isArray(parsed)) {
+                    const cleaned = parsed.filter(r => {
+                      const rText = `${r.title || ''} ${r.label || ''}`.toLowerCase();
+                      return !rText.includes(normKey) && !rText.includes('over each other');
+                    });
+                    localStorage.setItem(juniorKey, JSON.stringify(cleaned));
+                    setLocalJuniorRecordingsTrigger(prev => prev + 1);
+                  }
+                }
+              } catch {}
+
+              // Clean up any test notes from homeworkNotesList
+              setHomeworkNotesList(prev => {
+                const ex = prev || [];
+                const cleanedList = ex.filter(n => {
+                  if (typeof n === 'string' && n.startsWith('AUDIO:')) {
+                    const nLower = n.toLowerCase();
+                    return !nLower.includes(normKey) && !nLower.includes('over each other');
+                  }
+                  return true;
+                });
+                if (cleanedList.length !== ex.length) {
+                  syncHomeworkNotes(cleanedList).catch(() => {});
+                }
+                return cleanedList;
+              });
+
+              // 🎵 Update React State for activeSongSkills and progressItems ONLY
+              setActiveSongSkills(prev => (prev || []).map(s => {
+                const sTitle = (s.songs?.title || s.title || s.song_title || '').toLowerCase().trim();
+                if ((currentSongId && s.id === currentSongId) || (sTitle && (normKey.includes(sTitle) || sTitle.includes(normKey)))) {
+                  return { ...s, recording_url: audioUrlString, audio_url: audioUrlString };
+                }
+                return s;
+              }));
+
+              setProgressItems(prev => (prev || []).map(p => {
+                const pTitle = ((p as any).topic_name || (p as any).title || '').toLowerCase().trim();
+                if ((currentSongId && p.id === currentSongId) || (pTitle && (normKey.includes(pTitle) || pTitle.includes(normKey)))) {
+                  return {
+                    ...p,
+                    recording_url: audioUrlString
+                  };
+                }
+                return p;
+              }));
+
+              // ☁️ Async Supabase Database Persist for the song ONLY
+              if (currentSongId) {
+                supabase.from('user_song_skills').update({ recording_url: audioUrlString }).eq('id', currentSongId).then(() => {});
+                supabase.from('progress_matrix').update({ recording_url: audioUrlString }).eq('id', currentSongId).then(() => {});
+              }
+
+              setAudioLabel('');
+              return;
+            }
+
+            // --- Regular non-Meisterwerk homework notes & junior recordings ---
+            const recDuration = durationInSeconds || Math.round(audioDuration) || 1;
+            const smartTitle = generateSmartAudioTitle(isTeacherActor, currentAudioLabel);
+
             if (isStudentSession) {
-              // 🎓 STUDENT RECORDING -> Stored on the RIGHT side in `campus_junior_recordings_${student.id}`
+              // 🎓 Student practice recording
               const juniorKey = `campus_junior_recordings_${student.id}`;
               let existing: any[] = [];
               try {
@@ -2123,37 +2256,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 }
               } catch {}
 
-              const recDuration = durationInSeconds || Math.round(audioDuration) || 1;
-              const smartTitle = generateSmartAudioTitle(false, audioLabel);
               const newRec = {
-                id: `stud-${Date.now()}`,
+                id: `rec-${Date.now()}`,
                 url: audioUrlString,
                 duration: recDuration,
                 date: new Date().toISOString(),
                 title: smartTitle,
-                label: smartTitle,
-                visibility: 'private'
+                label: currentAudioLabel,
+                visibility: isTeacherActor ? 'shared_with_teacher' : 'private'
               };
 
               const updated = [newRec, ...existing];
               localStorage.setItem(juniorKey, JSON.stringify(updated));
               setLocalJuniorRecordingsTrigger(prev => prev + 1);
             } else {
-              // 👨‍🏫 TEACHER NOTE -> Stored on the LEFT side in `homeworkNotesList`
+              // 👨‍🏫 Teacher homework voice note
               const creatorRole = 'teacher';
               const initialVisibility = 'shared_with_teacher';
-              const smartTitle = generateSmartAudioTitle(true, audioLabel);
-              const recDur = durationInSeconds || Math.round(audioDuration) || 1;
-              const audioMetaStr = `AUDIO:${audioUrlString}|${recDur}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}`;
+              const audioMetaStr = `AUDIO:${audioUrlString}|${recDuration}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}`;
               
               setHomeworkNotesList(prev => {
-                const existing = prev || [];
-                const updatedList = [...existing.filter(n => n !== audioMetaStr), audioMetaStr];
+                const ex = prev || [];
+                const updatedList = [...ex.filter(n => n !== audioMetaStr), audioMetaStr];
                 syncHomeworkNotes(updatedList).catch(err => console.warn('[saveAudioMetadata] sync note:', err));
                 return updatedList;
               });
             }
-            
+
             notifyHomeworkChange();
             setAudioLabel('');
           } catch (saveErr) {
@@ -2285,8 +2414,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
     setIsRecordingAudio(false);
+    setActiveRecordingSongId(null);
   };
 
   const awardSticker = async (stickerId: string, topicNameContext?: string) => {
@@ -2988,44 +3119,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }
       }
 
-      // Check localStorage to ensure all audio items are preserved
+      // Single source of truth for active weekly homework notes
       try {
         const cachedHW = localStorage.getItem(`campus_homework_notes_${student.id}`);
         if (cachedHW) {
           if (cachedHW.startsWith('[') && cachedHW.endsWith(']')) {
             const parsed = JSON.parse(cachedHW);
             if (Array.isArray(parsed)) {
-              parsed.forEach((item: any) => {
-                if (typeof item === 'string' && !loadedHomeworkNotesList.includes(item)) {
-                  loadedHomeworkNotesList.push(item);
-                }
-              });
+              loadedHomeworkNotesList = parsed;
             }
-          } else if (!loadedHomeworkNotesList.includes(cachedHW)) {
-            loadedHomeworkNotesList.push(cachedHW);
+          } else if (cachedHW.trim()) {
+            loadedHomeworkNotesList = [cachedHW.trim()];
           }
         }
       } catch (lsErr) {}
-
-      // Check all progress items for any AUDIO: entries
-      (data || []).forEach(item => {
-        if (item.homework_notes && typeof item.homework_notes === 'string' && item.homework_notes.includes('AUDIO:')) {
-          try {
-            if (item.homework_notes.startsWith('[') && item.homework_notes.endsWith(']')) {
-              const p = JSON.parse(item.homework_notes);
-              if (Array.isArray(p)) {
-                p.forEach((n: any) => {
-                  if (typeof n === 'string' && n.includes('AUDIO:') && !loadedHomeworkNotesList.includes(n)) {
-                    loadedHomeworkNotesList.push(n);
-                  }
-                });
-              }
-            } else if (!loadedHomeworkNotesList.includes(item.homework_notes)) {
-              loadedHomeworkNotesList.push(item.homework_notes);
-            }
-          } catch {}
-        }
-      });
 
       // Filter text notes for the textarea
       loadedHomeworkNotes = loadedHomeworkNotesList.filter((n: string) => 
@@ -3834,33 +3941,145 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  const handleDeleteNote = async (noteIndex: number) => {
+  const handleDeleteNote = async (noteIndexOrUrl: number | string, optionalUrl?: string) => {
     try {
-      const noteToDelete = homeworkNotesList[noteIndex];
-      if (noteToDelete && noteToDelete.startsWith("AUDIO:")) {
+      let targetUrl: string | undefined = typeof noteIndexOrUrl === 'string' ? noteIndexOrUrl : optionalUrl;
+      let targetIndex: number = typeof noteIndexOrUrl === 'number' ? noteIndexOrUrl : -1;
+
+      // 1. Locate the note in homeworkNotesList
+      let noteToDelete = targetIndex >= 0 ? homeworkNotesList[targetIndex] : undefined;
+      if (!noteToDelete && targetUrl) {
+        const urlMatch = targetUrl;
+        noteToDelete = homeworkNotesList.find(n => typeof n === 'string' && n.includes(urlMatch));
+      }
+      if (!targetUrl && noteToDelete && typeof noteToDelete === 'string' && noteToDelete.startsWith('AUDIO:')) {
         const parts = noteToDelete.substring(6).split('|');
-        const audioUrlString = parts[0];
-        const audioLabelString = parts[3] || 'Aufnahme';
+        targetUrl = parts[0]?.trim();
+      }
 
-        const confirmDelete = window.confirm(`Möchtest du die Aufnahme "${audioLabelString}" wirklich unwiderruflich löschen?`);
-        if (!confirmDelete) return;
-
-        if (audioUrlString && audioUrlString.startsWith("http")) {
-          const marker = '/storage/v1/object/public/campus-assets/';
-          const markerIndex = audioUrlString.indexOf(marker);
-          if (markerIndex !== -1) {
-            const filePath = audioUrlString.substring(markerIndex + marker.length);
-            console.log("Deleting audio file from storage:", filePath);
-            await supabase.storage.from('campus-assets').remove([filePath]);
-          }
+      // 2. Delete from Supabase Storage if remote
+      if (targetUrl && targetUrl.startsWith('http')) {
+        const marker = '/storage/v1/object/public/campus-assets/';
+        const markerIndex = targetUrl.indexOf(marker);
+        if (markerIndex !== -1) {
+          const filePath = targetUrl.substring(markerIndex + marker.length);
+          console.log('[handleDeleteNote] Removing audio file from storage:', filePath);
+          supabase.storage.from('campus-assets').remove([filePath]).catch(err => console.warn('Storage remove warning:', err));
         }
       }
 
-      const updatedList = homeworkNotesList.filter((_, idx) => idx !== noteIndex);
+      // 3. Delete from IndexedDB if local blob
+      if (targetUrl && (targetUrl.startsWith('campus_blob_') || targetUrl.startsWith('campus_audio_'))) {
+        deleteBlob(targetUrl).catch(() => {});
+      }
+
+      // 4. Filter from homeworkNotesList by Index, Note String, AND URL
+      const updatedList = (homeworkNotesList || []).filter((item, idx) => {
+        if (targetIndex >= 0 && idx === targetIndex) return false;
+        if (noteToDelete && item === noteToDelete) return false;
+        if (targetUrl && typeof item === 'string' && item.includes(targetUrl)) return false;
+        return true;
+      });
+
       setHomeworkNotesList(updatedList);
-      
+
+      // 5. Update localStorage campus_homework_notes
+      try {
+        localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(updatedList));
+      } catch {}
+
+      // 6. Filter from campus_junior_recordings (if present)
+      const juniorKey = `campus_junior_recordings_${student.id}`;
+      try {
+        const storedJunior = localStorage.getItem(juniorKey);
+        if (storedJunior) {
+          const parsed = JSON.parse(storedJunior);
+          if (Array.isArray(parsed)) {
+            const updatedJunior = parsed.filter((r: any) => {
+              if (targetUrl && (r.url === targetUrl || r.url?.includes(targetUrl))) return false;
+              return true;
+            });
+            localStorage.setItem(juniorKey, JSON.stringify(updatedJunior));
+            setLocalJuniorRecordingsTrigger(prev => prev + 1);
+          }
+        }
+      } catch {}
+
+      // 7. Update progressItems and clean ALL progress_matrix rows in Supabase
+      if (student?.id) {
+        try {
+          const { data: allStudentMatrix } = await supabase
+            .from('progress_matrix')
+            .select('id, homework_notes, recording_url')
+            .eq('student_id', student.id);
+
+          if (allStudentMatrix) {
+            for (const row of allStudentMatrix) {
+              let updatedRowNotes = row.homework_notes;
+              let rowRecUrl = row.recording_url;
+              let rowChanged = false;
+
+              if (row.homework_notes && (
+                (targetUrl && row.homework_notes.includes(targetUrl)) ||
+                (noteToDelete && row.homework_notes.includes(noteToDelete))
+              )) {
+                rowChanged = true;
+                if (row.homework_notes.startsWith('[') && row.homework_notes.endsWith(']')) {
+                  try {
+                    const parsed = JSON.parse(row.homework_notes);
+                    if (Array.isArray(parsed)) {
+                      const filtered = parsed.filter((n: string) => {
+                        if (typeof n !== 'string') return true;
+                        if (targetUrl && n.includes(targetUrl)) return false;
+                        if (noteToDelete && n === noteToDelete) return false;
+                        return true;
+                      });
+                      updatedRowNotes = JSON.stringify(filtered);
+                    }
+                  } catch {}
+                } else if (targetUrl) {
+                  updatedRowNotes = updatedRowNotes.replace(new RegExp(`AUDIO:${targetUrl}[^\\s,"]*`, 'g'), '').trim();
+                }
+              }
+
+              if (rowRecUrl && targetUrl && rowRecUrl === targetUrl) {
+                rowChanged = true;
+                rowRecUrl = null;
+              }
+
+              if (rowChanged) {
+                await supabase
+                  .from('progress_matrix')
+                  .update({ homework_notes: updatedRowNotes, recording_url: rowRecUrl, updated_at: new Date().toISOString() })
+                  .eq('id', row.id);
+              }
+            }
+          }
+        } catch (cleanErr) {
+          console.warn('[handleDeleteNote] Error cleaning matrix rows:', cleanErr);
+        }
+      }
+
+      setProgressItems(prev => prev.map(p => {
+        let notesStr = p.homework_notes ? String(p.homework_notes) : '';
+        let hasChange = false;
+        if (targetUrl && notesStr.includes(targetUrl)) {
+          notesStr = notesStr.replace(new RegExp(`AUDIO:${targetUrl}[^\\s,"]*`, 'g'), '').trim();
+          hasChange = true;
+        }
+        const pRecUrl = (p as any).recording_url;
+        if (pRecUrl && targetUrl && pRecUrl === targetUrl) {
+          hasChange = true;
+          (p as any).recording_url = null;
+        }
+        if (hasChange) {
+          return { ...p, homework_notes: notesStr };
+        }
+        return p;
+      }));
+
+      // 8. Sync with database
       await syncHomeworkNotes(updatedList);
-      
       await fetchProgress();
       notifyHomeworkChange();
     } catch (e) {
@@ -4006,18 +4225,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       : generalHomeworkNotes;
 
     const lines = current.split('\n').map(s => s.trim()).filter(Boolean);
-    const itemToDelete = lines[indexToDelete];
     const updatedLines = lines.filter((_, idx) => idx !== indexToDelete);
     const nextText = updatedLines.join('\n');
 
     latestGeneralHomeworkNotesRef.current = nextText;
     setGeneralHomeworkNotes(nextText);
+    setHomeworkNotes(nextText);
+
+    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
+    const combined = [...specialNotes, ...updatedLines];
+    setHomeworkNotesList(combined);
 
     try {
-      localStorage.setItem(`campus_homework_notes_${student.id}`, nextText);
+      localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined));
     } catch {}
 
+    syncHomeworkNotes(combined).catch(() => {});
     triggerImmediateAutoSave();
+    notifyHomeworkChange();
   };
 
   const handleTogglePresetChip = (chip: { label: string; text: string; isBpm?: boolean }, e?: React.MouseEvent) => {
@@ -8680,7 +8905,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             badge="👨‍🏫 Lehrkraft"
                             badgeBg="#dcfce7"
                             badgeColor="#15803d"
-                            onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                            onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
                           />
                         ))}
                       </div>
@@ -8737,7 +8962,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 badge="👨‍🏫 Lehrkraft"
                                 badgeBg="#dcfce7"
                                 badgeColor="#15803d"
-                                onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                                onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
                               />
                             ))}
                           </div>
@@ -8828,7 +9053,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       badge="👨‍🏫 Lehrkraft"
                                       badgeBg="#dcfce7"
                                       badgeColor="#15803d"
-                                      onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                                      onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
                                     />
                                   ))}
                                 </div>
@@ -8884,7 +9109,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 badge="👨‍🏫 Lehrkraft"
                                 badgeBg="#dcfce7"
                                 badgeColor="#15803d"
-                                onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                                onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
                               />
                             ))}
                           </div>
@@ -18723,6 +18948,150 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               }
             });
 
+            const resolveMasteredSongAudio = (songId?: string, title?: string, key?: string): string | undefined => {
+              const normKey = (key || title || '').toLowerCase().trim();
+              const normTitle = (title || '').toLowerCase().trim();
+
+              // 1. Direct Local Cache by Song ID
+              if (songId) {
+                const cachedById = localStorage.getItem(`campus_mastered_audio_${student.id}_${songId}`);
+                if (cachedById) return cachedById;
+              }
+
+              // 2. Direct Local Cache by Title Key
+              if (normKey) {
+                const cachedByKey = localStorage.getItem(`campus_mastered_audio_${student.id}_${normKey}`);
+                if (cachedByKey) return cachedByKey;
+              }
+
+              // 3. From activeSongSkills
+              const matchSkill = (activeSongSkills || []).find(s => {
+                const sTitle = (s.songs?.title || s.title || s.song_title || '').toLowerCase().trim();
+                return (songId && s.id === songId) || (normKey && sTitle === normKey) || (normTitle && sTitle === normTitle);
+              });
+              if (matchSkill && ((matchSkill as any).recording_url || (matchSkill as any).audio_url)) {
+                return (matchSkill as any).recording_url || (matchSkill as any).audio_url;
+              }
+
+              // 4. From progressItems (recording_url column only)
+              const matchProg = (progressItems || []).find((p: any) => {
+                const pText = (p.topic_name || p.title || '').toLowerCase().trim();
+                const matches = (normKey && pText === normKey) || (normTitle && pText === normTitle) || (songId && p.id === songId);
+                return matches && (p as any).recording_url;
+              });
+              if (matchProg && (matchProg as any).recording_url) {
+                return (matchProg as any).recording_url;
+              }
+
+              return undefined;
+            };
+
+            const playMasteredAudio = async (url: string) => {
+              try {
+                if (activeAudioPlayerRef.current) {
+                  activeAudioPlayerRef.current.pause();
+                  activeAudioPlayerRef.current = null;
+                  if (playingAudioUrl === url) {
+                    setPlayingAudioUrl(null);
+                    return;
+                  }
+                }
+                let playUrl = url;
+                if (url.startsWith('campus_blob_') || url.startsWith('campus_audio_')) {
+                  const raw = await getBlob(url);
+                  if (raw) {
+                    const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
+                    playUrl = URL.createObjectURL(finalBlob);
+                  }
+                }
+                const audio = new Audio(playUrl);
+                activeAudioPlayerRef.current = audio;
+                setPlayingAudioUrl(url);
+                audio.onended = () => {
+                  setPlayingAudioUrl(null);
+                  activeAudioPlayerRef.current = null;
+                };
+                audio.onerror = (err) => {
+                  console.warn('[playMasteredAudio] Play error:', err);
+                  setPlayingAudioUrl(null);
+                  activeAudioPlayerRef.current = null;
+                };
+                await audio.play();
+              } catch (err) {
+                console.warn('[playMasteredAudio] Playback notice:', err);
+                setPlayingAudioUrl(null);
+              }
+            };
+
+            const handleDeleteMasteredAudio = async (skillItem: any) => {
+              try {
+                const audioUrl = skillItem.audioUrl;
+                const songId = skillItem.id;
+                const title = skillItem.title;
+                const artist = skillItem.artist;
+                const normKey = `${artist || ''} - ${title || ''}`.toLowerCase().trim();
+                const cleanTitleKey = (title || '').toLowerCase().trim();
+
+                // 1. Clear LocalStorage
+                if (student?.id) {
+                  if (songId) {
+                    localStorage.removeItem(`campus_mastered_audio_${student.id}_${songId}`);
+                  }
+                  if (normKey) {
+                    localStorage.removeItem(`campus_mastered_audio_${student.id}_${normKey}`);
+                  }
+                  if (cleanTitleKey) {
+                    localStorage.removeItem(`campus_mastered_audio_${student.id}_${cleanTitleKey}`);
+                  }
+                }
+
+                // 2. Remove from Supabase Storage if remote
+                if (audioUrl && audioUrl.startsWith('http')) {
+                  const marker = '/storage/v1/object/public/campus-assets/';
+                  const markerIndex = audioUrl.indexOf(marker);
+                  if (markerIndex !== -1) {
+                    const filePath = audioUrl.substring(markerIndex + marker.length);
+                    supabase.storage.from('campus-assets').remove([filePath]).catch(() => {});
+                  }
+                }
+
+                // 3. Remove from IndexedDB if local blob
+                if (audioUrl && (audioUrl.startsWith('campus_blob_') || audioUrl.startsWith('campus_audio_'))) {
+                  deleteBlob(audioUrl).catch(() => {});
+                }
+
+                // 4. Update React State
+                setActiveSongSkills(prev => (prev || []).map(s => {
+                  const sTitle = (s.songs?.title || s.title || s.song_title || '').toLowerCase().trim();
+                  if ((songId && s.id === songId) || (cleanTitleKey && sTitle === cleanTitleKey) || (normKey && sTitle.includes(cleanTitleKey))) {
+                    return { ...s, recording_url: null, audio_url: null };
+                  }
+                  return s;
+                }));
+
+                setProgressItems(prev => (prev || []).map(p => {
+                  const pTitle = ((p as any).topic_name || (p as any).title || '').toLowerCase().trim();
+                  if ((songId && p.id === songId) || (cleanTitleKey && pTitle === cleanTitleKey) || (normKey && pTitle.includes(cleanTitleKey))) {
+                    return { ...p, recording_url: null };
+                  }
+                  return p;
+                }));
+
+                // 5. Update Supabase database
+                if (songId && !String(songId).startsWith('temp-')) {
+                  supabase.from('user_song_skills').update({ recording_url: null }).eq('id', songId).then(() => {});
+                  supabase.from('progress_matrix').update({ recording_url: null }).eq('id', songId).then(() => {});
+                }
+                if (student?.id && title) {
+                  supabase.from('progress_matrix').update({ recording_url: null }).eq('student_id', student.id).ilike('topic_name', `%${title}%`).then(() => {});
+                }
+
+                notifyHomeworkChange();
+              } catch (err) {
+                console.error('Error deleting mastered audio:', err);
+              }
+            };
+
             const masteredSongsMap = new Map<string, any>();
 
             // 1. From activeSongSkills
@@ -18732,11 +19101,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 const artist = skill.songs?.artist || skill.artist || 'Unbekannt';
                 if (title) {
                   const key = title.toLowerCase().trim();
+                  const skillAudio = (skill as any)?.audio_url || (skill as any)?.recording_url || resolveMasteredSongAudio(skill.id, title, key);
                   masteredSongsMap.set(key, {
                     title,
                     artist,
-                    instrument: skill.instrument || 'Campus',
-                    id: skill.id
+                    instrument: skill.instrument || student?.instrument || 'Campus',
+                    id: skill.id,
+                    audioUrl: skillAudio,
+                    masteredDate: skill.updated_at || skill.created_at
                   });
                 }
               }
@@ -18757,11 +19129,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     artist = parts[0].trim();
                     title = parts.slice(1).join(' - ').trim();
                   }
+                  const itemAudio = (item as any).recording_url || resolveMasteredSongAudio(item.id, title, key);
                   masteredSongsMap.set(key, {
                     title,
                     artist,
-                    instrument: item.instrument || 'Campus',
-                    id: item.id
+                    instrument: item.instrument || student?.instrument || 'Campus',
+                    id: item.id,
+                    audioUrl: itemAudio,
+                    masteredDate: item.updated_at || item.created_at
                   });
                 }
               }
@@ -18863,24 +19238,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   ) : (
                     masteredSongs.map((skill, idx) => {
                       const songColor = getSongColor(skill.title || 'Song');
+                      const isThisRecording = isRecordingAudio && (activeRecordingSongId === skill.id || selectedActiveSongId === skill.id || recordingTargetRef.current.songId === skill.id);
                       return (
-                        <div key={`m-song-${idx}`} style={{
-                          background: 'white',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '20px',
-                          padding: '12px 18px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '14px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                        }}>
-                          {/* Cover + Vinyl */}
-                          {renderSongVinylCover(songColor, 'sm')}
-
-                          {/* Content in a single line */}
-                          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                        <div 
+                          key={`m-song-${idx}`} 
+                          style={{
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '16px',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+                            minHeight: '64px',
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          {/* Left: Vinyl Cover + Title */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                            {renderSongVinylCover(songColor, 'sm')}
                             <div style={{
-                              fontSize: '0.86rem',
+                              fontSize: '0.90rem',
                               color: '#0f172a',
                               fontWeight: 900,
                               letterSpacing: '-0.02em',
@@ -18891,8 +19271,122 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             }}>
                               {skill.artist} - {skill.title}
                             </div>
-                            <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '8px', fontWeight: 800, border: '1px solid #bbf7d0', flexShrink: 0 }}>
-                              🏆 Meisterwerk
+                          </div>
+
+                          {/* Right: Buttons [ Aufnahme ] [ 🏅 Gold-Urkunde ] [ 🏆 Meisterwerk ] */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                            {/* 🎙️ 1. Aufnahme Button */}
+                            {isThisRecording ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  stopRecordingAudio();
+                                }}
+                                style={{
+                                  background: '#fef2f2',
+                                  color: '#dc2626',
+                                  border: '1.5px solid #f87171',
+                                  borderRadius: '10px',
+                                  padding: '6px 12px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.25)'
+                                }}
+                                title="Aufnahme stoppen & im Meisterwerk archivieren"
+                              >
+                                <Square size={12} fill="#dc2626" />
+                                <span>Stopp ({Math.floor(audioDuration / 60)}:{String(Math.floor(audioDuration % 60)).padStart(2, '0')})</span>
+                              </button>
+                            ) : skill.audioUrl ? (
+                              <MasterworkAudioCapsule
+                                url={skill.audioUrl}
+                                songTitle={`${skill.artist} - ${skill.title}`}
+                                onDelete={!readOnly ? () => handleDeleteMasteredAudio(skill) : undefined}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startRecordingAudio(skill.id, `${skill.artist} - ${skill.title}`, true);
+                                }}
+                                style={{
+                                  background: '#f0fdf4',
+                                  color: '#166534',
+                                  border: '1px solid #bbf7d0',
+                                  borderRadius: '10px',
+                                  padding: '6px 11px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  boxShadow: '0 1px 4px rgba(22, 101, 52, 0.08)'
+                                }}
+                                title="100% Meisterwerk-Aufnahme im Unterricht starten"
+                              >
+                                <Mic size={13} />
+                                <span>Aufnahme</span>
+                              </button>
+                            )}
+
+                            {/* 🏅 2. Gold-Urkunde Button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCertModalSong({
+                                  studentName: student?.first_name ? `${student.first_name} ${student.last_name || ''}`.trim() : (student?.name || 'Musikschüler'),
+                                  songTitle: skill.title,
+                                  instrument: skill.instrument || student?.instrument || 'Instrument',
+                                  schoolName: resolvedSchoolName || 'Campus-Groovelab Musikschule',
+                                  teacherName: (student as any)?.teacher_name ? formatTeacherFullName((student as any).teacher_name) : 'Deine Lehrkraft',
+                                  masteredDate: skill.masteredDate || new Date().toISOString(),
+                                  certificateId: `MW-${new Date().getFullYear()}-${skill.id ? String(skill.id).substring(0, 6).toUpperCase() : '100'}`
+                                });
+                              }}
+                              style={{
+                                background: '#fef3c7',
+                                color: '#92400e',
+                                border: '1px solid #fde68a',
+                                borderRadius: '10px',
+                                padding: '6px 12px',
+                                fontSize: '0.74rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                boxShadow: '0 2px 6px rgba(202, 138, 4, 0.15)'
+                              }}
+                              title="Offizielle Meisterwerk-Goldurkunde öffnen"
+                            >
+                              <Award size={14} color="#ca8a04" />
+                              <span>Gold-Urkunde</span>
+                            </button>
+
+                            {/* 🏆 3. Meisterwerk Badge */}
+                            <span style={{
+                              fontSize: '0.72rem',
+                              background: '#dcfce7',
+                              color: '#15803d',
+                              padding: '6px 11px',
+                              borderRadius: '10px',
+                              fontWeight: 800,
+                              border: '1px solid #bbf7d0',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              boxShadow: '0 1px 4px rgba(21, 128, 61, 0.08)'
+                            }}>
+                              <span>🏆</span>
+                              <span>Meisterwerk</span>
                             </span>
                           </div>
                         </div>
@@ -19545,6 +20039,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             {content}
           </div>
           {skillRadarDrawer}
+          {certModalSong && (
+            <MeisterwerkCertificateModal
+              studentName={certModalSong.studentName}
+              songTitle={certModalSong.songTitle}
+              instrument={certModalSong.instrument}
+              schoolName={certModalSong.schoolName}
+              teacherName={certModalSong.teacherName}
+              masteredDate={certModalSong.masteredDate}
+              certificateId={certModalSong.certificateId}
+              onClose={() => setCertModalSong(null)}
+            />
+          )}
         </>
       );
     }
@@ -19580,6 +20086,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           portalTarget
         )}
         {skillRadarDrawer}
+        {certModalSong && (
+          <MeisterwerkCertificateModal
+            studentName={certModalSong.studentName}
+            songTitle={certModalSong.songTitle}
+            instrument={certModalSong.instrument}
+            schoolName={certModalSong.schoolName}
+            teacherName={certModalSong.teacherName}
+            masteredDate={certModalSong.masteredDate}
+            certificateId={certModalSong.certificateId}
+            onClose={() => setCertModalSong(null)}
+          />
+        )}
       </>
     );
   };
@@ -19651,6 +20169,254 @@ const playCountInBeep = (isAccent: boolean) => {
   } catch {
     // silent fallback
   }
+};
+
+interface MasterworkAudioCapsuleProps {
+  url: string;
+  songTitle: string;
+  onDelete?: () => void;
+}
+
+const MasterworkAudioCapsule: React.FC<MasterworkAudioCapsuleProps> = ({
+  url,
+  songTitle,
+  onDelete
+}) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState<number>(0);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [resolvedUrl, setResolvedUrl] = useState<string>(url);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const playerIdRef = React.useRef<string>(`mw_capsule_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
+
+  const notifyGlobalPlay = () => {
+    window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: playerIdRef.current } }));
+  };
+
+  useEffect(() => {
+    const handleOtherPlay = (e: any) => {
+      if (e?.detail?.playerId && e.detail.playerId !== playerIdRef.current) {
+        if (audioRef.current && !audioRef.current.paused) {
+          audioRef.current.pause();
+        }
+        setIsPlaying(false);
+      }
+    };
+    window.addEventListener('campus-global-audio-play', handleOtherPlay);
+    return () => window.removeEventListener('campus-global-audio-play', handleOtherPlay);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let createdBlobUrl: string | null = null;
+
+    if (url.startsWith('campus_blob_') || url.startsWith('campus_audio_')) {
+      getBlob(url).then((raw: any) => {
+        if (active && raw) {
+          const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
+          createdBlobUrl = URL.createObjectURL(finalBlob);
+          setResolvedUrl(createdBlobUrl);
+        }
+      }).catch((err: any) => console.warn('[MasterworkAudioCapsule] Blob load note:', err));
+    } else {
+      setResolvedUrl(url);
+    }
+
+    return () => {
+      active = false;
+      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
+    };
+  }, [url]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleLoaded = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(Math.round(audio.duration));
+      }
+    };
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    if (audio.duration && isFinite(audio.duration)) {
+      setDuration(Math.round(audio.duration));
+    }
+
+    audio.addEventListener('loadedmetadata', handleLoaded);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleLoaded);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [resolvedUrl]);
+
+  const togglePlay = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      notifyGlobalPlay();
+      audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[MasterworkAudioCapsule] Play err:', err));
+    }
+  };
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const progressRatio = duration > 0 ? currentTime / duration : 0;
+  const waveformHeights = [25, 55, 80, 45, 90, 70, 40, 85, 95, 60, 45, 80, 100, 65, 45, 30];
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+        background: isPlaying ? '#f0f9ff' : '#f8fafc',
+        border: isPlaying ? '1px solid #7dd3fc' : '1px solid #e2e8f0',
+        borderRadius: '10px',
+        padding: '4px 8px 4px 6px',
+        boxShadow: isPlaying ? '0 2px 8px rgba(14, 165, 233, 0.18)' : '0 1px 3px rgba(0, 0, 0, 0.02)',
+        transition: 'all 0.15s ease',
+        boxSizing: 'border-box'
+      }}
+    >
+      <audio ref={audioRef} src={resolvedUrl} />
+
+      {/* Play / Pause Circular Button */}
+      <button
+        type="button"
+        onClick={togglePlay}
+        style={{
+          width: '28px',
+          height: '28px',
+          borderRadius: '50%',
+          background: isPlaying ? '#0284c7' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+          color: '#ffffff',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          boxShadow: isPlaying ? '0 0 8px rgba(2, 132, 199, 0.45)' : '0 1px 4px rgba(2, 132, 199, 0.25)',
+          transition: 'all 0.15s ease'
+        }}
+        className="hover-scale-mini"
+        title={isPlaying ? 'Pause' : 'Meisterwerk-Aufnahme abspielen'}
+      >
+        {isPlaying ? (
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
+            <rect x="6" y="5" width="4" height="14" rx="1.5" />
+            <rect x="14" y="5" width="4" height="14" rx="1.5" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" style={{ marginLeft: '1.5px' }}>
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
+      </button>
+
+      {/* Time display */}
+      <span style={{
+        fontSize: '0.68rem',
+        fontWeight: 800,
+        color: isPlaying ? '#0369a1' : '#64748b',
+        fontVariantNumeric: 'tabular-nums',
+        minWidth: '55px'
+      }}>
+        {formatTime(currentTime)} / {formatTime(duration)}
+      </span>
+
+      {/* Interactive Scrubbable Waveform Visualizer */}
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
+          const newTime = newRatio * (duration || 0);
+          setCurrentTime(newTime);
+          if (audioRef.current) audioRef.current.currentTime = newTime;
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '2px',
+          height: '18px',
+          width: '90px',
+          cursor: 'pointer',
+          padding: '2px 4px',
+          background: isPlaying ? '#e0f2fe' : '#f1f5f9',
+          borderRadius: '6px',
+          border: isPlaying ? '1px solid #bae6fd' : '1px solid #e2e8f0'
+        }}
+        title="In der Aufnahme springen (Tippen/Klicken)"
+      >
+        {waveformHeights.map((h, i) => {
+          const barRatio = i / waveformHeights.length;
+          const isFilled = barRatio <= progressRatio;
+          return (
+            <div
+              key={i}
+              style={{
+                flex: 1,
+                minWidth: '2px',
+                height: `${Math.max(20, h)}%`,
+                borderRadius: '1px',
+                background: isFilled ? (isPlaying ? '#0284c7' : '#0369a1') : '#cbd5e1',
+                transition: 'background 0.1s ease'
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Delete Recording Button */}
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          style={{
+            border: '1px solid #fecdd3',
+            background: '#fff1f2',
+            color: '#dc2626',
+            cursor: 'pointer',
+            height: '24px',
+            width: '24px',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'all 0.15s ease'
+          }}
+          className="hover-scale-mini"
+          title="Meisterwerk-Aufnahme löschen"
+        >
+          <Trash2 size={12} strokeWidth={2.2} />
+        </button>
+      )}
+    </div>
+  );
 };
 
 const InlineAudioPlayer: React.FC<{ 
