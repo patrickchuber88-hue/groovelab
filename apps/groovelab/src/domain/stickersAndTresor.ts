@@ -118,19 +118,6 @@ export const getUnifiedStickerStatus = (
         awardedDetails.push({ topic: topicName, date: dateStr });
       }
     });
-
-    // If still empty but student has songs in progress_matrix, grab the song name
-    if (awardedDetails.length === 0) {
-      const anySong = progressItems.find(item => {
-        const t = (item.topic_name || '').toLowerCase().trim();
-        return !t.includes(' - seite ') && t !== 'test' && t !== 'test - test' && t !== 'test-test' && !t.startsWith('hausaufgabe kw ');
-      });
-      if (anySong) {
-        const topicName = (anySong.topic_name || anySong.title || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
-        const dateStr = anySong.updated_at ? new Date(anySong.updated_at).toLocaleDateString('de-DE') : 'Meilenstein erreicht';
-        awardedDetails.push({ topic: topicName, date: dateStr });
-      }
-    }
   }
 
   const explicitAwardCount = awardedDetails.length;
@@ -198,23 +185,54 @@ export const getUnifiedStickersMap = (ctx: StickerUnlockContext) => {
   return result;
 };
 
+export const isInternalMetadataNote = (text: any): boolean => {
+  if (!text) return true;
+  const str = typeof text === 'string' ? text : JSON.stringify(text);
+  const lower = str.toLowerCase().trim();
+  const clean = str.replace(/^[•\-\*\s\[\]"'\(\)]+/, '').trim().toLowerCase();
+  
+  return (
+    lower.includes('latency:') ||
+    lower.includes('latency_calibration:') ||
+    clean.startsWith('audio:') ||
+    clean.startsWith('sticker:') ||
+    clean.startsWith('loop:') ||
+    clean.startsWith('system:') ||
+    clean.startsWith('feedback:') ||
+    clean.startsWith('student_note_') ||
+    clean.startsWith('hausaufgabe kw ') ||
+    clean.startsWith('rhythm_score:') ||
+    clean === 'inhalte in der premium-version freischalten' ||
+    clean === 'null' ||
+    clean === 'undefined' ||
+    clean === '[]' ||
+    clean === '{}' ||
+    clean.length === 0
+  );
+};
+
 export const cleanNotesText = (text: string | null | undefined): string => {
   if (!text) return '';
-  return text
+  let raw = text;
+  if (raw.startsWith('[') || raw.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        raw = parsed.join('\n');
+      } else {
+        raw = String(parsed);
+      }
+    } catch {}
+  }
+  return raw
     .split('\n')
-    .filter(line => {
-      const trimmed = line.trim();
-      return !trimmed.startsWith('STICKER:') && 
-             !trimmed.startsWith('AUDIO:') &&
-             !trimmed.startsWith('LOOP:') &&
-             !trimmed.startsWith('LATENCY:') &&
-             !trimmed.startsWith('RHYTHM_SCORE:') &&
-             !trimmed.startsWith('STUDENT_NOTE_PUBLIC:') &&
-             !trimmed.startsWith('STUDENT_NOTE_PRIVATE:');
-    })
+    .filter(line => !isInternalMetadataNote(line))
+    .map(line => line.replace(/^[•\-\*\s]+/, '').trim())
+    .filter(Boolean)
     .join('\n')
     .trim();
 };
+
 
 export const checkIsAudioTresorActive = (studentObj?: any): boolean => {
   if (typeof window !== 'undefined') {

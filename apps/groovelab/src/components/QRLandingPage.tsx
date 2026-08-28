@@ -4947,10 +4947,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         .split('\n')
         .filter((line: string) => {
           const trimmed = line.trim();
+          const lower = trimmed.toLowerCase();
           return !trimmed.startsWith('AUDIO:') && 
                  !trimmed.startsWith('STICKER:') && 
                  !trimmed.startsWith('LOOP:') &&
-                 !trimmed.startsWith('LATENCY:') &&
+                 !lower.startsWith('latency:') &&
+                 !lower.startsWith('latency_calibration:') &&
+                 !trimmed.startsWith('SYSTEM:') &&
+                 !trimmed.startsWith('FEEDBACK:') &&
                  !trimmed.startsWith('STUDENT_NOTE_PUBLIC:') && 
                  !trimmed.startsWith('STUDENT_NOTE_PRIVATE:');
         })
@@ -5188,7 +5192,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const audioNotes = notesList.filter(note => (note || '').trim().startsWith("AUDIO:"));
     const filteredTextNotes = notesList.filter(note => {
       const t = (note || '').trim();
-      return !t.startsWith("AUDIO:") && !t.includes("STICKER:") && !t.includes("LATENCY:");
+      const lower = t.toLowerCase();
+      return !t.startsWith("AUDIO:") && !t.includes("STICKER:") && !lower.includes("latency:") && !lower.includes("latency_calibration:") && !t.startsWith("SYSTEM:") && !t.startsWith("FEEDBACK:");
     });
 
     const hasAnyHWItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || filteredTextNotes.length > 0;

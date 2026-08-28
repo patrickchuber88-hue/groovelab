@@ -9,7 +9,7 @@ import {
 
 import { renderInstrumentIcon } from '../utils/instruments';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
-import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatTeacherFullName } from '../utils/nameHelper';
 import { IDBadgeCard } from './IDBadgeCard';
 import { StudentPinResetModal } from './StudentPinResetModal';
 import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
@@ -62,7 +62,8 @@ interface StudentDetailModalProps {
   onClose: () => void;
   onOpenBandProfile?: (band: any) => void;
   onOpenTageskompass?: (student: any) => void;
-  activePlatform?: 'secretary' | 'campus' | 'groovelab';
+  activePlatform?: 'secretary' | 'campus' | 'groovelab' | 'admin' | 'teacher';
+  callerDashboard?: 'teacher' | 'secretary' | 'admin';
   onSwitchPlatform?: (newPlatform: 'campus' | 'groovelab') => void;
 }
 
@@ -105,10 +106,18 @@ const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role
   return '/avatars/student_eguitar_1.png';
 };
 
-export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose, onOpenBandProfile, onOpenTageskompass, activePlatform, onSwitchPlatform }) => {
+export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ 
+  student, 
+  onClose, 
+  onOpenBandProfile, 
+  onOpenTageskompass, 
+  activePlatform, 
+  callerDashboard,
+  onSwitchPlatform 
+}) => {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
-  const [firstName, setFirstName] = useState<string>(student.first_name || '');
-  const [lastName, setLastName] = useState<string>(student.last_name || '');
+  const [firstName, setFirstName] = useState<string>(student.first_name || (student.name ? student.name.split(' ')[0] : ''));
+  const [lastName, setLastName] = useState<string>(student.last_name || (student.name && student.name.split(' ').length > 1 ? student.name.split(' ').slice(1).join(' ') : ''));
   const [isLastNameRevealedLocally, setIsLastNameRevealedLocally] = useState<boolean>(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editFirstName, setEditFirstName] = useState('');
@@ -122,6 +131,15 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [studentUiLevel, setStudentUiLevel] = useState<'junior' | 'teen' | 'pro'>(() => {
     return student.campus_ui_level || 'junior';
   });
+
+  useEffect(() => {
+    setFirstName(student.first_name || (student.name ? student.name.split(' ')[0] : ''));
+    setLastName(student.last_name || (student.name && student.name.split(' ').length > 1 ? student.name.split(' ').slice(1).join(' ') : ''));
+    setIsCampusActive(student.is_campus_active ?? student.isCampusActive ?? false);
+    setIsGroovelabActive(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
+    setStudentUiLevel(student.campus_ui_level || 'junior');
+    setIsLastNameRevealedLocally(false);
+  }, [student]);
 
   const handleLevelChange = async (newLevel: 'junior' | 'teen' | 'pro') => {
     setStudentUiLevel(newLevel);
@@ -292,6 +310,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const isOwnProfile = currentTeacherId === student.id;
   const isPeerStudent = currentUserRole === 'student' && !isOwnProfile;
+  // Context Primacy (Aktiver Dashboard-Kontext schlägt statische Rollen-Zugehörigkeit):
+  // Wenn ein Benutzer im Lehrer-Dashboard agiert (callerDashboard === 'teacher'),
+  // MUSS er strikt wie eine Lehrkraft behandelt werden (keine Finanzdaten, Name maskiert, kein Stift).
+  const isSecretaryOrAdmin = callerDashboard 
+    ? (callerDashboard === 'secretary' || callerDashboard === 'admin')
+    : (activePlatform === 'secretary' || activePlatform === 'admin' || (currentUserRole === 'admin' || currentUserRole === 'secretary'));
 
   useEffect(() => {
     if (isPeerStudent) {
@@ -2232,7 +2256,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     document.body.removeChild(link);
   };
 
-  const [activeModalTab, setActiveModalTab] = useState<'dashboard' | 'groovelab' | 'settings' | 'access'>('dashboard');
+  const [activeModalTab, setActiveModalTab] = useState<'dashboard' | 'groovelab' | 'settings' | 'access'>(() => {
+    if (isSecretaryOrAdmin) {
+      return localTab === 'groovelab' ? 'groovelab' : 'settings';
+    }
+    return localTab === 'groovelab' ? 'groovelab' : 'dashboard';
+  });
 
   const renderProfileHeader = () => {
     const activeColor = localTab === 'campus' ? '#34a853' : '#eab308';
@@ -2314,10 +2343,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           ) : (
             <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <span>
-                {firstName} {isLastNameRevealedLocally ? lastName : maskLastName(lastName, true)}
+                {isLastNameRevealedLocally 
+                  ? `${firstName} ${lastName}`.trim() 
+                  : formatSingleStudentAnonymized(firstName, lastName, student.id, true)}
                 {groupStudents.length > 0 && (
                   <span style={{ color: '#3b82f6', fontWeight: 800 }}>
-                    {groupStudents.map(g => ` & ${g.first_name} ${isLastNameRevealedLocally ? g.last_name : maskLastName(g.last_name, true)}`).join('')}
+                    {groupStudents.map(g => ` & ${isLastNameRevealedLocally ? `${g.first_name} ${g.last_name}`.trim() : formatSingleStudentAnonymized(g.first_name, g.last_name, g.id, true)}`).join('')}
                   </span>
                 )}
               </span>
@@ -2334,25 +2365,28 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   👥 Partner-Gruppe
                 </span>
               )}
+              {/* Privacy Reveal Button (Available for BOTH Teachers & Administration) */}
               <button 
                 onClick={() => setIsLastNameRevealedLocally(prev => !prev)}
                 style={{
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: isLastNameRevealedLocally ? '#3b82f6' : '#64748b',
-                  display: 'flex',
+                  color: isLastNameRevealedLocally ? '#3b82f6' : '#94a3b8',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  padding: '4px',
+                  justifyContent: 'center',
+                  padding: '6px',
                   borderRadius: '50%',
                   transition: 'all 0.15s ease'
                 }}
-                title={isLastNameRevealedLocally ? "Nachnamen verbergen" : "Nachnamen enthüllen"}
+                title={isLastNameRevealedLocally ? "Nachnamen verbergen (Anonymisiert)" : "Nachnamen enthüllen (Klarname)"}
                 className="hover-scale-mini"
               >
                 {isLastNameRevealedLocally ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
-              {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
+              {/* Edit Master Data Pencil (Only for Administration) */}
+              {isSecretaryOrAdmin && (
                 <button 
                   onClick={() => {
                     setIsEditingName(true);
@@ -2363,17 +2397,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     background: 'transparent',
                     border: 'none',
                     cursor: 'pointer',
-                    color: '#64748b',
-                    display: 'flex',
+                    color: '#94a3b8',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    padding: '4px',
+                    justifyContent: 'center',
+                    padding: '6px',
                     borderRadius: '50%',
                     transition: 'all 0.15s ease'
                   }}
-                  title="Name bearbeiten"
+                  title="Stammdaten: Vorname & Nachname korrigieren"
                   className="hover-scale-mini"
                 >
-                  <Pencil size={16} />
+                  <Pencil size={15} />
                 </button>
               )}
             </h2>
@@ -2456,7 +2491,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         marginBottom: '28px',
         paddingBottom: '8px'
       }}>
-        {localTab === 'campus' ? (
+        {/* Tab 1: Dashboard (Only for Lehrkräfte in Campus mode) */}
+        {!isSecretaryOrAdmin && localTab === 'campus' && (
           <button
             onClick={() => setActiveModalTab('dashboard')}
             style={{
@@ -2477,7 +2513,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             <LayoutDashboard size={16} style={{ color: activeModalTab === 'dashboard' ? activeColor : '#64748b' }} />
             <span>Dashboard</span>
           </button>
-        ) : (
+        )}
+
+        {/* Tab 1 (GrooveLab): Band & Songs */}
+        {localTab === 'groovelab' && (
           <button
             onClick={() => setActiveModalTab('groovelab')}
             style={{
@@ -2500,26 +2539,31 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           </button>
         )}
 
-        <button
-          onClick={() => setActiveModalTab('settings')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            borderBottom: activeModalTab === 'settings' ? `3px solid ${activeColor}` : '3px solid transparent',
-            padding: '8px 16px',
-            fontSize: '0.9rem',
-            fontWeight: 700,
-            color: activeModalTab === 'settings' ? '#1e293b' : '#64748b',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.15s'
-          }}
-        >
-          <Sliders size={16} style={{ color: activeModalTab === 'settings' ? activeColor : '#64748b' }} />
-          <span>Einstellungen &amp; Module</span>
-        </button>
+        {/* Tab 2 (Campus): Stammdaten & Vertrag (Verwaltung) vs. Einstellungen & Module (Lehrkraft) */}
+        {localTab === 'campus' && (
+          <button
+            onClick={() => setActiveModalTab('settings')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: activeModalTab === 'settings' ? `3px solid ${activeColor}` : '3px solid transparent',
+              padding: '8px 16px',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              color: activeModalTab === 'settings' ? '#1e293b' : '#64748b',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s'
+            }}
+          >
+            <Sliders size={16} style={{ color: activeModalTab === 'settings' ? activeColor : '#64748b' }} />
+            <span>{isSecretaryOrAdmin ? 'Stammdaten & Vertrag' : 'Einstellungen & Module'}</span>
+          </button>
+        )}
+
+        {/* Access Tab: Always present */}
         <button
           onClick={() => setActiveModalTab('access')}
           style={{
@@ -2694,34 +2738,6 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       SERIE AM LAUFEN
                     </div>
                   </div>
-                  {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-                    <button
-                      onClick={() => {
-                        const val = prompt('Neue Anzahl an Streak-Tagen eingeben:', String(streakDays));
-                        if (val !== null) {
-                          const num = parseInt(val, 10);
-                          if (!isNaN(num) && num >= 0) {
-                            handleUpdateStreak(num);
-                          }
-                        }
-                      }}
-                      style={{
-                        position: 'absolute',
-                        right: '8px',
-                        top: '8px',
-                        background: 'rgba(255,255,255,0.2)',
-                        border: 'none',
-                        color: '#ffffff',
-                        borderRadius: '6px',
-                        padding: '2px 5px',
-                        fontSize: '0.55rem',
-                        fontWeight: 800,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Bearbeiten
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -3474,17 +3490,80 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
             }}>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={18} style={{ color: activeColor }} /> Modul-Aktivierung &amp; Unterricht
+                <Sliders size={18} style={{ color: activeColor }} /> {isSecretaryOrAdmin ? 'Unterrichts- & Modul-Vertrag' : (localTab === 'campus' ? 'Campus-Modul & Unterricht' : 'GrooveLab-Modul & Band-Setup')}
               </h4>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* 📅 Aktueller Unterricht (Kompakt für sofortige Telefonauskunft im Sekretariat) */}
+                {isSecretaryOrAdmin && (
+                  <>
+                    <div style={{
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      borderRadius: '16px',
+                      padding: '12px 14px',
+                      border: '1.5px solid #e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ background: '#e6f4ea', color: '#137333', padding: '8px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Calendar size={18} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#1e293b' }}>
+                            {schedulesList.length > 0
+                              ? getFormattedScheduleDayTime(schedulesList[0].day_of_week, schedulesList[0].time_slot)
+                              : 'Kein fester Termin hinterlegt'}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span>📍 {schedulesList[0]?.rooms?.name || 'Raum zugewiesen'}</span>
+                            <span>•</span>
+                            <span>👤 {formatTeacherFullName(schedulesList[0]?.teacher || student.teachers?.full_name || (student as any)?.teacher_name || 'Lehrkraft')}</span>
+                          </div>
+                        </div>
+                      </div>
+                      {onOpenTageskompass && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenTageskompass(student)}
+                          style={{
+                            background: '#ffffff',
+                            color: '#334155',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '10px',
+                            padding: '6px 10px',
+                            fontSize: '0.72rem',
+                            fontWeight: 750,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0
+                          }}
+                          className="hover-scale-mini"
+                          title="Hausaufgabenheft zur didaktischen Einsicht öffnen"
+                        >
+                          <BookOpen size={13} />
+                          <span>Heft</span>
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ height: '1px', background: '#f1f5f9' }} />
+                  </>
+                )}
+
                 {/* Campus-Modul Toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <div>
                     <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Campus-Modul</span>
                     <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Hausaufgaben, XP, Übe-Timer &amp; Raum-Engine</div>
                   </div>
-                  {activePlatform === 'secretary' ? (
+                  {isSecretaryOrAdmin ? (
                     <div style={{ 
                       background: '#f1f5f9', 
                       padding: '2px', 
@@ -3551,136 +3630,83 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Altersgerechte Bedienung für den Schüler</div>
                   </div>
                   
-                  <div style={{ 
-                    background: '#f1f5f9', 
-                    padding: '3px', 
-                    borderRadius: '12px', 
-                    display: 'inline-flex', 
-                    gap: '4px',
-                    alignItems: 'center'
-                  }}>
-                    <button
-                      type="button"
-                      onClick={() => handleLevelChange('junior')}
-                      style={{
-                        background: studentUiLevel === 'junior' ? '#34a853' : 'transparent',
-                        color: studentUiLevel === 'junior' ? '#ffffff' : '#64748b',
-                        border: 'none',
-                        borderRadius: '9px',
-                        padding: '4px 8px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        boxShadow: studentUiLevel === 'junior' ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
-                      }}
-                      title="Level 1: 6–10 Jahre (Große Kacheln, 3-W-Regel, Sticker-Album)"
-                    >
-                      🐣 6–10 J.
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleLevelChange('teen')}
-                      style={{
-                        background: studentUiLevel === 'teen' ? '#34a853' : 'transparent',
-                        color: studentUiLevel === 'teen' ? '#ffffff' : '#64748b',
-                        border: 'none',
-                        borderRadius: '9px',
-                        padding: '4px 8px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        boxShadow: studentUiLevel === 'teen' ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
-                      }}
-                      title="Level 2: 11–15 Jahre (2-Spalten Cockpit, Pomodoro-Timer, Checkliste)"
-                    >
-                      🚀 11–15 J.
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleLevelChange('pro')}
-                      style={{
-                        background: studentUiLevel === 'pro' ? '#34a853' : 'transparent',
-                        color: studentUiLevel === 'pro' ? '#ffffff' : '#64748b',
-                        border: 'none',
-                        borderRadius: '9px',
-                        padding: '4px 8px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        boxShadow: studentUiLevel === 'pro' ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
-                      }}
-                      title="Level 3: Ab 16 Jahre (Vollständige Pro-Ansicht mit Loopstation & Meisterwerk)"
-                    >
-                      👑 16+ J.
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ height: '1px', background: '#f1f5f9' }} />
-
-                {/* GrooveLab-Modul Toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <div>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>GrooveLab-Modul</span>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Bands, Songverwaltung &amp; Echtzeit Live Lab</div>
-                  </div>
-                  {activePlatform === 'secretary' ? (
+                  {isSecretaryOrAdmin ? (
                     <div style={{ 
                       background: '#f1f5f9', 
-                      padding: '2px', 
+                      padding: '3px', 
                       borderRadius: '12px', 
                       display: 'inline-flex', 
-                      border: 'none',
+                      gap: '4px',
                       alignItems: 'center'
                     }}>
                       <button
-                        onClick={() => handleToggleGroovelab(false)}
+                        type="button"
+                        onClick={() => handleLevelChange('junior')}
                         style={{
-                          background: !isGroovelabActive ? '#ffffff' : 'transparent',
-                          color: !isGroovelabActive ? '#1e293b' : '#64748b',
+                          background: studentUiLevel === 'junior' ? '#34a853' : 'transparent',
+                          color: studentUiLevel === 'junior' ? '#ffffff' : '#64748b',
                           border: 'none',
-                          borderRadius: '10px',
-                          padding: '4px 10px',
+                          borderRadius: '9px',
+                          padding: '4px 8px',
                           fontSize: '0.75rem',
-                          fontWeight: !isGroovelabActive ? 800 : 600,
+                          fontWeight: 800,
                           cursor: 'pointer',
                           transition: 'all 0.2s',
-                          boxShadow: !isGroovelabActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                          boxShadow: studentUiLevel === 'junior' ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
                         }}
+                        title="Level 1: 6–10 Jahre (Große Kacheln, 3-W-Regel, Sticker-Album)"
                       >
-                        Inaktiv
+                        🐣 6–10 J.
                       </button>
                       <button
-                        onClick={() => handleToggleGroovelab(true)}
+                        type="button"
+                        onClick={() => handleLevelChange('teen')}
                         style={{
-                          background: isGroovelabActive ? '#eab308' : 'transparent',
-                          color: isGroovelabActive ? '#ffffff' : '#64748b',
+                          background: studentUiLevel === 'teen' ? '#34a853' : 'transparent',
+                          color: studentUiLevel === 'teen' ? '#ffffff' : '#64748b',
                           border: 'none',
-                          borderRadius: '10px',
-                          padding: '4px 10px',
+                          borderRadius: '9px',
+                          padding: '4px 8px',
                           fontSize: '0.75rem',
-                          fontWeight: isGroovelabActive ? 800 : 600,
+                          fontWeight: 800,
                           cursor: 'pointer',
                           transition: 'all 0.2s',
-                          boxShadow: isGroovelabActive ? '0 1px 4px rgba(234, 179, 8, 0.3)' : 'none'
+                          boxShadow: studentUiLevel === 'teen' ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
                         }}
+                        title="Level 2: 11–15 Jahre (2-Spalten Cockpit, Pomodoro-Timer, Checkliste)"
                       >
-                        Aktiv
+                        🚀 11–15 J.
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleLevelChange('pro')}
+                        style={{
+                          background: studentUiLevel === 'pro' ? '#34a853' : 'transparent',
+                          color: studentUiLevel === 'pro' ? '#ffffff' : '#64748b',
+                          border: 'none',
+                          borderRadius: '9px',
+                          padding: '4px 8px',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: studentUiLevel === 'pro' ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
+                        }}
+                        title="Level 3: Ab 16 Jahre (Vollständige Pro-Ansicht mit Loopstation & Meisterwerk)"
+                      >
+                        👑 16+ J.
                       </button>
                     </div>
                   ) : (
                     <span style={{ 
-                      background: isGroovelabActive ? '#fef3c7' : '#f1f5f9', 
-                      color: isGroovelabActive ? '#b45309' : '#64748b', 
+                      background: '#f1f5f9', 
+                      color: '#1e293b', 
                       padding: '4px 10px', 
                       borderRadius: '10px', 
                       fontSize: '0.75rem', 
                       fontWeight: 800 
                     }}>
-                      {isGroovelabActive ? 'Aktiv' : 'Inaktiv'}
+                      {studentUiLevel === 'junior' ? '🐣 6–10 Jahre (Junior)' : studentUiLevel === 'teen' ? '🚀 11–15 Jahre (Teen)' : '👑 16+ Jahre (Pro)'}
                     </span>
                   )}
                 </div>
@@ -3690,7 +3716,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 {/* Unterrichtsform / Dauer Selector */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Unterrichtsdauer</span>
-                  {activePlatform === 'secretary' || currentUserRole === 'admin' || currentUserRole === 'secretary' ? (
+                  {isSecretaryOrAdmin ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       {durationRequestSent && (
                         <span style={{ 
@@ -3753,7 +3779,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 </div>
 
                 {/* 🛡️ Tarif & Preisanpassung (Enterprise Per-Profile Pricing Control) */}
-                {(currentUserRole === 'admin' || currentUserRole === 'secretary' || activePlatform === 'secretary') && (
+                {isSecretaryOrAdmin && (
                   <>
                     <div style={{ height: '1px', background: '#f1f5f9' }} />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0' }}>
@@ -3879,13 +3905,13 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                           {groupStudents.map(s => (
                             <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
                               <span style={{ display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', background: '#64748b' }}></span>
-                              {s.first_name} {s.last_name ? s.last_name.charAt(0) + '.' : ''}
+                              {isSecretaryOrAdmin ? `${s.first_name} ${s.last_name}`.trim() : formatSingleStudentAnonymized(s.first_name, s.last_name, s.id, true)}
                             </div>
                           ))}
                         </div>
                       </div>
                       
-                      {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
+                      {isSecretaryOrAdmin && (
                         <button
                           onClick={handleUnlinkGroup}
                           style={{
@@ -3915,7 +3941,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                         Dieser Schüler hat aktuell Einzelunterricht.
                       </div>
 
-                      {(currentUserRole === 'admin' || currentUserRole === 'secretary' || currentUserRole === 'teacher' || (typeof window !== 'undefined' && ['teacher', 'admin', 'secretary'].includes((sessionStorage.getItem('groovelab_user_role') || '').toLowerCase()))) && (
+                      {isSecretaryOrAdmin && (
                         <>
                           {!showGroupSelector ? (
                             <button
@@ -4090,14 +4116,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
             }}>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldCheck size={18} style={{ color: activeColor }} /> Lern- &amp; Sicherheits-Einstellungen
+                <ShieldCheck size={18} style={{ color: activeColor }} /> {localTab === 'campus' ? 'Lern- & Sicherheits-Einstellungen' : 'Band-Proben & Sicherheit'}
               </h4>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {/* Evolution Level (Streaks) */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Übungs-Level (Streaks)</span>
-                  {currentUserRole === 'admin' || currentUserRole === 'secretary' ? (
+                  {!isPeerStudent ? (
                     <div style={{
                       background: '#f1f5f9',
                       padding: '2px',
@@ -4143,7 +4169,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 {/* Campus-Nutzungsmodus */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus-Nutzungsmodus</span>
-                  {currentUserRole === 'admin' || currentUserRole === 'secretary' ? (
+                  {isSecretaryOrAdmin ? (
                     <div style={{
                       background: '#f1f5f9',
                       padding: '2px',
@@ -4194,8 +4220,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       </button>
                     </div>
                   ) : (
-                    <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                      {appUsageMode === 'student_only' ? 'Selbstnutzer' : 'Eltern-Hybrid'}
+                    <span style={{ 
+                      background: appUsageMode === 'parent_hybrid' || appUsageMode === 'parent_managed' ? '#eff6ff' : '#f1f5f9', 
+                      color: appUsageMode === 'parent_hybrid' || appUsageMode === 'parent_managed' ? '#1d4ed8' : '#1e293b', 
+                      padding: '4px 10px', 
+                      borderRadius: '10px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 800,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      {appUsageMode === 'parent_hybrid' || appUsageMode === 'parent_managed' ? '🔒 Eltern-Hybrid (PIN-geschützt)' : '📱 Selbstnutzer'}
                     </span>
                   )}
                 </div>
@@ -4279,86 +4315,48 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           {/* Left Column: Onboarding Link & Unified Single Pass Card */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {(() => {
-              const isCampusAct = !!isCampusActive;
-              const isGrooveAct = !!isGroovelabActive;
-              const isKombi = isCampusAct && isGrooveAct;
+              const isGroove = localTab === 'groovelab';
 
-              const cardBg = isKombi
-                ? 'linear-gradient(135deg, #e6f4ea 0%, #fefce8 100%)'
-                : isCampusAct
-                ? 'linear-gradient(135deg, #e6f4ea 0%, #ffffff 100%)'
-                : isGrooveAct
+              const cardBg = isGroove
                 ? 'linear-gradient(135deg, #fefce8 0%, #ffffff 100%)'
-                : 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)';
+                : 'linear-gradient(135deg, #e6f4ea 0%, #ffffff 100%)';
 
-              const borderColor = isKombi
-                ? '#34a853'
-                : isCampusAct
-                ? 'rgba(52, 168, 83, 0.3)'
-                : isGrooveAct
+              const borderColor = isGroove
                 ? 'rgba(234, 179, 8, 0.3)'
-                : '#e2e8f0';
+                : 'rgba(52, 168, 83, 0.3)';
 
-              const titleColor = isKombi
-                ? '#1e293b'
-                : isCampusAct
-                ? '#34a853'
-                : isGrooveAct
+              const titleColor = isGroove
                 ? '#ca8a04'
-                : '#64748b';
+                : '#34a853';
 
-              const badgeText = isKombi
-                ? 'Kombi'
-                : isCampusAct
-                ? 'Campus'
-                : isGrooveAct
+              const badgeText = isGroove
                 ? 'GrooveLab'
-                : 'Ausweis';
+                : 'Campus';
 
-              const badgeBg = isKombi
-                ? 'linear-gradient(90deg, #34a853 0%, #eab308 100%)'
-                : isCampusAct
-                ? '#34a853'
-                : isGrooveAct
+              const badgeBg = isGroove
                 ? '#eab308'
-                : '#94a3b8';
+                : '#34a853';
 
-              const passTitle = isKombi
-                ? 'Campus-Groovelab Pass'
-                : isCampusAct
-                ? 'Campus Pass'
-                : isGrooveAct
-                ? 'Member Pass'
-                : 'Campus-Groovelab Pass';
+              const passTitle = isGroove
+                ? 'GrooveLab Member Pass'
+                : 'Campus Pass';
 
-              const passSubtitle = isKombi
-                ? 'Kombi-Mitgliedsausweis • QR-Code'
-                : isCampusAct
-                ? 'Instrument-Avatar • Campus PWA Link'
-                : isGrooveAct
+              const passSubtitle = isGroove
                 ? 'Musiker-Avatar • GrooveLab PWA Link'
-                : 'Gestrichelter Ausweis • Noch kein Modul gebucht';
+                : 'Instrument-Avatar • Campus PWA Link';
 
-              const avatarSrc = isGrooveAct && !isCampusAct ? getGroovelabAvatarSrc() : getCampusAvatarSrc();
-              const avatarBorder = isKombi ? '2px solid #34a853' : isCampusAct ? '2px solid #34a853' : isGrooveAct ? '2px solid #eab308' : '2px dashed #34a853';
+              const avatarSrc = isGroove ? getGroovelabAvatarSrc() : getCampusAvatarSrc();
+              const avatarBorder = isGroove ? '2px solid #eab308' : '2px solid #34a853';
 
-              const linkBtnLabel = isKombi
-                ? (copiedCampusLink ? 'Link kopiert! ✓' : 'App-Link kopieren')
-                : isCampusAct
-                ? (copiedCampusLink ? 'Link kopiert! ✓' : 'Campus PWA Link')
-                : isGrooveAct
+              const linkBtnLabel = isGroove
                 ? (copiedGrooveLink ? 'Link kopiert! ✓' : 'GrooveLab PWA Link')
-                : (copiedCampusLink ? 'Link kopiert! ✓' : 'Onboarding-Link kopieren');
+                : (copiedCampusLink ? 'Link kopiert! ✓' : 'Campus PWA Link');
 
-              const mainBtnBg = isKombi
-                ? (copiedCampusLink ? '#e6f4ea' : 'linear-gradient(90deg, #34a853 0%, #eab308 100%)')
-                : isCampusAct
-                ? (copiedCampusLink ? '#e6f4ea' : '#34a853')
-                : isGrooveAct
+              const mainBtnBg = isGroove
                 ? (copiedGrooveLink ? '#fefce8' : '#eab308')
-                : (copiedCampusLink ? '#e6f4ea' : '#64748b');
+                : (copiedCampusLink ? '#e6f4ea' : '#34a853');
 
-              const mainBtnColor = (copiedCampusLink || copiedGrooveLink) ? '#1e293b' : '#ffffff';
+              const mainBtnColor = (isGroove ? copiedGrooveLink : copiedCampusLink) ? '#1e293b' : '#ffffff';
 
               return (
                 <section style={{
@@ -4392,10 +4390,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     <button
                       type="button"
                       onClick={() => {
-                        const targetPlatform = isGrooveAct && !isCampusAct ? 'groovelab' : 'campus';
+                        const targetPlatform = isGroove ? 'groovelab' : 'campus';
                         const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=${targetPlatform}`;
                         navigator.clipboard.writeText(link);
-                        if (isGrooveAct && !isCampusAct) {
+                        if (isGroove) {
                           setCopiedGrooveLink(true);
                           setTimeout(() => setCopiedGrooveLink(false), 2000);
                         } else {
@@ -4422,21 +4420,21 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       }}
                       className="hover-scale"
                     >
-                      {(copiedCampusLink || copiedGrooveLink) ? <Check size={14} /> : <Copy size={14} />}
+                      {(isGroove ? copiedGrooveLink : copiedCampusLink) ? <Check size={14} /> : <Copy size={14} />}
                       <span>{linkBtnLabel}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setQrOverlayTab(isGrooveAct && !isCampusAct ? 'groovelab' : 'campus');
+                        setQrOverlayTab(isGroove ? 'groovelab' : 'campus');
                         setShowQrOverlay(true);
                       }}
                       style={{
                         flex: 1,
                         background: '#ffffff',
-                        color: isKombi ? '#34a853' : isGrooveAct ? '#ca8a04' : '#34a853',
-                        border: `1.5px solid ${isKombi ? '#34a853' : isGrooveAct ? '#eab308' : '#34a853'}`,
+                        color: isGroove ? '#ca8a04' : '#34a853',
+                        border: `1.5px solid ${isGroove ? '#eab308' : '#34a853'}`,
                         borderRadius: '14px',
                         padding: '10px 14px',
                         fontSize: '0.78rem',
@@ -4499,8 +4497,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               </section>
             )}
 
-            {/* DSGVO Datenschutz Card */}
-            {(currentUserRole === 'admin' || currentUserRole === 'secretary' || currentUserRole === 'teacher') && (
+            {/* DSGVO Datenschutz Card (Sekretariat / Admin) */}
+            {isSecretaryOrAdmin && (
               <section style={{ 
                 background: '#ffffff', 
                 borderRadius: '24px', 
@@ -4627,8 +4625,22 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 </div>
               </div>
             ) : (
-              <div style={{ background: '#fffbe8', border: '1px solid #fef08a', padding: '14px 16px', borderRadius: '16px', color: '#854d0e', fontSize: '0.74rem', lineHeight: 1.45 }}>
-                ⚠️ <strong>Kein digitales Protokoll vorhanden:</strong> Es wurde bisher keine digitale Eltern-Einwilligung über die App erfasst (z. B. bei rein organisatorischem Schul-Import). Beim ersten Login des Schülers/Elternteils wird die Einwilligung automatisch abgefragt.
+              <div style={{ 
+                background: '#f8fafc', 
+                border: '1.5px solid #e2e8f0', 
+                padding: '14px 16px', 
+                borderRadius: '16px', 
+                color: '#475569', 
+                fontSize: '0.74rem', 
+                lineHeight: 1.45,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <ShieldCheck size={18} color="#34a853" style={{ flexShrink: 0 }} />
+                <div>
+                  <strong style={{ color: '#0f172a' }}>Schulvertragliche Basis-Erfassung aktiv:</strong> Die digitale Eltern-Einwilligung über die App wird beim ersten Login des Schülers/Elternteils automatisch verifiziert und revisionssicher protokolliert.
+                </div>
               </div>
             )}
           </section>
@@ -4672,7 +4684,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         }
       `}</style>
       <div className="glass-panel student-detail-panel animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.95)', padding: '32px', borderRadius: '32px', maxWidth: '920px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 30px 60px rgba(0, 0, 0, 0.08)' }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}>
+        <button onClick={onClose} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s ease', zIndex: 10 }} className="hover-scale-mini" title="Schließen">
           <X size={20} />
         </button>
         
@@ -4691,30 +4703,28 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               display: 'inline-flex', 
               gap: '2px' 
             }}>
-              {isCampusActive && (
-                <button
-                  onClick={() => handleTabChange('campus')}
-                  style={{
-                    border: 'none',
-                    borderRadius: '99px',
-                    padding: '8px 20px',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    background: localTab === 'campus' ? '#ffffff' : 'transparent',
-                    color: localTab === 'campus' ? '#000000' : '#636366',
-                    boxShadow: localTab === 'campus' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
-                  }}
-                >
-                  <GraduationCap size={16} />
-                  <span>Campus</span>
-                </button>
-              )}
-              {isGroovelabActive && (
+              <button
+                onClick={() => handleTabChange('campus')}
+                style={{
+                  border: 'none',
+                  borderRadius: '99px',
+                  padding: '8px 20px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  background: localTab === 'campus' ? '#ffffff' : 'transparent',
+                  color: localTab === 'campus' ? '#000000' : '#636366',
+                  boxShadow: localTab === 'campus' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
+                }}
+              >
+                <GraduationCap size={16} />
+                <span>Campus</span>
+              </button>
+              {(isSecretaryOrAdmin || isGroovelabActive) && (
                 <button
                   onClick={() => handleTabChange('groovelab')}
                   style={{
@@ -4740,44 +4750,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             </div>
           )}
 
-          {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-            <button
-              type="button"
-              onClick={() => {
-                const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}`;
-                navigator.clipboard.writeText(link);
-                alert(`${localTab === 'campus' ? 'Campus' : 'GrooveLab'}-Onboarding-Link in die Zwischenablage kopiert! 📋`);
-              }}
-              style={{
-                marginLeft: 'auto',
-                marginRight: '12px',
-                border: '1.5px solid rgba(0, 0, 0, 0.05)',
-                borderRadius: '99px',
-                padding: '6px 14px',
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s',
-                background: '#f1f5f9',
-                color: '#475569',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-              }}
-              className="hover-scale"
-            >
-              <Copy size={14} />
-              <span>Onboarding-Link kopieren</span>
-            </button>
-          )}
-
           {!isPeerStudent && (
             <button
               type="button"
               onClick={() => setShowQrOverlay(true)}
               style={{
-                marginLeft: (currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') ? '0' : 'auto',
+                marginLeft: 'auto',
                 marginRight: '60px',
                 border: '1.5px solid rgba(0, 0, 0, 0.05)',
                 borderRadius: '99px',

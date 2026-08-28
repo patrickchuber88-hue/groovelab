@@ -883,6 +883,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [saveProgress, setSaveProgress] = useState<{ percent: number; stage: string; detail: string } | null>(null);
   const [editSaveProgress, setEditSaveProgress] = useState<{ percent: number; stage: string; detail: string } | null>(null);
 
+  // 👏 Live Familien-Reaktionen & Applaus State
+  const [playlistReactions, setPlaylistReactions] = useState<{ [playlistId: string]: { bravo: number; love: number; fire: number; star: number; total: number } }>({});
+
   // 🗑️ Delete Confirmation Modal State (Double confirmation on delete)
   const [pendingDeleteModal, setPendingDeleteModal] = useState<{
     type: 'track' | 'playlist';
@@ -1414,9 +1417,134 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     };
   }, [studentId]);
 
-  // 🌟 Real-Time Listener: Automatically unlock & complete family milestone upon share, family listen, or applause
+  // 🛡️ WebAudio & Tab-Visibility Synchronization (Auto-Pause on Tab Change & Bus Sync)
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+        setIsMiniPlayerPlaying(false);
+      }
+    };
+
+    const handleGlobalAudioPlay = (e: Event) => {
+      const customEvt = e as CustomEvent<{ playerId?: string }>;
+      if (customEvt.detail?.playerId !== 'campus_audio_biography_main') {
+        if (audioRef.current && !audioRef.current.paused) {
+          audioRef.current.pause();
+          setIsMiniPlayerPlaying(false);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('campus-global-audio-play', handleGlobalAudioPlay);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('campus-global-audio-play', handleGlobalAudioPlay);
+    };
+  }, []);
+
+  // 🌟 Real-Time Listener: Automatically unlock & complete family milestone upon share, family listen, or applause + sync reactions
+  useEffect(() => {
+    const targetKey = studentId || 'demo_student';
+
+    const loadReactions = () => {
+      const map: { [playlistId: string]: { bravo: number; love: number; fire: number; star: number; total: number } } = {};
+      const plIds = ['default', 'pl_milestones_album', 'pl_gifts', ...(customPlaylists || []).map(p => p.id)];
+      plIds.forEach(id => {
+        try {
+          const raw = localStorage.getItem(`campus_reactions_${targetKey}_${id}`);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const bravo = Number(parsed.bravo) || 0;
+            const love = Number(parsed.love) || 0;
+            const fire = Number(parsed.fire) || 0;
+            const star = Number(parsed.star) || 0;
+            const total = bravo + love + fire + star;
+            if (total > 0) {
+              map[id] = { bravo, love, fire, star, total };
+            }
+          }
+        } catch {}
+      });
+      setPlaylistReactions(map);
+    };
+
+    loadReactions();
+
+    // ☁️ Cross-Device Cloud Reaction & Playlist Loader from Supabase
+    const fetchRemoteReactionsAndPlaylists = async () => {
+      if (!studentId) return;
+      try {
+        // 1. Fetch remote playlists if local state is empty
+        const { data: plRow } = await supabase
+          .from('progress_matrix')
+          .select('homework_notes')
+          .eq('student_id', studentId)
+          .eq('topic_name', 'CAMPUS_CUSTOM_PLAYLISTS')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (plRow && plRow.length > 0 && plRow[0].homework_notes) {
+          try {
+            const remoteParsedPl = JSON.parse(plRow[0].homework_notes);
+            if (Array.isArray(remoteParsedPl) && remoteParsedPl.length > 0) {
+              setCustomPlaylists(prev => {
+                if (prev.length === 0) {
+                  try {
+                    localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(remoteParsedPl));
+                  } catch {}
+                  return remoteParsedPl;
+                }
+                return prev;
+              });
+            }
+          } catch {}
+        }
+
+        // 2. Fetch all remote family reactions
+        const { data: reactionRows } = await supabase
+          .from('progress_matrix')
+          .select('topic_name, homework_notes')
+          .eq('student_id', studentId)
+          .like('topic_name', 'FAMILY_REACTION:%');
+
+        if (reactionRows && reactionRows.length > 0) {
+          const cloudMap: { [playlistId: string]: { bravo: number; love: number; fire: number; star: number; total: number } } = {};
+          reactionRows.forEach(row => {
+            const plId = (row.topic_name || '').replace('FAMILY_REACTION:', '');
+            if (row.homework_notes) {
+              try {
+                const parsed = JSON.parse(row.homework_notes);
+                const bravo = Number(parsed.bravo) || 0;
+                const love = Number(parsed.love) || 0;
+                const fire = Number(parsed.fire) || 0;
+                const star = Number(parsed.star) || 0;
+                const total = bravo + love + fire + star;
+                if (total > 0) {
+                  cloudMap[plId] = { bravo, love, fire, star, total };
+                  // Also cache in local storage
+                  try {
+                    localStorage.setItem(`campus_reactions_${targetKey}_${plId}`, JSON.stringify(parsed));
+                  } catch {}
+                }
+              } catch {}
+            }
+          });
+
+          setPlaylistReactions(prev => ({ ...prev, ...cloudMap }));
+        }
+      } catch (err) {
+        console.warn('Cross-device reaction fetch notice:', err);
+      }
+    };
+
+    fetchRemoteReactionsAndPlaylists();
+
     const handleFamilyEvent = () => {
+      loadReactions();
+      fetchRemoteReactionsAndPlaylists();
       setMilestones(prev => {
         const familyMs = prev.find(m => m.type === 'family_share');
         if (familyMs && !familyMs.audioUrl) {
@@ -1467,13 +1595,47 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     }
   };
 
-  // Persist custom playlists state changes
-  const savePlaylists = (updated: CustomPlaylist[]) => {
+  // Persist custom playlists state changes (Local + Cloud Sync)
+  const savePlaylists = async (updated: CustomPlaylist[]) => {
     setCustomPlaylists(updated);
     try {
       localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(updated));
     } catch {
       // Ignore
+    }
+
+    if (studentId) {
+      try {
+        const { data: existingPl } = await supabase
+          .from('progress_matrix')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('topic_name', 'CAMPUS_CUSTOM_PLAYLISTS')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (existingPl && existingPl.length > 0) {
+          await supabase
+            .from('progress_matrix')
+            .update({
+              homework_notes: JSON.stringify(updated),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingPl[0].id);
+        } else {
+          await supabase
+            .from('progress_matrix')
+            .insert({
+              student_id: studentId,
+              topic_name: 'CAMPUS_CUSTOM_PLAYLISTS',
+              homework_notes: JSON.stringify(updated),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+        }
+      } catch (cloudErr) {
+        console.warn('Cross-device playlist sync notice:', cloudErr);
+      }
     }
   };
 
@@ -2664,8 +2826,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     });
 
     const versionLabel = selectedVersionChoice === 'master'
-      ? 'Studio-Processing (-14 LUFS)'
-      : 'Pure RAW (-14 LUFS Lautheits-Match)';
+      ? 'Studio-Processing'
+      : 'Pure RAW (Originalaufnahme)';
 
     // Case A: Saving into a Milestone
     if (activeUploadModalMilestone) {
@@ -3106,8 +3268,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       });
 
       const versionLabel = editingTrackData.preferredVersion === 'master'
-        ? 'Studio-Processing (-14 LUFS)'
-        : 'Pure RAW (-14 LUFS Lautheits-Match)';
+        ? 'Studio-Processing'
+        : 'Pure RAW (Originalaufnahme)';
 
       const artistSubtitle = editingTrackData.artist?.trim()
         ? `${editingTrackData.artist.trim()} • ${versionLabel}`
@@ -3472,21 +3634,27 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   const isLight = theme === 'light';
 
-  // HIGH-CONTRAST APPLE COLOR TOKENS
+  // HIGH-CONTRAST SPOTIFY ENTERPRISE COLOR TOKENS
   const colors = {
-    bg: isLight ? '#f8fafc' : 'radial-gradient(ellipse at top, #111827 0%, #030712 100%)',
+    bg: isLight ? '#f8fafc' : '#121212',
+    bgMesh: isLight 
+      ? 'radial-gradient(circle at top right, rgba(16,185,129,0.06), transparent 50%)' 
+      : 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(30, 215, 96, 0.08) 0%, #121212 100%)',
     textPrimary: isLight ? '#0f172a' : '#ffffff',
-    textSecondary: isLight ? '#334155' : '#e2e8f0',
-    textMuted: isLight ? '#475569' : '#cbd5e1',
-    cardBg: isLight ? '#ffffff' : 'rgba(17, 24, 39, 0.85)',
-    cardBgHighlight: isLight ? '#f0fdf4' : 'rgba(31, 41, 55, 0.95)',
-    cardBorder: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.14)',
-    cardBorderHighlight: isLight ? '#86efac' : 'rgba(16, 185, 129, 0.5)',
-    panelBg: isLight ? '#f1f5f9' : 'rgba(15, 23, 42, 0.75)',
-    panelBorder: isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.1)',
-    noteBg: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.07)',
-    noteBorder: isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.18)',
-    shadow: isLight ? '0 4px 20px rgba(0, 0, 0, 0.06)' : '0 10px 30px rgba(0, 0, 0, 0.45)',
+    textSecondary: isLight ? '#334155' : '#b3b3b3',
+    textMuted: isLight ? '#475569' : '#727272',
+    cardBg: isLight ? '#ffffff' : '#181818',
+    cardBgHover: isLight ? '#f8fafc' : '#242424',
+    cardBgHighlight: isLight ? '#f0fdf4' : '#1f2937',
+    cardBorder: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)',
+    cardBorderHover: isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.20)',
+    cardBorderHighlight: isLight ? '#86efac' : 'rgba(30, 215, 96, 0.5)',
+    panelBg: isLight ? '#f1f5f9' : 'rgba(24, 24, 24, 0.85)',
+    panelBorder: isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.08)',
+    noteBg: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.05)',
+    noteBorder: isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)',
+    shadow: isLight ? '0 4px 20px rgba(0, 0, 0, 0.06)' : '0 10px 30px rgba(0, 0, 0, 0.65)',
+    spotifyGreen: '#1ed760',
     emerald: '#10b981',
     gold: '#f59e0b'
   };
@@ -5506,8 +5674,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                           <span style={{ fontSize: '0.86rem', fontWeight: 900, color: colors.textPrimary, display: 'block' }}>
                             {pl.title}
                           </span>
-                          <span style={{ fontSize: '0.72rem', color: colors.textMuted }}>
-                            {pl.tracks.length} Songs • -14 LUFS
+                          <span style={{ fontSize: '0.72rem', color: isLight ? '#475569' : '#94a3b8', fontWeight: 600 }}>
+                            {pl.tracks.length} {pl.tracks.length === 1 ? 'Song' : 'Songs'} • Studio-Master
                           </span>
                         </div>
                       </div>
@@ -6148,7 +6316,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 }}
               >
                 <Sparkles size={12} color="#10b981" />
-                <span>{audioMode === 'master' ? '✨ Studio (-14 LUFS)' : '🎙️ RAW'}</span>
+                <span>{audioMode === 'master' ? '✨ Studio-Master' : '🎙️ RAW'}</span>
               </button>
             )}
 
@@ -6903,6 +7071,119 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
       </div>
 
+      {/* 👏 Live Familien-Applaus & Reaktionen Lounge (Tier-1 SaaS Enterprise+ Goldstandard) */}
+      {(() => {
+        const curPlId = effectiveShelfMode === 'playlists' ? (selectedCustomPlaylistId || customPlaylists[0]?.id || 'default') : 'pl_milestones_album';
+        const reactions = playlistReactions[curPlId] || (effectiveShelfMode === 'playlists' ? playlistReactions['default'] : null);
+        if (!reactions || reactions.total === 0) return null;
+
+        return (
+          <div style={{
+            background: isLight 
+              ? 'linear-gradient(135deg, rgba(254, 243, 199, 0.7) 0%, rgba(254, 249, 195, 0.5) 100%)' 
+              : 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(234, 179, 8, 0.07) 100%)',
+            border: isLight ? '1.5px solid #fde68a' : '1.5px solid rgba(245, 158, 11, 0.28)',
+            borderRadius: '20px',
+            padding: '14px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            boxShadow: isLight ? '0 4px 14px rgba(245, 158, 11, 0.08)' : '0 4px 18px rgba(0, 0, 0, 0.25)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <span style={{ fontSize: '1.1rem' }}>🎉</span>
+                <span style={{ fontSize: '0.80rem', fontWeight: 900, color: isLight ? '#92400e' : '#fde68a', letterSpacing: '-0.01em' }}>
+                  Familien-Applaus ({reactions.total})
+                </span>
+              </div>
+              <span style={{
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                color: isLight ? '#b45309' : '#fef3c7',
+                background: isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.2)',
+                padding: '3px 8px',
+                borderRadius: '100px',
+                border: isLight ? '1px solid #fde68a' : '1px solid rgba(245, 158, 11, 0.3)'
+              }}>
+                Live Feedback
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {reactions.bravo > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                  border: isLight ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  padding: '5px 10px',
+                  borderRadius: '100px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  color: isLight ? '#0f172a' : '#ffffff'
+                }}>
+                  <span>👏</span>
+                  <span>{reactions.bravo}× Bravo</span>
+                </div>
+              )}
+              {reactions.love > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                  border: isLight ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  padding: '5px 10px',
+                  borderRadius: '100px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  color: isLight ? '#0f172a' : '#ffffff'
+                }}>
+                  <span>❤️</span>
+                  <span>{reactions.love}× Herz</span>
+                </div>
+              )}
+              {reactions.fire > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                  border: isLight ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  padding: '5px 10px',
+                  borderRadius: '100px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  color: isLight ? '#0f172a' : '#ffffff'
+                }}>
+                  <span>🔥</span>
+                  <span>{reactions.fire}× Begeisterung</span>
+                </div>
+              )}
+              {reactions.star > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                  border: isLight ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  padding: '5px 10px',
+                  borderRadius: '100px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  color: isLight ? '#0f172a' : '#ffffff'
+                }}>
+                  <span>⭐</span>
+                  <span>{reactions.star}× Meisterwerk</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Quick Share to Family Button */}
       <button
         type="button"
@@ -7031,7 +7312,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             }}
             className="hover-scale"
           >
-            <span>Zurück zum Hausaufgabenheft / Protokoll</span>
+            <span>Zurück zu den Modulen</span>
           </button>
         </div>
       </div>
@@ -7047,7 +7328,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       display: 'flex',
       flexDirection: 'column',
       gap: '16px',
-      background: colors.bg,
+      background: isLight ? colors.bg : colors.bgMesh,
       color: colors.textPrimary,
       fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
       boxSizing: 'border-box',
@@ -7056,16 +7337,16 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       {/* Keyframe animations & Spotify Hover Styles */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes soundBarPulse {
-          0%, 100% { height: 4px; }
-          50% { height: 16px; }
+          0%, 100% { transform: scaleY(0.25); opacity: 0.7; }
+          50% { transform: scaleY(1.0); opacity: 1; }
         }
         @keyframes vinylSpin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+          from { transform: rotate(0deg) translateZ(0); }
+          to { transform: rotate(360deg) translateZ(0); }
         }
         @keyframes activeStepGlow {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
-          50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(30, 215, 96, 0.45); }
+          50% { box-shadow: 0 0 0 8px rgba(30, 215, 96, 0); }
         }
         @keyframes countInPulse {
           0% { transform: scale(0.6); opacity: 0; }
@@ -7074,23 +7355,24 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         }
         @keyframes seasonalGlowPulse {
           0%, 100% {
-            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0), 0 4px 14px rgba(0, 0, 0, 0.05);
-            transform: translateY(0);
+            transform: translate3d(0, 0, 0);
+            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0), 0 4px 14px rgba(0, 0, 0, 0.25);
           }
           50% {
-            box-shadow: 0 6px 24px 3px rgba(245, 158, 11, 0.35), 0 2px 8px rgba(0, 0, 0, 0.08);
-            transform: translateY(-3px);
+            transform: translate3d(0, -3px, 0);
+            box-shadow: 0 6px 24px 3px rgba(245, 158, 11, 0.45), 0 2px 8px rgba(0, 0, 0, 0.15);
           }
         }
         .spotify-card-hover {
-          transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease !important;
+          transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.24s ease, box-shadow 0.24s ease !important;
         }
         .spotify-card-hover:hover {
-          transform: translateY(-5px) !important;
+          transform: translateY(-4px) !important;
+          background-color: #242424 !important;
         }
         .spotify-play-btn {
           opacity: 0;
-          transform: translateY(8px) scale(0.85);
+          transform: translateY(6px) scale(0.9);
           transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease !important;
         }
         .spotify-card-hover:hover .spotify-play-btn {
@@ -7099,14 +7381,20 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         }
         .spotify-play-btn:hover {
           transform: translateY(0) scale(1.08) !important;
-          background: #059669 !important;
+          background: #1ed760 !important;
+        }
+        @media (max-width: 768px), (hover: none) {
+          .spotify-play-btn {
+            opacity: 0.95 !important;
+            transform: translateY(0) scale(1) !important;
+          }
         }
       `}} />
 
       {/* Top Bar: Context-Aware Navigation (Hidden in Junior Mode for maximum vertical space and zero clutter) */}
       {isJunior ? null : (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          {activeMainTab === 'playlists' ? (
+          {activeMainTab === 'playlists' && (
             <button
               type="button"
               onClick={() => setActiveMainTab('overview')}
@@ -7129,29 +7417,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             >
               <ArrowLeft size={15} color="#10b981" />
               <span>Zurück zur Übersicht</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onBackToHub}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
-                border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
-                color: colors.textPrimary,
-                padding: '8px 16px',
-                borderRadius: '100px',
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
-                transition: 'all 0.2s ease'
-              }}
-              className="hover-scale"
-            >
-              <span>← Zurück zum Aufgabenheft</span>
             </button>
           )}
 
@@ -7176,17 +7441,42 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     style={{
                       padding: '6px 14px',
                       borderRadius: '100px',
-                      border: `1.5px solid ${isCur ? otherTheme.color : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)')}`,
-                      background: isCur ? `${otherTheme.color}22` : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.04)'),
-                      color: isCur ? otherTheme.color : colors.textSecondary,
-                      fontSize: '0.76rem',
-                      fontWeight: 800,
+                      border: isCur 
+                        ? `1.5px solid ${otherTheme.color}` 
+                        : `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.16)'}`,
+                      background: isCur 
+                        ? otherTheme.gradient || otherTheme.color 
+                        : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)'),
+                      color: isCur ? '#ffffff' : (isLight ? '#0f172a' : '#f1f5f9'),
+                      fontSize: '0.78rem',
+                      fontWeight: 900,
                       cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
                       whiteSpace: 'nowrap',
-                      transition: 'all 0.15s ease'
+                      boxShadow: isCur ? `0 3px 12px ${otherTheme.color}55` : 'none',
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                      letterSpacing: '-0.01em'
                     }}
+                    className="hover-scale"
                   >
-                    {otherPl.title} ({otherPl.tracks.length})
+                    <span>{otherPl.title} ({otherPl.tracks.length})</span>
+                    {playlistReactions[otherPl.id]?.total > 0 && (
+                      <span style={{
+                        fontSize: '0.66rem',
+                        fontWeight: 900,
+                        background: isCur ? 'rgba(255, 255, 255, 0.3)' : (isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.25)'),
+                        color: isCur ? '#ffffff' : (isLight ? '#b45309' : '#fde68a'),
+                        padding: '1px 6px',
+                        borderRadius: '100px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}>
+                        👏 {playlistReactions[otherPl.id].total}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -7195,17 +7485,17 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 type="button"
                 onClick={handleOpenCreatePlaylist}
                 style={{
-                  padding: '6px 12px',
+                  padding: '6px 14px',
                   borderRadius: '100px',
-                  border: `1.5px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-                  background: 'transparent',
-                  color: colors.textPrimary,
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
+                  border: `1.5px dashed ${isLight ? '#94a3b8' : 'rgba(255, 255, 255, 0.3)'}`,
+                  background: isLight ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.05)',
+                  color: isLight ? '#0f172a' : '#ffffff',
+                  fontSize: '0.78rem',
+                  fontWeight: 900,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px',
+                  gap: '5px',
                   whiteSpace: 'nowrap'
                 }}
                 className="hover-scale"
@@ -7281,7 +7571,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   borderRadius: '100px',
                   border: 'none',
                   background: 'transparent',
-                  color: colors.textSecondary,
+                  color: isLight ? '#475569' : '#f1f5f9',
                   fontSize: '0.78rem',
                   fontWeight: 900,
                   cursor: 'pointer',
@@ -8027,9 +8317,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     <span style={{
                       fontSize: '0.68rem',
                       fontWeight: 900,
-                      color: effectiveAccent,
-                      background: `${effectiveAccent}18`,
-                      border: `1px solid ${effectiveAccent}33`,
+                      color: isLight ? effectiveAccent : '#e0e7ff',
+                      background: isLight ? `${effectiveAccent}18` : 'rgba(99, 102, 241, 0.25)',
+                      border: `1px solid ${isLight ? `${effectiveAccent}33` : 'rgba(99, 102, 241, 0.5)'}`,
                       padding: '3px 10px',
                       borderRadius: '100px',
                       letterSpacing: '0.04em',
@@ -8042,9 +8332,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       <span style={{
                         fontSize: '0.68rem',
                         fontWeight: 900,
-                        color: seasonalFocus.glowColor,
-                        background: `${seasonalFocus.glowColor}22`,
-                        border: `1px solid ${seasonalFocus.glowColor}44`,
+                        color: isLight ? seasonalFocus.glowColor : '#fef08a',
+                        background: isLight ? `${seasonalFocus.glowColor}22` : 'rgba(234, 179, 8, 0.25)',
+                        border: `1px solid ${isLight ? `${seasonalFocus.glowColor}44` : 'rgba(234, 179, 8, 0.5)'}`,
                         padding: '3px 10px',
                         borderRadius: '100px'
                       }}>
@@ -8055,9 +8345,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     <span style={{
                       fontSize: '0.68rem',
                       fontWeight: 900,
-                      color: '#15803d',
-                      background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.2)',
-                      border: '1px solid rgba(16, 185, 129, 0.4)',
+                      color: isLight ? '#15803d' : '#86efac',
+                      background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.25)',
+                      border: `1px solid ${isLight ? 'rgba(16, 185, 129, 0.4)' : 'rgba(16, 185, 129, 0.5)'}`,
                       padding: '3px 10px',
                       borderRadius: '100px',
                       display: 'inline-flex',
@@ -8065,7 +8355,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       gap: '4px'
                     }}>
                       <Sparkles size={11} />
-                      <span>Studio Master (-14 LUFS)</span>
+                      <span>Studio-Master</span>
                     </span>
                   </div>
 
@@ -8084,8 +8374,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     <p style={{
                       margin: 0,
                       fontSize: '0.86rem',
-                      color: colors.textSecondary,
-                      lineHeight: 1.4
+                      color: isLight ? '#475569' : '#e2e8f0',
+                      lineHeight: 1.4,
+                      fontWeight: 500
                     }}>
                       {pl.description || 'Eigene Sammlung aufgenommener Stücke'}
                     </p>
@@ -8095,7 +8386,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   <div style={{
                     fontSize: '0.78rem',
                     fontWeight: 700,
-                    color: colors.textMuted,
+                    color: isLight ? '#475569' : '#cbd5e1',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
@@ -8300,8 +8591,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: colors.textPrimary }}>
                     Trackliste ({pl.tracks.length} {pl.tracks.length === 1 ? 'Song' : 'Songs'})
                   </h3>
-                  <span style={{ fontSize: '0.74rem', color: colors.textSecondary }}>
-                    Automatisches Studio Mastering (-14 LUFS)
+                  <span style={{ fontSize: '0.76rem', fontWeight: 700, color: isLight ? '#475569' : '#94a3b8' }}>
+                    Automatisches Studio-Mastering
                   </span>
                 </div>
 
@@ -8321,12 +8612,12 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       width: '60px',
                       height: '60px',
                       borderRadius: '50%',
-                      background: `${effectiveAccent}18`,
-                      border: `1.5px solid ${effectiveAccent}44`,
+                      background: isLight ? `${effectiveAccent}18` : 'rgba(16, 185, 129, 0.15)',
+                      border: `1.5px solid ${isLight ? `${effectiveAccent}44` : 'rgba(16, 185, 129, 0.35)'}`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: effectiveAccent,
+                      color: isLight ? effectiveAccent : '#34d399',
                       boxShadow: `0 8px 20px ${effectiveAccent}25`
                     }}>
                       <Mic size={28} />
@@ -8335,8 +8626,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       <h4 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 900, color: colors.textPrimary }}>
                         Dieses Album wartet auf deinen 1. Song!
                       </h4>
-                      <p style={{ margin: 0, fontSize: '0.84rem', color: colors.textSecondary, lineHeight: 1.5 }}>
-                        Nimm dein Stück direkt über die Studio-Mikrofonaufnahme auf. Dein Klang wird automatisch studio-gemastert (-14 LUFS) und dauerhaft im Album archiviert.
+                      <p style={{ margin: 0, fontSize: '0.84rem', color: isLight ? '#475569' : '#e2e8f0', lineHeight: 1.5, fontWeight: 500 }}>
+                        Nimm dein Stück direkt über die Studio-Mikrofonaufnahme auf. Dein Klang wird automatisch studio-gemastert und dauerhaft im Album archiviert.
                       </p>
                     </div>
                     <button
@@ -9462,7 +9753,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     🎛️ Studio Audio-Processing...
                   </span>
                   <span style={{ fontSize: '0.78rem', color: colors.textSecondary, marginTop: '4px', display: 'block' }}>
-                    Erzeuge <b>Studio Audio-Processing</b> (-14.0 LUFS) & <b>Pure RAW</b> (-14.5 LUFS)
+                    Erzeuge <b>Studio Audio-Processing</b> & <b>Pure RAW</b>
                   </span>
                 </div>
               </div>
@@ -9474,7 +9765,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     🎵 Aufnahme fertig! Welche Version möchtest du speichern?
                   </span>
                   <span style={{ fontSize: '0.76rem', color: colors.textSecondary, marginTop: '2px', display: 'block', lineHeight: 1.35 }}>
-                    Studio Master (<b>-14.0 LUFS</b>) & Pure RAW (<b>-14.5 LUFS</b>). Du kannst beide im direkten A/B-Vergleich vorhören und deine Standard-Version wählen (jederzeit im Player umschaltbar).
+                    Studio-Master & Pure RAW. Du kannst beide im direkten A/B-Vergleich vorhören und deine Standard-Version wählen (jederzeit im Player umschaltbar).
                   </span>
                 </div>
 
@@ -9528,7 +9819,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                         )}
                       </div>
                       <div style={{ fontSize: '0.86rem', fontWeight: 900, color: colors.textPrimary }}>
-                        Studio Audio-Processing (-14.0 LUFS)
+                        Studio Audio-Processing
                       </div>
                       <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.3 }}>
                         Festlicher Gala-Konzertsaal-Klang mit edler 3D-Konzertakustik.
@@ -9592,7 +9883,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                         )}
                       </div>
                       <div style={{ fontSize: '0.86rem', fontWeight: 900, color: colors.textPrimary }}>
-                        Originalklang (-14.5 LUFS)
+                        Originalklang (Pure RAW)
                       </div>
                       <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: colors.textSecondary, lineHeight: 1.3 }}>
                         Unbearbeitete Originalaufnahme mit pegelangepasster Lautheit.
@@ -10622,8 +10913,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               </button>
             </div>
 
-            <p style={{ margin: 0, fontSize: '0.8rem', color: colors.textSecondary, lineHeight: 1.4 }}>
-              Wähle dein bevorzugtes Format. Beide Spuren sind in verlustfreier Studioqualität (WAV) nach <b>EBU R128 (-14.0 / -14.5 LUFS)</b> pegelangeglichen.
+            <p style={{ margin: 0, fontSize: '0.8rem', color: isLight ? '#475569' : '#e2e8f0', lineHeight: 1.4, fontWeight: 500 }}>
+              Wähle dein bevorzugtes Format. Beide Spuren sind in verlustfreier Studioqualität (WAV) nach <b>EBU R128 Studio-Standard</b> pegelangeglichen.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -10660,8 +10951,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#10b981' }}>
                       Studio Audio-Processing (.wav)
                     </div>
-                    <div style={{ fontSize: '0.74rem', color: colors.textSecondary }}>
-                      Mit Studio Audio-Processing • -14 LUFS
+                    <div style={{ fontSize: '0.74rem', color: isLight ? '#475569' : '#cbd5e1' }}>
+                      Mit Studio Audio-Processing • HD Studio-Master
                     </div>
                   </div>
                 </div>
@@ -10701,8 +10992,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#3b82f6' }}>
                       Pure RAW (.wav)
                     </div>
-                    <div style={{ fontSize: '0.74rem', color: colors.textSecondary }}>
-                      Unbearbeitete Originalaufnahme • -14 LUFS Pegel-Match
+                    <div style={{ fontSize: '0.74rem', color: isLight ? '#475569' : '#cbd5e1' }}>
+                      Unbearbeitete Originalaufnahme • Pegel-Match
                     </div>
                   </div>
                 </div>

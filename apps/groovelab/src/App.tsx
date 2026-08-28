@@ -14706,6 +14706,7 @@ function App() {
               setSelectedStudentProfile(null);
             }}
             activePlatform={activePlatform as any}
+            callerDashboard={user?.role === 'teacher' ? 'teacher' : user?.role === 'secretary' ? 'secretary' : user?.role === 'admin' ? 'admin' : undefined}
             onSwitchPlatform={(newPlatform) => {
               setActivePlatform(newPlatform);
             }}

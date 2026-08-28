@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  X, Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Volume2, Sparkles, Music, Send
+  X, Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Send, FileText, Plus, ChevronRight, Trash2, Zap, Sparkles, ArrowLeft, Music, Sliders
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { acquireAudioStream, releaseAudioStream } from '../../services/audioPermissionService';
 import { processPureRawBlob } from '../../utils/audioMasteringEngine';
+import { capitalizeFirstLetter } from '../../utils/nameHelper';
 
 interface TagesplanQuickAudioModalProps {
   isOpen: boolean;
@@ -12,8 +13,60 @@ interface TagesplanQuickAudioModalProps {
   teacher: any;
   dateStr?: string;
   onClose: () => void;
-  onSaved?: (audioUrl: string) => void;
+  onSaved?: (resultUrlOrText: string) => void;
 }
+
+interface TemplateCategory {
+  id: string;
+  title: string;
+  iconType: 'music' | 'sliders' | 'sparkles';
+  items: string[];
+}
+
+const TEMPLATE_CATEGORIES: TemplateCategory[] = [
+  {
+    id: 'practice',
+    title: 'Üben & Tempo',
+    iconType: 'music',
+    items: [
+      'Takt 1–8 wiederholen',
+      'Mit Metronom (60 bpm) langsam üben',
+      'Langsam und sorgfältig einüben',
+      'Rhythmus laut mitzählen',
+      'Schwierige Stellen isoliert 5x wiederholen'
+    ]
+  },
+  {
+    id: 'technique',
+    title: 'Technik & Haltung',
+    iconType: 'sliders',
+    items: [
+      'Auf den richtigen Fingersatz achten',
+      'Wechselschlag kontrollieren',
+      'Handhaltung entspannen und locker bleiben',
+      'Dynamik und saubere Betonung beachten',
+      'Sauberen Tonansatz und Dämpfung üben'
+    ]
+  },
+  {
+    id: 'performance',
+    title: 'Stück & Motivation',
+    iconType: 'sparkles',
+    items: [
+      'Ablauf auswendig versuchen',
+      'Intro und Refrain flüssig verbinden',
+      'Nächste Woche zum Vorspielen vorbereiten',
+      'Tolle Leistung heute! Weiter so.'
+    ]
+  }
+];
+
+const QUICK_PILLS = [
+  { label: 'Takt 1–8', text: 'Takt 1–8 wiederholen' },
+  { label: 'Metronom 60 bpm', text: 'Mit Metronom (60 bpm) langsam üben' },
+  { label: 'Fingersatz', text: 'Auf den richtigen Fingersatz achten' },
+  { label: 'Wechselschlag', text: 'Wechselschlag kontrollieren' }
+];
 
 export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> = ({
   isOpen,
@@ -23,14 +76,25 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   onClose,
   onSaved
 }) => {
+  const [activeMode, setActiveMode] = useState<'dictate' | 'audio'>('dictate');
+  const [viewState, setViewState] = useState<'main' | 'templates'>('main');
+
+  // --- Dictation State ---
+  const [isDictating, setIsDictating] = useState(false);
+  const [dictatedText, setDictatedText] = useState('');
+  const recognitionRef = useRef<any>(null);
+
+  // --- Audio Recording State ---
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioTitle, setAudioTitle] = useState('');
+
+  // --- Common State ---
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [audioTitle, setAudioTitle] = useState('');
 
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -38,18 +102,21 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   const timerRef = useRef<any>(null);
   const audioElemRef = useRef<HTMLAudioElement | null>(null);
 
-  // Set default title based on student and date
+  const isSpeechSupported = typeof window !== 'undefined' && 
+    (Boolean((window as any).SpeechRecognition) || Boolean((window as any).webkitSpeechRecognition));
+
   useEffect(() => {
     if (student) {
-      const studentName = student.first_name || (student.name ? student.name.split(' ')[0] : 'Schüler');
       const todayFormatted = dateStr 
         ? new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
         : new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
       setAudioTitle(`Unterrichts-Aufnahme (${todayFormatted})`);
+      setDictatedText('');
+      setViewState('main');
+      setSaveSuccess(false);
     }
-  }, [student, dateStr]);
+  }, [student, dateStr, isOpen]);
 
-  // Hardware Safety Cleanup
   const stopHardware = () => {
     if (streamRef.current) {
       releaseAudioStream(streamRef.current);
@@ -63,12 +130,15 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       audioElemRef.current.pause();
       audioElemRef.current = null;
     }
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+      recognitionRef.current = null;
+    }
+    setIsDictating(false);
   };
 
   useEffect(() => {
-    return () => {
-      stopHardware();
-    };
+    return () => stopHardware();
   }, []);
 
   if (!isOpen || !student) return null;
@@ -77,165 +147,69 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   const studentLastName = student.last_name || (student.name ? student.name.split(' ').slice(1).join(' ') : '');
   const studentFullName = `${studentFirstName} ${studentLastName}`.trim();
 
-  // 1. Start Recording
-  const handleStartRecord = async () => {
+  // 1. DICTATION LOGIC
+  const handleStartDictation = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
     try {
-      setAudioBlob(null);
-      setAudioUrl(null);
-      setSaveSuccess(false);
-      audioChunksRef.current = [];
+      stopHardware();
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'de-DE';
+      recognition.continuous = true;
+      recognition.interimResults = true;
 
-      const stream = await acquireAudioStream({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          channelCount: 1,
-          sampleRate: 48000
-        } as any
-      });
-      streamRef.current = stream;
-
-      let mimeType = '';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
-        else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
-        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-      }
-
-      const mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
+      recognition.onresult = (event: any) => {
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) final += event.results[i][0].transcript;
+        }
+        if (final) {
+          setDictatedText(prev => capitalizeFirstLetter((prev + ' ' + final).trim()));
         }
       };
 
-      mediaRecorder.onstop = async () => {
-        const rawBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
-        try {
-          // Studio sound mastering
-          const masteredResult = await processPureRawBlob(rawBlob);
-          setAudioBlob(masteredResult.processedBlob);
-          setAudioUrl(masteredResult.processedUrl || URL.createObjectURL(masteredResult.processedBlob));
-        } catch {
-          setAudioBlob(rawBlob);
-          const url = URL.createObjectURL(rawBlob);
-          setAudioUrl(url);
-        }
-        stopHardware();
-      };
+      recognition.onerror = () => setIsDictating(false);
+      recognition.onend = () => setIsDictating(false);
 
-      mediaRecorder.start(250);
-      setIsRecording(true);
-      setRecordingSeconds(0);
-
-      timerRef.current = setInterval(() => {
-        setRecordingSeconds(s => s + 1);
-      }, 1000);
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsDictating(true);
     } catch (err) {
-      console.warn('[QuickAudioModal] Failed to start recording:', err);
-      setIsRecording(false);
+      setIsDictating(false);
     }
   };
 
-  // 2. Stop Recording
-  const handleStopRecord = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+  const handleStopDictation = () => {
+    if (recognitionRef.current) try { recognitionRef.current.stop(); } catch {}
+    setIsDictating(false);
   };
 
-  // 3. Play / Pause Review
-  const handleTogglePlayback = () => {
-    if (!audioUrl) return;
-    if (isPlaying) {
-      if (audioElemRef.current) {
-        audioElemRef.current.pause();
-      }
-      setIsPlaying(false);
-    } else {
-      const audio = new Audio(audioUrl);
-      audioElemRef.current = audio;
-      audio.onended = () => setIsPlaying(false);
-      audio.onerror = () => setIsPlaying(false);
-      audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-    }
+  const handleAppendPhrase = (phrase: string) => {
+    setDictatedText(prev => {
+      const clean = prev.trim();
+      if (!clean) return capitalizeFirstLetter(phrase);
+      return `${clean}. ${capitalizeFirstLetter(phrase)}`;
+    });
   };
 
-  // 4. Reset
-  const handleReset = () => {
-    stopHardware();
-    setAudioBlob(null);
-    setAudioUrl(null);
-    setIsPlaying(false);
-    setRecordingSeconds(0);
-    setSaveSuccess(false);
-  };
-
-  // 5. Save & Attach directly to Student's Homework Book
-  const handleSaveToHomework = async () => {
-    if (!audioBlob || !student.id) return;
+  const handleSaveDictatedText = async () => {
+    if (!dictatedText.trim() || !student.id) return;
     setIsSaving(true);
-
     try {
-      let finalAudioUrl = '';
-
-      // Upload to Supabase Storage
-      const fileName = `quick_hw_${student.id}_${Date.now()}.webm`;
-      const filePath = `homework/${student.id}/${fileName}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('recordings')
-        .upload(filePath, audioBlob, {
-          contentType: audioBlob.type || 'audio/webm',
-          upsert: true
-        });
-
-      if (!uploadError && uploadData) {
-        const { data: publicUrlData } = supabase.storage
-          .from('recordings')
-          .getPublicUrl(filePath);
-        finalAudioUrl = publicUrlData.publicUrl;
-      } else {
-        // Fallback to base64 data URL if storage upload failed or offline
-        const reader = new FileReader();
-        finalAudioUrl = await new Promise((resolve) => {
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(audioBlob);
-        });
-      }
-
-      // Format canonical homework audio entry
-      // Format: AUDIO:url|duration|isoDate|title|teacher|shared_with_teacher
-      const durationSec = Math.max(1, recordingSeconds);
-      const isoNow = new Date().toISOString();
-      const cleanTitle = (audioTitle.trim() || `Unterrichts-Aufnahme (${studentFirstName})`).replace(/\|/g, '-');
-      const formattedEntry = `AUDIO:${finalAudioUrl}|${durationSec}|${isoNow}|${cleanTitle}|teacher|shared_with_teacher`;
-
-      // Save to localStorage cache for instant zero-latency UI
+      const cleanNote = capitalizeFirstLetter(dictatedText.trim());
       const storageKey = `campus_homework_notes_${student.id}`;
       const existingRaw = localStorage.getItem(storageKey);
       let existingList: string[] = [];
       try {
         existingList = existingRaw ? JSON.parse(existingRaw) : [];
-        if (!Array.isArray(existingList)) existingList = existingRaw ? [existingRaw] : [];
-      } catch {
-        existingList = existingRaw ? [existingRaw] : [];
-      }
+      } catch { existingList = []; }
 
-      if (!existingList.includes(formattedEntry)) {
-        existingList.push(formattedEntry);
+      if (!existingList.includes(cleanNote)) {
+        existingList.push(cleanNote);
         localStorage.setItem(storageKey, JSON.stringify(existingList));
       }
 
-      // Sync with Supabase progress_matrix (Hausaufgabe)
       try {
         const d = new Date();
         const startOfYear = new Date(d.getFullYear(), 0, 1);
@@ -245,334 +219,708 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
 
         const { data: existingMatrix } = await supabase
           .from('progress_matrix')
-          .select('id, homework_notes')
+          .select('id')
           .eq('student_id', student.id)
           .eq('topic_name', topicName)
           .maybeSingle();
 
         if (existingMatrix) {
-          await supabase
-            .from('progress_matrix')
-            .update({
-              homework_notes: JSON.stringify(existingList),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingMatrix.id);
+          await supabase.from('progress_matrix').update({ homework_notes: JSON.stringify(existingList), updated_at: new Date().toISOString() }).eq('id', existingMatrix.id);
         } else {
-          await supabase
-            .from('progress_matrix')
-            .insert({
-              student_id: student.id,
-              teacher_id: teacher?.id,
-              topic_name: topicName,
-              status: 'IN_PROGRESS',
-              homework_notes: JSON.stringify(existingList),
-              updated_at: new Date().toISOString()
-            });
+          await supabase.from('progress_matrix').insert({ student_id: student.id, teacher_id: teacher?.id, topic_name: topicName, status: 'IN_PROGRESS', homework_notes: JSON.stringify(existingList), updated_at: new Date().toISOString() });
         }
-      } catch (e) {
-        console.warn('[QuickAudioModal] Background DB sync caught error:', e);
-      }
+      } catch (e) { console.warn('[QuickAudioModal] Dictation DB sync error:', e); }
 
-      // Notify UI
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: student.id } }));
-      }
-
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: student.id } }));
       setSaveSuccess(true);
-      if (onSaved) onSaved(finalAudioUrl);
-
-      setTimeout(() => {
-        onClose();
-        handleReset();
-      }, 1200);
-
+      if (onSaved) onSaved(cleanNote);
+      setTimeout(() => onClose(), 1000);
     } catch (err) {
-      console.error('[QuickAudioModal] Failed to save homework audio:', err);
-    } finally {
-      setIsSaving(false);
+      console.error(err);
+    } finally { setIsSaving(false); }
+  };
+
+  // 2. AUDIO LOGIC
+  const handleStartRecord = async () => {
+    try {
+      setAudioBlob(null); setAudioUrl(null); setSaveSuccess(false); audioChunksRef.current = [];
+      const stream = await acquireAudioStream({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1, sampleRate: 48000 } as any });
+      streamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mediaRecorder.onstop = async () => {
+        const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        try {
+          const mastered = await processPureRawBlob(rawBlob);
+          setAudioBlob(mastered.processedBlob);
+          setAudioUrl(mastered.processedUrl || URL.createObjectURL(mastered.processedBlob));
+        } catch { setAudioBlob(rawBlob); setAudioUrl(URL.createObjectURL(rawBlob)); }
+        stopHardware();
+      };
+      mediaRecorder.start(250);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      timerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+    } catch (err) { setIsRecording(false); }
+  };
+
+  const handleStopRecord = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop();
+    setIsRecording(false);
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  };
+
+  const handleTogglePlayback = () => {
+    if (!audioUrl) return;
+    if (isPlaying) { if (audioElemRef.current) audioElemRef.current.pause(); setIsPlaying(false); }
+    else {
+      const audio = new Audio(audioUrl);
+      audioElemRef.current = audio;
+      audio.onended = () => setIsPlaying(false);
+      audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     }
   };
 
-  const formatTime = (totalSec: number) => {
-    const m = Math.floor(totalSec / 60);
-    const s = totalSec % 60;
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  const handleReset = () => {
+    stopHardware();
+    setAudioBlob(null); setAudioUrl(null); setIsPlaying(false); setRecordingSeconds(0); setSaveSuccess(false); setDictatedText(''); setViewState('main');
+  };
+
+  const handleSaveAudioToHomework = async () => {
+    if (!audioBlob || !student.id) return;
+    setIsSaving(true);
+    try {
+      const fileName = `quick_hw_${student.id}_${Date.now()}.webm`;
+      const filePath = `homework/${student.id}/${fileName}`;
+      const { data: uploadData } = await supabase.storage.from('recordings').upload(filePath, audioBlob, { contentType: 'audio/webm', upsert: true });
+      const { data: urlData } = supabase.storage.from('recordings').getPublicUrl(filePath);
+      const finalUrl = urlData.publicUrl;
+      const durationSec = Math.max(1, recordingSeconds);
+      const isoNow = new Date().toISOString();
+      const formattedEntry = `AUDIO:${finalUrl}|${durationSec}|${isoNow}|${audioTitle.replace(/\|/g, '-')}|teacher|shared_with_teacher`;
+      
+      const storageKey = `campus_homework_notes_${student.id}`;
+      const existingRaw = localStorage.getItem(storageKey);
+      let list: string[] = [];
+      try { list = existingRaw ? JSON.parse(existingRaw) : []; } catch {}
+      list.push(formattedEntry);
+      localStorage.setItem(storageKey, JSON.stringify(list));
+
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: student.id } }));
+      setSaveSuccess(true);
+      if (onSaved) onSaved(finalUrl);
+      setTimeout(() => onClose(), 1000);
+    } catch (err) { console.error(err); } finally { setIsSaving(false); }
+  };
+
+  const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  const renderCategoryIcon = (type: TemplateCategory['iconType']) => {
+    switch (type) {
+      case 'music': return <Music size={16} />;
+      case 'sliders': return <Sliders size={16} />;
+      case 'sparkles': return <Sparkles size={16} />;
+    }
   };
 
   return (
     <div 
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15, 23, 42, 0.55)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 99999,
-        padding: '16px'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isRecording && !isSaving) {
-          stopHardware();
-          onClose();
-        }
-      }}
+      style={{ 
+        position: 'fixed', 
+        inset: 0, 
+        background: 'rgba(15, 23, 42, 0.45)', 
+        backdropFilter: 'blur(12px)', 
+        WebkitBackdropFilter: 'blur(12px)', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        zIndex: 99999, 
+        padding: 'clamp(12px, 3.5vw, 24px)' 
+      }} 
+      onClick={(e) => { if (e.target === e.currentTarget && !isRecording && !isDictating && !isSaving) { stopHardware(); onClose(); } }}
     >
       <div 
-        style={{
-          background: '#ffffff',
-          borderRadius: '24px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          maxWidth: '460px',
-          width: '100%',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '18px',
-          position: 'relative',
-          animation: 'scaleUp 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
+        style={{ 
+          background: '#ffffff', 
+          borderRadius: '24px', 
+          border: '1px solid rgba(226, 232, 240, 0.9)', 
+          boxShadow: '0 24px 48px -12px rgba(15, 23, 42, 0.22), 0 0 1px 1px rgba(0,0,0,0.04)', 
+          maxWidth: 'min(480px, 94vw)', 
+          width: '100%', 
+          maxHeight: '90vh', 
+          overflowY: 'auto', 
+          padding: 'clamp(18px, 4vw, 24px)', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '16px', 
+          position: 'relative', 
+          animation: 'scaleUp 0.16s cubic-bezier(0.16, 1, 0.3, 1)' 
         }}
       >
-        {/* Close Button */}
-        <button
-          type="button"
-          onClick={() => {
-            stopHardware();
-            onClose();
-          }}
-          disabled={isRecording || isSaving}
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            border: '1px solid #e2e8f0',
-            background: '#f8fafc',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: (isRecording || isSaving) ? 'not-allowed' : 'pointer',
-            color: '#64748b'
-          }}
-        >
-          <X size={16} />
-        </button>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '12px',
-            background: '#e6f4ea',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#34a853',
-            flexShrink: 0
-          }}>
-            <Mic size={22} color="#34a853" />
-          </div>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-              Audio-Hausaufgabe aufnehmen
-            </h3>
-            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-              Für <strong>{studentFullName}</strong> • Heute im Hausaufgabenheft
-            </p>
-          </div>
-        </div>
-
-        {/* Recording Stage */}
-        <div style={{
-          background: isRecording 
-            ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' 
-            : (audioBlob ? '#f0fdf4' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'),
-          borderRadius: '18px',
-          border: isRecording ? '1.5px solid #ef4444' : (audioBlob ? '1.5px solid #34a853' : '1px solid #e2e8f0'),
-          padding: '24px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-          transition: 'all 0.2s ease'
-        }}>
-          {/* Animated Waveform / Timer */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {isRecording && (
-              <div style={{
-                width: '12px',
-                height: '12px',
-                borderRadius: '50%',
-                background: '#ef4444',
-                boxShadow: '0 0 12px rgba(239, 68, 68, 0.8)',
-                animation: 'pulse 1.2s infinite'
-              }} />
-            )}
-            <span style={{
-              fontSize: '2.2rem',
-              fontWeight: 900,
-              color: isRecording ? '#dc2626' : (audioBlob ? '#15803d' : '#0f172a'),
-              letterSpacing: '-0.03em',
-              fontFamily: 'monospace'
-            }}>
-              {formatTime(recordingSeconds)}
-            </span>
-          </div>
-
-          <p style={{ margin: 0, fontSize: '0.74rem', fontWeight: 700, color: isRecording ? '#b91c1c' : '#64748b', textAlign: 'center' }}>
-            {isRecording 
-              ? '● Aufnahme läuft... Spiele das Stück oder die Übung ein'
-              : (audioBlob ? '✓ Aufnahme bereit zur Übernahme' : 'Klicke auf den Button, um die Aufnahme zu starten')}
-          </p>
-
-          {/* Record / Stop Action Button */}
-          {!audioBlob ? (
-            <button
-              type="button"
-              onClick={isRecording ? handleStopRecord : handleStartRecord}
-              style={{
-                marginTop: '4px',
-                padding: '12px 24px',
-                borderRadius: '14px',
-                border: 'none',
-                background: isRecording ? '#ef4444' : '#34a853',
-                color: '#ffffff',
-                fontWeight: 800,
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                boxShadow: isRecording 
-                  ? '0 6px 20px -2px rgba(239, 68, 68, 0.4)' 
-                  : '0 6px 20px -2px rgba(52, 168, 83, 0.35)',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              {isRecording ? <Square size={16} fill="#ffffff" /> : <Mic size={18} />}
-              <span>{isRecording ? 'Aufnahme stoppen' : 'Aufnahme starten'}</span>
-            </button>
-          ) : (
-            /* Review & Playback Controls */
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-              <button
-                type="button"
-                onClick={handleTogglePlayback}
-                style={{
-                  padding: '9px 18px',
-                  borderRadius: '12px',
-                  border: '1px solid #34a853',
-                  background: '#ffffff',
-                  color: '#15803d',
-                  fontWeight: 800,
-                  fontSize: '0.78rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                {isPlaying ? <Pause size={15} /> : <Play size={15} />}
-                <span>{isPlaying ? 'Pause' : 'Anhören'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleReset}
-                style={{
-                  padding: '9px 14px',
-                  borderRadius: '12px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
+        {viewState === 'main' && (
+          <>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ 
+                  width: '42px', 
+                  height: '42px', 
+                  borderRadius: '12px', 
+                  background: '#f0fdf4', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  color: '#16a34a', 
+                  flexShrink: 0 
+                }}>
+                  {activeMode === 'dictate' ? <FileText size={22} /> : <Mic size={22} />}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 'clamp(1.05rem, 2.5vw, 1.15rem)', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    {activeMode === 'dictate' ? 'Hausaufgabe diktieren' : 'Audio-Aufnahme'}
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                    Für <strong>{studentFullName}</strong> • Heute
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => { stopHardware(); onClose(); }} 
+                disabled={isRecording || isDictating || isSaving} 
+                style={{ 
+                  width: '34px', 
+                  height: '34px', 
+                  borderRadius: '50%', 
+                  border: 'none', 
+                  background: '#f1f5f9', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  cursor: (isRecording || isDictating || isSaving) ? 'not-allowed' : 'pointer', 
                   color: '#64748b',
-                  fontWeight: 700,
-                  fontSize: '0.78rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
+                  flexShrink: 0,
+                  transition: 'background 0.12s ease'
                 }}
-                title="Aufnahme verwerfen und neu starten"
               >
-                <RotateCcw size={14} />
-                <span>Neu aufnehmen</span>
+                <X size={17} strokeWidth={2.4} />
               </button>
             </div>
-          )}
-        </div>
 
-        {/* Title Input */}
-        {audioBlob && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
-              Titel / Bezeichnung im Hausaufgabenheft:
-            </label>
-            <input
-              type="text"
-              value={audioTitle}
-              onChange={(e) => setAudioTitle(e.target.value)}
-              placeholder="z. B. Fingersatz Takt 12–16, Intro Gitarre..."
-              style={{
-                padding: '10px 12px',
-                borderRadius: '12px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                color: '#0f172a',
-                outline: 'none'
-              }}
-            />
-          </div>
+            {/* Apple Segmented Control */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr', 
+              background: '#f1f5f9', 
+              padding: '4px', 
+              borderRadius: '14px', 
+              gap: '4px' 
+            }}>
+              <button 
+                type="button" 
+                onClick={() => { stopHardware(); setActiveMode('dictate'); }} 
+                style={{ 
+                  padding: '9px 12px', 
+                  borderRadius: '10px', 
+                  border: 'none', 
+                  background: activeMode === 'dictate' ? '#ffffff' : 'transparent', 
+                  color: activeMode === 'dictate' ? '#0f172a' : '#64748b', 
+                  fontWeight: activeMode === 'dictate' ? 850 : 600, 
+                  fontSize: '0.84rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '7px', 
+                  cursor: 'pointer', 
+                  boxShadow: activeMode === 'dictate' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.12s ease'
+                }}
+              >
+                <FileText size={16} /> <span>Diktieren</span>
+              </button>
+              <button 
+                type="button" 
+                onClick={() => { stopHardware(); setActiveMode('audio'); }} 
+                style={{ 
+                  padding: '9px 12px', 
+                  borderRadius: '10px', 
+                  border: 'none', 
+                  background: activeMode === 'audio' ? '#ffffff' : 'transparent', 
+                  color: activeMode === 'audio' ? '#0f172a' : '#64748b', 
+                  fontWeight: activeMode === 'audio' ? 850 : 600, 
+                  fontSize: '0.84rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '7px', 
+                  cursor: 'pointer', 
+                  boxShadow: activeMode === 'audio' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.12s ease'
+                }}
+              >
+                <Mic size={16} /> <span>Audio</span>
+              </button>
+            </div>
+
+            {/* TAB 1: DICTATE */}
+            {activeMode === 'dictate' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Live Dictation Strip */}
+                <div style={{ 
+                  background: isDictating ? '#fef2f2' : '#f8fafc', 
+                  borderRadius: '16px', 
+                  border: isDictating ? '1.5px solid #ef4444' : '1px solid #e2e8f0', 
+                  padding: '12px 16px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  gap: '10px',
+                  transition: 'all 0.15s ease'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ 
+                      width: '11px', 
+                      height: '11px', 
+                      borderRadius: '50%', 
+                      background: isDictating ? '#ef4444' : '#16a34a', 
+                      boxShadow: isDictating ? '0 0 10px rgba(239, 68, 68, 0.8)' : 'none',
+                      animation: isDictating ? 'pulse 1.2s infinite' : 'none' 
+                    }} />
+                    <span style={{ fontSize: '0.86rem', fontWeight: 750, color: isDictating ? '#b91c1c' : '#334155' }}>
+                      {isDictating ? 'Diktat läuft... Sprich jetzt' : (isSpeechSupported ? 'Sprach-Diktat bereit' : 'Tastatureingabe')}
+                    </span>
+                  </div>
+                  {isSpeechSupported && (
+                    <button 
+                      type="button" 
+                      onClick={isDictating ? handleStopDictation : handleStartDictation} 
+                      style={{ 
+                        padding: '8px 16px', 
+                        borderRadius: '11px', 
+                        border: 'none', 
+                        background: isDictating ? '#ef4444' : '#16a34a', 
+                        color: '#ffffff', 
+                        fontWeight: 800, 
+                        fontSize: '0.82rem', 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px',
+                        boxShadow: isDictating ? '0 4px 12px rgba(239, 68, 68, 0.35)' : '0 4px 12px rgba(22, 163, 74, 0.25)',
+                        transition: 'all 0.12s ease'
+                      }}
+                    >
+                      {isDictating ? <Square size={14} fill="#ffffff" /> : <Mic size={15} />} 
+                      <span>{isDictating ? 'Stopp' : 'Sprechen'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Editor Container */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Hausaufgaben-Bemerkung:
+                    </label>
+                    {dictatedText && (
+                      <button 
+                        type="button" 
+                        onClick={() => setDictatedText('')} 
+                        style={{ 
+                          background: 'transparent', 
+                          border: 'none', 
+                          color: '#94a3b8', 
+                          fontSize: '0.74rem', 
+                          fontWeight: 700, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '4px',
+                          cursor: 'pointer',
+                          padding: '2px 6px'
+                        }}
+                      >
+                        <Trash2 size={13} /> Leeren
+                      </button>
+                    )}
+                  </div>
+                  <textarea 
+                    value={dictatedText} 
+                    onChange={(e) => setDictatedText(e.target.value)} 
+                    placeholder="Diktieren oder tippen (z. B. Seite 14 Takt 1–8 mit Metronom 60 bpm üben)..." 
+                    rows={4} 
+                    style={{ 
+                      width: '100%', 
+                      boxSizing: 'border-box',
+                      padding: '14px 16px', 
+                      borderRadius: '16px', 
+                      border: '1px solid #cbd5e1', 
+                      fontSize: '0.90rem', 
+                      fontWeight: 600,
+                      lineHeight: 1.5,
+                      color: '#0f172a',
+                      outline: 'none',
+                      resize: 'none',
+                      fontFamily: 'inherit',
+                      minHeight: '105px'
+                    }} 
+                  />
+                </div>
+
+                {/* Quick-Pills & Full-Library Launcher */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>
+                      Schnell-Bausteine:
+                    </span>
+                    <button 
+                      type="button" 
+                      onClick={() => setViewState('templates')} 
+                      style={{ 
+                        background: 'transparent', 
+                        border: 'none', 
+                        color: '#16a34a', 
+                        fontSize: '0.78rem', 
+                        fontWeight: 800, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '4px',
+                        cursor: 'pointer',
+                        padding: '2px 4px'
+                      }}
+                    >
+                      <Zap size={13} /> 
+                      <span>Alle Vorlagen</span> 
+                      <ChevronRight size={13} />
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: '2px' }}>
+                    {QUICK_PILLS.map((pill) => (
+                      <button 
+                        key={pill.label} 
+                        type="button" 
+                        onClick={() => handleAppendPhrase(pill.text)} 
+                        style={{ 
+                          padding: '8px 14px', 
+                          borderRadius: '11px', 
+                          border: '1px solid #e2e8f0', 
+                          background: '#f8fafc', 
+                          fontSize: '0.78rem', 
+                          fontWeight: 700, 
+                          color: '#334155',
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px', 
+                          whiteSpace: 'nowrap',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          transition: 'all 0.12s ease'
+                        }}
+                      >
+                        <Plus size={12} /> {pill.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Primary CTA */}
+                <button 
+                  type="button" 
+                  onClick={handleSaveDictatedText} 
+                  disabled={!dictatedText.trim() || isSaving || saveSuccess} 
+                  style={{ 
+                    marginTop: '4px', 
+                    padding: '14px 20px', 
+                    borderRadius: '16px', 
+                    border: 'none', 
+                    background: saveSuccess ? '#15803d' : (!dictatedText.trim() ? '#e2e8f0' : '#16a34a'), 
+                    color: !dictatedText.trim() ? '#94a3b8' : '#ffffff', 
+                    fontWeight: 900, 
+                    fontSize: '0.92rem', 
+                    cursor: (!dictatedText.trim() || isSaving || saveSuccess) ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '9px',
+                    boxShadow: dictatedText.trim() ? '0 8px 24px -3px rgba(22, 163, 74, 0.4)' : 'none',
+                    minHeight: '48px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      <span>Wird eingetragen...</span>
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check size={18} strokeWidth={3} />
+                      <span>Bemerkung eingetragen!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send size={16} />
+                      <span>Als Bemerkung übernehmen ➔</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* TAB 2: AUDIO */}
+            {activeMode === 'audio' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ 
+                  background: isRecording ? '#fef2f2' : (audioBlob ? '#f0fdf4' : '#f8fafc'), 
+                  borderRadius: '20px', 
+                  border: isRecording ? '1.5px solid #ef4444' : (audioBlob ? '1.5px solid #86efac' : '1px solid #e2e8f0'),
+                  padding: '24px 16px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  gap: '14px',
+                  transition: 'all 0.15s ease'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {isRecording && (
+                      <span style={{ 
+                        width: '12px', 
+                        height: '12px', 
+                        borderRadius: '50%', 
+                        background: '#ef4444', 
+                        boxShadow: '0 0 12px rgba(239, 68, 68, 0.8)',
+                        animation: 'pulse 1.2s infinite' 
+                      }} />
+                    )}
+                    <span style={{ 
+                      fontSize: 'clamp(2.2rem, 5vw, 2.6rem)', 
+                      fontWeight: 900, 
+                      color: isRecording ? '#dc2626' : (audioBlob ? '#15803d' : '#0f172a'), 
+                      fontFamily: 'monospace',
+                      letterSpacing: '-0.02em'
+                    }}>
+                      {formatTime(recordingSeconds)}
+                    </span>
+                  </div>
+
+                  <p style={{ margin: 0, fontSize: '0.80rem', fontWeight: 700, color: isRecording ? '#b91c1c' : '#64748b', textAlign: 'center' }}>
+                    {isRecording 
+                      ? 'Aufnahme läuft... Spiele das Stück oder den Rhythmus ein' 
+                      : (audioBlob ? 'Aufnahme bereit zur Übernahme' : 'Klicke auf den Button, um die Aufnahme zu starten')}
+                  </p>
+
+                  {!audioBlob ? (
+                    <button 
+                      type="button" 
+                      onClick={isRecording ? handleStopRecord : handleStartRecord} 
+                      style={{ 
+                        padding: '12px 26px', 
+                        borderRadius: '14px', 
+                        border: 'none', 
+                        background: isRecording ? '#ef4444' : '#16a34a', 
+                        color: '#ffffff', 
+                        fontWeight: 800, 
+                        fontSize: '0.90rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '9px',
+                        boxShadow: isRecording ? '0 6px 20px rgba(239, 68, 68, 0.35)' : '0 6px 20px rgba(22, 163, 74, 0.3)',
+                        transition: 'all 0.12s ease'
+                      }}
+                    >
+                      {isRecording ? <Square size={16} fill="#ffffff" /> : <Mic size={18} />}
+                      <span>{isRecording ? 'Aufnahme stoppen' : 'Aufnahme starten'}</span>
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        type="button" 
+                        onClick={handleTogglePlayback} 
+                        style={{ 
+                          padding: '9px 18px', 
+                          borderRadius: '12px', 
+                          border: '1px solid #16a34a', 
+                          color: '#15803d', 
+                          background: '#ffffff',
+                          fontWeight: 800,
+                          fontSize: '0.82rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '7px'
+                        }}
+                      >
+                        {isPlaying ? <Pause size={15} /> : <Play size={15} />}
+                        <span>{isPlaying ? 'Pause' : 'Anhören'}</span>
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={handleReset} 
+                        style={{ 
+                          padding: '9px 16px', 
+                          borderRadius: '12px', 
+                          border: '1px solid #cbd5e1', 
+                          color: '#64748b', 
+                          background: '#ffffff',
+                          fontWeight: 700,
+                          fontSize: '0.82rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <RotateCcw size={14} /> <span>Neu</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {audioBlob && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                      Titel / Bezeichnung:
+                    </label>
+                    <input 
+                      type="text" 
+                      value={audioTitle} 
+                      onChange={(e) => setAudioTitle(e.target.value)} 
+                      style={{ 
+                        padding: '11px 14px', 
+                        borderRadius: '12px', 
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.86rem',
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        outline: 'none'
+                      }} 
+                    />
+                  </div>
+                )}
+
+                {audioBlob && (
+                  <button 
+                    type="button" 
+                    onClick={handleSaveAudioToHomework} 
+                    disabled={isSaving || saveSuccess}
+                    style={{ 
+                      marginTop: '4px',
+                      padding: '14px 20px', 
+                      borderRadius: '16px', 
+                      border: 'none', 
+                      background: saveSuccess ? '#15803d' : '#16a34a', 
+                      color: '#ffffff', 
+                      fontWeight: 900,
+                      fontSize: '0.92rem',
+                      cursor: (isSaving || saveSuccess) ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '9px',
+                      boxShadow: '0 8px 24px -3px rgba(22, 163, 74, 0.4)',
+                      minHeight: '48px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                        <span>Wird gespeichert...</span>
+                      </>
+                    ) : saveSuccess ? (
+                      <>
+                        <Check size={18} strokeWidth={3} />
+                        <span>Audio gespeichert!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send size={16} />
+                        <span>Audio ins Hausaufgabenheft übertragen ➔</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
 
-        {/* Primary Save Button */}
-        {audioBlob && (
-          <button
-            type="button"
-            onClick={handleSaveToHomework}
-            disabled={isSaving || saveSuccess}
-            style={{
-              padding: '13px',
-              borderRadius: '14px',
-              border: 'none',
-              background: saveSuccess ? '#15803d' : '#34a853',
-              color: '#ffffff',
-              fontWeight: 900,
-              fontSize: '0.88rem',
-              cursor: (isSaving || saveSuccess) ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              boxShadow: '0 8px 24px -4px rgba(52, 168, 83, 0.4)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                <span>Wird im Hausaufgabenheft gespeichert...</span>
-              </>
-            ) : saveSuccess ? (
-              <>
-                <Check size={18} strokeWidth={3} />
-                <span>✓ Erfolgreich im Hausaufgabenheft eingetragen!</span>
-              </>
-            ) : (
-              <>
-                <Send size={16} />
-                <span>Ins Hausaufgabenheft von {studentFirstName} übertragen ➔</span>
-              </>
-            )}
-          </button>
+        {/* VIEW B: TEMPLATES LIBRARY */}
+        {viewState === 'templates' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', animation: 'fadeIn 0.15s ease' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <button 
+                type="button" 
+                onClick={() => setViewState('main')} 
+                style={{ 
+                  background: 'transparent', 
+                  border: 'none', 
+                  color: '#16a34a', 
+                  fontWeight: 800, 
+                  fontSize: '0.86rem',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                <ArrowLeft size={17} /> <span>Zurück zum Diktat</span>
+              </button>
+              <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#94a3b8' }}>
+                Tippen zum Einfügen
+              </span>
+            </div>
+
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.10rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                Vorlagen-Bibliothek
+              </h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.80rem', color: '#64748b', fontWeight: 500 }}>
+                Wähle einen Baustein für das Hausaufgabenheft von {studentFirstName}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '360px', overflowY: 'auto', paddingRight: '2px' }}>
+              {TEMPLATE_CATEGORIES.map((cat) => (
+                <div key={cat.id} style={{ background: '#f8fafc', borderRadius: '18px', border: '1px solid #e2e8f0', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155' }}>
+                    {renderCategoryIcon(cat.iconType)}
+                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#1e293b' }}>{cat.title}</span>
+                  </div>
+                  {cat.items.map((item) => (
+                    <button 
+                      key={item} 
+                      type="button" 
+                      onClick={() => { handleAppendPhrase(item); setViewState('main'); }} 
+                      style={{ 
+                        width: '100%', 
+                        padding: '10px 14px', 
+                        borderRadius: '12px', 
+                        border: '1px solid #e2e8f0', 
+                        textAlign: 'left', 
+                        background: '#ffffff',
+                        fontSize: '0.84rem',
+                        fontWeight: 650,
+                        color: '#0f172a',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        transition: 'all 0.12s ease'
+                      }}
+                    >
+                      <span>{item}</span>
+                      <Plus size={15} color="#16a34a" style={{ flexShrink: 0 }} />
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

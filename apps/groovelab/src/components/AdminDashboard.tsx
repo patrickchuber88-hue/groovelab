@@ -14707,6 +14707,7 @@ export function AdminDashboard({
       <StudentDetailModal 
         student={selectedStudent} 
         onClose={() => setSelectedStudent(null)} 
+        callerDashboard="teacher"
         onOpenBandProfile={(band) => {
           setEditingBand(band);
           setSelectedStudent(null);
@@ -16519,7 +16520,11 @@ export function AdminDashboard({
                                     {(() => {
                                       const pagesWithNotes = homeworkPages.filter(p => {
                                         if (!p.homeworkNotes) return false;
-                                        const cleanText = p.homeworkNotes.split('\n').filter((line: string) => !line.trim().startsWith('AUDIO:') && !line.trim().startsWith('STICKER:')).join('\n').trim();
+                                        const cleanText = p.homeworkNotes.split('\n').filter((line: string) => {
+                                            const trimmed = line.trim();
+                                            const lower = trimmed.toLowerCase();
+                                            return !trimmed.startsWith('AUDIO:') && !trimmed.startsWith('STICKER:') && !lower.startsWith('latency:') && !lower.startsWith('latency_calibration:') && !trimmed.startsWith('SYSTEM:') && !trimmed.startsWith('FEEDBACK:');
+                                          }).join('\n').trim();
                                         return cleanText !== '';
                                       });
                                       if (pagesWithNotes.length === 0) return null;
@@ -16536,7 +16541,11 @@ export function AdminDashboard({
                                           boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
                                         }}>
                                           {pagesWithNotes.map(p => {
-                                            const cleanText = p.homeworkNotes.split('\n').filter((line: string) => !line.trim().startsWith('AUDIO:') && !line.trim().startsWith('STICKER:')).join('\n').trim();
+                                            const cleanText = p.homeworkNotes.split('\n').filter((line: string) => {
+                                                const trimmed = line.trim();
+                                                const lower = trimmed.toLowerCase();
+                                                return !trimmed.startsWith('AUDIO:') && !trimmed.startsWith('STICKER:') && !lower.startsWith('latency:') && !lower.startsWith('latency_calibration:') && !trimmed.startsWith('SYSTEM:') && !trimmed.startsWith('FEEDBACK:');
+                                              }).join('\n').trim();
                                             return (
                                               <div key={`p-note-${p.num}`} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
                                                 <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {p.num}:</span>

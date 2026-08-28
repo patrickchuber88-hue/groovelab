@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench, Hash, Filter, Target } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench, Hash, Filter, Target, Printer, MessageSquare, Mail, Copy, ExternalLink } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
@@ -16,6 +16,9 @@ import { MeisterOhrSticker } from './MeisterOhrSticker';
 import { AudioEditorModal } from './campus/AudioEditorModal';
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
+import { generateStudentHomeworkPrintoutPDF } from '../utils/pdfGenerator';
+import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard } from '../utils/nameHelper';
+
 
 
 const getSimulatedNow = (): Date => {
@@ -32,6 +35,7 @@ import {
   getUnifiedStickerStatus, 
   getUnifiedStickersMap, 
   cleanNotesText, 
+  isInternalMetadataNote,
   checkIsAudioTresorActive,
   type StickerUnlockContext,
   type StickerUnlockResult
@@ -42,6 +46,7 @@ export {
   getUnifiedStickerStatus, 
   getUnifiedStickersMap, 
   cleanNotesText, 
+  isInternalMetadataNote,
   checkIsAudioTresorActive 
 };
 export type { StickerUnlockContext, StickerUnlockResult };
@@ -61,6 +66,8 @@ interface MeisterwerkDocumentationModalProps {
   student: Student;
   onClose: () => void;
   teacherId?: string;
+  teacherName?: string;
+  schoolName?: string;
   initialLehrwerkId?: string;
   initialViewMode?: 'document' | 'recordings' | 'loopstation' | 'practice';
   initialModalTab?: 'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography';
@@ -140,7 +147,7 @@ const getInstrumentAvatarUrl = (instrument: string | null | undefined): string =
   if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
   if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
   if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
+  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar.png';
   if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
   if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
   if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
@@ -205,15 +212,9 @@ export const getCleanPageNotes = (notes: any): string => {
   }
   return text
     .split('\n')
-    .filter((line: string) => {
-      const trimmed = line.trim();
-      return !trimmed.startsWith('AUDIO:') && 
-             !trimmed.startsWith('STICKER:') && 
-             !trimmed.startsWith('LOOP:') &&
-             !trimmed.startsWith('LATENCY:') &&
-             !trimmed.startsWith('STUDENT_NOTE_PUBLIC:') && 
-             !trimmed.startsWith('STUDENT_NOTE_PRIVATE:');
-    })
+    .filter((line: string) => !isInternalMetadataNote(line))
+    .map((line: string) => line.replace(/^[•\-\*\s]+/, '').trim())
+    .filter(Boolean)
     .join('\n')
     .trim();
 };
@@ -243,15 +244,9 @@ export const getCleanTeacherHomeworkText = (notes: any): string => {
   }
   return text
     .split('\n')
-    .filter((line: string) => {
-      const trimmed = line.trim();
-      return !trimmed.startsWith('AUDIO:') && 
-             !trimmed.startsWith('STICKER:') && 
-             !trimmed.startsWith('LOOP:') &&
-             !trimmed.startsWith('LATENCY:') &&
-             !trimmed.startsWith('STUDENT_NOTE_PUBLIC:') && 
-             !trimmed.startsWith('STUDENT_NOTE_PRIVATE:');
-    })
+    .filter((line: string) => !isInternalMetadataNote(line))
+    .map((line: string) => line.replace(/^[•\-\*\s]+/, '').trim())
+    .filter(Boolean)
     .join('\n')
     .trim();
 };
@@ -390,6 +385,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   student, 
   onClose, 
   teacherId, 
+  teacherName: propTeacherName,
+  schoolName: propSchoolName,
   initialLehrwerkId, 
   initialViewMode, 
   initialModalTab, 
@@ -1234,30 +1231,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   useEffect(() => {
     if (initialModalTab) {
       setActiveModalTab(initialModalTab);
+      if (initialModalTab === 'document') {
+        setActiveSubView('hub');
+        setHubTab('modules');
+        setActiveViewMode('document');
+      }
     }
   }, [initialModalTab]);
   const [simulatedStickers, setSimulatedStickers] = useState<Record<string, { count: number; details: { topic: string; date: string }[] }>>({});
   const currentSchoolYear = useMemo(() => getSchoolYearString(), []);
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>(currentSchoolYear);
-  const [simulatedSchoolYearData] = useState<Record<string, Record<string, { count: number; details: { topic: string; date: string }[] }>>>({
-    '2023/2024': {
-      'fleiss-pionier': { count: 1, details: [{ topic: 'Fleiß-Pionier (50 Min)', date: '2023-11-12' }] },
-      'uebe-meister': { count: 1, details: [{ topic: 'Übe-Meister (250 Min)', date: '2024-03-15' }] },
-      'xp-sammler': { count: 1, details: [{ topic: 'XP-Sammler', date: '2023-10-04' }] },
-      'dranbleiber': { count: 1, details: [{ topic: 'Dranbleiber', date: '2023-09-20' }] },
-      'erster-erfolg': { count: 1, details: [{ topic: 'Erster Erfolg', date: '2023-10-01' }] }
-    },
-    '2024/2025': {
-      'fleiss-pionier': { count: 1, details: [{ topic: 'Fleiß-Pionier', date: '2024-09-18' }] },
-      'uebe-meister': { count: 1, details: [{ topic: 'Übe-Meister', date: '2024-11-05' }] },
-      'uebe-legende': { count: 1, details: [{ topic: 'Übe-Legende (1000 Min)', date: '2025-04-10' }] },
-      'xp-sammler': { count: 1, details: [{ topic: 'XP-Sammler', date: '2024-09-22' }] },
-      'xp-champion': { count: 1, details: [{ topic: 'XP-Champion', date: '2025-01-14' }] },
-      'streak-koenig': { count: 1, details: [{ topic: 'Streak-König', date: '2025-02-02' }] },
-      'song-sammler': { count: 1, details: [{ topic: 'Song-Sammler', date: '2024-12-01' }] },
-      'stage-star': { count: 2, details: [{ topic: 'Stage-Star', date: '2025-06-20' }] }
-    }
-  });
 
   const simulateMultiYearProgress = () => {
     setSimulatedStickers({
@@ -2317,6 +2300,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       const targetTopic = topicNameContext || topicName || `Allgemein`;
       const dateStr = new Date().toISOString();
+      const stickerEntry = `STICKER:${stickerId}|${targetTopic.replace(/\|/g, '-')}|${dateStr}`;
+
+      // Update homeworkNotesList so handleSave and progressItems persist it
+      setHomeworkNotesList(prev => [...(prev || []), stickerEntry]);
 
       // Update simulatedStickers state so the Sticker Board renders the sticker immediately
       setSimulatedStickers(prev => {
@@ -2329,6 +2316,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }
         };
       });
+
+      // Persist directly to Supabase progress_matrix if activeItem or general row exists
+      if (!readOnly && student?.id) {
+        try {
+          const currentNotes = [...(homeworkNotesList || []), stickerEntry];
+          const specialNotes = currentNotes.filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
+          const effectiveGeneralNotes = latestGeneralHomeworkNotesRef.current || generalHomeworkNotes || '';
+          const finalNotesList = [...specialNotes];
+          if (effectiveGeneralNotes.trim().length > 0) {
+            effectiveGeneralNotes.split('\n').map((s: string) => s.trim()).filter(Boolean).forEach((line: string) => {
+              if (!finalNotesList.includes(line)) finalNotesList.push(line);
+            });
+          }
+          const targetTopicName = activeItem?.topic_name || topicName || 'Allgemeine Hausaufgabe';
+          await supabase.from('progress_matrix').upsert({
+            student_id: student.id,
+            topic_name: targetTopicName,
+            status: activeItem?.status || 'IN_PROGRESS',
+            is_current_homework: true,
+            homework_notes: JSON.stringify(finalNotesList),
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'student_id,topic_name' });
+        } catch (dbErr) {
+          console.warn('Could not directly persist sticker award to progress_matrix:', dbErr);
+        }
+      }
 
       await fetchProgress();
       notifyHomeworkChange();
@@ -3982,9 +3995,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     if (!notesText || !notesText.trim()) return [];
     return notesText
       .split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('AUDIO:') && !s.startsWith('STICKER:') && !s.startsWith('FEEDBACK:') && !s.startsWith('STUDENT_NOTE_'));
+      .map(s => s.replace(/^[•\-\*\s]+/, '').trim())
+      .filter(s => s.length > 0 && !isInternalMetadataNote(s));
   };
+
 
   const handleDeleteSingleNoteItem = (indexToDelete: number) => {
     const current = latestGeneralHomeworkNotesRef.current !== undefined
@@ -7031,49 +7045,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const renderSchoolYearSelector = () => {
-    const [cStartYear] = currentSchoolYear.split('/').map(Number);
-    const options = [
-      currentSchoolYear,
-      `${cStartYear - 1}/${cStartYear}`,
-      `${cStartYear - 2}/${cStartYear - 1}`
-    ];
-
     return (
-      <div style={{ position: 'relative', display: 'inline-block' }}>
-        <select
-          value={selectedSchoolYear}
-          onChange={(e) => setSelectedSchoolYear(e.target.value)}
-          style={{
-            background: selectedSchoolYear === currentSchoolYear 
-              ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
-              : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-            border: '2px solid #fef3c7',
-            color: '#ffffff',
-            borderRadius: '999px',
-            padding: '8px 36px 8px 16px',
-            fontSize: '0.86rem',
-            fontWeight: 900,
-            cursor: 'pointer',
-            outline: 'none',
-            boxShadow: '0 4px 16px rgba(245, 158, 11, 0.4)',
-            transition: 'all 0.15s ease',
-            appearance: 'none',
-            WebkitAppearance: 'none'
-          }}
-        >
-          <option value={currentSchoolYear} style={{ color: '#0f172a', fontWeight: 800 }}>
-            🎓 Schuljahr {currentSchoolYear} (Aktuell)
-          </option>
-          {options.slice(1).map(sy => (
-            <option key={sy} value={sy} style={{ color: '#0f172a', fontWeight: 800 }}>
-              🏆 Schuljahr {sy} (Hall of Fame Archiv)
-            </option>
-          ))}
-        </select>
-        <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#ffffff', fontSize: '0.7rem' }}>
-          ▼
-        </div>
-      </div>
+      <span style={{
+        background: '#f8fafc',
+        border: '1px solid #e2e8f0',
+        color: '#475569',
+        fontSize: '0.72rem',
+        fontWeight: 800,
+        padding: '3px 10px',
+        borderRadius: '20px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px',
+        letterSpacing: '0.01em'
+      }}>
+        🎓 Schuljahr {currentSchoolYear}
+      </span>
     );
   };
 
@@ -7112,10 +7099,344 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     );
   };
 
+  const getCurrentHomeworkSnapshot = () => {
+    // 1. School & Teacher Names
+    let tName = propTeacherName || (student as any)?.teacher_name || (student as any)?.teacher?.name || '';
+    let sName = propSchoolName || (student as any)?.school_name || (student as any)?.schools?.name || '';
+
+    try {
+      const storedTeacher = localStorage.getItem('groovelab_user') || localStorage.getItem('campus_user');
+      if (storedTeacher) {
+        const parsed = JSON.parse(storedTeacher);
+        if (!tName && parsed.first_name) {
+          tName = `${parsed.first_name} ${parsed.last_name || ''}`.trim();
+        }
+        if (!sName && parsed.school_name) {
+          sName = parsed.school_name;
+        }
+      }
+      if (!sName) {
+        sName = localStorage.getItem('groovelab_school_name') || localStorage.getItem('campus_school_name') || '';
+      }
+    } catch {}
+
+    const rawTeacher = tName || (student as any)?.teacher_name || (student as any)?.teacher?.name || 'Severin Landenberger';
+    const finalTeacher = formatTeacherFullName(rawTeacher);
+    const finalSchool = sName || 'Campus-Groovelab Musikschule';
+    const finalInstrument = (student as any)?.instrument || (student as any)?.instrument_name || 'Gitarre';
+    const stName = `${student.first_name || ''} ${student.last_name ? student.last_name.trim().charAt(0) + '.' : ''}`.trim() || 'Schüler/in';
+    const stFirstName = (student.first_name || (student as any)?.name?.split(' ')[0] || 'Schüler').trim();
+    const targetToken = (student as any)?.qr_token || (student as any)?.ausweis_nummer || student?.id;
+    const appUrl = `https://app.campus-groovelab.de/qr/${targetToken}`;
+    const weekNum = getISOWeek().split('-W')[1] || '';
+
+    // 2. Build 1:1 Structured Items
+    const items: Array<{ type: 'song' | 'lehrwerk' | 'note'; title: string; subtitle?: string; notes?: string }> = [];
+
+    // 2a. Songs from progressItems / activeSongSkills
+    const uniqueItemsMap = new Map<string, any>();
+    (progressItems || []).forEach(item => {
+      const canonicalKey = getCanonicalSongKey(item);
+      const normTitle = getNormalizedSongTitle(item).toLowerCase();
+      const name = canonicalKey || normTitle || (item.topic_name || '').trim().toLowerCase();
+      if (name && !uniqueItemsMap.has(name)) {
+        uniqueItemsMap.set(name, item);
+      }
+    });
+
+    const currentSongs: any[] = [];
+    Array.from(uniqueItemsMap.values()).forEach(item => {
+      if (item.is_current_homework && !item.topic_name?.includes(' - Seite ') && !item.topic_name?.startsWith('Hausaufgabe KW ')) {
+        const rawArtist = (item.songs?.artist || item.artist || '').trim();
+        const rawTitle = (item.songs?.title || item.song_title || item.title || '').trim();
+        let displayTitle = rawTitle ? (rawArtist ? `${rawArtist} - ${rawTitle}` : rawTitle) : (item.topic_name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+        displayTitle = formatSongTitleCase(displayTitle);
+        const cachedNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
+                           localStorage.getItem(`song_note_${student.id}_${item.song_id}`) ||
+                           item.homework_notes || '';
+        const cleanNote = capitalizeFirstLetter(getCleanPageNotes(cachedNote));
+        currentSongs.push({
+          title: displayTitle || 'Song',
+          notes: cleanNote
+        });
+      }
+    });
+
+    (activeSongSkills || []).forEach(skill => {
+      const isHwInLs = localStorage.getItem(`song_hw_${student.id}_${skill.id}`) === 'true' ||
+                       localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true';
+      if (isHwInLs) {
+        const rawArtist = (skill.songs?.artist || skill.artist || '').trim();
+        const rawTitle = (skill.songs?.title || skill.song_title || skill.title || '').trim();
+        let displayTitle = rawTitle ? (rawArtist ? `${rawArtist} - ${rawTitle}` : rawTitle) : (skill.topic_name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+        displayTitle = formatSongTitleCase(displayTitle);
+        if (!currentSongs.some(s => s.title.toLowerCase() === displayTitle.toLowerCase())) {
+          const cachedNote = localStorage.getItem(`song_note_${student.id}_${skill.id}`) ||
+                             localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) || '';
+          const cleanNote = capitalizeFirstLetter(getCleanPageNotes(cachedNote));
+          currentSongs.push({
+            title: displayTitle || 'Song',
+            notes: cleanNote
+          });
+        }
+      }
+    });
+
+    currentSongs.forEach(song => {
+      items.push({
+        type: 'song',
+        title: song.title,
+        notes: song.notes ? `📌 Fahrplan: ${song.notes}` : undefined
+      });
+    });
+
+    // 2b. Lehrwerke from assignedLehrwerke
+    const groupedLehrwerke: Record<string, { pages: number[]; notes: string[] }> = {};
+    (assignedLehrwerke || []).forEach(assignment => {
+      const book = globalLehrwerke.find(g => g.id === assignment.lehrwerkId);
+      if (!book || !assignment.pageStates) return;
+      Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
+        if (pState?.status === 'homework' || pState?.isCurrentHomework) {
+          const pageNum = parseInt(pNumStr, 10);
+          if (!isNaN(pageNum)) {
+            if (!groupedLehrwerke[book.title]) {
+              groupedLehrwerke[book.title] = { pages: [], notes: [] };
+            }
+            if (!groupedLehrwerke[book.title].pages.includes(pageNum)) {
+              groupedLehrwerke[book.title].pages.push(pageNum);
+              const cleanNote = capitalizeFirstLetter(getCleanPageNotes(pState.homeworkNotes || pState.homework_notes));
+              if (cleanNote) {
+                groupedLehrwerke[book.title].notes.push(`Seite ${pageNum}: ${cleanNote}`);
+              }
+            }
+          }
+        }
+      });
+    });
+
+    Object.entries(groupedLehrwerke).forEach(([title, info]) => {
+      info.pages.sort((a, b) => a - b);
+      const pagesLabel = info.pages.length > 0 ? ` (S. ${info.pages.join(', ')})` : '';
+      items.push({
+        type: 'lehrwerk',
+        title: `${title}${pagesLabel}`,
+        notes: info.notes.length > 0 ? info.notes.join('; ') : undefined
+      });
+    });
+
+    // 2c. Additional Homework Notes & Quick-Chips
+    const noteItems = getHomeworkNoteItems(generalHomeworkNotes);
+    if (noteItems.length > 0) {
+      noteItems.forEach(note => {
+        const cleanT = capitalizeFirstLetter(cleanNotesText(note).trim());
+        if (cleanT && !cleanT.startsWith('[AUDIO:') && !cleanT.startsWith('AUDIO:')) {
+          items.push({
+            type: 'note',
+            title: cleanT
+          });
+        }
+      });
+    }
+
+    if (homeworkNotesList && homeworkNotesList.length > 0) {
+      homeworkNotesList.forEach(note => {
+        const cleanT = capitalizeFirstLetter(cleanNotesText(note).trim());
+        if (cleanT && !cleanT.startsWith('[AUDIO:') && !cleanT.startsWith('AUDIO:') && !items.some(it => it.title === cleanT)) {
+          items.push({
+            type: 'note',
+            title: cleanT
+          });
+        }
+      });
+    }
+
+    if (items.length === 0) {
+      items.push({
+        type: 'note',
+        title: 'Aktuelle Übungen aus dem Unterricht wie besprochen fortführen.'
+      });
+    }
+
+    // 3. Audio Recordings List
+    const audioList: Array<{ label: string; duration?: string; url?: string }> = (homeworkNotesList || [])
+      .map((note, idx) => ({ note: typeof note === 'string' ? note : String(note || ''), idx }))
+      .filter(item => item.note.includes("AUDIO:"))
+      .map((item, index) => {
+        const cleanStr = item.note.startsWith('[') ? item.note.replace(/[\[\]"]/g, '') : item.note;
+        const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+        const durSec = parseInt(parts[1] || '0', 10);
+        const durStr = durSec > 0 ? `${Math.floor(durSec / 60)}:${String(durSec % 60).padStart(2, '0')}` : undefined;
+        const rawLabel = parts[3]?.trim() || `Aufnahme #${index + 1}`;
+        return {
+          label: capitalizeFirstLetter(rawLabel),
+          duration: durStr,
+          url: parts[0]?.trim()
+        };
+      })
+      .filter(a => !!a.url);
+
+    return {
+      studentName: stName,
+      studentFirstName: stFirstName,
+      teacherName: finalTeacher,
+      schoolName: finalSchool,
+      instrument: finalInstrument,
+      weekNumber: weekNum,
+      date: new Date().toLocaleDateString('de-DE'),
+      qrToken: targetToken,
+      appUrl,
+      items,
+      audioRecordings: audioList
+    };
+  };
+
+  const handlePrintCurrentHomework = async () => {
+    try {
+      const snap = getCurrentHomeworkSnapshot();
+      await generateStudentHomeworkPrintoutPDF({
+        schoolName: snap.schoolName,
+        studentName: snap.studentName,
+        instrument: snap.instrument,
+        teacherName: snap.teacherName,
+        items: snap.items,
+        audioRecordings: snap.audioRecordings,
+        weekNumber: snap.weekNumber,
+        date: snap.date,
+        qrToken: snap.qrToken,
+        hasAudioRecordings: snap.audioRecordings.length > 0
+      });
+    } catch (err) {
+      console.warn('[PrintHomework] PDF Generation error:', err);
+    }
+  };
+
+  const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
+  const [isLinkCopied, setIsLinkCopied] = useState(false);
+  const shareMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
+        setIsShareMenuOpen(false);
+      }
+    };
+    if (isShareMenuOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isShareMenuOpen]);
+
+  const getHomeworkFormattedSummary = () => {
+    const snap = getCurrentHomeworkSnapshot();
+    const sections: string[] = [];
+
+    // 1. Lehrwerke (mit Seiten)
+    const lehrwerke = snap.items.filter(it => it.type === 'lehrwerk');
+    if (lehrwerke.length > 0) {
+      const lwLines = lehrwerke.map(lw => {
+        if (lw.notes) {
+          const cleanN = capitalizeFirstLetter(lw.notes.replace(/^📌\s*/, '').trim());
+          return `📖 *${lw.title}*\n   Notiz: ${cleanN}`;
+        }
+        return `📖 *${lw.title}*`;
+      });
+      sections.push(lwLines.join('\n\n'));
+    }
+
+    // 2. Songs (mit Titel & Fahrplan)
+    const songs = snap.items.filter(it => it.type === 'song');
+    if (songs.length > 0) {
+      const songLines = songs.map(s => {
+        if (s.notes) {
+          const cleanF = capitalizeFirstLetter(s.notes.replace(/^📌\s*(Fahrplan:\s*)?/i, '').trim());
+          return `🎵 *${s.title}*\n📌 *Fahrplan:* ${cleanF}`;
+        }
+        return `🎵 *${s.title}*`;
+      });
+      sections.push(songLines.join('\n\n'));
+    }
+
+    // 3. Zusatz-Notizen
+    const notes = snap.items.filter(it => it.type === 'note');
+    if (notes.length > 0) {
+      const noteLines = notes.map(n => `📝 ${capitalizeFirstLetter(n.title)}`);
+      sections.push(noteLines.join('\n'));
+    }
+
+    // 4. Namentliche Unterrichtsaufnahmen mit Laufzeit
+    if (snap.audioRecordings && snap.audioRecordings.length > 0) {
+      const audioLines = snap.audioRecordings.map(a => {
+        const dur = a.duration ? ` (${a.duration})` : '';
+        return `• ${capitalizeFirstLetter(a.label)}${dur}`;
+      });
+      sections.push(`🎙️ *Unterrichtsaufnahmen (${snap.audioRecordings.length}):*\n${audioLines.join('\n')}`);
+    }
+
+    const tasksBlock = sections.length > 0 
+      ? sections.join('\n\n') 
+      : '• Aktuelle Übungen aus dem Unterricht wie besprochen fortführen.';
+
+    const shareSubject = `Hausaufgaben KW ${snap.weekNumber} - ${snap.schoolName}`;
+    const shareBody = `🎵 *Campus-Groovelab • ${snap.schoolName}*\n*Wochenplan (KW ${snap.weekNumber})*\n\nHallo ${snap.studentFirstName},\n\nHier sind deine Übe-Ziele für diese Woche:\n\n${tasksBlock}\n\n📱 *Unterrichtsaufnahmen & Fokus-Timer in der Web-App:*\n👉 ${snap.appUrl}\n\nViele Grüße,\n${snap.teacherName}`;
+
+    return {
+      shareSubject,
+      shareBody,
+      appUrl: snap.appUrl
+    };
+  };
+
+  const handleShareWhatsApp = () => {
+    const { shareBody } = getHomeworkFormattedSummary();
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareBody)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+    setIsShareMenuOpen(false);
+  };
+
+  const handleShareEmail = () => {
+    const { shareSubject, shareBody } = getHomeworkFormattedSummary();
+    const mailUrl = `mailto:?subject=${encodeURIComponent(shareSubject)}&body=${encodeURIComponent(shareBody)}`;
+    window.location.href = mailUrl;
+    setIsShareMenuOpen(false);
+  };
+
+  const handleCopyShareLink = () => {
+    try {
+      const { shareBody } = getHomeworkFormattedSummary();
+      const success = copyTextToClipboard(shareBody);
+      if (success) {
+        setIsLinkCopied(true);
+        setTimeout(() => setIsLinkCopied(false), 2500);
+      }
+    } catch (e) {
+      console.warn('Clipboard write failed', e);
+    }
+  };
+
+  const handleNativeShare = async () => {
+    const { shareSubject, shareBody, appUrl } = getHomeworkFormattedSummary();
+    if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      try {
+        await navigator.share({
+          title: shareSubject,
+          text: shareBody,
+          url: appUrl
+        });
+        setIsShareMenuOpen(false);
+      } catch (err) {
+        // Fallback / dismissed
+      }
+    }
+  };
+
+
+
   const renderCloseButton = () => {
     if (isEmbed) return null;
     return (
       <button
+
+
         type="button"
         onClick={handleClose}
         style={{
@@ -7144,6 +7465,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       </button>
     );
   };
+
+
 
   const isMobileOrSim = isFullscreen || isMobileView || isInsideSim || (typeof window !== 'undefined' && window.innerWidth < 1024);
 
@@ -9941,7 +10264,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 <span>Studio Master</span>
                               </div>
                               <span style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.3 }}>
-                                High-End Dynamik-EQ, Röhrenwärme & Stereo-Breite (-13 LUFS).
+                                High-End Dynamik-EQ, Röhrenwärme & Stereo-Breite.
                               </span>
                             </div>
                           </div>
@@ -10135,29 +10458,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
             {activeSubView === 'history' ? (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', overflowY: 'auto', padding: '24px' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveSubView('hub')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: '#f1f5f9',
-                    border: 'none',
-                    color: '#475569',
-                    padding: '8px 14px',
-                    borderRadius: '20px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    width: 'fit-content',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  className="hover-scale"
-                >
-                  <span>← Zurück zum Hub</span>
-                </button>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><BookOpen size={18} style={{ color: '#34a853', verticalAlign: 'middle' }} /> Hausaufgaben-Archiv</span>
@@ -10469,30 +10769,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', flex: 1, overflowY: 'auto', padding: '24px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveSubView('hub')}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: '#f1f5f9',
-                        border: 'none',
-                        color: '#475569',
-                        padding: '8px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.74rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        width: 'fit-content',
-                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <span>← Zurück zum Hub</span>
-                    </button>
-
                     {/* Textbook Cover Card */}
                     <div style={{
                       background: 'white',
@@ -11020,32 +11296,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', flex: 1, overflowY: 'auto', padding: '24px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleBackToHub();
-                      }}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: '#f1f5f9',
-                        border: 'none',
-                        color: '#475569',
-                        padding: '8px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.74rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        width: 'fit-content',
-                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <span>← Zurück zum Hub</span>
-                    </button>
-
                     {/* Song Cover Card */}
                     <div style={{
                       background: 'white',
@@ -15304,7 +15554,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   .filter(a => !!a.url);
 
                                 homeworkNoteItems = parsedNotes
-                                  .filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_'))
+                                  .filter((n: string) => {
+                                    if (typeof n !== 'string') return false;
+                                    const lower = n.toLowerCase();
+                                    return !n.startsWith('AUDIO:') && 
+                                           !n.startsWith('STICKER:') && 
+                                           !n.startsWith('LOOP:') &&
+                                           !lower.startsWith('latency:') && 
+                                           !lower.startsWith('latency_calibration:') && 
+                                           !n.startsWith('SYSTEM:') && 
+                                           !n.startsWith('FEEDBACK:') && 
+                                           !n.startsWith('STUDENT_NOTE_');
+                                  })
                                   .map((s: string) => s.trim())
                                   .filter(Boolean);
                               } else if (typeof parsedNotes === 'string') {
@@ -15494,6 +15755,222 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     </>
                                   )}
                                 </button>
+
+                                {/* ↗ Unified Share & Print Action Hub (Apple-Grade 2026 Goldstandard) */}
+                                <div ref={shareMenuRef} style={{ position: 'relative' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsShareMenuOpen(prev => !prev)}
+                                    style={{
+                                      background: isShareMenuOpen ? '#ffffff' : '#f8fafc',
+                                      border: '1px solid #e2e8f0',
+                                      color: '#0f172a',
+                                      borderRadius: '100px',
+                                      padding: '5px 11px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 750,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      transition: 'all 0.15s ease',
+                                      boxShadow: isShareMenuOpen ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
+                                    }}
+                                    className="hover-scale"
+                                    title="Hausaufgabe teilen, per WhatsApp/Mail senden oder drucken"
+                                  >
+                                    <Share2 size={12} color="#475569" strokeWidth={2.2} />
+                                    <span>Teilen & Drucken</span>
+                                    <ChevronDown 
+                                      size={11} 
+                                      color="#64748b" 
+                                      style={{ 
+                                        transform: isShareMenuOpen ? 'rotate(180deg)' : 'none', 
+                                        transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1)' 
+                                      }} 
+                                    />
+                                  </button>
+
+                                  {isShareMenuOpen && (
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        top: 'calc(100% + 6px)',
+                                        right: 0,
+                                        zIndex: 9999,
+                                        minWidth: '240px',
+                                        background: '#ffffff',
+                                        borderRadius: '16px',
+                                        border: '1px solid #e2e8f0',
+                                        boxShadow: '0 16px 36px -4px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(0,0,0,0.05)',
+                                        padding: '6px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '2px',
+                                        animation: 'fadeIn 0.15s ease'
+                                      }}
+                                    >
+                                      {/* 1. DIN A5 PDF Drucken */}
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          setIsShareMenuOpen(false);
+                                          await handlePrintCurrentHomework();
+                                        }}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          width: '100%',
+                                          padding: '8px 10px',
+                                          background: 'transparent',
+                                          border: 'none',
+                                          borderRadius: '10px',
+                                          cursor: 'pointer',
+                                          textAlign: 'left',
+                                          color: '#0f172a',
+                                          fontSize: '0.78rem',
+                                          fontWeight: 750,
+                                          transition: 'background 0.12s ease'
+                                        }}
+                                        className="hover-bg-slate"
+                                      >
+                                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
+                                          <Printer size={14} strokeWidth={2.2} />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                          <span>DIN A5 PDF drucken</span>
+                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>Mit QR-Code für Notenständer</span>
+                                        </div>
+                                      </button>
+
+                                      {/* 2. WhatsApp */}
+                                      <button
+                                        type="button"
+                                        onClick={handleShareWhatsApp}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          width: '100%',
+                                          padding: '8px 10px',
+                                          background: 'transparent',
+                                          border: 'none',
+                                          borderRadius: '10px',
+                                          cursor: 'pointer',
+                                          textAlign: 'left',
+                                          color: '#0f172a',
+                                          fontSize: '0.78rem',
+                                          fontWeight: 750,
+                                          transition: 'background 0.12s ease'
+                                        }}
+                                        className="hover-bg-slate"
+                                      >
+                                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
+                                          <MessageSquare size={14} strokeWidth={2.2} />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                          <span>Per WhatsApp senden</span>
+                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>Direkt an Schüler oder Eltern</span>
+                                        </div>
+                                      </button>
+
+                                      {/* 3. E-Mail */}
+                                      <button
+                                        type="button"
+                                        onClick={handleShareEmail}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          width: '100%',
+                                          padding: '8px 10px',
+                                          background: 'transparent',
+                                          border: 'none',
+                                          borderRadius: '10px',
+                                          cursor: 'pointer',
+                                          textAlign: 'left',
+                                          color: '#0f172a',
+                                          fontSize: '0.78rem',
+                                          fontWeight: 750,
+                                          transition: 'background 0.12s ease'
+                                        }}
+                                        className="hover-bg-slate"
+                                      >
+                                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', flexShrink: 0 }}>
+                                          <Mail size={14} strokeWidth={2.2} />
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                          <span>Per E-Mail versenden</span>
+                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>Wochenplan als Nachricht</span>
+                                        </div>
+                                      </button>
+
+                                      {/* 4. Link & Text kopieren */}
+                                      <button
+                                        type="button"
+                                        onClick={handleCopyShareLink}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          width: '100%',
+                                          padding: '8px 10px',
+                                          background: isLinkCopied ? '#f0fdf4' : 'transparent',
+                                          border: 'none',
+                                          borderRadius: '10px',
+                                          cursor: 'pointer',
+                                          textAlign: 'left',
+                                          color: isLinkCopied ? '#16a34a' : '#0f172a',
+                                          fontSize: '0.78rem',
+                                          fontWeight: 750,
+                                          transition: 'all 0.12s ease'
+                                        }}
+                                        className="hover-bg-slate"
+                                      >
+                                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: isLinkCopied ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isLinkCopied ? '#16a34a' : '#475569', flexShrink: 0 }}>
+                                          {isLinkCopied ? <Check size={14} strokeWidth={2.5} /> : <Copy size={14} strokeWidth={2.2} />}
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                          <span>{isLinkCopied ? 'Kopiert!' : 'Text & Link kopieren'}</span>
+                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: isLinkCopied ? '#16a34a' : '#64748b' }}>In Zwischenablage legen</span>
+                                        </div>
+                                      </button>
+
+                                      {/* 5. Optional Native System Share (AirDrop / OS Dialog) */}
+                                      {typeof navigator !== 'undefined' && 'share' in navigator && (
+                                        <button
+                                          type="button"
+                                          onClick={handleNativeShare}
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            width: '100%',
+                                            padding: '7px 10px',
+                                            marginTop: '2px',
+                                            borderTop: '1px solid #f1f5f9',
+                                            background: 'transparent',
+                                            borderRadius: '8px',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                            color: '#64748b',
+                                            fontSize: '0.70rem',
+                                            fontWeight: 650,
+                                            transition: 'background 0.12s ease'
+                                          }}
+                                          className="hover-bg-slate"
+                                        >
+                                          <ExternalLink size={12} strokeWidth={2} />
+                                          <span>System-Menü / AirDrop öffnen…</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+
 
                                 {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '') && !readOnly && (
                                   <button 
@@ -16037,7 +16514,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       borderTop: (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0) ? '1px dashed #e2e8f0' : 'none'
                                     }}>
                                       {homeworkNoteItems
-                                        .filter(item => !selectedCategoryFilter || item.toLowerCase().includes(selectedCategoryFilter.toLowerCase()))
+                                        .filter(item => {
+                                          if (!item || typeof item !== 'string') return false;
+                                          const lower = item.toLowerCase();
+                                          if (lower.startsWith('latency:') || lower.startsWith('latency_calibration:') || item.startsWith('SYSTEM:') || item.startsWith('STICKER:') || item.startsWith('AUDIO:') || item.startsWith('LOOP:')) return false;
+                                          return !selectedCategoryFilter || item.toLowerCase().includes(selectedCategoryFilter.toLowerCase());
+                                        })
                                         .map((noteItem, nIdx) => {
                                         const isSpeakingThisNote = isTtsSpeaking && activeTtsKey === `general_note_${nIdx}`;
                                         const currentTag = DIDACTIC_QUICK_TAGS.find(t => noteItem.includes(t.tag));
@@ -16546,33 +17028,35 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                             </button>
                                           </div>
 
-                                          {/* Speech Dictation Button */}
-                                          <SpeechDictationButton
-                                            onTranscript={(text) => {
-                                              if (activeNoteTarget === 'student') {
-                                                const current = latestGeneralHomeworkNotesRef.current !== undefined
-                                                  ? latestGeneralHomeworkNotesRef.current
-                                                  : generalHomeworkNotes;
-                                                const trimmed = current.trim();
-                                                const next = trimmed ? `${trimmed}\n${text}` : text;
-                                                latestGeneralHomeworkNotesRef.current = next;
-                                                setGeneralHomeworkNotes(next);
-                                                try { localStorage.setItem(`campus_homework_notes_${student.id}`, next); } catch {}
-                                              } else {
-                                                const current = latestTeacherNotesRef.current !== undefined
-                                                  ? latestTeacherNotesRef.current
-                                                  : teacherNotes;
-                                                const trimmed = current.trim();
-                                                const next = trimmed ? `${trimmed}\n${text}` : text;
-                                                latestTeacherNotesRef.current = next;
-                                                setTeacherNotes(next);
-                                                try { localStorage.setItem(`campus_teacher_notes_${student.id}`, next); } catch {}
-                                              }
-                                              triggerDebouncedAutoSave(350);
-                                            }}
-                                            title="Diktieren"
-                                          />
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <SpeechDictationButton
+                                              onTranscript={(text) => {
+                                                if (activeNoteTarget === 'student') {
+                                                  const current = latestGeneralHomeworkNotesRef.current !== undefined
+                                                    ? latestGeneralHomeworkNotesRef.current
+                                                    : generalHomeworkNotes;
+                                                  const trimmed = current.trim();
+                                                  const next = trimmed ? `${trimmed}\n${text}` : text;
+                                                  latestGeneralHomeworkNotesRef.current = next;
+                                                  setGeneralHomeworkNotes(next);
+                                                  try { localStorage.setItem(`campus_homework_notes_${student.id}`, next); } catch {}
+                                                } else {
+                                                  const current = latestTeacherNotesRef.current !== undefined
+                                                    ? latestTeacherNotesRef.current
+                                                    : teacherNotes;
+                                                  const trimmed = current.trim();
+                                                  const next = trimmed ? `${trimmed}\n${text}` : text;
+                                                  latestTeacherNotesRef.current = next;
+                                                  setTeacherNotes(next);
+                                                  try { localStorage.setItem(`campus_teacher_notes_${student.id}`, next); } catch {}
+                                                }
+                                                triggerDebouncedAutoSave(350);
+                                              }}
+                                              title="Diktieren"
+                                            />
+                                          </div>
                                         </div>
+
 
                                         {/* Notice Pill when in historical or future week */}
                                         {viewingWeekOffset !== 0 && activeNoteTarget === 'student' && (
@@ -16880,32 +17364,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             }
           `}} />
 
-          {/* TOP BAR: Back to Hub Button */}
-          <div style={{ flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: '#ffffff',
-                border: '1.5px solid #e2e8f0',
-                color: '#334155',
-                padding: '7px 14px',
-                borderRadius: '20px',
-                fontSize: '0.75rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                width: 'fit-content',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale"
-            >
-              <span>← Zurück zum Hub</span>
-            </button>
-          </div>
 
           {/* SIMULATOR TOGGLE BAR (Dev Mode Only) */}
           {!readOnly && isDevEnvironment() && (
@@ -16992,63 +17450,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
           {/* ALBUM HEADER & PROGRESS TRACKER HERO BANNER (APPLE SQUIRCLE WHITE STAGE) */}
           {(() => {
-            const activeStickerSource = selectedSchoolYear === currentSchoolYear 
-              ? collectedStickers 
-              : (simulatedSchoolYearData[selectedSchoolYear] || {});
-
+            const activeStickerSource = collectedStickers;
             const totalCount = ALL_STICKERS.length;
             const collectedCount = ALL_STICKERS.filter(st => (activeStickerSource[st.id]?.count || 0) > 0).length;
             const percentage = Math.round((collectedCount / totalCount) * 100);
-
-            if (selectedSchoolYear !== currentSchoolYear) {
-              return (
-                <div style={{
-                  background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 40%, #ffffff 100%)',
-                  borderRadius: '20px',
-                  padding: isMobileOrSim ? '16px' : '20px 24px',
-                  color: '#1e293b',
-                  boxShadow: '0 8px 24px -4px rgba(245, 158, 11, 0.12), 0 1px 3px rgba(0,0,0,0.02)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  border: '1.5px solid #fde68a',
-                  flexShrink: 0,
-                  width: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', position: 'relative', zIndex: 2 }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.5rem' }}>🏛️</span>
-                        <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, letterSpacing: '-0.4px', color: '#92400e' }}>
-                          Schuljahr-Ehrentafel {selectedSchoolYear}
-                        </h2>
-                        {renderSchoolYearSelector()}
-                      </div>
-                      <p style={{ margin: 0, fontSize: '0.82rem', color: '#78350f', fontWeight: 600, maxWidth: '580px', lineHeight: '1.4' }}>
-                        Abgeheftete Meilensteine aus dem Schuljahr {selectedSchoolYear}. Alle gelernten Songs & Lehrwerke bleiben lebenslang im Repertoire!
-                      </p>
-                    </div>
-
-                    <div style={{
-                      background: '#ffffff',
-                      border: '1.5px solid #fcd34d',
-                      borderRadius: '16px',
-                      padding: '10px 18px',
-                      textAlign: 'right',
-                      boxShadow: '0 2px 8px rgba(245, 158, 11, 0.1)',
-                      flexShrink: 0
-                    }}>
-                      <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 900, color: '#d97706' }}>
-                        SIEGEL {selectedSchoolYear}
-                      </span>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#92400e', marginTop: '2px' }}>
-                        {collectedCount} Trophäen ✓
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
 
             let rankTitle = '🌱 Rookie-Sammler';
             if (percentage >= 100) rankTitle = '👑 Master Collector';
@@ -17292,9 +17697,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               .filter(cat => stickerCategoryFilter === 'all' || cat.id === stickerCategoryFilter)
               .map(cat => {
                 const categoryStickers = ALL_STICKERS.filter(st => st.category === cat.id);
-                const activeStickerSource = selectedSchoolYear === currentSchoolYear 
-                  ? collectedStickers 
-                  : (simulatedSchoolYearData[selectedSchoolYear] || {});
+                const activeStickerSource = collectedStickers;
                 const catCollectedCount = categoryStickers.filter(st => (activeStickerSource[st.id]?.count || 0) > 0).length;
                 const isCatComplete = catCollectedCount === categoryStickers.length;
 
@@ -18284,29 +18687,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               ))}
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: '#f1f5f9',
-              border: 'none',
-              color: '#475569',
-              padding: '8px 14px',
-              borderRadius: '20px',
-              fontSize: '0.74rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              width: 'fit-content',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-              transition: 'all 0.15s ease'
-            }}
-            className="hover-scale"
-          >
-            <span>← Zurück zum Hub</span>
-          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
             <span style={{ fontSize: '1.25rem' }}>🏆</span>
             <span style={{

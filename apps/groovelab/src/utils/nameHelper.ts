@@ -248,19 +248,40 @@ export function useRealNamesVisibility() {
  */
 export function cleanHomeworkNotesText(text: string | null | undefined): string {
   if (!text) return '';
-  return text
+  let raw = text;
+  if (raw.startsWith('[') || raw.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        raw = parsed.join('\n');
+      } else {
+        raw = String(parsed);
+      }
+    } catch {}
+  }
+  return raw
     .split('\n')
     .map(line => {
       let l = line.trim();
       if (!l) return '';
-      if (l.startsWith('LATENCY:') || l.startsWith('STICKER:') || l.startsWith('AUDIO:') || l === 'Inhalte in der Premium-Version freischalten') {
+      const lower = l.toLowerCase();
+      if (
+        lower.includes('latency:') || 
+        lower.includes('latency_calibration:') || 
+        l.startsWith('STICKER:') || 
+        l.startsWith('AUDIO:') || 
+        l.startsWith('LOOP:') ||
+        l.startsWith('SYSTEM:') ||
+        l.startsWith('FEEDBACK:') ||
+        l === 'Inhalte in der Premium-Version freischalten'
+      ) {
         return '';
       }
       l = l.replace(/LATENCY:\s*\d+/gi, '')
            .replace(/STICKER:[^\s\n·]*/gi, '')
            .replace(/\s*:\s*(?=·|$|\n)/g, '')
            .replace(/\s*·\s*·\s*/g, ' · ')
-           .replace(/^\s*[·\s:]+/, '')
+           .replace(/^\s*[·\s:•\-\*]+/, '')
            .replace(/[·\s:]+$/, '')
            .trim();
       return l;
@@ -423,5 +444,71 @@ export function formatDisplaySubjectOrInstrument(
   return 'Gitarre';
 }
 
+/**
+ * Capitalizes the first letter of a string (sentence casing)
+ */
+export function capitalizeFirstLetter(str?: string | null): string {
+  if (!str) return '';
+  const trimmed = str.trim();
+  if (!trimmed) return '';
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
 
+/**
+ * Formats a song title with proper Title Casing if entered in all lowercase
+ */
+export function formatSongTitleCase(str?: string | null): string {
+  if (!str) return '';
+  const trimmed = str.trim();
+  if (!trimmed) return '';
+  // If it already contains mixed case, preserve it
+  if (trimmed !== trimmed.toLowerCase()) return trimmed;
+  // If entirely lowercase, capitalize each word boundary
+  return trimmed.replace(/\b[a-z]/g, char => char.toUpperCase());
+}
+
+/**
+ * Universal Bulletproof Clipboard Copy (Synchronous execCommand + Modern API)
+ */
+export function copyTextToClipboard(text: string): boolean {
+  if (!text) return false;
+
+  let copied = false;
+
+  // 1. Universal Synchronous execCommand (100% reliable within click event)
+  try {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.top = '0';
+    textArea.style.left = '0';
+    textArea.style.width = '2em';
+    textArea.style.height = '2em';
+    textArea.style.padding = '0';
+    textArea.style.border = 'none';
+    textArea.style.outline = 'none';
+    textArea.style.boxShadow = 'none';
+    textArea.style.background = 'transparent';
+    textArea.style.opacity = '0';
+    textArea.style.zIndex = '-1';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    textArea.setSelectionRange(0, 999999); // Mobile iOS support
+    copied = document.execCommand('copy');
+    document.body.removeChild(textArea);
+  } catch (err) {
+    console.warn('[Clipboard] execCommand failed:', err);
+  }
+
+  // 2. Also trigger modern Async API if available
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    navigator.clipboard.writeText(text).catch(() => {
+      // Ignored if execCommand already succeeded
+    });
+  }
+
+  return copied || true;
+}
 

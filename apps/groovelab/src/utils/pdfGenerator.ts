@@ -1,4 +1,5 @@
 import { getParentOnboardingUrl, getTeacherLoginUrl } from './tenantUrlHelper';
+import { capitalizeFirstLetter, formatSongTitleCase } from './nameHelper';
 
 export const generateConsentPDF = async (
   schoolName: string, 
@@ -1688,6 +1689,413 @@ export const generateInvoicePDF = async (params: InvoicePDFParams) => {
   const sanitizedSchool = (params.schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_');
   doc.save(`${cleanInvoiceId}_${sanitizedSchool}.pdf`);
 };
+
+export interface HomeworkItemPDF {
+  type?: 'song' | 'lehrwerk' | 'note';
+  title: string;
+  subtitle?: string;
+  notes?: string;
+}
+
+export interface AudioNotePDF {
+  label: string;
+  duration?: string | number;
+  url?: string;
+}
+
+export interface StudentHomeworkPDFParams {
+  schoolName: string;
+  studentName: string;
+  instrument?: string;
+  teacherName: string;
+  homeworkNotes?: string;
+  items?: HomeworkItemPDF[];
+  audioRecordings?: AudioNotePDF[];
+  date?: string;
+  weekNumber?: string | number;
+  qrToken?: string;
+  hasAudioRecordings?: boolean;
+}
+
+// Generates a crisp QR code PNG Data URL for PDF embedding
+async function fetchQrDataUrl(text: string): Promise<string | null> {
+  try {
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&format=png&margin=1&data=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`QR API returned status ${res.status}`);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    console.warn('[PDF] Could not fetch QR code image:', err);
+    return null;
+  }
+}
+
+export const generateStudentHomeworkPrintoutPDF = async (params: StudentHomeworkPDFParams) => {
+  const { default: jsPDF } = await import('jspdf');
+
+  // Format: DIN A5 portrait (148 mm x 210 mm)
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a5'
+  });
+
+  const studentClean = params.studentName || 'Schueler';
+  const teacherClean = params.teacherName || 'Lehrkraft';
+  const schoolClean = params.schoolName || 'Campus-Groovelab';
+  const dateStr = params.date || new Date().toLocaleDateString('de-DE');
+  const targetToken = params.qrToken || 'schueler';
+  const targetAppUrl = `https://app.campus-groovelab.de/qr/${targetToken}`;
+
+  doc.setProperties({
+    title: `Hausaufgabe - ${studentClean}`,
+    subject: `Campus-Groovelab Hausaufgaben- & Übe-Fahrplan - ${schoolClean}`,
+    author: teacherClean,
+    creator: `${schoolClean} Enterprise+ Edition`
+  });
+
+  // Fetch QR Code data URL in parallel
+  const qrDataUrl = await fetchQrDataUrl(targetAppUrl);
+
+  // Apple-grade Design Palette
+  const greenPrimary = [22, 163, 74];       // #16a34a
+  const greenDark = [21, 128, 61];          // #15803d
+  const mintBg = [240, 253, 244];           // #f0fdf4
+  const mintBorder = [187, 247, 208];       // #bbf7d0
+  const bluePillBg = [239, 246, 255];       // #eff6ff
+  const bluePillBorder = [191, 219, 254];   // #bfdbfe
+  const blueDark = [29, 78, 216];           // #1d4ed8
+  const darkNavy = [15, 23, 42];            // #0f172a
+  const slateText = [51, 65, 85];           // #334155
+  const slateMuted = [100, 116, 139];       // #64748b
+  const cardBg = [248, 250, 252];           // #f8fafc
+  const borderLight = [226, 232, 240];      // #e2e8f0
+
+  // 1. Top Accent Header Bar (Apple Minimalist)
+  doc.setFillColor(greenPrimary[0], greenPrimary[1], greenPrimary[2]);
+  doc.rect(0, 0, 148, 3.5, 'F');
+
+  let y = 11;
+
+  // 2. Header School Category Pill
+  doc.setFillColor(mintBg[0], mintBg[1], mintBg[2]);
+  doc.setDrawColor(mintBorder[0], mintBorder[1], mintBorder[2]);
+  doc.roundedRect(14, y, 78, 5.5, 1.2, 1.2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(greenDark[0], greenDark[1], greenDark[2]);
+  const schoolHeaderTitle = `${schoolClean.toUpperCase()} • UNTERRICHTS-PLAN`.slice(0, 48);
+  doc.text(schoolHeaderTitle, 17, y + 3.8);
+
+  // Date Pill on Top Right
+  doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+  doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+  const weekLabel = params.weekNumber ? `KW ${params.weekNumber} • ` : '';
+  const dateBadgeText = `${weekLabel}${dateStr}`;
+  doc.roundedRect(98, y, 36, 5.5, 1.2, 1.2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text(dateBadgeText, 116, y + 3.8, { align: 'center' });
+
+  y += 9.5;
+
+  // 3. Main Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13.5);
+  doc.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+  doc.text('Hausaufgaben- & Übe-Plan', 14, y);
+
+  y += 4.5;
+
+  // 4. Student & Teacher Hero Squircle Card
+  doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+  doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+  doc.roundedRect(14, y, 120, 17, 2.5, 2.5, 'FD');
+
+  // Column 1: Student & Instrument
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text('SCHÜLER/IN', 18, y + 4.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+  doc.text(studentClean, 18, y + 9);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(slateText[0], slateText[1], slateText[2]);
+  const instClean = params.instrument && params.instrument.trim() ? params.instrument.trim() : 'Musikunterricht';
+  doc.text(`Fach: ${instClean}`, 18, y + 13.5);
+
+  // Column 2: Teacher & Role
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text('LEHRKRAFT', 72, y + 4.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+  doc.text(teacherClean, 72, y + 9);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(slateText[0], slateText[1], slateText[2]);
+  doc.text('Fachlehrkraft', 72, y + 13.5);
+
+  y += 22;
+
+  // 5. Section Header
+  doc.setFillColor(greenPrimary[0], greenPrimary[1], greenPrimary[2]);
+  doc.rect(14, y - 2.5, 1.8, 4.5, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+  doc.text('WOCHEN-FAHRPLAN & CHECKLISTE', 18, y + 1);
+
+  y += 3.5;
+
+  // 6. Build Structured Items List
+  let rawItems: HomeworkItemPDF[] = [];
+  if (params.items && params.items.length > 0) {
+    rawItems = params.items;
+  } else if (params.homeworkNotes) {
+    // Fallback: parse raw lines into items
+    const rawClean = params.homeworkNotes
+      .replace(/\[AUDIO:[^\]]*\]/gi, '')
+      .replace(/AUDIO:[^\n]*/gi, '')
+      .trim();
+    rawItems = rawClean
+      .split('\n')
+      .map(line => line.replace(/^[•\-\*\d\.\)]\s*/, '').trim())
+      .filter(Boolean)
+      .map(title => ({ type: 'note' as const, title }));
+  }
+
+  if (rawItems.length === 0) {
+    rawItems = [{ type: 'note', title: 'Aktuelle Übungen aus dem Unterricht wie besprochen fortführen.' }];
+  }
+
+  // Calculate Tasks Box Height dynamically
+  const taskBoxY = y;
+  const taskBoxHeight = 65;
+
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+  doc.roundedRect(14, taskBoxY, 120, taskBoxHeight, 2.5, 2.5, 'FD');
+
+  // Left green accent line
+  doc.setFillColor(greenPrimary[0], greenPrimary[1], greenPrimary[2]);
+  doc.roundedRect(14, taskBoxY, 1.5, taskBoxHeight, 1, 1, 'F');
+
+  let taskY = taskBoxY + 6;
+  const maxDisplayItems = 4;
+  const displayItems = rawItems.slice(0, maxDisplayItems);
+
+  displayItems.forEach((item) => {
+    if (taskY > taskBoxY + 45) return;
+
+    // 1. Student Checkbox [ ] for checking off with pen
+    doc.setDrawColor(greenPrimary[0], greenPrimary[1], greenPrimary[2]);
+    doc.setLineWidth(0.35);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(18, taskY - 3.2, 4.2, 4.2, 0.8, 0.8, 'FD');
+
+    // 2. Type badge (Song or Lehrwerk or Notiz)
+    if (item.type === 'song') {
+      doc.setFillColor(bluePillBg[0], bluePillBg[1], bluePillBg[2]);
+      doc.setDrawColor(bluePillBorder[0], bluePillBorder[1], bluePillBorder[2]);
+      doc.roundedRect(24, taskY - 3.2, 10, 4.2, 0.8, 0.8, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.5);
+      doc.setTextColor(blueDark[0], blueDark[1], blueDark[2]);
+      doc.text('SONG', 29, taskY - 0.5, { align: 'center' });
+    } else if (item.type === 'lehrwerk') {
+      doc.setFillColor(mintBg[0], mintBg[1], mintBg[2]);
+      doc.setDrawColor(mintBorder[0], mintBorder[1], mintBorder[2]);
+      doc.roundedRect(24, taskY - 3.2, 15, 4.2, 0.8, 0.8, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.5);
+      doc.setTextColor(greenDark[0], greenDark[1], greenDark[2]);
+      doc.text('LEHRWERK', 31.5, taskY - 0.5, { align: 'center' });
+    }
+
+    const titleOffsetX = item.type === 'song' ? 36 : (item.type === 'lehrwerk' ? 41 : 24);
+    const maxTitleWidth = 130 - titleOffsetX;
+
+    // 3. Item Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+    const displayTitle = item.type === 'song' ? formatSongTitleCase(item.title) : capitalizeFirstLetter(item.title);
+    const wrappedTitle = doc.splitTextToSize(displayTitle, maxTitleWidth);
+    doc.text(wrappedTitle, titleOffsetX, taskY);
+
+    let consumedHeight = wrappedTitle.length * 3.5;
+
+    // 4. Fahrplan / Notes
+    if (item.notes && item.notes.trim()) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(slateText[0], slateText[1], slateText[2]);
+      const cleanFahrplan = capitalizeFirstLetter(item.notes.replace(/^📌\s*/, '').trim());
+      const fahrplanText = `Fahrplan: ${cleanFahrplan}`;
+      const wrappedFahrplan = doc.splitTextToSize(fahrplanText, maxTitleWidth);
+      doc.text(wrappedFahrplan, titleOffsetX, taskY + consumedHeight);
+      consumedHeight += wrappedFahrplan.length * 3.2;
+    }
+
+    taskY += Math.max(10, consumedHeight + 4.5);
+  });
+
+  // 7-Tage Didaktischer Übe-Tracker (Checkliste Mo - So)
+  const trackerY = taskBoxY + taskBoxHeight - 11;
+  doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+  doc.setLineWidth(0.2);
+  doc.line(18, trackerY - 2, 130, trackerY - 2);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text('Übe-Check (10 Min):', 18, trackerY + 3.5);
+
+  const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  let dayX = 54;
+  days.forEach(day => {
+    // Squircle Checkbox
+    doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+    doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+    doc.roundedRect(dayX, trackerY, 9.5, 6, 1, 1, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(slateText[0], slateText[1], slateText[2]);
+    doc.text(day, dayX + 4.75, trackerY + 4.2, { align: 'center' });
+
+    dayX += 11;
+  });
+
+  y = taskBoxY + taskBoxHeight + 4;
+
+  // 7. Audio-Aufnahmen & Digitales Übe-Studio Box
+  const audioList = params.audioRecordings || [];
+  const hasAudios = audioList.length > 0;
+
+  doc.setFillColor(mintBg[0], mintBg[1], mintBg[2]);
+  doc.setDrawColor(mintBorder[0], mintBorder[1], mintBorder[2]);
+  doc.roundedRect(14, y, 120, 39, 2.5, 2.5, 'FD');
+
+  // Left Content of Audio Box
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(greenDark[0], greenDark[1], greenDark[2]);
+  const audioBoxTitle = hasAudios 
+    ? `UNTERRICHTSAUFNAHMEN & AUDIO-STUDIO (${audioList.length})` 
+    : 'AUDIO-AUFNAHMEN & DIGITALES STUDIO';
+  doc.text(audioBoxTitle, 18, y + 5.5);
+
+  let audioListY = y + 10.5;
+
+  if (hasAudios) {
+    // List individual tracks by name with duration (up to 6 tracks)
+    const maxAudioTracks = 6;
+    const displayAudios = audioList.slice(0, maxAudioTracks);
+    displayAudios.forEach((track, idx) => {
+      const durStr = track.duration ? ` (${typeof track.duration === 'number' ? `${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}` : track.duration})` : '';
+      const trackLabel = `${idx + 1}. ${track.label}${durStr}`;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(darkNavy[0], darkNavy[1], darkNavy[2]);
+      doc.text(trackLabel.slice(0, 48), 18, audioListY);
+      audioListY += 3.6;
+    });
+
+    if (audioList.length > maxAudioTracks) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(5.8);
+      doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+      doc.text(`+ ${audioList.length - maxAudioTracks} weitere Aufnahmen in der App`, 18, audioListY);
+      audioListY += 3.2;
+    }
+  } else {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(slateText[0], slateText[1], slateText[2]);
+    const audioExpl = doc.splitTextToSize(
+      'Scanne diesen QR-Code mit der Smartphone-Kamera, um die Unterrichtsaufnahmen, Play-Alongs und den Fokus-Timer direkt im Browser zu öffnen.',
+      82
+    );
+    doc.text(audioExpl, 18, audioListY);
+    audioListY += 9;
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(greenPrimary[0], greenPrimary[1], greenPrimary[2]);
+  doc.text('App öffnen: app.campus-groovelab.de', 18, y + 35);
+
+  // Right QR Code Inlay
+  const qrX = 106;
+  const qrY = y + 4.5;
+  const qrSize = 24;
+
+  // White Card behind QR code for maximum contrast
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+  doc.roundedRect(qrX - 1.5, qrY - 1.5, qrSize + 3, qrSize + 5.5, 1.5, 1.5, 'FD');
+
+  if (qrDataUrl) {
+    try {
+      doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+    } catch (e) {
+      console.warn('[PDF] Error embedding QR image:', e);
+    }
+  } else {
+    doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+    doc.rect(qrX, qrY, qrSize, qrSize, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+    doc.text('QR-Code', qrX + qrSize / 2, qrY + qrSize / 2, { align: 'center' });
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5.5);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text('Kamera scannen', qrX + qrSize / 2, qrY + qrSize + 2.8, { align: 'center' });
+
+  // 8. Bottom Minimalist Footer
+  doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
+  doc.setLineWidth(0.2);
+  doc.line(14, 201, 134, 201);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text(`${schoolClean} • Digitales Hausaufgabenheft & Audio-Studio • 100% DSGVO-konform`, 14, 205);
+  doc.text('Seite 1 von 1', 134, 205, { align: 'right' });
+
+  // Trigger Instant Browser Download
+  const cleanName = studentClean.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const safeDate = dateStr.replace(/\./g, '-');
+  doc.save(`Hausaufgabe_${cleanName}_${safeDate}.pdf`);
+};
+
+
+
 
 
 

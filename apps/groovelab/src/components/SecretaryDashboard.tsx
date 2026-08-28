@@ -34900,6 +34900,7 @@ status: status,
             setSelectedStudentForDetail(null);
             fetchDashboardData();
           }} 
+          callerDashboard="secretary"
           activePlatform={activeTab}
           onSwitchPlatform={(newPlatform) => {
             setActiveTab(newPlatform);

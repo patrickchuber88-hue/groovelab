@@ -2865,20 +2865,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       onTabChange(tab);
     }
   };
-  const [homeworkBookTab, setHomeworkBookTabRaw] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>(() => {
-    const valid = ['document', 'logbook', 'stickeralbum', 'skillradar', 'audiobiography'];
-    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('campus_student_homework_subtab') || localStorage.getItem('campus_student_homework_subtab')) : null;
-    if (saved && valid.includes(saved)) return saved as any;
-    return 'document';
-  });
+  const [homeworkBookTab, setHomeworkBookTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>('document');
 
-  const setHomeworkBookTab = (tab: 'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography') => {
-    setHomeworkBookTabRaw(tab);
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('campus_student_homework_subtab', tab);
-      localStorage.setItem('campus_student_homework_subtab', tab);
+  useEffect(() => {
+    if (activeTab === 'homework_book' || parentActiveTab === 'homework_book') {
+      setHomeworkBookTab('document');
     }
-  };
+  }, [activeTab, parentActiveTab]);
 
   // ── Asset Preloading Hook (3.2) ──
   useEffect(() => {
@@ -3079,6 +3072,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   };
 
   const handleTabChangeLocal = (tab: string) => {
+    if (tab === 'homework_book') {
+      setHomeworkBookTab('document');
+    }
     setActiveTab(tab);
     if (tab !== 'settings' && tab !== 'parent_controls' && !isAdultStudent) {
       // Auto-lock parent session when navigating to student boards
@@ -14162,7 +14158,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             try {
                               const parsed = JSON.parse(cleanNote);
                               if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                               }
                             } catch {}
                           }
@@ -14195,7 +14191,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             try {
                               const parsed = JSON.parse(cleanNote);
                               if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                               }
                             } catch {}
                           }
@@ -14231,7 +14227,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             try {
                               const parsed = JSON.parse(cleanNote);
                               if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                               }
                             } catch {}
                           }
@@ -14989,7 +14985,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       try {
                                         const parsed = JSON.parse(cleanNote);
                                         if (Array.isArray(parsed)) {
-                                          cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                          cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                         }
                                       } catch {}
                                     }
@@ -15024,7 +15020,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     try {
                                       const parsed = JSON.parse(cleanNote);
                                       if (Array.isArray(parsed)) {
-                                        cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                        cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                       }
                                     } catch {}
                                   }
@@ -15049,7 +15045,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       try {
                                         const parsed = JSON.parse(cleanNote);
                                         if (Array.isArray(parsed)) {
-                                          cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                          cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                         }
                                       } catch {}
                                     }
@@ -15089,7 +15085,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   try {
                                     const parsed = JSON.parse(cleanNote);
                                     if (Array.isArray(parsed)) {
-                                      cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                      cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                     }
                                   } catch {}
                                 }
@@ -17790,7 +17786,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   try {
                                     const parsed = JSON.parse(cleanNote);
                                     if (Array.isArray(parsed)) {
-                                      cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                      cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                     }
                                   } catch {}
                                 }
@@ -17825,7 +17821,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 try {
                                   const parsed = JSON.parse(cleanNote);
                                   if (Array.isArray(parsed)) {
-                                    cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                    cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                   }
                                 } catch {}
                               }
@@ -17851,7 +17847,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   try {
                                     const parsed = JSON.parse(cachedNote);
                                     if (Array.isArray(parsed)) {
-                                      cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                      cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                     }
                                   } catch {}
                                 }
@@ -17891,7 +17887,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               try {
                                 const parsed = JSON.parse(cachedNote);
                                 if (Array.isArray(parsed)) {
-                                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                 }
                               } catch {}
                             }
@@ -19178,7 +19174,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   try {
                                     const parsed = JSON.parse(cleanNote);
                                     if (Array.isArray(parsed)) {
-                                      cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                      cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                     }
                                   } catch {}
                                 }
@@ -19213,7 +19209,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 try {
                                   const parsed = JSON.parse(cleanNote);
                                   if (Array.isArray(parsed)) {
-                                    cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                    cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                   }
                                 } catch {}
                               }
@@ -19240,7 +19236,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   try {
                                     const parsed = JSON.parse(cachedNote);
                                     if (Array.isArray(parsed)) {
-                                      cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                      cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                     }
                                   } catch {}
                                 }
@@ -19280,7 +19276,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               try {
                                 const parsed = JSON.parse(cachedNote);
                                 if (Array.isArray(parsed)) {
-                                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                  cachedNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                 }
                               } catch {}
                             }
@@ -25250,7 +25246,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           try {
             const parsed = JSON.parse(rawNotes);
             if (Array.isArray(parsed)) {
-              cleanNotes = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+              cleanNotes = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
             } else if (typeof parsed === 'string') {
               cleanNotes = parsed;
             }
@@ -25261,6 +25257,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         cleanNotes = cleanNotes
           .replace(/\["AUDIO:[^"]*"\]/g, '')
           .replace(/AUDIO:[^\s,|]+/g, '')
+          .replace(/LATENCY:[^\s,|]+/gi, '')
+          .replace(/LATENCY_CALIBRATION:[^\s,|]+/gi, '')
           .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
           .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
           .trim();

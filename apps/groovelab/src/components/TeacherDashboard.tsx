@@ -8874,7 +8874,7 @@ useEffect(() => {
                                         });
                                       }
                                     }}
-                                    title={`Audio-Hausaufgabe für ${targetStudent?.name || 'Schüler'} aufnehmen`}
+                                    title={`Hausaufgabe diktieren / Audio aufnehmen für ${targetStudent?.name || 'Schüler'}`}
                                     style={{
                                       display: 'flex',
                                       alignItems: 'center',
@@ -10388,6 +10388,8 @@ useEffect(() => {
         <StudentDetailModal 
           student={selectedStudentProfile} 
           onClose={() => setSelectedStudentProfile(null)} 
+          callerDashboard="teacher"
+          activePlatform={activePlatform === 'campus' ? 'campus' : 'groovelab'}
           onOpenBandProfile={(band) => {
             setEditingBand(band);
             setSelectedStudentProfile(null);
@@ -10439,10 +10441,13 @@ useEffect(() => {
           student={{
             ...docStudent,
             school_id: teacher?.school_id || docStudent.school_id,
-            schools: schoolData || docStudent.schools
+            schools: schoolData || docStudent.schools,
+            teacher_name: teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : (teacher?.name || '')
           }} 
           onClose={() => setDocStudent(null)} 
           teacherId={userId}
+          teacherName={teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : (teacher?.name || '')}
+          schoolName={schoolData?.name || ''}
           hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(docStudent)}
           onProfileClick={(student) => {
             setDocStudent(null);
@@ -10460,7 +10465,7 @@ useEffect(() => {
           dateStr={getSimulatedNow().toISOString()}
           onClose={() => setQuickAudioStudent(null)}
           onSaved={() => {
-            setToastMessage(`✓ Audio-Hausaufgabe für ${quickAudioStudent.first_name || quickAudioStudent.name} gespeichert!`);
+            setToastMessage(`✓ Hausaufgabe für ${quickAudioStudent.first_name || quickAudioStudent.name} erfolgreich aktualisiert!`);
           }}
         />
       )}

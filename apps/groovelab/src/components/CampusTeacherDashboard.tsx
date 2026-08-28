@@ -30,13 +30,19 @@ import {
   Flame,
   ChevronLeft,
   RefreshCw,
-  Lightbulb
+  Lightbulb,
+  Printer,
+  Mic,
+  KeyRound
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
 import { HelpCenterModal } from './help/HelpCenterModal';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { fetchHolidaysCached } from '../utils/holidayHelper';
+import { StudentPinResetModal } from './StudentPinResetModal';
+import { generateStudentHomeworkPrintoutPDF } from '../utils/pdfGenerator';
+
 
 const timeToMinutes = (timeStr: string): number => {
   if (!timeStr) return 0;
@@ -92,6 +98,60 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   const [selectedStudentHistory, setSelectedStudentHistory] = useState<any>(null);
   const [cascadeLink, setCascadeLink] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [studentForPinReset, setStudentForPinReset] = useState<any>(null);
+  const [isListeningVoice, setIsListeningVoice] = useState(false);
+
+  // Fast-Track Voice-to-Homework Diktat (Web Speech API)
+  const handleToggleVoiceRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Spracherkennung wird in diesem Browser leider nicht unterstützt. Bitte Chrome, Safari oder Edge verwenden.');
+      return;
+    }
+    if (isListeningVoice) {
+      setIsListeningVoice(false);
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'de-DE';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.onstart = () => setIsListeningVoice(true);
+      recognition.onend = () => setIsListeningVoice(false);
+      recognition.onerror = (err: any) => {
+        console.warn('[VoiceRec] Error:', err);
+        setIsListeningVoice(false);
+      };
+      recognition.onresult = (event: any) => {
+        const transcript = event.results?.[0]?.[0]?.transcript;
+        if (transcript) {
+          setNewDocNotes(prev => prev ? `${prev}\n${transcript}` : transcript);
+          setNewDocHomework(true);
+        }
+      };
+      recognition.start();
+    } catch (e) {
+      console.warn('[VoiceRec] Start error:', e);
+      setIsListeningVoice(false);
+    }
+  };
+
+  // 1-Click DIN A5 Hybrid Homework Print
+  const handlePrintHomeworkSheet = async (targetStudent?: any, customNotes?: string) => {
+    const st = targetStudent || selectedStudentForDoc;
+    if (!st) return;
+    const stName = `${st.first_name || ''} ${maskLastName(st.last_name, showRealNames)}`.trim();
+    const tName = formatTeacherFullName(teacher?.first_name, teacher?.last_name) || 'Lehrkraft';
+    await generateStudentHomeworkPrintoutPDF({
+      schoolName: school?.name || 'CAMPUS-GROOVELAB',
+      studentName: stName,
+      instrument: st.instrument || 'Instrument',
+      teacherName: tName,
+      homeworkNotes: customNotes || newDocNotes || 'Aktueller Übe-Auftrag aus dem Unterricht.'
+    });
+  };
+
 
   // Board 3: Mein Stundenplan
   const [rawWeekSchedules, setRawWeekSchedules] = useState<any[]>([]);
@@ -2393,7 +2453,20 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                     <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{student.instrument || 'Instrument unbestimmt'}</p>
                     <span className="text-[10px] text-slate-500 font-semibold block mt-1">Ausweis-ID: {student.ausweis_id || 'Keine'}</span>
                   </div>
-                  <ChevronRight size={20} className="text-slate-600" />
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      title="PIN-Reset & Ausweis-Link generieren"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setStudentForPinReset(student);
+                      }}
+                      className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-emerald-400 border border-slate-700/50 transition"
+                    >
+                      <KeyRound size={16} />
+                    </button>
+                    <ChevronRight size={20} className="text-slate-600" />
+                  </div>
                 </div>
               ))}
             </div>
@@ -2408,13 +2481,34 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                       {selectedStudentHistory.student.first_name} {maskLastName(selectedStudentHistory.student.last_name)}
                     </p>
                   </div>
-                  <button 
-                    onClick={() => setSelectedStudentHistory(null)}
-                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg"
-                  >
-                    Schließen
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => setStudentForPinReset(selectedStudentHistory.student)}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700"
+                    >
+                      <KeyRound size={14} /> PIN-Reset
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const currentHw = selectedStudentHistory.history.find((h: any) => h.is_current_homework);
+                        handlePrintHomeworkSheet(selectedStudentHistory.student, currentHw?.teacher_notes);
+                      }}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700"
+                    >
+                      <Printer size={14} /> Drucken
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setSelectedStudentHistory(null)}
+                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg"
+                    >
+                      Schließen
+                    </button>
+                  </div>
                 </div>
+
 
                 <div className="space-y-3">
                   {selectedStudentHistory.history.length === 0 ? (
@@ -3409,11 +3503,25 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   </div>
                 </div>
 
-                {/* Free text notes */}
+                {/* Free text notes with Voice-to-Homework */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Coach-Notiz (Freitext):</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Coach-Notiz (Freitext):</label>
+                    <button
+                      type="button"
+                      onClick={handleToggleVoiceRecognition}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition ${
+                        isListeningVoice
+                          ? 'bg-red-500 text-white animate-pulse'
+                          : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30'
+                      }`}
+                    >
+                      <Mic size={12} className={isListeningVoice ? 'animate-spin' : ''} />
+                      {isListeningVoice ? '🔴 Höre zu... (Diktieren)' : '🎙️ Diktieren (Sprache)'}
+                    </button>
+                  </div>
                   <textarea
-                    placeholder="Hausaufgaben details, Feedback..."
+                    placeholder="Hausaufgaben details, Feedback oder einfach per Diktat einsprechen..."
                     value={newDocNotes}
                     onChange={(e) => setNewDocNotes(e.target.value)}
                     rows={3}
@@ -3421,14 +3529,25 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSaveMeisterwerk}
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition duration-150"
-                >
-                  Unzensiert im Backend speichern
-                </button>
+                {/* 2-Column Action Bar: Save & Hybrid Print */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handlePrintHomeworkSheet()}
+                    className="py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-xs uppercase tracking-wider rounded-xl transition duration-150 flex items-center justify-center gap-1.5 border border-slate-700"
+                  >
+                    <Printer size={14} /> DIN A5 Drucken
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveMeisterwerk}
+                    className="py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition duration-150 flex items-center justify-center gap-1.5"
+                  >
+                    <Check size={14} /> Speichern
+                  </button>
+                </div>
               </div>
+
 
               {/* History log */}
               <div className="space-y-3 pt-2">

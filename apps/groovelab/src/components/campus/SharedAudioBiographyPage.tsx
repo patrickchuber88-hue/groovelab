@@ -250,6 +250,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
   });
   const [studentDisplayName, setStudentDisplayName] = useState<string>('Amelia • Gitarre');
   const [studentInstrument, setStudentInstrument] = useState<string>('Gitarre');
+  const [schoolId, setSchoolId] = useState<string | number>(1);
 
   const currentTheme = useMemo(() => {
     const themeKey = activePlaylistMeta?.vibeTheme || 'sunset_gold';
@@ -327,6 +328,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
               }
               if (userRecord.school_id) {
                 targetSchoolId = userRecord.school_id;
+                setSchoolId(userRecord.school_id);
               }
             }
 
@@ -339,6 +341,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
                 .maybeSingle();
               if (studentRecord?.school_id) {
                 targetSchoolId = studentRecord.school_id;
+                setSchoolId(studentRecord.school_id);
               }
             }
 
@@ -410,43 +413,67 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
         let rawTracks: PlaylistTrackItem[] = [];
         let plMeta: SharedPlaylistMeta | null = null;
 
+        let parsedPlaylists: any[] = [];
         const savedPlaylistsStr = localStorage.getItem(PLAYLISTS_KEY);
         if (savedPlaylistsStr) {
           try {
-            const parsedPlaylists = JSON.parse(savedPlaylistsStr);
-            if (Array.isArray(parsedPlaylists) && parsedPlaylists.length > 0) {
-              const matchedPl = targetPlaylistId 
-                ? parsedPlaylists.find((p: any) => p.id === targetPlaylistId) 
-                : parsedPlaylists[0];
-
-              if (matchedPl) {
-                plMeta = {
-                  id: matchedPl.id,
-                  title: matchedPl.title,
-                  description: matchedPl.description || 'Persönliche Meisterstücke & Song-Sammlung',
-                  vibeTheme: matchedPl.vibeTheme || 'sunset_gold',
-                  iconName: matchedPl.iconName || 'music',
-                  createdAt: matchedPl.createdAt || 'Aktuelles Schuljahr',
-                  tracks: matchedPl.tracks || []
-                };
-
-                rawTracks = matchedPl.tracks.map((t: any, idx: number) => ({
-                  id: t.id || `pl_track_${idx}`,
-                  title: t.title || `Song ${idx + 1}`,
-                  subtitle: t.subtitle,
-                  audioUrl: t.audioUrl,
-                  masteredAudioUrl: t.masteredAudioUrl,
-                  duration: t.duration || 45,
-                  recordedAt: t.recordedAt || 'Aufgenommen',
-                  personalNote: t.personalNote,
-                  preferredVersion: t.preferredVersion || 'master',
-                  stepNumber: idx + 1,
-                  iconName: 'music'
-                }));
-              }
-            }
+            parsedPlaylists = JSON.parse(savedPlaylistsStr);
           } catch (e) {
             console.warn('Custom playlists parse note:', e);
+          }
+        }
+
+        // ☁️ Cross-Device Fallback: If family opens link on their own phone, load playlist definition from Supabase
+        if ((!parsedPlaylists || parsedPlaylists.length === 0) && targetId) {
+          try {
+            const { data: remotePlRow } = await supabase
+              .from('progress_matrix')
+              .select('homework_notes')
+              .eq('student_id', targetId)
+              .eq('topic_name', 'CAMPUS_CUSTOM_PLAYLISTS')
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            if (remotePlRow && remotePlRow.length > 0 && remotePlRow[0].homework_notes) {
+              const remoteParsed = JSON.parse(remotePlRow[0].homework_notes);
+              if (Array.isArray(remoteParsed) && remoteParsed.length > 0) {
+                parsedPlaylists = remoteParsed;
+              }
+            }
+          } catch (cloudErr) {
+            console.warn('Remote playlists fallback notice:', cloudErr);
+          }
+        }
+
+        if (Array.isArray(parsedPlaylists) && parsedPlaylists.length > 0) {
+          const matchedPl = targetPlaylistId 
+            ? parsedPlaylists.find((p: any) => p.id === targetPlaylistId) 
+            : parsedPlaylists[0];
+
+          if (matchedPl) {
+            plMeta = {
+              id: matchedPl.id,
+              title: matchedPl.title,
+              description: matchedPl.description || 'Persönliche Meisterstücke & Song-Sammlung',
+              vibeTheme: matchedPl.vibeTheme || 'sunset_gold',
+              iconName: matchedPl.iconName || 'music',
+              createdAt: matchedPl.createdAt || 'Aktuelles Schuljahr',
+              tracks: matchedPl.tracks || []
+            };
+
+            rawTracks = (matchedPl.tracks || []).map((t: any, idx: number) => ({
+              id: t.id || `pl_track_${idx}`,
+              title: t.title || `Song ${idx + 1}`,
+              subtitle: t.subtitle,
+              audioUrl: t.audioUrl,
+              masteredAudioUrl: t.masteredAudioUrl,
+              duration: t.duration || 45,
+              recordedAt: t.recordedAt || 'Aufgenommen',
+              personalNote: t.personalNote,
+              preferredVersion: t.preferredVersion || 'master',
+              stepNumber: idx + 1,
+              iconName: 'music'
+            }));
           }
         }
 
@@ -487,48 +514,15 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           }
         }
 
-        if (rawTracks.length === 0) {
-          rawTracks = [
-            {
-              id: 'demo_1',
-              title: 'Song 15.8.2026',
-              subtitle: 'Akustikgitarre Solo',
-              preferredVersion: 'master',
-              duration: 45,
-              recordedAt: '15. Aug. 2026',
-              stepNumber: 1,
-              personalNote: 'Mein Lieblingsstück für das Sommerkonzert.'
-            },
-            {
-              id: 'demo_2',
-              title: 'Song 15.8.2026',
-              subtitle: 'Live Einspielung',
-              preferredVersion: 'raw',
-              duration: 45,
-              recordedAt: '15. Aug. 2026',
-              stepNumber: 2,
-              personalNote: 'Direkte RAW-Aufnahme ohne Studio-Bearbeitung.'
-            },
-            {
-              id: 'demo_3',
-              title: 'Song 15.8.2026',
-              subtitle: 'Konzert-Vorbereitung',
-              preferredVersion: 'raw',
-              duration: 45,
-              recordedAt: '15. Aug. 2026',
-              stepNumber: 3,
-              personalNote: 'Volle Dynamik der Live-Session.'
-            }
-          ];
-
+        if (rawTracks.length === 0 && !plMeta) {
           plMeta = {
-            id: 'pl_demo',
-            title: 'Mein Sommerkonzert 2026',
-            description: 'Akustische Highlights & Vorbereitungen',
+            id: targetPlaylistId || 'pl_empty',
+            title: 'Audio-Biografie',
+            description: 'Persönliche Meisterstücke & Song-Sammlung',
             vibeTheme: 'sunset_gold',
             iconName: 'music',
-            createdAt: '15. Aug 2026',
-            tracks: rawTracks
+            createdAt: 'Aktuelles Schuljahr',
+            tracks: []
           };
         }
 
@@ -590,7 +584,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleReaction = (type: 'bravo' | 'love' | 'fire' | 'star') => {
+  const handleReaction = async (type: 'bravo' | 'love' | 'fire' | 'star') => {
     setUserReacted(prev => ({ ...prev, [type]: true }));
     setConfettiBurst(true);
     setTimeout(() => setConfettiBurst(false), 2000);
@@ -606,6 +600,51 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       window.dispatchEvent(new CustomEvent('campus_reaction_received', { detail: { targetId, playlistId: playlistKey, type } }));
       window.dispatchEvent(new CustomEvent('campus_family_listen_received', { detail: { targetId, playlistId: playlistKey, reaction: type } }));
     } catch {}
+
+    // 🌟 PERSIST TO SUPABASE FOR CROSS-DEVICE STUDENT SYNC (§ 53 UrhG / Tier-1 SaaS Enterprise+)
+    if (targetId) {
+      try {
+        const topicIdentifier = `FAMILY_REACTION:${playlistKey}`;
+        const { data: existingMatrix } = await supabase
+          .from('progress_matrix')
+          .select('id, homework_notes')
+          .eq('student_id', targetId)
+          .eq('topic_name', topicIdentifier)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        let reactionTally = { bravo: 0, love: 0, fire: 0, star: 0 };
+        if (existingMatrix && existingMatrix.length > 0 && existingMatrix[0].homework_notes) {
+          try {
+            reactionTally = JSON.parse(existingMatrix[0].homework_notes);
+          } catch {}
+        }
+        reactionTally[type] = (Number(reactionTally[type]) || 0) + 1;
+
+        if (existingMatrix && existingMatrix.length > 0) {
+          await supabase
+            .from('progress_matrix')
+            .update({
+              homework_notes: JSON.stringify(reactionTally),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingMatrix[0].id);
+        } else {
+          await supabase
+            .from('progress_matrix')
+            .insert({
+              student_id: targetId,
+              school_id: schoolId || 1,
+              topic_name: topicIdentifier,
+              homework_notes: JSON.stringify(reactionTally),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+        }
+      } catch (cloudErr) {
+        console.warn('Cross-device reaction sync notice:', cloudErr);
+      }
+    }
 
     const messages = {
       bravo: '👏 Bravo gesendet! Dein Applaus ist beim Nachwuchstalent angekommen.',
@@ -1696,7 +1735,9 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '6px' }}>
               <button
                 type="button"
+                disabled={tracks.length === 0}
                 onClick={() => {
+                  if (tracks.length === 0) return;
                   if (activePlayingId) {
                     if (audioRef.current) audioRef.current.pause();
                     setActivePlayingId(null);
@@ -1708,21 +1749,26 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
                   padding: '12px 28px',
                   borderRadius: '100px',
                   border: 'none',
-                  background: activePlayingId ? '#ef4444' : currentTheme.gradient,
-                  color: 'white',
+                  background: tracks.length === 0 
+                    ? (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.12)') 
+                    : (activePlayingId ? '#ef4444' : currentTheme.gradient),
+                  color: tracks.length === 0 ? (isLight ? '#64748b' : '#94a3b8') : 'white',
                   fontSize: '0.92rem',
                   fontWeight: 900,
-                  cursor: 'pointer',
+                  cursor: tracks.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: tracks.length === 0 ? 0.7 : 1,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: activePlayingId ? '0 4px 18px rgba(239, 68, 68, 0.5)' : `0 4px 22px ${currentTheme.glow}`,
+                  boxShadow: tracks.length === 0 
+                    ? 'none' 
+                    : (activePlayingId ? '0 4px 18px rgba(239, 68, 68, 0.5)' : `0 4px 22px ${currentTheme.glow}`),
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
-                className="hover-scale"
+                className={tracks.length > 0 ? "hover-scale" : undefined}
               >
                 {activePlayingId ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: '2px' }} />}
-                <span>{activePlayingId ? 'Pausieren' : 'Abspielen'}</span>
+                <span>{tracks.length === 0 ? 'Keine Aufnahmen' : (activePlayingId ? 'Pausieren' : 'Abspielen')}</span>
               </button>
 
               {/* Live Applause Lounge (Frameless, individual glowing reaction pills) */}
@@ -1877,9 +1923,45 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
             </div>
           </div>
 
-          {/* Unified Track Rows */}
+          {/* Unified Track Rows / Empty State */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {tracks.map((t, idx) => {
+            {tracks.length === 0 ? (
+              <div style={{
+                padding: '36px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                textAlign: 'center',
+                background: isLight ? 'rgba(241, 245, 249, 0.6)' : 'rgba(255, 255, 255, 0.03)',
+                borderRadius: '20px',
+                border: isLight ? '1.5px dashed #cbd5e1' : '1.5px dashed rgba(255, 255, 255, 0.12)'
+              }}>
+                <div style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: currentTheme.accent,
+                  boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
+                }}>
+                  <Music size={24} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.96rem', fontWeight: 800, color: isLight ? '#0f172a' : '#f8fafc' }}>
+                    Noch keine Aufnahmen in dieser Playlist
+                  </div>
+                  <div style={{ fontSize: '0.80rem', color: isLight ? '#64748b' : '#94a3b8', marginTop: '4px', maxWidth: '380px', lineHeight: 1.45 }}>
+                    Sobald neue Meisterwerke oder Playlisten-Titel hinzugefügt werden, erscheinen sie hier geschützt für die Familie.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              tracks.map((t, idx) => {
               const isPlaying = activePlayingId === t.id;
 
               return (
@@ -2043,7 +2125,8 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
                   )}
                 </div>
               );
-            })}
+            })
+          )}
           </div>
         </div>
 
