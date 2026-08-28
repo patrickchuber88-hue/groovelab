@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { acquireAudioStream, releaseAudioStream } from '../../services/audioPermissionService';
 import { processPureRawBlob } from '../../utils/audioMasteringEngine';
 import { capitalizeFirstLetter } from '../../utils/nameHelper';
+import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
 
 interface TagesplanQuickAudioModalProps {
   isOpen: boolean;
@@ -291,13 +292,41 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
     if (!audioBlob || !student.id) return;
     setIsSaving(true);
     try {
-      const fileName = `quick_hw_${student.id}_${Date.now()}.webm`;
-      const filePath = `homework/${student.id}/${fileName}`;
-      const { data: uploadData } = await supabase.storage.from('recordings').upload(filePath, audioBlob, { contentType: 'audio/webm', upsert: true });
-      const { data: urlData } = supabase.storage.from('recordings').getPublicUrl(filePath);
-      const finalUrl = urlData.publicUrl;
+      let finalUrl = '';
       const durationSec = Math.max(1, recordingSeconds);
       const isoNow = new Date().toISOString();
+      const fileName = `quick_hw_${student.id}_${Date.now()}.webm`;
+      const filePath = `homework/${student.id}/${fileName}`;
+
+      if (navigator.onLine) {
+        try {
+          const { data: uploadData, error: upErr } = await supabase.storage.from('recordings').upload(filePath, audioBlob, { contentType: 'audio/webm', upsert: true });
+          if (upErr) throw upErr;
+          const { data: urlData } = supabase.storage.from('recordings').getPublicUrl(filePath);
+          finalUrl = urlData.publicUrl;
+        } catch (cloudErr) {
+          console.warn('[QuickAudioModal] Cloud upload failed, saving locally into Offline Audio Vault:', cloudErr);
+        }
+      }
+
+      // If offline or cloud upload failed: Save lossless Audio-Blob into IndexedDB
+      if (!finalUrl) {
+        const savedRecord = await saveOfflineAudioRecord({
+          blob: audioBlob,
+          mimeType: 'audio/webm',
+          durationSeconds: durationSec,
+          studentId: student.id,
+          teacherId: teacher?.id,
+          context: 'homework',
+          title: audioTitle,
+          metadata: {
+            storagePath: filePath,
+            syncTable: 'progress_matrix'
+          }
+        });
+        finalUrl = `offline://${savedRecord.id}`;
+      }
+
       const formattedEntry = `AUDIO:${finalUrl}|${durationSec}|${isoNow}|${audioTitle.replace(/\|/g, '-')}|teacher|shared_with_teacher`;
       
       const storageKey = `campus_homework_notes_${student.id}`;
@@ -311,7 +340,11 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       setSaveSuccess(true);
       if (onSaved) onSaved(finalUrl);
       setTimeout(() => onClose(), 1000);
-    } catch (err) { console.error(err); } finally { setIsSaving(false); }
+    } catch (err) { 
+      console.error('[QuickAudioModal] Error saving audio to homework:', err); 
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
   const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;

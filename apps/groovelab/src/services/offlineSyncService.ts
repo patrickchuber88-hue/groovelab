@@ -1,4 +1,10 @@
 import { supabase } from '../lib/supabase';
+import { 
+  getAllPendingAudioRecords, 
+  removeOfflineAudioRecord, 
+  getPendingAudioCount,
+  OfflineAudioRecord 
+} from '../utils/offlineAudioVault';
 
 export type OfflineOperationType = 'upsert' | 'delete' | 'insert';
 
@@ -18,21 +24,53 @@ const QUARANTINE_KEY = 'groovelab_quarantined_offline_sync';
 const MAX_RETRY_ATTEMPTS = 5;
 
 // Subscribers for UI reactive updates
-const listeners = new Set<(count: number) => void>();
+export interface OfflineQueueState {
+  pendingActionsCount: number;
+  pendingAudioCount: number;
+  totalPending: number;
+  isSyncing: boolean;
+  isOnline: boolean;
+  lastSyncTime: number | null;
+}
 
-export const subscribePendingOfflineCount = (cb: (count: number) => void): (() => void) => {
+const listeners = new Set<(state: OfflineQueueState) => void>();
+let isCurrentlySyncing = false;
+let lastSuccessfulSyncTime: number | null = null;
+
+export const getOfflineState = async (): Promise<OfflineQueueState> => {
+  const actionsCount = getPendingSyncActions().length;
+  const audioCount = await getPendingAudioCount();
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+  return {
+    pendingActionsCount: actionsCount,
+    pendingAudioCount: audioCount,
+    totalPending: actionsCount + audioCount,
+    isSyncing: isCurrentlySyncing,
+    isOnline,
+    lastSyncTime: lastSuccessfulSyncTime
+  };
+};
+
+export const subscribeOfflineState = (cb: (state: OfflineQueueState) => void): (() => void) => {
   listeners.add(cb);
-  cb(getPendingOfflineActionsCount());
+  getOfflineState().then(st => cb(st));
   return () => {
     listeners.delete(cb);
   };
 };
 
-const notifyListeners = () => {
-  const count = getPendingOfflineActionsCount();
+export const subscribePendingOfflineCount = (cb: (count: number) => void): (() => void) => {
+  return subscribeOfflineState((state) => {
+    cb(state.totalPending);
+  });
+};
+
+const notifyListeners = async () => {
+  const state = await getOfflineState();
   listeners.forEach(cb => {
     try {
-      cb(count);
+      cb(state);
     } catch {
       // Ignore subscriber errors
     }
@@ -66,7 +104,10 @@ export const enqueueOfflineAction = (
     const newAction: PendingSyncAction = {
       id: `${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       table,
-      payload,
+      payload: {
+        ...payload,
+        updated_at: payload.updated_at || new Date().toISOString()
+      },
       actionType: options?.actionType || 'upsert',
       matchCriteria: options?.matchCriteria,
       timestamp: new Date().toISOString(),
@@ -81,6 +122,82 @@ export const enqueueOfflineAction = (
   }
 };
 
+/**
+ * Flush audio records from IndexedDB Audio Vault to Supabase Storage
+ */
+export const flushOfflineAudioQueue = async (): Promise<{ success: number; failed: number }> => {
+  let successCount = 0;
+  let failedCount = 0;
+
+  try {
+    const records = await getAllPendingAudioRecords();
+    if (records.length === 0) return { success: 0, failed: 0 };
+
+    console.log(`[OfflineSync] Flushing ${records.length} pending lossless audio records from IndexedDB...`);
+
+    for (const record of records) {
+      try {
+        const fileExt = record.mimeType?.includes('wav') ? 'wav' : (record.mimeType?.includes('ogg') ? 'ogg' : 'webm');
+        const filename = `offline_${record.context}_${record.studentId || 'unknown'}_${record.id}.${fileExt}`;
+        const filePath = `recordings/${filename}`;
+
+        // 1. Upload lossless Blob to Supabase Storage bucket 'student-recordings' or 'audio'
+        const { error: uploadError } = await supabase.storage
+          .from('student-recordings')
+          .upload(filePath, record.blob, {
+            contentType: record.mimeType || 'audio/webm',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.warn('[OfflineSync] Upload to student-recordings failed, trying fallback bucket:', uploadError);
+          const { error: fallbackErr } = await supabase.storage
+            .from('audio')
+            .upload(filePath, record.blob, {
+              contentType: record.mimeType || 'audio/webm',
+              upsert: true
+            });
+          if (fallbackErr) throw fallbackErr;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from('student-recordings')
+          .getPublicUrl(filePath);
+
+        const finalAudioUrl = publicUrlData?.publicUrl || filePath;
+
+        // 2. If metadata indicates linked database table (e.g. campus_homework_notes or student_progress)
+        if (record.metadata?.syncTable && record.metadata?.syncPayload) {
+          const syncPayload = {
+            ...record.metadata.syncPayload,
+            audio_url: finalAudioUrl,
+            updated_at: new Date().toISOString()
+          };
+          const { error: dbErr } = await supabase
+            .from(record.metadata.syncTable)
+            .upsert(syncPayload);
+          if (dbErr) throw dbErr;
+        }
+
+        // 3. Remove from IndexedDB
+        await removeOfflineAudioRecord(record.id);
+        successCount++;
+        console.log('[OfflineSync] Successfully synced offline audio record:', record.id);
+      } catch (err: any) {
+        console.error(`[OfflineSync] Error syncing audio record ${record.id}:`, err);
+        failedCount++;
+      }
+    }
+  } catch (err) {
+    console.error('[OfflineSync] Error in flushOfflineAudioQueue:', err);
+  }
+
+  return { success: successCount, failed: failedCount };
+};
+
+/**
+ * Flush pending database mutations with Smart Conflict Resolution (Last-Write-Wins)
+ */
 export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed: number; quarantined: number }> => {
   const actions = getPendingSyncActions();
   if (actions.length === 0) return { success: 0, failed: 0, quarantined: 0 };
@@ -106,7 +223,21 @@ export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed
         const { error } = await supabase.from(action.table).insert(action.payload);
         if (error) throw error;
       } else {
-        // Default: upsert
+        // Smart Conflict Resolution (Opt 6): Last-Write-Wins with Timestamp Comparison
+        if (action.payload?.id && action.payload?.updated_at) {
+          const { data: remoteRecord } = await supabase
+            .from(action.table)
+            .select('updated_at')
+            .eq('id', action.payload.id)
+            .maybeSingle();
+
+          if (remoteRecord?.updated_at && new Date(remoteRecord.updated_at) > new Date(action.payload.updated_at)) {
+            console.log(`[OfflineSync] Remote version is newer for ${action.id}. Skipping stale offline write.`);
+            successCount++;
+            continue;
+          }
+        }
+
         const { error } = await supabase.from(action.table).upsert(action.payload);
         if (error) throw error;
       }
@@ -133,7 +264,7 @@ export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed
   // Save remaining retryable actions
   localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingActions));
 
-  // Save quarantined actions to quarantine log
+  // Save quarantined actions
   if (quarantinedActions.length > 0) {
     try {
       const rawQuarantine = localStorage.getItem(QUARANTINE_KEY);
@@ -144,15 +275,56 @@ export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed
     }
   }
 
-  notifyListeners();
   return { success: successCount, failed: failedCount, quarantined: quarantinedCount };
+};
+
+/**
+ * Flush all offline data (mutations + audio recordings)
+ */
+export const flushAllOfflineData = async (): Promise<{ mutationsSynced: number; audioSynced: number }> => {
+  if (isCurrentlySyncing) return { mutationsSynced: 0, audioSynced: 0 };
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    console.log('[OfflineSync] Device is currently offline. Postponing sync.');
+    return { mutationsSynced: 0, audioSynced: 0 };
+  }
+
+  isCurrentlySyncing = true;
+  notifyListeners();
+
+  try {
+    const [mutationsResult, audioResult] = await Promise.all([
+      flushOfflineSyncQueue(),
+      flushOfflineAudioQueue()
+    ]);
+
+    lastSuccessfulSyncTime = Date.now();
+    return {
+      mutationsSynced: mutationsResult.success,
+      audioSynced: audioResult.success
+    };
+  } finally {
+    isCurrentlySyncing = false;
+    notifyListeners();
+  }
 };
 
 // Automatic Online Auto-Flush Listener for Tier-1 Offline Resilience
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     console.info('[OfflineSync] Network connectivity restored. Triggering automatic queue flush...');
-    flushOfflineSyncQueue();
+    notifyListeners();
+    flushAllOfflineData();
   });
-}
 
+  window.addEventListener('offline', () => {
+    console.info('[OfflineSync] Device went offline. Activating offline mode...');
+    notifyListeners();
+  });
+
+  // Background Heartbeat every 60 seconds to retry pending syncs if connected
+  setInterval(() => {
+    if (navigator.onLine && !isCurrentlySyncing) {
+      flushAllOfflineData();
+    }
+  }, 60000);
+}

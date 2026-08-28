@@ -59,6 +59,7 @@ import { LegalTextModal } from './components/LegalTextModal';
 import { MaintenanceLockoutOverlay } from './components/MaintenanceLockoutOverlay';
 import { GlobalBroadcastBanner } from './components/GlobalBroadcastBanner';
 import { PwaUpdateToast } from './components/ui/PwaUpdateToast';
+import { OfflineStatusBadge } from './components/ui/OfflineStatusBadge';
 import { runStorageJanitor, runClientStorageJanitor } from './services/storageJanitorService';
 import { verifyMasterSessionLease, revokeMasterSessionLease } from './utils/masterAuditLogger';
 import './App.css';
@@ -8245,6 +8246,7 @@ function App() {
           onDismiss={() => setShowPwaUpdateToast(false)}
         />
       )}
+      <OfflineStatusBadge />
       <div className="app-layout">
       {toastMessage && (
         <div 
